@@ -1,0 +1,27 @@
+{
+  "name": "rudra-js",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A framework of server side components built dynamically and rendered in real time",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "examples/*",
+    "bench"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "npm run build --workspace @rudra/core --workspace @rudra/provider-anthropic --workspace @rudra/provider-openai --workspace @rudra/react",
+    "typecheck": "tsc -b packages/core packages/provider-anthropic packages/provider-openai packages/react",
+    "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo examples/*/.next",
+    "dev": "npm run dev --workspace @rudra/example-next-store",
+    "bench:ttfb": "node bench/ttfb.mjs",
+    "bench:fcp": "node bench/fcp.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

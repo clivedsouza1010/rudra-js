@@ -1,0 +1,27 @@
+{
+  "name": "@rudra/core",
+  "version": "0.1.0",
+  "description": "BE Layer: tracking-input contract, UI spec contract, prompt construction, cache, fallback and the real-time component generator.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3",
+    "zod": "^3.23.8"
+  }
+}
