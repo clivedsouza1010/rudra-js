@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.next/
+out/
+.env
+.env.local
+coverage/
+bench/results/
+.DS_Store
