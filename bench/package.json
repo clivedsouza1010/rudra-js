@@ -1,0 +1,14 @@
+{
+  "name": "@rudra/bench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TTFB, FCP and recommendation-visibility measurements for AI-driven SSR against client-side rendering.",
+  "type": "module",
+  "scripts": {
+    "ttfb": "node ttfb.mjs",
+    "fcp": "node fcp.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

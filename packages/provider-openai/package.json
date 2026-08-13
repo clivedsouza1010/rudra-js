@@ -12,7 +12,9 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
@@ -20,13 +22,13 @@
     "@rudra/core": "0.1.0"
   },
   "peerDependencies": {
-    "openai": "^4.77.0",
-    "zod": "^3.23.0"
+    "openai": "^7.0.0",
+    "zod": "^3.25.0 || ^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
-    "openai": "^4.77.0",
+    "openai": "^7.4.0",
     "typescript": "^5.6.3",
-    "zod": "^3.23.8"
+    "zod": "^4.4.3"
   }
 }

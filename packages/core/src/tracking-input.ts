@@ -58,7 +58,7 @@ export const interactionSchema = z.object({
   category: z.string().optional(),
   at: z.number().int().optional(),
   value: z.union([z.string(), z.number(), z.boolean()]).optional(),
-  meta: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
+  meta: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
 });
 export type Interaction = z.infer<typeof interactionSchema>;
 
@@ -96,7 +96,17 @@ export const trackingInputSchema = z.object({
     isReturning: z.boolean().optional(),
   }),
   context: renderContextSchema,
-  signals: trackingSignalsSchema.default({}),
+  // A payload with no `signals` block at all is the cold-start case, not an
+  // error — every signal category defaults to empty.
+  signals: trackingSignalsSchema.default(() => ({
+    likes: [],
+    dislikes: [],
+    mostViewed: [],
+    lastPurchased: [],
+    cart: [],
+    recentSearches: [],
+    interactions: [],
+  })),
   /**
    * The candidate set. The LLM may only choose SKUs from this list — anything
    * else is dropped during reconciliation. This is what makes it impossible for

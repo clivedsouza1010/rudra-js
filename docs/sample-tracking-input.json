@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "1",
+
+  "user": {
+    "id": "u-1042",
+    "segment": "endurance",
+    "isReturning": true
+  },
+
+  "context": {
+    "surface": "pdp",
+    "slot": "pdp-recommendations",
+    "currentSku": "TR-104",
+    "currentCategory": "Trail Running",
+    "locale": "en-US",
+    "maxItems": 4
+  },
+
+  "signals": {
+    "likes": [
+      { "sku": "TR-102", "at": 1755000000000 },
+      { "sku": "TR-104", "at": 1755123000000 }
+    ],
+
+    "dislikes": [
+      { "sku": "OW-303", "at": 1754600000000 }
+    ],
+
+    "mostViewed": [
+      { "sku": "TR-104", "views": 7, "dwellMs": 96000, "at": 1755123400000 },
+      { "sku": "TR-102", "views": 3, "dwellMs": 41000, "at": 1754960000000 }
+    ],
+
+    "lastPurchased": [
+      { "sku": "TR-101", "at": 1752600000000, "quantity": 1, "price": 139.0 },
+      { "sku": "NU-502", "at": 1754300000000, "quantity": 2, "price": 32.0 }
+    ],
+
+    "cart": [
+      { "sku": "NU-501", "at": 1755123500000 }
+    ],
+
+    "recentSearches": ["hydration vest", "ultra pack 8l"],
+
+    "interactions": [
+      { "type": "size_guide_opened", "sku": "TR-104", "at": 1755123300000 },
+      { "type": "review_read", "sku": "TR-104", "at": 1755123350000 },
+      { "type": "scroll_depth", "sku": "TR-104", "value": 0.92, "at": 1755123380000 },
+      { "type": "filter_applied", "value": "waterproof", "at": 1755123100000 },
+      { "type": "shipping_estimate", "at": 1755123450000, "meta": { "postcode": "94110" } }
+    ]
+  },
+
+  "candidates": [
+    {
+      "sku": "TR-102",
+      "title": "Switchback Trail Shoe GTX",
+      "category": "Trail Running",
+      "price": 174.0,
+      "currency": "USD",
+      "imageUrl": "https://cdn.example.com/p/TR-102.jpg",
+      "rating": 4.8,
+      "inStock": true,
+      "tags": ["trail", "footwear", "waterproof"]
+    },
+    {
+      "sku": "TR-103",
+      "title": "Scree Gaiters",
+      "category": "Trail Running",
+      "price": 34.0,
+      "currency": "USD",
+      "rating": 4.2,
+      "inStock": true,
+      "tags": ["trail", "accessory"]
+    },
+    {
+      "sku": "NU-501",
+      "title": "Electrolyte Tabs (20)",
+      "category": "Nutrition",
+      "price": 14.0,
+      "currency": "USD",
+      "rating": 4.5,
+      "inStock": true,
+      "tags": ["hydration", "consumable"]
+    },
+    {
+      "sku": "OW-301",
+      "title": "Stormline Hardshell",
+      "category": "Outerwear",
+      "price": 289.0,
+      "currency": "USD",
+      "rating": 4.8,
+      "inStock": true,
+      "tags": ["waterproof", "shell", "lightweight"]
+    },
+    {
+      "sku": "OW-303",
+      "title": "Gridline Fleece",
+      "category": "Outerwear",
+      "price": 89.0,
+      "currency": "USD",
+      "rating": 4.4,
+      "inStock": true,
+      "tags": ["midlayer", "fleece"]
+    },
+    {
+      "sku": "OW-304",
+      "title": "Packable Wind Shell",
+      "category": "Outerwear",
+      "price": 74.0,
+      "currency": "USD",
+      "rating": 4.1,
+      "inStock": false,
+      "tags": ["shell", "lightweight"]
+    }
+  ]
+}
