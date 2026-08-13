@@ -1,20 +1,23 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import type { ComponentProvider, ProviderRequest, ProviderResult } from '@rudra/core';
 
 /**
  * Anthropic adapter for the LLM Component.
  *
- * Three things matter on this path, all of them latency:
+ * Two things matter on this path, both of them latency:
  *
- *  - Structured outputs. The schema is enforced server-side, so there is no
- *    parse-retry loop on the critical rendering path.
+ *  - Structured outputs. The schema is enforced server-side and parsed by the
+ *    SDK, so there is no parse-retry loop on the critical rendering path. This
+ *    lives on `client.beta.messages.parse`, which also sets the required beta
+ *    header for us.
  *  - Prompt caching. The system prompt is byte-stable per deployment and is
  *    marked as a cache breakpoint, so only the per-shopper segment is billed
- *    and processed at full rate.
- *  - Effort. Defaults to `low`. Component selection is a judgement call over a
- *    small candidate set, not a reasoning problem, and TTFB is the point of the
- *    whole architecture.
+ *    and processed at full rate. `@rudra/core` builds the prompt with exactly
+ *    this split in mind.
+ *
+ * SDK retries are disabled: the generator owns the wall-clock budget, and a
+ * retry that outlives the render it was issued for is pure cost.
  */
 
 export interface AnthropicProviderOptions {
@@ -22,12 +25,6 @@ export interface AnthropicProviderOptions {
   apiKey?: string;
   /** Defaults to 'claude-opus-5'. */
   model?: string;
-  /**
-   * Thinking depth and overall token spend. 'low' is the default here because
-   * this call sits inside a server-render budget; raise it if you find the
-   * model under-reasoning about which products to pair.
-   */
-  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   /** Output ceiling. The spec is small; 2048 is comfortable headroom. */
   maxTokens?: number;
   /** Supply a pre-configured client to control retries, base URL, or timeouts. */
@@ -36,13 +33,15 @@ export interface AnthropicProviderOptions {
 
 const DEFAULT_MODEL = 'claude-opus-5';
 
-/** Distinguishes "the model declined" from "the call failed". */
+/**
+ * Raised when safety classifiers decline the request. Distinct from a transport
+ * failure: the call succeeded, the model declined to answer. The generator
+ * treats it as a degraded generation and renders the deterministic fallback.
+ */
 export class AnthropicRefusalError extends Error {
-  readonly category: string | null;
-  constructor(category: string | null, explanation?: string) {
-    super(`model refused the request${explanation ? `: ${explanation}` : ''}`);
+  constructor() {
+    super('model refused the request');
     this.name = 'AnthropicRefusalError';
-    this.category = category;
   }
 }
 
@@ -51,14 +50,11 @@ export function createAnthropicProvider(
 ): ComponentProvider {
   const model = options.model ?? DEFAULT_MODEL;
   const maxTokens = options.maxTokens ?? 2048;
-  const effort = options.effort ?? 'low';
 
   const client =
     options.client ??
     new Anthropic({
       ...(options.apiKey ? { apiKey: options.apiKey } : {}),
-      // The generator owns the wall-clock budget and aborts; leaving SDK
-      // retries on would let a retry outlive the render it was for.
       maxRetries: 0,
     });
 
@@ -67,11 +63,12 @@ export function createAnthropicProvider(
     model,
 
     async generate(request: ProviderRequest): Promise<ProviderResult> {
-      const response = await client.messages.parse(
+      const response = await client.beta.messages.parse(
         {
           model,
           max_tokens: maxTokens,
           // Array form so the stable prefix can carry a cache breakpoint.
+          // Everything volatile is in the user turn, after this boundary.
           system: [
             {
               type: 'text',
@@ -80,21 +77,15 @@ export function createAnthropicProvider(
             },
           ],
           messages: [{ role: 'user', content: request.user }],
-          output_config: {
-            effort,
-            format: zodOutputFormat(request.schema),
-          },
+          output_format: betaZodOutputFormat(request.schema),
         },
         { signal: request.signal },
       );
 
       // Check the stop reason before touching content: a refusal returns a
-      // successful HTTP response with empty or partial content.
+      // successful HTTP response whose content is empty or partial.
       if (response.stop_reason === 'refusal') {
-        throw new AnthropicRefusalError(
-          response.stop_details?.category ?? null,
-          response.stop_details?.explanation,
-        );
+        throw new AnthropicRefusalError();
       }
 
       if (!response.parsed_output) {

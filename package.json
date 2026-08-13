@@ -19,7 +19,8 @@
     "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo examples/*/.next",
     "dev": "npm run dev --workspace @rudra/example-next-store",
     "bench:ttfb": "node bench/ttfb.mjs",
-    "bench:fcp": "node bench/fcp.mjs"
+    "bench:fcp": "node bench/fcp.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3"
