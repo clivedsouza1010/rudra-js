@@ -180,6 +180,13 @@ node bench/fcp.mjs --sku TR-104 --throttle fast-3g   # FCP, LCP, time-to-recomme
 `bench/ttfb.mjs` needs no dependencies. `bench/fcp.mjs` needs Playwright
 (`npm install --workspace @rudra/bench && npx playwright install chromium`).
 
+> **Erratum — do not cite this table.** It is labelled "AI-driven SSR" but was measured in
+> fallback-only mode, which makes no model call. That is the *static-template* arm reported under the
+> generated arm's label; the generated arm has never been measured. The `Route JS` column additionally
+> has no source in the harness and cannot be reproduced from the commands above. These numbers should
+> be regenerated per arm, with each run asserting the `data-rudra-source` distribution it actually
+> produced, so that an arm cannot be silently mislabelled again.
+
 Measured on this repo, Next.js 15 production build, localhost, fast-3G emulation, **fallback-only
 mode** — that is, with model latency at zero, isolating the rendering strategy:
 
