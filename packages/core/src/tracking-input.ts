@@ -9,6 +9,12 @@ import { z } from 'zod';
  * framework one JSON object per render. This module is that contract: one
  * schema, validated at the edge, so a malformed payload fails loudly here
  * rather than quietly producing a bad prompt several layers later.
+ *
+ * Every fixed-shape object below is a `strictObject`, so an unrecognised field
+ * is an error rather than being dropped. That matters more than it looks: with
+ * a lenient object, a host that misspells `recentSearches` gets a shopper who
+ * silently looks like a first-time visitor, and nothing anywhere reports it.
+ * The only dynamic shape is `interaction.meta`, which is a record by design.
  */
 
 /**
@@ -26,6 +32,7 @@ export const FIELD_LIMITS = {
   searchQuery: 200,
   tag: 64,
   tagsPerProduct: 20,
+  metaEntries: 50,
   signalsPerCategory: 500,
   candidates: 200,
 } as const;
@@ -34,7 +41,7 @@ const identifier = () => z.string().min(1).max(FIELD_LIMITS.identifier);
 const optionalIdentifier = () => z.string().min(1).max(FIELD_LIMITS.identifier).optional();
 
 /** A product the generated component is permitted to place. */
-export const productSchema = z.object({
+export const productSchema = z.strictObject({
   sku: identifier(),
   title: z.string().min(1).max(FIELD_LIMITS.shortText),
   category: identifier(),
@@ -48,7 +55,7 @@ export const productSchema = z.object({
 export type Product = z.infer<typeof productSchema>;
 
 /** Base shape for any signal that points at a single SKU. */
-export const skuSignalSchema = z.object({
+export const skuSignalSchema = z.strictObject({
   sku: identifier(),
   category: optionalIdentifier(),
   /** Epoch milliseconds. Used only for recency ordering. */
@@ -75,23 +82,29 @@ export type PurchaseSignal = z.infer<typeof purchaseSignalSchema>;
  * on purpose — 'scroll_depth', 'wishlist', 'filter_applied', whatever the host
  * already emits — so hosts do not have to map their events onto ours.
  */
-export const interactionSchema = z.object({
+export const interactionSchema = z.strictObject({
   type: identifier(),
   sku: optionalIdentifier(),
   category: optionalIdentifier(),
   at: z.number().int().optional(),
   value: z.union([z.string().max(FIELD_LIMITS.shortText), z.number(), z.boolean()]).optional(),
+  // `z.record` bounds key and value shape but not how many entries a record
+  // may carry, so the count is checked separately.
   meta: z
     .record(
       z.string().max(FIELD_LIMITS.identifier),
       z.union([z.string().max(FIELD_LIMITS.shortText), z.number(), z.boolean()]),
+    )
+    .refine(
+      (entries) => Object.keys(entries).length <= FIELD_LIMITS.metaEntries,
+      { message: `meta may carry at most ${FIELD_LIMITS.metaEntries} entries` },
     )
     .optional(),
 });
 export type Interaction = z.infer<typeof interactionSchema>;
 
 /** Where on the site this component is being rendered. */
-export const renderContextSchema = z.object({
+export const renderContextSchema = z.strictObject({
   /** 'pdp', 'home', 'cart', 'search', or any host-defined surface. */
   surface: identifier(),
   /** Named placement, e.g. 'below-fold-recommendations'. */
@@ -108,7 +121,7 @@ export type RenderContext = z.infer<typeof renderContextSchema>;
 const signalArray = <Schema extends z.ZodTypeAny>(schema: Schema) =>
   z.array(schema).max(FIELD_LIMITS.signalsPerCategory).default([]);
 
-export const trackingSignalsSchema = z.object({
+export const trackingSignalsSchema = z.strictObject({
   likes: signalArray(skuSignalSchema),
   dislikes: signalArray(skuSignalSchema),
   mostViewed: signalArray(viewSignalSchema),
@@ -119,9 +132,9 @@ export const trackingSignalsSchema = z.object({
 });
 export type TrackingSignals = z.infer<typeof trackingSignalsSchema>;
 
-export const trackingInputSchema = z.object({
+export const trackingInputSchema = z.strictObject({
   schemaVersion: z.literal('1').default('1'),
-  user: z.object({
+  user: z.strictObject({
     id: identifier(),
     segment: optionalIdentifier(),
     isReturning: z.boolean().optional(),

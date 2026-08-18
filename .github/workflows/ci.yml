@@ -5,11 +5,19 @@ on:
     branches: [main]
   pull_request:
 
+# This job only reads the repository. Nothing here needs write access.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
+      # `npm ci` runs dependency lifecycle scripts, and actions/checkout leaves
+      # its token in .git/config by default — so do not persist it.
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       # TypeScript 7 and Vitest 4 both require Node ^20.19 || >=22.12.
       - uses: actions/setup-node@v5

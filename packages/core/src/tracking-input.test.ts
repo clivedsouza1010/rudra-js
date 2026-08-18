@@ -137,10 +137,73 @@ describe('field limits', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects a meta record with more entries than the cap allows', () => {
+    const meta = Object.fromEntries(
+      Array.from({ length: FIELD_LIMITS.metaEntries + 1 }, (_unused, index) => [`key-${index}`, index]),
+    );
+
+    const result = safeParseTrackingInput(
+      minimalPayload({ signals: { interactions: [{ type: 'filter_applied', meta }] } }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a meta record exactly at the cap', () => {
+    const meta = Object.fromEntries(
+      Array.from({ length: FIELD_LIMITS.metaEntries }, (_unused, index) => [`key-${index}`, index]),
+    );
+
+    const result = safeParseTrackingInput(
+      minimalPayload({ signals: { interactions: [{ type: 'filter_applied', meta }] } }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
   it('accepts a value exactly at the limit', () => {
     const result = safeParseTrackingInput(
       minimalPayload({
         context: { surface: 'pdp', searchQuery: 'x'.repeat(FIELD_LIMITS.searchQuery) },
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+});
+
+/**
+ * The contract rejects unrecognised fields rather than dropping them. A lenient
+ * schema turns a host's typo into a shopper with no history and no error
+ * anywhere, which is the exact failure this module exists to prevent.
+ */
+describe('unknown fields', () => {
+  it('rejects an unknown top-level field', () => {
+    const result = safeParseTrackingInput({ ...minimalPayload(), unexpected: 'value' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a misspelled signal category instead of silently returning cold start', () => {
+    const result = safeParseTrackingInput(
+      minimalPayload({ signals: { recentSeraches: ['hydration vest'] } as never }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an unknown field on a nested object', () => {
+    const result = safeParseTrackingInput(
+      minimalPayload({ user: { id: 'shopper-1', tier: 'gold' } as never }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('still accepts arbitrary keys inside interaction meta, which is a record by design', () => {
+    const result = safeParseTrackingInput(
+      minimalPayload({
+        signals: { interactions: [{ type: 'filter_applied', meta: { anythingAtAll: 'ok' } }] },
       }),
     );
 
