@@ -29,3 +29,12 @@ export {
   type TrackingInputDraft,
   type TrackingInputResult,
 } from './tracking-input.js';
+
+export {
+  DIGEST_LIMITS,
+  buildDigest,
+  type CategoryAffinity,
+  type InteractionCount,
+  type SignalDigest,
+  type ViewedProduct,
+} from './digest.js';
