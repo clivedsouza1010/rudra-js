@@ -58,6 +58,23 @@ const optionalIdentifier = () => z.string().min(1).max(FIELD_LIMITS.identifier).
  */
 const epochMs = () => z.number().int().min(0).max(MAX_EPOCH_MS).optional();
 
+/**
+ * An absolute http(s) URL, or a root-relative path such as `/images/tr-102.png`.
+ * Anything else — a bare word, a `javascript:` URI, a protocol-relative `//host`
+ * — is rejected before it can reach an `<img src>`.
+ */
+const imageReference = () =>
+  z
+    .string()
+    .max(FIELD_LIMITS.shortText)
+    .refine(
+      (value) =>
+        value.startsWith('/') && !value.startsWith('//')
+          ? true
+          : z.url({ protocol: /^https?$/ }).safeParse(value).success,
+      { message: 'expected an http(s) URL or a root-relative path' },
+    );
+
 /** A product the generated component is permitted to place. */
 export const productSchema = z.strictObject({
   sku: identifier(),
@@ -68,12 +85,11 @@ export const productSchema = z.strictObject({
     .string()
     .regex(/^[A-Z]{3}$/, 'expected a three-letter ISO 4217 code')
     .default('USD'),
-  // Constrained to http(s) because this lands in an `<img src>` the host did
-  // not write. A bare capped string would also accept '' and 'javascript:'.
-  imageUrl: z
-    .url({ protocol: /^https?$/ })
-    .max(FIELD_LIMITS.shortText)
-    .optional(),
+  // This lands in an `<img src>` the host did not write, so the scheme matters:
+  // a bare capped string would accept '' and 'javascript:'. Root-relative paths
+  // are allowed because most catalogs store images that way, and they carry no
+  // scheme to abuse.
+  imageUrl: imageReference().optional(),
   rating: z.number().min(0).max(5).optional(),
   inStock: z.boolean().default(true),
   tags: z

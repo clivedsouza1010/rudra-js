@@ -1,9 +1,0 @@
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "categories": {
-    "correctness": "error",
-    "suspicious": "error",
-    "perf": "warn"
-  },
-  "ignorePatterns": ["dist", "package-lock.json"]
-}

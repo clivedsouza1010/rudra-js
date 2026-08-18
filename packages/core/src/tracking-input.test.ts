@@ -166,6 +166,12 @@ const capCases: Array<[string, keyof typeof FIELD_LIMITS, (size: number) => Trac
   ],
 ];
 
+it('exercises every entry in FIELD_LIMITS, so a new cap cannot ship untested', () => {
+  const covered = new Set(capCases.map(([, cap]) => cap));
+
+  expect([...covered].toSorted()).toEqual(Object.keys(FIELD_LIMITS).toSorted());
+});
+
 describe.each(capCases)('the cap on %s', (_label, cap, build) => {
   it(`accepts exactly ${cap}`, () => {
     expect(safeParseTrackingInput(build(FIELD_LIMITS[cap])).success).toBe(true);
@@ -240,7 +246,9 @@ describe('host-supplied values that are not merely bounded', () => {
     ['an http url', 'http://cdn.example.com/tr-102.png', true],
     ['a javascript: url', 'javascript:alert(1)', false],
     ['an empty string', '', false],
-    ['a bare path', '/images/tr-102.png', false],
+    ['a root-relative path', '/images/tr-102.png', true],
+    ['a protocol-relative url', '//cdn.example.com/tr-102.png', false],
+    ['a bare word', 'tr-102.png', false],
   ])('imageUrl: %s', (_label, imageUrl, accepted) => {
     expect(withProduct({ imageUrl }).success).toBe(accepted);
   });

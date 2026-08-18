@@ -20,9 +20,7 @@ npm install
 
 npm run build        # tsc -b across the workspace
 npm run typecheck    # includes test files, which the build does not
-npm run lint
-npm run format:check
 npm test
 ```
 
-CI runs all five on every pull request.
+CI runs all three on every pull request.

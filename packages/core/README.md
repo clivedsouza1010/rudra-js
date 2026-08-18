@@ -35,7 +35,7 @@ const input = parseTrackingInput({
       title: 'Switchback Trail Shoe GTX',
       category: 'Trail Running',
       price: 174,
-      imageUrl: 'https://cdn.example.com/tr-102.png',
+      imageUrl: 'https://cdn.example.com/tr-102.png', // or '/images/tr-102.png'
     },
   ],
 });
