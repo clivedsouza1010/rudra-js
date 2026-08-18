@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# This job only reads the repository. Nothing here needs write access.
+permissions:
+  contents: read
+
+# A new push supersedes whatever is still running for the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned by commit: a tag is a mutable ref, and this workflow
+      # runs on every pull request. actions/checkout also leaves its token in
+      # .git/config by default, so do not persist it.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      # TypeScript 7 and Vitest 4 both require Node ^20.19 || >=22.12.
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # No dependency of this workspace needs an install script to be usable
+      # (the only one in the tree is fsevents, which is darwin-only), so do not
+      # run arbitrary code from the dependency graph on every CI run.
+      - run: npm ci --ignore-scripts
+
+      # Build first: the workspace packages resolve each other through their
+      # generated `dist/`, which `npm ci` does not produce.
+      - run: npm run build
+
+      - run: npm run typecheck
+
+      - run: npm test
