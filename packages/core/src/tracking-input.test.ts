@@ -74,7 +74,7 @@ describe('parseTrackingInput', () => {
     ['a missing user id', { user: { id: '' } }],
     ['a missing surface', { context: { surface: '' } }],
   ])('rejects %s', (_label, overrides) => {
-    const result = safeParseTrackingInput(minimalPayload(overrides as Partial<TrackingInputDraft>));
+    const result = safeParseTrackingInput(minimalPayload(overrides));
 
     expect(result.success).toBe(false);
   });
@@ -82,93 +82,97 @@ describe('parseTrackingInput', () => {
   it('throws rather than returning a partial result, so a caller bug is loud', () => {
     expect(() => parseTrackingInput({ user: { id: 'shopper-1' } })).toThrow();
   });
+
+  it('reports which field failed, so a host can act on the error', () => {
+    const result = safeParseTrackingInput(minimalPayload({ user: { id: '' } }));
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['user', 'id']);
+  });
 });
 
 /**
  * These bounds are what stop a host-supplied string from becoming an unbounded
  * prompt, and therefore an unbounded model bill. They are load-bearing, not
- * defensive.
+ * defensive — so every entry in FIELD_LIMITS is exercised at the cap and one
+ * past it, from the same builder, which is what makes the boundary meaningful.
  */
-describe('field limits', () => {
-  const tooLong = (limit: number) => 'x'.repeat(limit + 1);
+const repeat = (size: number) => 'x'.repeat(size);
+const sized = <T>(size: number, build: (index: number) => T) =>
+  Array.from({ length: size }, (_unused, index) => build(index));
 
-  it('rejects an over-long search query', () => {
-    const result = safeParseTrackingInput(
-      minimalPayload({ context: { surface: 'pdp', searchQuery: tooLong(FIELD_LIMITS.searchQuery) } }),
-    );
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects an over-long interaction type', () => {
-    const result = safeParseTrackingInput(
-      minimalPayload({ signals: { interactions: [{ type: tooLong(FIELD_LIMITS.identifier) }] } }),
-    );
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects an over-long recent search', () => {
-    const result = safeParseTrackingInput(
-      minimalPayload({ signals: { recentSearches: [tooLong(FIELD_LIMITS.searchQuery)] } }),
-    );
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects more candidates than a single prompt should ever carry', () => {
-    const tooMany = Array.from({ length: FIELD_LIMITS.candidates + 1 }, (_unused, index) => ({
-      ...aProduct,
-      sku: `SKU-${index}`,
-    }));
-
-    const result = safeParseTrackingInput(minimalPayload({ candidates: tooMany }));
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects more signals in one category than the cap allows', () => {
-    const tooMany = Array.from({ length: FIELD_LIMITS.signalsPerCategory + 1 }, (_unused, index) => ({
-      sku: `SKU-${index}`,
-    }));
-
-    const result = safeParseTrackingInput(minimalPayload({ signals: { likes: tooMany } }));
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a meta record with more entries than the cap allows', () => {
-    const meta = Object.fromEntries(
-      Array.from({ length: FIELD_LIMITS.metaEntries + 1 }, (_unused, index) => [`key-${index}`, index]),
-    );
-
-    const result = safeParseTrackingInput(
-      minimalPayload({ signals: { interactions: [{ type: 'filter_applied', meta }] } }),
-    );
-
-    expect(result.success).toBe(false);
-  });
-
-  it('accepts a meta record exactly at the cap', () => {
-    const meta = Object.fromEntries(
-      Array.from({ length: FIELD_LIMITS.metaEntries }, (_unused, index) => [`key-${index}`, index]),
-    );
-
-    const result = safeParseTrackingInput(
-      minimalPayload({ signals: { interactions: [{ type: 'filter_applied', meta }] } }),
-    );
-
-    expect(result.success).toBe(true);
-  });
-
-  it('accepts a value exactly at the limit', () => {
-    const result = safeParseTrackingInput(
+const capCases: Array<[string, keyof typeof FIELD_LIMITS, (size: number) => TrackingInputDraft]> = [
+  [
+    'a product title',
+    'shortText',
+    (size) => minimalPayload({ candidates: [{ ...aProduct, title: repeat(size) }] }),
+  ],
+  [
+    'an interaction type',
+    'identifier',
+    (size) => minimalPayload({ signals: { interactions: [{ type: repeat(size) }] } }),
+  ],
+  [
+    'a search query',
+    'searchQuery',
+    (size) => minimalPayload({ context: { surface: 'pdp', searchQuery: repeat(size) } }),
+  ],
+  [
+    'a recent search',
+    'searchQuery',
+    (size) => minimalPayload({ signals: { recentSearches: [repeat(size)] } }),
+  ],
+  [
+    'a product tag',
+    'tag',
+    (size) => minimalPayload({ candidates: [{ ...aProduct, tags: [repeat(size)] }] }),
+  ],
+  [
+    'the tags on one product',
+    'tagsPerProduct',
+    (size) =>
       minimalPayload({
-        context: { surface: 'pdp', searchQuery: 'x'.repeat(FIELD_LIMITS.searchQuery) },
+        candidates: [{ ...aProduct, tags: sized(size, (index) => `tag-${index}`) }],
       }),
-    );
+  ],
+  [
+    'the entries in an interaction meta',
+    'metaEntries',
+    (size) =>
+      minimalPayload({
+        signals: {
+          interactions: [
+            {
+              type: 'filter_applied',
+              meta: Object.fromEntries(sized(size, (index) => [`key-${index}`, index])),
+            },
+          ],
+        },
+      }),
+  ],
+  [
+    'the signals in one category',
+    'signalsPerCategory',
+    (size) =>
+      minimalPayload({ signals: { likes: sized(size, (index) => ({ sku: `SKU-${index}` })) } }),
+  ],
+  [
+    'the candidate set',
+    'candidates',
+    (size) =>
+      minimalPayload({
+        candidates: sized(size, (index) => ({ ...aProduct, sku: `SKU-${index}` })),
+      }),
+  ],
+];
 
-    expect(result.success).toBe(true);
+describe.each(capCases)('the cap on %s', (_label, cap, build) => {
+  it(`accepts exactly ${cap}`, () => {
+    expect(safeParseTrackingInput(build(FIELD_LIMITS[cap])).success).toBe(true);
+  });
+
+  it(`rejects one past ${cap}`, () => {
+    expect(safeParseTrackingInput(build(FIELD_LIMITS[cap] + 1)).success).toBe(false);
   });
 });
 
@@ -178,26 +182,25 @@ describe('field limits', () => {
  * anywhere, which is the exact failure this module exists to prevent.
  */
 describe('unknown fields', () => {
-  it('rejects an unknown top-level field', () => {
-    const result = safeParseTrackingInput({ ...minimalPayload(), unexpected: 'value' });
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a misspelled signal category instead of silently returning cold start', () => {
-    const result = safeParseTrackingInput(
-      minimalPayload({ signals: { recentSeraches: ['hydration vest'] } as never }),
-    );
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects an unknown field on a nested object', () => {
-    const result = safeParseTrackingInput(
-      minimalPayload({ user: { id: 'shopper-1', tier: 'gold' } as never }),
-    );
-
-    expect(result.success).toBe(false);
+  it.each([
+    ['at the top level', { ...minimalPayload(), unexpected: 'value' }],
+    [
+      'on a signal category',
+      { ...minimalPayload(), signals: { recentSeraches: ['hydration vest'] } },
+    ],
+    ['on a nested object', { ...minimalPayload(), user: { id: 'shopper-1', tier: 'gold' } }],
+    // mostViewed and lastPurchased inherit strictness through .extend(), which
+    // is zod behaviour rather than something this module states. Pin it.
+    [
+      'on an extended view signal',
+      { ...minimalPayload(), signals: { mostViewed: [{ sku: 'TR-104', vieuws: 3 }] } },
+    ],
+    [
+      'on an extended purchase signal',
+      { ...minimalPayload(), signals: { lastPurchased: [{ sku: 'TR-104', quantitiy: 2 }] } },
+    ],
+  ])('rejects an unknown field %s', (_label, payload) => {
+    expect(safeParseTrackingInput(payload).success).toBe(false);
   });
 
   it('still accepts arbitrary keys inside interaction meta, which is a record by design', () => {
@@ -208,5 +211,67 @@ describe('unknown fields', () => {
     );
 
     expect(result.success).toBe(true);
+  });
+
+  it.each(['__proto__', 'constructor'])(
+    'rejects %s as a meta key rather than dropping it',
+    (key) => {
+      const meta = JSON.parse(`{"${key}": "x"}`) as Record<string, string>;
+
+      const result = safeParseTrackingInput(
+        minimalPayload({ signals: { interactions: [{ type: 'filter_applied', meta }] } }),
+      );
+
+      expect(result.success).toBe(false);
+    },
+  );
+});
+
+/**
+ * Values the host controls that reach a browser or a sort order. A bare capped
+ * string accepts things that fail somewhere less obvious than here.
+ */
+describe('host-supplied values that are not merely bounded', () => {
+  const withProduct = (overrides: Record<string, unknown>) =>
+    safeParseTrackingInput(minimalPayload({ candidates: [{ ...aProduct, ...overrides }] }));
+
+  it.each([
+    ['an https url', 'https://cdn.example.com/tr-102.png', true],
+    ['an http url', 'http://cdn.example.com/tr-102.png', true],
+    ['a javascript: url', 'javascript:alert(1)', false],
+    ['an empty string', '', false],
+    ['a bare path', '/images/tr-102.png', false],
+  ])('imageUrl: %s', (_label, imageUrl, accepted) => {
+    expect(withProduct({ imageUrl }).success).toBe(accepted);
+  });
+
+  it.each([
+    ['an ISO 4217 code', 'EUR', true],
+    ['a lowercase code', 'usd', false],
+    ['a currency name', 'DOLLARS', false],
+  ])('currency: %s', (_label, currency, accepted) => {
+    expect(withProduct({ currency }).success).toBe(accepted);
+  });
+
+  it.each([
+    ['a real timestamp', Date.UTC(2026, 0, 1), true],
+    ['zero', 0, true],
+    ['a negative timestamp', -1, false],
+    ['a year-3000 timestamp', Date.UTC(3000, 0, 1), false],
+    ['a fractional timestamp', 1.5, false],
+  ])('signal timestamp: %s', (_label, at, accepted) => {
+    const result = safeParseTrackingInput(
+      minimalPayload({ signals: { likes: [{ sku: 'TR-104', at }] } }),
+    );
+
+    expect(result.success).toBe(accepted);
+  });
+
+  it('rejects a duplicate SKU in the candidate set', () => {
+    const result = safeParseTrackingInput(
+      minimalPayload({ candidates: [aProduct, { ...aProduct, title: 'Same shoe, listed twice' }] }),
+    );
+
+    expect(result.success).toBe(false);
   });
 });

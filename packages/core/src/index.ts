@@ -27,4 +27,5 @@ export {
   type TrackingSignals,
   type TrackingInput,
   type TrackingInputDraft,
+  type TrackingInputResult,
 } from './tracking-input.js';

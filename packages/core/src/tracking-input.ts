@@ -18,13 +18,18 @@ import { z } from 'zod';
  */
 
 /**
- * Every free-text field is length-capped.
+ * Every free-text field and every array is length-capped.
  *
  * These caps are not cosmetic. Host-supplied strings end up inside the prompt
  * we send to a language model, and a model is billed per token — so an
  * unbounded string is an unbounded bill, and an unbounded array of candidates
- * is the same problem multiplied. Capping at the schema means the cost of a
- * render has a ceiling that does not depend on what the host sends.
+ * is the same problem multiplied.
+ *
+ * What this buys is that no single field is unbounded. It is deliberately not
+ * an aggregate budget: the caps multiply out to far more than any context
+ * window, because rejecting a large-but-legitimate payload is the wrong
+ * response to one. Fitting a payload into a prompt is `digest`'s job, and it
+ * trims rather than throws.
  */
 export const FIELD_LIMITS = {
   identifier: 128,
@@ -37,8 +42,21 @@ export const FIELD_LIMITS = {
   candidates: 200,
 } as const;
 
+/** Assigning these as object keys mutates the prototype instead of the object. */
+const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** Upper bound on any timestamp: 2100-01-01. */
+const MAX_EPOCH_MS = Date.UTC(2100, 0, 1);
+
 const identifier = () => z.string().min(1).max(FIELD_LIMITS.identifier);
 const optionalIdentifier = () => z.string().min(1).max(FIELD_LIMITS.identifier).optional();
+
+/**
+ * Epoch milliseconds, used only for recency ordering. Bounded because a
+ * negative or year-3000 timestamp does not fail anywhere downstream — it just
+ * sorts to one end and silently reorders the shopper's history.
+ */
+const epochMs = () => z.number().int().min(0).max(MAX_EPOCH_MS).optional();
 
 /** A product the generated component is permitted to place. */
 export const productSchema = z.strictObject({
@@ -46,11 +64,22 @@ export const productSchema = z.strictObject({
   title: z.string().min(1).max(FIELD_LIMITS.shortText),
   category: identifier(),
   price: z.number().nonnegative(),
-  currency: z.string().min(1).max(8).default('USD'),
-  imageUrl: z.string().max(FIELD_LIMITS.shortText).optional(),
+  currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/, 'expected a three-letter ISO 4217 code')
+    .default('USD'),
+  // Constrained to http(s) because this lands in an `<img src>` the host did
+  // not write. A bare capped string would also accept '' and 'javascript:'.
+  imageUrl: z
+    .url({ protocol: /^https?$/ })
+    .max(FIELD_LIMITS.shortText)
+    .optional(),
   rating: z.number().min(0).max(5).optional(),
   inStock: z.boolean().default(true),
-  tags: z.array(z.string().min(1).max(FIELD_LIMITS.tag)).max(FIELD_LIMITS.tagsPerProduct).default([]),
+  tags: z
+    .array(z.string().min(1).max(FIELD_LIMITS.tag))
+    .max(FIELD_LIMITS.tagsPerProduct)
+    .default([]),
 });
 export type Product = z.infer<typeof productSchema>;
 
@@ -58,8 +87,7 @@ export type Product = z.infer<typeof productSchema>;
 export const skuSignalSchema = z.strictObject({
   sku: identifier(),
   category: optionalIdentifier(),
-  /** Epoch milliseconds. Used only for recency ordering. */
-  at: z.number().int().optional(),
+  at: epochMs(),
   /** Caller-supplied strength, 0..1. Defaults to 1 when absent. */
   weight: z.number().min(0).max(1).optional(),
 });
@@ -78,6 +106,34 @@ export const purchaseSignalSchema = skuSignalSchema.extend({
 export type PurchaseSignal = z.infer<typeof purchaseSignalSchema>;
 
 /**
+ * `meta` is the one dynamic shape in the contract, so its keys are checked
+ * before the record is parsed rather than after. Zod builds its result by
+ * assigning each key, and assigning `__proto__` sets the prototype instead of
+ * adding a key — so the entry would vanish from the parsed output with no
+ * error, which is the silent drop this module exists to prevent.
+ */
+const metaKeysAreSafe = z.custom<Record<string, string | number | boolean>>(
+  (value) =>
+    typeof value === 'object' &&
+    value !== null &&
+    !Object.getOwnPropertyNames(value).some((key) => RESERVED_KEYS.has(key)),
+  { message: `meta may not use the reserved keys ${[...RESERVED_KEYS].join(', ')}` },
+);
+
+// `z.record` bounds key and value shape but not how many entries a record may
+// carry, so the count is checked separately.
+const metaSchema = metaKeysAreSafe.pipe(
+  z
+    .record(
+      z.string().min(1).max(FIELD_LIMITS.identifier),
+      z.union([z.string().max(FIELD_LIMITS.shortText), z.number(), z.boolean()]),
+    )
+    .refine((entries) => Object.keys(entries).length <= FIELD_LIMITS.metaEntries, {
+      message: `meta may carry at most ${FIELD_LIMITS.metaEntries} entries`,
+    }),
+);
+
+/**
  * Catch-all for everything else the shopper did. `type` is an open vocabulary
  * on purpose — 'scroll_depth', 'wishlist', 'filter_applied', whatever the host
  * already emits — so hosts do not have to map their events onto ours.
@@ -86,20 +142,9 @@ export const interactionSchema = z.strictObject({
   type: identifier(),
   sku: optionalIdentifier(),
   category: optionalIdentifier(),
-  at: z.number().int().optional(),
+  at: epochMs(),
   value: z.union([z.string().max(FIELD_LIMITS.shortText), z.number(), z.boolean()]).optional(),
-  // `z.record` bounds key and value shape but not how many entries a record
-  // may carry, so the count is checked separately.
-  meta: z
-    .record(
-      z.string().max(FIELD_LIMITS.identifier),
-      z.union([z.string().max(FIELD_LIMITS.shortText), z.number(), z.boolean()]),
-    )
-    .refine(
-      (entries) => Object.keys(entries).length <= FIELD_LIMITS.metaEntries,
-      { message: `meta may carry at most ${FIELD_LIMITS.metaEntries} entries` },
-    )
-    .optional(),
+  meta: metaSchema.optional(),
 });
 export type Interaction = z.infer<typeof interactionSchema>;
 
@@ -118,7 +163,7 @@ export const renderContextSchema = z.strictObject({
 });
 export type RenderContext = z.infer<typeof renderContextSchema>;
 
-const signalArray = <Schema extends z.ZodTypeAny>(schema: Schema) =>
+const signalArray = <Schema extends z.ZodType>(schema: Schema) =>
   z.array(schema).max(FIELD_LIMITS.signalsPerCategory).default([]);
 
 export const trackingSignalsSchema = z.strictObject({
@@ -149,14 +194,32 @@ export const trackingInputSchema = z.strictObject({
    * belong here: whatever the host leaves out cannot be recommended, which is
    * what makes it impossible to surface a product that does not exist or is not
    * merchandised for this shopper.
+   *
+   * SKUs must be unique — a duplicate is a host bug that spends prompt budget
+   * twice and invites the same product in two slots.
    */
-  candidates: z.array(productSchema).min(1).max(FIELD_LIMITS.candidates),
+  candidates: z
+    .array(productSchema)
+    .min(1)
+    .max(FIELD_LIMITS.candidates)
+    .refine(
+      (products) => new Set(products.map((product) => product.sku)).size === products.length,
+      {
+        message: 'candidates must have unique SKUs',
+      },
+    ),
 });
 
 export type TrackingInput = z.infer<typeof trackingInputSchema>;
 
 /** The shape a caller passes in, before defaults are applied. */
 export type TrackingInputDraft = z.input<typeof trackingInputSchema>;
+
+/**
+ * The result of a non-throwing parse. Exported so a consumer can type a
+ * validation failure without depending on zod directly.
+ */
+export type TrackingInputResult = z.ZodSafeParseResult<TrackingInput>;
 
 /**
  * Validates a payload, throwing a `ZodError` if it does not satisfy the
@@ -167,6 +230,6 @@ export function parseTrackingInput(value: unknown): TrackingInput {
 }
 
 /** Non-throwing variant, for callers that want to inspect the failure. */
-export function safeParseTrackingInput(value: unknown) {
+export function safeParseTrackingInput(value: unknown): TrackingInputResult {
   return trackingInputSchema.safeParse(value);
 }
