@@ -151,15 +151,21 @@ function createPlacementTracker(maxItems: number) {
 type PlacementTracker = ReturnType<typeof createPlacementTracker>;
 
 /**
- * Decides whether one SKU may be placed, recording why not when it may not.
+ * Decides whether one SKU may be placed, and names the reason when it may not.
  * Does not consume budget — the caller does that once it commits.
+ *
+ * Order matters. The budget is checked last because it is the least specific
+ * cause: a hallucinated SKU that arrives after the budget is spent is still a
+ * hallucination, and reporting it as `budget:dropped` would understate how
+ * often the model invents products. These strings are the evaluation signal,
+ * so each one has to name the fault that actually fired.
  */
 function rejectionFor(sku: string, allowlist: Allowlist, tracker: PlacementTracker): string | null {
-  if (tracker.remaining <= 0) return `budget:dropped:${sku}`;
   // Either hallucinated or out of stock. Either way it cannot render.
   if (!allowlist.allowed.has(sku)) return `unknown-sku:${sku}`;
   if (allowlist.blocked.has(sku)) return `blocked-sku:${sku}`;
   if (tracker.hasPlaced(sku)) return `duplicate-sku:${sku}`;
+  if (tracker.remaining <= 0) return `budget:dropped:${sku}`;
   return null;
 }
 
@@ -222,9 +228,17 @@ function reconcileBlock(
           tracker.place(sku);
         }
       }
+      // Every other block kind disappears when its content clamps to nothing.
+      // A hero with no headline and no product is the same empty region, and
+      // it would otherwise render above real content.
+      const headline = clamp(block.headline, CLAMP.headline);
+      if (headline.length === 0 && sku === null) {
+        tracker.record('empty-block:hero');
+        return null;
+      }
       return {
         kind: 'hero',
-        headline: clamp(block.headline, CLAMP.headline),
+        headline,
         body: clampNullable(block.body, CLAMP.subheadline),
         sku,
         ctaLabel: clampNullable(block.ctaLabel, CLAMP.ctaLabel),
@@ -326,8 +340,11 @@ export function reconcileSpec(
   };
 
   // A component that recommends nothing is worse than no component at all.
-  const usable = blocks.length > 0 && showsAnyProduct(blocks) && spec.headline.length > 0;
-  if (!usable) tracker.record('unusable:no-products');
+  // Recorded separately: "no products survived" and "the model returned no
+  // headline" are different failures and want different fixes.
+  if (!showsAnyProduct(blocks)) tracker.record('unusable:no-products');
+  if (spec.headline.length === 0) tracker.record('unusable:no-headline');
+  const usable = showsAnyProduct(blocks) && spec.headline.length > 0;
 
   return { spec, usable, violations: tracker.violations };
 }

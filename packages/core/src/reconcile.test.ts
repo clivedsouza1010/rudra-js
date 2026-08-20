@@ -391,3 +391,95 @@ describe('usability', () => {
     expect(result.violations).toContain('empty-block:grid');
   });
 });
+
+/**
+ * `violations` is the evaluation signal — it is what a generation-validity rate
+ * is computed from. A string that names the wrong cause is worse than no string
+ * at all, because it looks like data.
+ */
+describe('attributing a rejection to its real cause', () => {
+  const spentBudget = { context: { surface: 'pdp', maxItems: 1 } };
+
+  it('still reports a hallucinated SKU once the budget is spent', () => {
+    const result = reconcile(grid([ref('TR-101'), ref('GHOST-1')]), spentBudget);
+
+    // Reporting this as budget:dropped would understate how often the model
+    // invents products, which is the number Section V asks for.
+    expect(result.violations).toContain('unknown-sku:GHOST-1');
+    expect(result.violations).not.toContain('budget:dropped:GHOST-1');
+  });
+
+  it('still reports a blocked SKU once the budget is spent', () => {
+    const result = reconcile(grid([ref('TR-102'), ref('TR-101')]), {
+      ...spentBudget,
+      signals: { dislikes: [{ sku: 'TR-101' }] },
+    });
+
+    expect(result.violations).toContain('blocked-sku:TR-101');
+  });
+
+  it('still reports a duplicate once the budget is spent', () => {
+    const result = reconcile(grid([ref('TR-101'), ref('TR-101')]), spentBudget);
+
+    expect(result.violations).toContain('duplicate-sku:TR-101');
+  });
+
+  it('reports the budget when the budget really is the reason', () => {
+    const result = reconcile(grid([ref('TR-101'), ref('TR-102')]), spentBudget);
+
+    expect(result.violations).toEqual(['budget:dropped:TR-102']);
+  });
+
+  it('names a missing headline as such, not as a missing product', () => {
+    const result = reconcile({ ...grid([ref('TR-101')]), headline: '   ' });
+
+    expect(result.usable).toBe(false);
+    expect(result.violations).toContain('unusable:no-headline');
+    expect(result.violations).not.toContain('unusable:no-products');
+  });
+
+  it('records both when both are missing', () => {
+    const result = reconcile({ ...grid([ref('GHOST-1')]), headline: '   ' });
+
+    expect(result.violations).toContain('unusable:no-products');
+    expect(result.violations).toContain('unusable:no-headline');
+  });
+});
+
+describe('an empty hero', () => {
+  it('is dropped when it has neither a headline nor a product', () => {
+    const result = reconcile(
+      specWith([
+        { kind: 'hero', headline: '   ', body: null, sku: 'GHOST-1', ctaLabel: null },
+        { kind: 'grid', title: null, columns: 2, items: [ref('TR-101')] },
+      ]),
+    );
+
+    // Every other block kind disappears when it clamps to nothing; a hero that
+    // survives empty renders a blank region above real content.
+    expect(result.spec.blocks.map((block) => block.kind)).toEqual(['grid']);
+    expect(result.violations).toContain('empty-block:hero');
+  });
+
+  it('survives on a headline alone', () => {
+    const result = reconcile(
+      specWith([
+        { kind: 'hero', headline: 'Pick of the season', body: null, sku: null, ctaLabel: null },
+        { kind: 'grid', title: null, columns: 2, items: [ref('TR-101')] },
+      ]),
+    );
+
+    expect(result.spec.blocks.map((block) => block.kind)).toEqual(['hero', 'grid']);
+  });
+
+  it('survives on a product alone', () => {
+    const result = reconcile(
+      specWith([{ kind: 'hero', headline: '   ', body: null, sku: 'TR-101', ctaLabel: null }]),
+    );
+
+    const [block] = result.spec.blocks;
+    if (block?.kind !== 'hero') throw new Error('expected a hero');
+    expect(block.sku).toBe('TR-101');
+    expect(result.usable).toBe(true);
+  });
+});
