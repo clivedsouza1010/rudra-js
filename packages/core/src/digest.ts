@@ -91,6 +91,14 @@ const SIGNAL_WEIGHTS = {
   dislike: -6,
 } as const;
 
+/**
+ * A signal that does not state a weight counts at full strength. This lives in
+ * one place on purpose: when the default was written out at each call site, the
+ * merge step defaulted to 0 while scoring defaulted to 1, and an unweighted view
+ * merged with a `weight: 0.2` view scored as though both were 0.2.
+ */
+const effectiveWeight = (signal: { weight?: number | undefined }): number => signal.weight ?? 1;
+
 /** Most recent first. A signal with no timestamp sorts last. */
 function byMostRecent(
   left: { at?: number | undefined },
@@ -142,27 +150,27 @@ function computeCategoryAffinity(
   for (const purchase of signals.lastPurchased) {
     addScore(
       categoryOf(purchase, candidatesBySku),
-      SIGNAL_WEIGHTS.purchase * (purchase.weight ?? 1),
+      SIGNAL_WEIGHTS.purchase * effectiveWeight(purchase),
     );
   }
   for (const like of signals.likes) {
-    addScore(categoryOf(like, candidatesBySku), SIGNAL_WEIGHTS.like * (like.weight ?? 1));
+    addScore(categoryOf(like, candidatesBySku), SIGNAL_WEIGHTS.like * effectiveWeight(like));
   }
   for (const inCart of signals.cart) {
-    addScore(categoryOf(inCart, candidatesBySku), SIGNAL_WEIGHTS.cart * (inCart.weight ?? 1));
+    addScore(categoryOf(inCart, candidatesBySku), SIGNAL_WEIGHTS.cart * effectiveWeight(inCart));
   }
   // Merged first, deliberately — see `mergeViewsBySku`. Views are noisy and
   // repeat cheaply, so the tenth view counts for far less than the second, and
   // log scaling keeps a single obsessive session from drowning out a purchase.
   for (const view of mergeViewsBySku(signals.mostViewed)) {
     const scaledViews = Math.log2(1 + view.views);
-    addScore(
-      categoryOf(view, candidatesBySku),
-      SIGNAL_WEIGHTS.view * scaledViews * (view.weight ?? 1),
-    );
+    addScore(categoryOf(view, candidatesBySku), SIGNAL_WEIGHTS.view * scaledViews * view.weight);
   }
   for (const dislike of signals.dislikes) {
-    addScore(categoryOf(dislike, candidatesBySku), SIGNAL_WEIGHTS.dislike * (dislike.weight ?? 1));
+    addScore(
+      categoryOf(dislike, candidatesBySku),
+      SIGNAL_WEIGHTS.dislike * effectiveWeight(dislike),
+    );
   }
 
   // The category the shopper is standing in right now is itself evidence.
@@ -180,7 +188,8 @@ function computeCategoryAffinity(
 
 interface MergedView extends ViewedProduct {
   category?: string;
-  weight?: number;
+  /** Always resolved, so no consumer has to re-apply the default. */
+  weight: number;
 }
 
 /**
@@ -204,7 +213,7 @@ function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
       running.views += view.views;
       if (view.dwellMs !== undefined) running.dwellMs = (running.dwellMs ?? 0) + view.dwellMs;
       if (view.category !== undefined) running.category ??= view.category;
-      if (view.weight !== undefined) running.weight = Math.max(running.weight ?? 0, view.weight);
+      running.weight = Math.max(running.weight, effectiveWeight(view));
       continue;
     }
     totalsBySku.set(view.sku, {
@@ -212,7 +221,7 @@ function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
       views: view.views,
       ...(view.dwellMs !== undefined ? { dwellMs: view.dwellMs } : {}),
       ...(view.category !== undefined ? { category: view.category } : {}),
-      ...(view.weight !== undefined ? { weight: view.weight } : {}),
+      weight: effectiveWeight(view),
     });
   }
 

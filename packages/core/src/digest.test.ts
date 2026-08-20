@@ -157,6 +157,55 @@ describe('most viewed', () => {
     expect(digest.topViewed[0]).not.toHaveProperty('dwellMs');
   });
 
+  it('does not let a weaker record drag down an unweighted one', () => {
+    const unweightedAlone = digestOf({
+      signals: {
+        mostViewed: [
+          { sku: 'TR-101', views: 1 },
+          { sku: 'TR-101', views: 1 },
+        ],
+      },
+    }).categoryAffinity[0]?.score;
+    const unweightedPlusWeak = digestOf({
+      signals: {
+        mostViewed: [
+          { sku: 'TR-101', views: 1 },
+          { sku: 'TR-101', views: 1, weight: 0.2 },
+        ],
+      },
+    }).categoryAffinity[0]?.score;
+
+    // An omitted weight means full strength, so the strongest of the two is 1.
+    expect(unweightedPlusWeak).toBe(unweightedAlone);
+  });
+
+  it('merges weights the same way whichever record arrives first', () => {
+    const weakFirst = digestOf({
+      signals: {
+        mostViewed: [
+          { sku: 'TR-101', views: 1, weight: 0.2 },
+          { sku: 'TR-101', views: 1 },
+        ],
+      },
+    }).categoryAffinity;
+    const weakSecond = digestOf({
+      signals: {
+        mostViewed: [
+          { sku: 'TR-101', views: 1 },
+          { sku: 'TR-101', views: 1, weight: 0.2 },
+        ],
+      },
+    }).categoryAffinity;
+
+    expect(weakFirst).toEqual(weakSecond);
+  });
+
+  it('lets an explicit zero weight contribute nothing', () => {
+    const digest = digestOf({ signals: { mostViewed: [{ sku: 'TR-101', views: 1, weight: 0 }] } });
+
+    expect(digest.categoryAffinity).toEqual([]);
+  });
+
   it('takes the strongest weight when records for one SKU disagree', () => {
     const strongest = digestOf({
       signals: {
@@ -263,7 +312,12 @@ describe('category affinity', () => {
       signals: { mostViewed: Array.from({ length: 30 }, () => ({ sku: 'TR-101', views: 1 })) },
     });
 
-    expect(asManyRecords.categoryAffinity).toEqual(asOneRecord.categoryAffinity);
+    // Asserting the score itself, not merely that the two agree: if scoring
+    // ever yields NaN, both collapse to [] and an equality check passes
+    // vacuously.
+    const expected = [{ category: 'Trail Running', score: 4.95 }];
+    expect(asOneRecord.categoryAffinity).toEqual(expected);
+    expect(asManyRecords.categoryAffinity).toEqual(expected);
   });
 
   it('does not let repeated single-view records outrank a purchase', () => {
@@ -274,7 +328,10 @@ describe('category affinity', () => {
       },
     });
 
-    expect(digest.categoryAffinity[0]?.category).toBe('Nutrition');
+    expect(digest.categoryAffinity).toEqual([
+      { category: 'Nutrition', score: 5 },
+      { category: 'Trail Running', score: 4.95 },
+    ]);
   });
 
   it('honours a caller-supplied weight', () => {
