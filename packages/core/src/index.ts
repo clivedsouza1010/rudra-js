@@ -38,3 +38,28 @@ export {
   type SignalDigest,
   type ViewedProduct,
 } from './digest.js';
+
+export {
+  BANNER_TONES,
+  EMPHASIS,
+  RECOMMENDATION_BASES,
+  SPEC_VERSION,
+  TONES,
+  blockSchema,
+  generatedSpecSchema,
+  parseGeneratedSpec,
+  productRefSchema,
+  safeParseGeneratedSpec,
+  type BannerBlock,
+  type Block,
+  type BlockKind,
+  type CarouselBlock,
+  type ComponentSpec,
+  type CopyBlock,
+  type GeneratedSpec,
+  type GridBlock,
+  type HeroBlock,
+  type ProductRef,
+  type RecommendationBasis,
+  type SpecSource,
+} from './component-spec.js';
