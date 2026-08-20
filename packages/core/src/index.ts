@@ -63,3 +63,5 @@ export {
   type RecommendationBasis,
   type SpecSource,
 } from './component-spec.js';
+
+export { reconcileSpec, type ReconcileResult } from './reconcile.js';
