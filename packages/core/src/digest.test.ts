@@ -157,6 +157,27 @@ describe('most viewed', () => {
     expect(digest.topViewed[0]).not.toHaveProperty('dwellMs');
   });
 
+  it('takes the strongest weight when records for one SKU disagree', () => {
+    const strongest = digestOf({
+      signals: {
+        mostViewed: [
+          { sku: 'TR-101', views: 1, weight: 0.2 },
+          { sku: 'TR-101', views: 1, weight: 1 },
+        ],
+      },
+    }).categoryAffinity[0]?.score;
+    const bothWeak = digestOf({
+      signals: {
+        mostViewed: [
+          { sku: 'TR-101', views: 1, weight: 0.2 },
+          { sku: 'TR-101', views: 1, weight: 0.2 },
+        ],
+      },
+    }).categoryAffinity[0]?.score;
+
+    expect(strongest).toBeGreaterThan(bothWeak ?? 0);
+  });
+
   it('orders by view count, most viewed first', () => {
     const digest = digestOf({
       signals: {
@@ -234,6 +255,26 @@ describe('category affinity', () => {
     }).categoryAffinity;
 
     expect(top?.category).toBe('Nutrition');
+  });
+
+  it('is unaffected by how the host batches view records', () => {
+    const asOneRecord = digestOf({ signals: { mostViewed: [{ sku: 'TR-101', views: 30 }] } });
+    const asManyRecords = digestOf({
+      signals: { mostViewed: Array.from({ length: 30 }, () => ({ sku: 'TR-101', views: 1 })) },
+    });
+
+    expect(asManyRecords.categoryAffinity).toEqual(asOneRecord.categoryAffinity);
+  });
+
+  it('does not let repeated single-view records outrank a purchase', () => {
+    const digest = digestOf({
+      signals: {
+        lastPurchased: [{ sku: 'NU-201' }],
+        mostViewed: Array.from({ length: 30 }, () => ({ sku: 'TR-101', views: 1 })),
+      },
+    });
+
+    expect(digest.categoryAffinity[0]?.category).toBe('Nutrition');
   });
 
   it('honours a caller-supplied weight', () => {

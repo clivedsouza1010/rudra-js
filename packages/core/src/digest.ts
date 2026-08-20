@@ -151,10 +151,10 @@ function computeCategoryAffinity(
   for (const inCart of signals.cart) {
     addScore(categoryOf(inCart, candidatesBySku), SIGNAL_WEIGHTS.cart * (inCart.weight ?? 1));
   }
-  for (const view of signals.mostViewed) {
-    // Views are noisy and repeat cheaply, so the tenth view counts for far less
-    // than the second. Log scaling keeps a single obsessive session from
-    // drowning out a purchase.
+  // Merged first, deliberately — see `mergeViewsBySku`. Views are noisy and
+  // repeat cheaply, so the tenth view counts for far less than the second, and
+  // log scaling keeps a single obsessive session from drowning out a purchase.
+  for (const view of mergeViewsBySku(signals.mostViewed)) {
     const scaledViews = Math.log2(1 + view.views);
     addScore(
       categoryOf(view, candidatesBySku),
@@ -178,27 +178,57 @@ function computeCategoryAffinity(
     .slice(0, DIGEST_LIMITS.affinity);
 }
 
-/** Merges repeat views of the same SKU, then keeps the most-viewed few. */
-function mostViewedProducts(views: ViewSignal[]): ViewedProduct[] {
-  const totalsBySku = new Map<string, ViewedProduct>();
+interface MergedView extends ViewedProduct {
+  category?: string;
+  weight?: number;
+}
+
+/**
+ * Collapses every view record for one SKU into a single running total.
+ *
+ * This has to happen before any scoring. A host is free to emit one record per
+ * page view rather than a running count, and scoring each record separately
+ * would let thirty `views: 1` records outweigh one `views: 30` record six times
+ * over, defeating the sub-linear scaling in `computeCategoryAffinity` entirely.
+ * Merging first makes the score depend on how much someone looked, not on how
+ * their tracking pipeline happens to batch.
+ *
+ * Where records disagree on `weight`, the strongest wins.
+ */
+function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
+  const totalsBySku = new Map<string, MergedView>();
 
   for (const view of views) {
     const running = totalsBySku.get(view.sku);
     if (running) {
       running.views += view.views;
       if (view.dwellMs !== undefined) running.dwellMs = (running.dwellMs ?? 0) + view.dwellMs;
+      if (view.category !== undefined) running.category ??= view.category;
+      if (view.weight !== undefined) running.weight = Math.max(running.weight ?? 0, view.weight);
       continue;
     }
     totalsBySku.set(view.sku, {
       sku: view.sku,
       views: view.views,
       ...(view.dwellMs !== undefined ? { dwellMs: view.dwellMs } : {}),
+      ...(view.category !== undefined ? { category: view.category } : {}),
+      ...(view.weight !== undefined ? { weight: view.weight } : {}),
     });
   }
 
-  return [...totalsBySku.values()]
+  return [...totalsBySku.values()];
+}
+
+/** The most-viewed few, as the digest reports them. */
+function mostViewedProducts(views: ViewSignal[]): ViewedProduct[] {
+  return mergeViewsBySku(views)
     .toSorted((left, right) => right.views - left.views)
-    .slice(0, DIGEST_LIMITS.viewed);
+    .slice(0, DIGEST_LIMITS.viewed)
+    .map(({ sku, views: viewCount, dwellMs }) => ({
+      sku,
+      views: viewCount,
+      ...(dwellMs !== undefined ? { dwellMs } : {}),
+    }));
 }
 
 /** The open-vocabulary long tail, reduced to "which kinds, and how often". */
