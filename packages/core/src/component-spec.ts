@@ -86,8 +86,12 @@ export const productRefSchema = z.object({
   /**
    * How the basis is phrased for the shopper, e.g. "Pairs with the boots you
    * bought". Free text, but it has to be consistent with `basis`, which is not.
+   *
+   * Nullable because reconciliation clears it when it cannot verify the basis:
+   * a pick may still be worth showing when the stated reason for it is not
+   * true, but the prose asserting that reason must not render.
    */
-  reason: z.string(),
+  reason: z.string().nullable(),
   /** Short accent label, e.g. "Back in stock". Null when nothing warrants one. */
   badge: z.string().nullable(),
   emphasis: z.enum(EMPHASIS),
