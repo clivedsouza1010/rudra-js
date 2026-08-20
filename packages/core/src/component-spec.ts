@@ -4,8 +4,9 @@ import { z } from 'zod';
  * The component specification — the only thing a language model is ever allowed
  * to return.
  *
- * The model chooses layout, ordering, emphasis, copy, and which of the host's
- * candidate products to surface. It never returns markup, code, URLs, prices,
+ * The model chooses layout, ordering, emphasis, copy, the recommendation
+ * strategy behind each pick, and which of the host's candidate products to
+ * surface. It never returns markup, code, URLs, prices,
  * product titles, or images. Every field is an enum, a bounded number, a SKU
  * reference resolved against the candidate set, or free text that is clamped
  * and escaped before it renders. That is what makes generated output safe to
@@ -42,17 +43,57 @@ export const BANNER_TONES = ['info', 'promo', 'urgency', 'restock'] as const;
 /** How prominently a single product is placed. */
 export const EMPHASIS = ['normal', 'featured'] as const;
 
+/**
+ * Why a product was chosen — the recommendation strategy behind the pick.
+ *
+ * This is a closed set rather than free text because every value here is a
+ * factual claim about the shopper, and a claim the server can check. "Because
+ * you viewed this" written as prose is unverifiable: nothing downstream can
+ * tell whether the shopper viewed anything. Declared as `most_viewed`,
+ * reconciliation can look it up in the digest and drop the claim if it is
+ * false.
+ *
+ * Every value is deliberately checkable against data already in hand — the
+ * signal digest or the host's own catalog. A basis that needs data the
+ * framework never receives (`new_arrival`, `back_in_stock`, `trending_today`)
+ * is not in this list, because it could only ever be taken on trust.
+ */
+export const RECOMMENDATION_BASES = [
+  /** Same category as the product being viewed. */
+  'similar_to_current',
+  /** The shopper has viewed this product. */
+  'most_viewed',
+  /** Goes with something already in the cart. */
+  'complements_cart',
+  /** Goes with something the shopper has bought. */
+  'complements_purchase',
+  /** In a category the shopper's signals favour. */
+  'liked_category',
+  /** No claim about this shopper at all — the safe default. */
+  'popular',
+] as const;
+
 /** A reference to one product from the candidate set, and why it was chosen. */
 export const productRefSchema = z.object({
   /** Must be a SKU the host supplied in `TrackingInput.candidates`. */
   sku: z.string(),
-  /** Shown to the shopper, e.g. "Pairs with the boots you bought". */
+  /**
+   * The strategy behind this pick. Reconciliation checks it against the
+   * shopper's signals, so the model cannot assert a relationship that is not
+   * there.
+   */
+  basis: z.enum(RECOMMENDATION_BASES),
+  /**
+   * How the basis is phrased for the shopper, e.g. "Pairs with the boots you
+   * bought". Free text, but it has to be consistent with `basis`, which is not.
+   */
   reason: z.string(),
   /** Short accent label, e.g. "Back in stock". Null when nothing warrants one. */
   badge: z.string().nullable(),
   emphasis: z.enum(EMPHASIS),
 });
 export type ProductRef = z.infer<typeof productRefSchema>;
+export type RecommendationBasis = (typeof RECOMMENDATION_BASES)[number];
 
 /** One large featured statement, optionally anchored to a single product. */
 const heroBlockSchema = z.object({

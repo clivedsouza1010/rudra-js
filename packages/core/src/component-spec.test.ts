@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   BANNER_TONES,
   EMPHASIS,
+  RECOMMENDATION_BASES,
   TONES,
   blockSchema,
   generatedSpecSchema,
@@ -10,10 +11,11 @@ import {
   safeParseGeneratedSpec,
   type Block,
   type GeneratedSpec,
-} from './spec.js';
+} from './component-spec.js';
 
 const productRef = {
   sku: 'TR-102',
+  basis: 'complements_purchase',
   reason: 'Pairs with the boots you bought',
   badge: null,
   emphasis: 'normal',
@@ -72,6 +74,42 @@ describe('generatedSpecSchema', () => {
     expect(safeParseGeneratedSpec(banner).success).toBe(true);
   });
 
+  it.each([...RECOMMENDATION_BASES])('accepts the recommendation basis %s', (basis) => {
+    const grid = spec([
+      { kind: 'grid', title: null, columns: 2, items: [{ ...productRef, basis }] },
+    ]);
+
+    expect(safeParseGeneratedSpec(grid).success).toBe(true);
+  });
+
+  it('rejects a recommendation basis outside the closed set', () => {
+    const grid = spec([
+      {
+        kind: 'grid',
+        title: null,
+        columns: 2,
+        items: [{ ...productRef, basis: 'trending_today' }],
+      },
+    ]);
+
+    expect(safeParseGeneratedSpec(grid).success).toBe(false);
+  });
+
+  it.each([
+    [
+      'omitted',
+      (() => {
+        const { basis: _drop, ...rest } = productRef;
+        return rest;
+      })(),
+    ],
+    // Distinct from omission: `.nullable()` would still demand the key while
+    // letting the model send null, which is a pick with no stated reason.
+    ['null', { ...productRef, basis: null }],
+  ])('rejects a basis that is %s, so no pick goes unexplained', (_label, ref) => {
+    expect(productRefSchema.safeParse(ref).success).toBe(false);
+  });
+
   it.each([...EMPHASIS])('accepts the emphasis %s', (emphasis) => {
     const grid = spec([
       { kind: 'grid', title: null, columns: 2, items: [{ ...productRef, emphasis }] },
@@ -98,7 +136,7 @@ describe('what the model cannot say', () => {
     // component. What matters is that it cannot reach the renderer.
     const parsed = productRefSchema.parse({ ...productRef, ...extra });
 
-    expect(Object.keys(parsed).toSorted()).toEqual(['badge', 'emphasis', 'reason', 'sku']);
+    expect(Object.keys(parsed).toSorted()).toEqual(['badge', 'basis', 'emphasis', 'reason', 'sku']);
     for (const key of Object.keys(extra)) {
       expect(parsed).not.toHaveProperty(key);
     }
@@ -153,7 +191,12 @@ describe('provider structured-output compatibility', () => {
   });
 
   it('expresses absence as null rather than as a missing key', () => {
-    const withoutBadge = { sku: 'TR-102', reason: 'Goes with your cart', emphasis: 'normal' };
+    const withoutBadge = {
+      sku: 'TR-102',
+      basis: 'complements_cart',
+      reason: 'Goes with your cart',
+      emphasis: 'normal',
+    };
 
     expect(productRefSchema.safeParse(withoutBadge).success).toBe(false);
     expect(productRefSchema.safeParse({ ...withoutBadge, badge: null }).success).toBe(true);
@@ -179,5 +222,36 @@ describe('type surface', () => {
 
   it('parses a block on its own, not only inside a spec', () => {
     expect(blockSchema.safeParse({ kind: 'copy', title: null, body: 'Hello' }).success).toBe(true);
+  });
+});
+
+/**
+ * `basis` exists so a claim about the shopper can be checked. Reconciliation
+ * does the checking; this pins the shape it depends on.
+ */
+describe('recommendation basis', () => {
+  it('offers a basis that makes no claim about the shopper', () => {
+    // Something has to be safe to fall back to when nothing else is provable.
+    expect(RECOMMENDATION_BASES).toContain('popular');
+  });
+
+  it('names only bases the framework has the data to verify', () => {
+    // Each of these would need catalog or inventory history the contract never
+    // receives, so the server could only ever take the model's word for it.
+    for (const unverifiable of ['new_arrival', 'back_in_stock', 'trending_today', 'low_stock']) {
+      expect(RECOMMENDATION_BASES).not.toContain(unverifiable);
+    }
+  });
+
+  it('keeps the prose separate from the claim it describes', () => {
+    const parsed = productRefSchema.parse({
+      ...productRef,
+      basis: 'most_viewed',
+      reason: 'You keep coming back to this',
+    });
+
+    // The enum is what reconciliation checks; the prose is what renders.
+    expect(parsed.basis).toBe('most_viewed');
+    expect(parsed.reason).toBe('You keep coming back to this');
   });
 });

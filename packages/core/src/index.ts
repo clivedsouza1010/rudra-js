@@ -42,6 +42,7 @@ export {
 export {
   BANNER_TONES,
   EMPHASIS,
+  RECOMMENDATION_BASES,
   SPEC_VERSION,
   TONES,
   blockSchema,
@@ -59,5 +60,6 @@ export {
   type GridBlock,
   type HeroBlock,
   type ProductRef,
+  type RecommendationBasis,
   type SpecSource,
-} from './spec.js';
+} from './component-spec.js';
