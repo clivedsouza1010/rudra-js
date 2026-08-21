@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # Actions are pinned by SHA, which is what makes a tag's mutability harmless —
+  # but a pinned SHA never picks up a security fix on its own. Dependabot is the
+  # other half of that trade.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(ci)'
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+    groups:
+      # One pull request for the toolchain rather than five. These move together
+      # and are only ever exercised by CI.
+      dev-tooling:
+        dependency-type: development
+        patterns: ['*']

@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Mints the OIDC token npm uses to attest that this build produced this
+      # package. Without it, --provenance fails rather than silently skipping.
+      id-token: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - run: npm run build
+
+      # Publishing an artefact nobody verified is how a broken release ships.
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+      # Provenance links the published tarball to this commit, this workflow and
+      # this runner, so a consumer can check where it came from. It requires a
+      # public `repository` field in package.json matching this repo, which
+      # @rudra/core has.
+      - run: npm publish --provenance --access public
+        working-directory: packages/core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
