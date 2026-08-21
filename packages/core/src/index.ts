@@ -64,4 +64,6 @@ export {
   type SpecSource,
 } from './component-spec.js';
 
-export { reconcileSpec, type ReconcileResult } from './reconcile.js';
+export { neverRecommend, reconcileSpec, type ReconcileResult } from './reconcile.js';
+export { selectProducts, type ProductPick } from './select.js';
+export { buildFallbackSpec } from './fallback.js';

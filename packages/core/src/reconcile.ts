@@ -73,6 +73,24 @@ interface Allowlist {
   blocked: Set<string>;
 }
 
+/**
+ * SKUs that must never be recommended, whatever chose them.
+ *
+ * Exported because the deterministic selector applies the same rule when it
+ * picks. Two copies of "never recommend these" would drift, and the pair that
+ * drifted would be the model path and the fallback path — the two whose
+ * comparability the whole evaluation depends on.
+ */
+export function neverRecommend(digest: SignalDigest): Set<string> {
+  const blocked = new Set<string>([
+    ...digest.dislikedSkus,
+    ...digest.purchasedSkus,
+    ...digest.cartSkus,
+  ]);
+  if (digest.currentSku) blocked.add(digest.currentSku);
+  return blocked;
+}
+
 function buildAllowlist(input: TrackingInput, digest: SignalDigest): Allowlist {
   const allowed = new Set<string>();
   for (const product of input.candidates) {
@@ -82,14 +100,7 @@ function buildAllowlist(input: TrackingInput, digest: SignalDigest): Allowlist {
 
   // Blocked structurally rather than by asking the model nicely. The prompt
   // says not to place these; this is what makes it true when it ignores us.
-  const blocked = new Set<string>([
-    ...digest.dislikedSkus,
-    ...digest.purchasedSkus,
-    ...digest.cartSkus,
-  ]);
-  if (digest.currentSku) blocked.add(digest.currentSku);
-
-  return { allowed, blocked };
+  return { allowed, blocked: neverRecommend(digest) };
 }
 
 /**
