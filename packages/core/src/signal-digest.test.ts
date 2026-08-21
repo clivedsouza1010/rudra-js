@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIGEST_LIMITS, buildDigest } from './digest.js';
+import { DIGEST_LIMITS, buildDigest } from './signal-digest.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, category = 'Trail Running') => ({

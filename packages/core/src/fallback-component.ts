@@ -1,6 +1,6 @@
-import type { GeneratedSpec, ProductRef } from './component-spec.js';
-import type { SignalDigest } from './digest.js';
-import { selectProducts, type ProductPick } from './select.js';
+import type { GeneratedSpec, ProductReference } from './component-spec.js';
+import type { SignalDigest } from './signal-digest.js';
+import { selectProducts, type ProductPick } from './product-selection.js';
 import type { TrackingInput } from './tracking-input.js';
 
 /**
@@ -41,7 +41,7 @@ function columnsFor(itemCount: number): 2 | 3 | 4 {
   return 2;
 }
 
-function toProductRef(pick: ProductPick, index: number, total: number): ProductRef {
+function toProductReference(pick: ProductPick, index: number, total: number): ProductReference {
   return {
     sku: pick.product.sku,
     basis: pick.basis,
@@ -60,7 +60,7 @@ function toProductRef(pick: ProductPick, index: number, total: number): ProductR
 export function buildFallbackSpec(input: TrackingInput, digest: SignalDigest): GeneratedSpec {
   const picks = selectProducts(input, digest).slice(0, digest.maxItems);
   const { headline, subheadline } = headlineFor(digest);
-  const items = picks.map((pick, index) => toProductRef(pick, index, picks.length));
+  const items = picks.map((pick, index) => toProductReference(pick, index, picks.length));
 
   return {
     tone: 'neutral',

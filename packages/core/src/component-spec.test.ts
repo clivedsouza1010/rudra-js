@@ -7,7 +7,7 @@ import {
   TONES,
   blockSchema,
   generatedSpecSchema,
-  productRefSchema,
+  productReferenceSchema,
   safeParseGeneratedSpec,
   type Block,
   type GeneratedSpec,
@@ -107,7 +107,7 @@ describe('generatedSpecSchema', () => {
     // letting the model send null, which is a pick with no stated reason.
     ['null', { ...productRef, basis: null }],
   ])('rejects a basis that is %s, so no pick goes unexplained', (_label, ref) => {
-    expect(productRefSchema.safeParse(ref).success).toBe(false);
+    expect(productReferenceSchema.safeParse(ref).success).toBe(false);
   });
 
   it.each([...EMPHASIS])('accepts the emphasis %s', (emphasis) => {
@@ -134,7 +134,7 @@ describe('what the model cannot say', () => {
     // Stripped rather than rejected: a stray key from a model is drift, and
     // failing the whole generation over it would cost the shopper the
     // component. What matters is that it cannot reach the renderer.
-    const parsed = productRefSchema.parse({ ...productRef, ...extra });
+    const parsed = productReferenceSchema.parse({ ...productRef, ...extra });
 
     expect(Object.keys(parsed).toSorted()).toEqual(['badge', 'basis', 'emphasis', 'reason', 'sku']);
     for (const key of Object.keys(extra)) {
@@ -181,7 +181,7 @@ describe('provider structured-output compatibility', () => {
 
   it('declares every property of a product reference as required', () => {
     const parsed = JSON.parse(serialised) as Record<string, unknown>;
-    const refSchema = z.toJSONSchema(productRefSchema, { io: 'output' }) as {
+    const refSchema = z.toJSONSchema(productReferenceSchema, { io: 'output' }) as {
       properties: Record<string, unknown>;
       required?: string[];
     };
@@ -198,8 +198,8 @@ describe('provider structured-output compatibility', () => {
       emphasis: 'normal',
     };
 
-    expect(productRefSchema.safeParse(withoutBadge).success).toBe(false);
-    expect(productRefSchema.safeParse({ ...withoutBadge, badge: null }).success).toBe(true);
+    expect(productReferenceSchema.safeParse(withoutBadge).success).toBe(false);
+    expect(productReferenceSchema.safeParse({ ...withoutBadge, badge: null }).success).toBe(true);
   });
 
   it('has no recursion, so the block union stays flat', () => {
@@ -244,7 +244,7 @@ describe('recommendation basis', () => {
   });
 
   it('keeps the prose separate from the claim it describes', () => {
-    const parsed = productRefSchema.parse({
+    const parsed = productReferenceSchema.parse({
       ...productRef,
       basis: 'most_viewed',
       reason: 'You keep coming back to this',

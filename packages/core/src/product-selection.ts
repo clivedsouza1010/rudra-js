@@ -1,6 +1,6 @@
 import type { RecommendationBasis } from './component-spec.js';
-import type { SignalDigest } from './digest.js';
-import { neverRecommend } from './reconcile.js';
+import type { SignalDigest } from './signal-digest.js';
+import { neverRecommend } from './reconciliation.js';
 import type { Product, TrackingInput } from './tracking-input.js';
 
 /**
@@ -120,7 +120,7 @@ export function selectProducts(input: TrackingInput, digest: SignalDigest): Prod
 
   const picks: ProductPick[] = [];
   for (const product of input.candidates) {
-    if (!product.inStock) continue;
+    if (!product.isInStock) continue;
     if (excluded.has(product.sku)) continue;
 
     const categoryScore = (affinityByCategory.get(product.category) ?? 0) / strongestAffinity;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildDigest } from './digest.js';
-import { selectProducts } from './select.js';
+import { buildDigest } from './signal-digest.js';
+import { selectProducts } from './product-selection.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
@@ -29,7 +29,7 @@ const skus = (picks: ReturnType<typeof selectProducts>) => picks.map((pick) => p
 
 describe('what the selector refuses to pick', () => {
   it.each([
-    ['out of stock', { candidates: [product('TR-101', { inStock: false }), product('TR-102')] }],
+    ['out of stock', { candidates: [product('TR-101', { isInStock: false }), product('TR-102')] }],
     ['disliked', { signals: { dislikes: [{ sku: 'TR-101' }] } }],
     ['already purchased', { signals: { lastPurchased: [{ sku: 'TR-101' }] } }],
     ['already in the cart', { signals: { cart: [{ sku: 'TR-101' }] } }],
@@ -39,7 +39,7 @@ describe('what the selector refuses to pick', () => {
   });
 
   it('returns nothing when every candidate is ineligible', () => {
-    expect(pickFor({ candidates: [product('TR-101', { inStock: false })] })).toEqual([]);
+    expect(pickFor({ candidates: [product('TR-101', { isInStock: false })] })).toEqual([]);
   });
 });
 

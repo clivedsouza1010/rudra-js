@@ -66,7 +66,7 @@ does not exist or is not merchandised for this shopper. SKUs must be unique.
 | `context.locale`           | `'en-US'`           |
 | `context.maxItems`         | `4`                 |
 | `candidates[].currency`    | `'USD'`             |
-| `candidates[].inStock`     | `true`              |
+| `candidates[].isInStock`   | `true`              |
 | `candidates[].tags`        | `[]`                |
 | `signals.*`                | `[]`                |
 | `mostViewed[].views`       | `1`                 |

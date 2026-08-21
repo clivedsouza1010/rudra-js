@@ -74,7 +74,7 @@ export const RECOMMENDATION_BASES = [
 ] as const;
 
 /** A reference to one product from the candidate set, and why it was chosen. */
-export const productRefSchema = z.object({
+export const productReferenceSchema = z.object({
   /** Must be a SKU the host supplied in `TrackingInput.candidates`. */
   sku: z.string(),
   /**
@@ -96,7 +96,7 @@ export const productRefSchema = z.object({
   badge: z.string().nullable(),
   emphasis: z.enum(EMPHASIS),
 });
-export type ProductRef = z.infer<typeof productRefSchema>;
+export type ProductReference = z.infer<typeof productReferenceSchema>;
 export type RecommendationBasis = (typeof RECOMMENDATION_BASES)[number];
 
 /** One large featured statement, optionally anchored to a single product. */
@@ -113,14 +113,14 @@ const gridBlockSchema = z.object({
   kind: z.literal('grid'),
   title: z.string().nullable(),
   columns: z.union([z.literal(2), z.literal(3), z.literal(4)]),
-  items: z.array(productRefSchema),
+  items: z.array(productReferenceSchema),
 });
 
 /** A horizontally scanned row, for when order implies a ranking. */
 const carouselBlockSchema = z.object({
   kind: z.literal('carousel'),
   title: z.string().nullable(),
-  items: z.array(productRefSchema),
+  items: z.array(productReferenceSchema),
 });
 
 /** A single line of merchandising copy. */
@@ -191,7 +191,7 @@ export interface ComponentSpec extends GeneratedSpec {
   provider: string | null;
   /** Model identifier, or null when no model was involved. */
   model: string | null;
-  /** Set when the model path was attempted and did not produce a usable spec. */
+  /** Set when the model path was attempted and did not produce a isUsable spec. */
   degradedReason?: string;
 }
 

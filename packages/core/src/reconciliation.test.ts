@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { RECOMMENDATION_BASES, type GeneratedSpec, type ProductRef } from './component-spec.js';
-import { buildDigest } from './digest.js';
-import { reconcileSpec, type ReconcileResult } from './reconcile.js';
+import {
+  RECOMMENDATION_BASES,
+  type GeneratedSpec,
+  type ProductReference,
+} from './component-spec.js';
+import { buildDigest } from './signal-digest.js';
+import { reconcileSpec, type ReconcileResult } from './reconciliation.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
@@ -27,7 +31,7 @@ function inputFor(overrides: Partial<TrackingInputDraft> = {}) {
   });
 }
 
-const ref = (sku: string, overrides: Partial<ProductRef> = {}): ProductRef => ({
+const ref = (sku: string, overrides: Partial<ProductReference> = {}): ProductReference => ({
   sku,
   basis: 'popular',
   reason: 'A dependable pick',
@@ -44,7 +48,7 @@ const specWith = (blocks: GeneratedSpec['blocks']): GeneratedSpec => ({
   rationale: 'Leaned on the category affinity.',
 });
 
-const grid = (items: ProductRef[]) =>
+const grid = (items: ProductReference[]) =>
   specWith([{ kind: 'grid', title: 'For you', columns: 3, items }]);
 
 /** Runs a spec through reconciliation against a given payload. */
@@ -54,7 +58,7 @@ function reconcile(spec: GeneratedSpec, overrides: Partial<TrackingInputDraft> =
 }
 
 /** The first product reference of a spec whose only block is a grid. */
-const basisOf = (result: ReconcileResult): ProductRef | undefined => {
+const basisOf = (result: ReconcileResult): ProductReference | undefined => {
   const [block] = result.spec.blocks;
   if (block?.kind !== 'grid') throw new Error('expected a grid');
   return block.items[0];
@@ -80,7 +84,7 @@ describe('product truth', () => {
 
   it('drops an out-of-stock candidate', () => {
     const result = reconcile(grid([ref('TR-101'), ref('TR-102')]), {
-      candidates: [product('TR-101'), product('TR-102', { inStock: false })],
+      candidates: [product('TR-101'), product('TR-102', { isInStock: false })],
     });
 
     expect(placedSkus(result.spec.blocks)).toEqual(['TR-101']);
@@ -332,7 +336,7 @@ describe('usability', () => {
   it('is unusable when every product was dropped', () => {
     const result = reconcile(grid([ref('GHOST-1'), ref('GHOST-2')]));
 
-    expect(result.usable).toBe(false);
+    expect(result.isUsable).toBe(false);
     expect(result.violations).toContain('unusable:no-products');
   });
 
@@ -341,21 +345,21 @@ describe('usability', () => {
       specWith([{ kind: 'copy', title: null, body: 'Trail season is here.' }]),
     );
 
-    expect(result.usable).toBe(false);
+    expect(result.isUsable).toBe(false);
   });
 
-  it('is usable when a single product survives', () => {
-    expect(reconcile(grid([ref('TR-101')])).usable).toBe(true);
+  it('is isUsable when a single product survives', () => {
+    expect(reconcile(grid([ref('TR-101')])).isUsable).toBe(true);
   });
 
-  it('is usable on a hero that kept its product', () => {
+  it('is isUsable on a hero that kept its product', () => {
     const result = reconcile(
       specWith([
         { kind: 'hero', headline: 'Pick of the season', body: null, sku: 'TR-101', ctaLabel: null },
       ]),
     );
 
-    expect(result.usable).toBe(true);
+    expect(result.isUsable).toBe(true);
   });
 
   it('keeps a hero as a headline when its product was rejected', () => {
@@ -376,7 +380,7 @@ describe('usability', () => {
     if (hero?.kind !== 'hero') throw new Error('expected a hero');
     expect(hero.sku).toBeNull();
     expect(hero.headline).toBe('Pick of the season');
-    expect(result.usable).toBe(true);
+    expect(result.isUsable).toBe(true);
   });
 
   it('reports an empty block rather than rendering it', () => {
@@ -433,7 +437,7 @@ describe('attributing a rejection to its real cause', () => {
   it('names a missing headline as such, not as a missing product', () => {
     const result = reconcile({ ...grid([ref('TR-101')]), headline: '   ' });
 
-    expect(result.usable).toBe(false);
+    expect(result.isUsable).toBe(false);
     expect(result.violations).toContain('unusable:no-headline');
     expect(result.violations).not.toContain('unusable:no-products');
   });
@@ -480,6 +484,6 @@ describe('an empty hero', () => {
     const [block] = result.spec.blocks;
     if (block?.kind !== 'hero') throw new Error('expected a hero');
     expect(block.sku).toBe('TR-101');
-    expect(result.usable).toBe(true);
+    expect(result.isUsable).toBe(true);
   });
 });
