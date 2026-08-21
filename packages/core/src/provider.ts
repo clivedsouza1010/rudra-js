@@ -55,9 +55,13 @@ export interface ProviderResult {
  *     response. Never return a partial or invented spec. The caller treats a
  *     throw as "use the deterministic component", which is always safe; a
  *     fabricated spec is not.
- *  3. Respect `signal`. The caller races the call against its own timeout
- *     regardless, so ignoring the signal does not hold a page open — but it
- *     does leave work running and billing after nobody is waiting.
+ *  3. Respect `signal`, in both directions: do not start work when it is
+ *     already aborted, and stop when it aborts mid-flight. The caller races
+ *     the call against its own timeout regardless, so ignoring it does not
+ *     hold a page open — but it does leave work running and billing after
+ *     nobody is waiting, and it answers a caller that has already given up.
+ *
+ *     `AbortSignal.throwIfAborted()` is the whole of the first half.
  *
  * The caller re-validates whatever comes back. An adapter that returns
  * something malformed is a bug, not a security hole.
@@ -82,6 +86,13 @@ export function createFixedSpecProvider(spec: GeneratedSpec): ComponentProvider 
   return {
     name: 'fixed',
     model: 'none',
-    generate: async () => ({ spec }),
+    generate: async ({ signal }) => {
+      // Nothing here is slow enough to need cancelling, which is exactly why it
+      // is worth checking: the obligation is not "cancel your work", it is "do
+      // not answer a caller that has already given up". A reference
+      // implementation that skips the cheap half teaches the wrong lesson.
+      signal.throwIfAborted();
+      return { spec };
+    },
   };
 }

@@ -15,6 +15,12 @@ const SPEC: GeneratedSpec = {
   rationale: 'Fixed spec for testing.',
 };
 
+const abortedSignal = (reason?: unknown): AbortSignal => {
+  const controller = new AbortController();
+  controller.abort(reason);
+  return controller.signal;
+};
+
 const request = (): ProviderRequest => ({
   system: 'system prompt',
   user: 'user turn',
@@ -53,6 +59,43 @@ describe('createFixedSpecProvider', () => {
     const result = await createFixedSpecProvider(SPEC).generate(request());
 
     expect(result.usage).toBeUndefined();
+  });
+});
+
+/**
+ * The contract says an adapter must not answer a caller that has already given
+ * up. The reference implementation does no slow work, which is exactly why it
+ * is worth checking here: an example that skips the cheap half of an obligation
+ * teaches every adapter author reading it to skip it too.
+ */
+describe('an aborted request', () => {
+  it('is rejected rather than answered', async () => {
+    const provider = createFixedSpecProvider(SPEC);
+
+    await expect(provider.generate({ ...request(), signal: abortedSignal() })).rejects.toThrow();
+  });
+
+  it('rejects with an AbortError, which is what a caller keys on', async () => {
+    const provider = createFixedSpecProvider(SPEC);
+
+    await expect(
+      provider.generate({ ...request(), signal: abortedSignal() }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it("propagates the caller's own reason rather than inventing one", async () => {
+    const provider = createFixedSpecProvider(SPEC);
+    const reason = new Error('generation budget elapsed');
+
+    await expect(provider.generate({ ...request(), signal: abortedSignal(reason) })).rejects.toBe(
+      reason,
+    );
+  });
+
+  it('does not reject a request whose signal is still live', async () => {
+    const provider = createFixedSpecProvider(SPEC);
+
+    await expect(provider.generate(request())).resolves.toMatchObject({ spec: SPEC });
   });
 });
 
