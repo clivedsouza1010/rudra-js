@@ -5,5 +5,13 @@
     "suspicious": "error",
     "perf": "warn"
   },
-  "ignorePatterns": ["dist", "package-lock.json"]
+  "ignorePatterns": ["dist", "package-lock.json"],
+  "rules": {
+    "unicorn/filename-case": [
+      "error",
+      {
+        "case": "kebabCase"
+      }
+    ]
+  }
 }

@@ -1,5 +1,10 @@
-import type { Block, GeneratedSpec, ProductRef, RecommendationBasis } from './component-spec.js';
-import type { SignalDigest } from './digest.js';
+import type {
+  Block,
+  GeneratedSpec,
+  ProductReference,
+  RecommendationBasis,
+} from './component-spec.js';
+import type { SignalDigest } from './signal-digest.js';
 import type { Product, TrackingInput } from './tracking-input.js';
 
 /**
@@ -12,7 +17,7 @@ import type { Product, TrackingInput } from './tracking-input.js';
  * become impossible.
  *
  * Nothing here trusts the model. A generation that survives every rule and
- * still has nothing to show degrades to `usable: false`, and the caller renders
+ * still has nothing to show degrades to `isUsable: false`, and the caller renders
  * the deterministic component instead.
  *
  * Repair, not rejection, is the default. A slightly clipped headline is a better
@@ -43,7 +48,7 @@ const MAX_BLOCKS = 4;
 export interface ReconcileResult {
   spec: GeneratedSpec;
   /** True when something survived that is worth rendering. */
-  usable: boolean;
+  isUsable: boolean;
   /** Machine-readable notes on what was removed or changed, for evaluation. */
   violations: string[];
 }
@@ -95,7 +100,7 @@ function buildAllowlist(input: TrackingInput, digest: SignalDigest): Allowlist {
   const allowed = new Set<string>();
   for (const product of input.candidates) {
     // An out-of-stock candidate is not a recommendation, it is a dead end.
-    if (product.inStock) allowed.add(product.sku);
+    if (product.isInStock) allowed.add(product.sku);
   }
 
   // Blocked structurally rather than by asking the model nicely. The prompt
@@ -181,13 +186,13 @@ function rejectionFor(sku: string, allowlist: Allowlist, tracker: PlacementTrack
 }
 
 function reconcileItems(
-  items: ProductRef[],
+  items: ProductReference[],
   allowlist: Allowlist,
   candidatesBySku: Map<string, Product>,
   digest: SignalDigest,
   tracker: PlacementTracker,
-): ProductRef[] {
-  const kept: ProductRef[] = [];
+): ProductReference[] {
+  const kept: ProductReference[] = [];
 
   for (const item of items) {
     const rejection = rejectionFor(item.sku, allowlist, tracker);
@@ -202,15 +207,15 @@ function reconcileItems(
 
     tracker.place(item.sku);
 
-    const basisHolds = verifyBasis(item.basis, product, digest);
-    if (!basisHolds) tracker.record(`unsupported-basis:${item.basis}:${item.sku}`);
+    const hasSupportedBasis = verifyBasis(item.basis, product, digest);
+    if (!hasSupportedBasis) tracker.record(`unsupported-basis:${item.basis}:${item.sku}`);
 
     kept.push({
       sku: item.sku,
-      basis: basisHolds ? item.basis : 'popular',
+      basis: hasSupportedBasis ? item.basis : 'popular',
       // The prose exists to state the basis. If the basis did not hold, the
       // prose is a claim we just decided is untrue.
-      reason: basisHolds ? clampNullable(item.reason, CLAMP.reason) : null,
+      reason: hasSupportedBasis ? clampNullable(item.reason, CLAMP.reason) : null,
       badge: clampNullable(item.badge, CLAMP.badge),
       emphasis: item.emphasis,
     });
@@ -355,7 +360,7 @@ export function reconcileSpec(
   // headline" are different failures and want different fixes.
   if (!showsAnyProduct(blocks)) tracker.record('unusable:no-products');
   if (spec.headline.length === 0) tracker.record('unusable:no-headline');
-  const usable = showsAnyProduct(blocks) && spec.headline.length > 0;
+  const isUsable = showsAnyProduct(blocks) && spec.headline.length > 0;
 
-  return { spec, usable, violations: tracker.violations };
+  return { spec, isUsable, violations: tracker.violations };
 }

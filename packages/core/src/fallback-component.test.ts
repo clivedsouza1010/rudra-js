@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { GeneratedSpec } from './component-spec.js';
-import { buildDigest } from './digest.js';
-import { buildFallbackSpec } from './fallback.js';
-import { reconcileSpec } from './reconcile.js';
+import { buildDigest } from './signal-digest.js';
+import { buildFallbackSpec } from './fallback-component.js';
+import { reconcileSpec } from './reconciliation.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
@@ -34,7 +34,7 @@ const gridOf = (spec: GeneratedSpec) => {
 
 describe('the deterministic component', () => {
   it('renders nothing rather than an empty region when nothing is eligible', () => {
-    const { spec } = build({ candidates: [product('TR-101', { inStock: false })] });
+    const { spec } = build({ candidates: [product('TR-101', { isInStock: false })] });
 
     expect(spec.blocks).toEqual([]);
   });
@@ -122,9 +122,9 @@ describe('survives its own reconciliation', () => {
     expect(reconcileSpec(spec, input, digest).spec).toEqual(spec);
   });
 
-  it('is usable whenever it produced anything at all', () => {
+  it('is isUsable whenever it produced anything at all', () => {
     const { spec, input, digest } = build();
 
-    expect(reconcileSpec(spec, input, digest).usable).toBe(true);
+    expect(reconcileSpec(spec, input, digest).isUsable).toBe(true);
   });
 });

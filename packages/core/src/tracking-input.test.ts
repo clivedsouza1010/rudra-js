@@ -52,7 +52,7 @@ describe('parseTrackingInput', () => {
     expect(input.context.locale).toBe('en-US');
     expect(input.context.maxItems).toBe(4);
     expect(input.candidates[0]?.currency).toBe('USD');
-    expect(input.candidates[0]?.inStock).toBe(true);
+    expect(input.candidates[0]?.isInStock).toBe(true);
     expect(input.candidates[0]?.tags).toEqual([]);
   });
 

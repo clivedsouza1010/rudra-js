@@ -91,7 +91,7 @@ export const productSchema = z.strictObject({
   // scheme to abuse.
   imageUrl: imageReference().optional(),
   rating: z.number().min(0).max(5).optional(),
-  inStock: z.boolean().default(true),
+  isInStock: z.boolean().default(true),
   tags: z
     .array(z.string().min(1).max(FIELD_LIMITS.tag))
     .max(FIELD_LIMITS.tagsPerProduct)

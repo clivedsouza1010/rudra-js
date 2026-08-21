@@ -37,7 +37,7 @@ export {
   type InteractionCount,
   type SignalDigest,
   type ViewedProduct,
-} from './digest.js';
+} from './signal-digest.js';
 
 export {
   BANNER_TONES,
@@ -48,7 +48,7 @@ export {
   blockSchema,
   generatedSpecSchema,
   parseGeneratedSpec,
-  productRefSchema,
+  productReferenceSchema,
   safeParseGeneratedSpec,
   type BannerBlock,
   type Block,
@@ -59,11 +59,11 @@ export {
   type GeneratedSpec,
   type GridBlock,
   type HeroBlock,
-  type ProductRef,
+  type ProductReference,
   type RecommendationBasis,
   type SpecSource,
 } from './component-spec.js';
 
-export { neverRecommend, reconcileSpec, type ReconcileResult } from './reconcile.js';
-export { selectProducts, type ProductPick } from './select.js';
-export { buildFallbackSpec } from './fallback.js';
+export { neverRecommend, reconcileSpec, type ReconcileResult } from './reconciliation.js';
+export { selectProducts, type ProductPick } from './product-selection.js';
+export { buildFallbackSpec } from './fallback-component.js';
