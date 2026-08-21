@@ -17,7 +17,7 @@ import type { Product, TrackingInput } from './tracking-input.js';
  *     able to ask that question honestly.
  */
 
-export interface Pick {
+export interface ProductPick {
   product: Product;
   /** Why this product, stated so reconciliation can check it. */
   basis: RecommendationBasis;
@@ -107,7 +107,7 @@ function basisFor(
  * Ties break on SKU so the order is total: two runs over the same payload
  * produce the same list, which is what makes the control arm reproducible.
  */
-export function selectProducts(input: TrackingInput, digest: SignalDigest): Pick[] {
+export function selectProducts(input: TrackingInput, digest: SignalDigest): ProductPick[] {
   const affinityByCategory = new Map(
     digest.categoryAffinity.map((affinity) => [affinity.category, affinity.score]),
   );
@@ -118,7 +118,7 @@ export function selectProducts(input: TrackingInput, digest: SignalDigest): Pick
   const excluded = neverRecommend(digest);
   const viewsBySku = new Map(digest.topViewed.map((viewed) => [viewed.sku, viewed.views]));
 
-  const picks: Pick[] = [];
+  const picks: ProductPick[] = [];
   for (const product of input.candidates) {
     if (!product.inStock) continue;
     if (excluded.has(product.sku)) continue;

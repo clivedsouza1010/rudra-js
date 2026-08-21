@@ -1,6 +1,6 @@
 import type { GeneratedSpec, ProductRef } from './component-spec.js';
 import type { SignalDigest } from './digest.js';
-import { selectProducts, type Pick } from './select.js';
+import { selectProducts, type ProductPick } from './select.js';
 import type { TrackingInput } from './tracking-input.js';
 
 /**
@@ -41,7 +41,7 @@ function columnsFor(itemCount: number): 2 | 3 | 4 {
   return 2;
 }
 
-function toProductRef(pick: Pick, index: number, total: number): ProductRef {
+function toProductRef(pick: ProductPick, index: number, total: number): ProductRef {
   return {
     sku: pick.product.sku,
     basis: pick.basis,
