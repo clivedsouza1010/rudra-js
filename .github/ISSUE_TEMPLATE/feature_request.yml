@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest something the framework should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        rudra-js deliberately does a narrow thing: it turns one validated payload
+        into one renderable component specification. It does not collect,
+        store, or aggregate tracking data, and it does not ship a model.
+        Proposals that stay inside that boundary are much easier to accept.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that is hard or impossible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: Rough shape is fine. An API sketch helps if you have one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: >
+        Including whether this can be done in host code today. If it can, say
+        what makes that unsatisfying — that is often the most useful part.
