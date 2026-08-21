@@ -67,3 +67,11 @@ export {
 export { neverRecommend, reconcileSpec, type ReconcileResult } from './reconciliation.js';
 export { selectProducts, type ProductPick } from './product-selection.js';
 export { buildFallbackSpec } from './fallback-component.js';
+
+export {
+  createFixedSpecProvider,
+  type ComponentProvider,
+  type ProviderRequest,
+  type ProviderResult,
+  type TokenUsage,
+} from './provider.js';
