@@ -1,0 +1,46 @@
+name: Bug report
+description: Something behaves differently from what the documentation says
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file this. If you have found a security
+        vulnerability, please [report it privately][advisory] instead.
+
+        [advisory]: https://github.com/clivedsouza1010/rudra-js/security/advisories/new
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: >
+        The smallest tracking payload and call that shows the problem. A failing
+        test is ideal, but a payload plus the output you saw is plenty.
+      render: typescript
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The `@rudra/core` version, or the commit if you are on a branch.
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Node version
+      description: Output of `node --version`. The package needs ^20.19 or >=22.12.
+    validations:
+      required: true

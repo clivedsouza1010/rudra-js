@@ -1,5 +1,47 @@
 # Contributing to rudra-js
 
+Thanks for looking. This is a small project maintained in spare time, so the
+most useful thing you can do before writing code is open an issue and check the
+idea fits — see _Scope_ below.
+
+## Getting set up
+
+Node `^20.19` or `>=22.12` is required; TypeScript 7 and Vitest 4 both refuse
+anything older, and fail with an error that never mentions Node. There is an
+`.nvmrc`.
+
+```sh
+nvm use
+npm install
+npm run build      # the packages resolve each other through dist/
+npm test
+```
+
+`npm run test:watch` while you work.
+
+## Scope
+
+rudra-js turns **one validated tracking payload into one renderable component
+specification**. That boundary is the design, not an accident:
+
+- It does not collect, store, or aggregate tracking data. The host owns its
+  pipeline and hands over a JSON object per render.
+- It does not ship a model. Adapters implement `ComponentProvider`.
+- It does not own the rendering. A registry of components does.
+
+Proposals that stay inside that boundary are easy to accept. Proposals that move
+it need a conversation first, because the answer is often "your host can do this
+already" — and hearing that after you have written the code is nobody's idea of
+a good time.
+
+## Sending a change
+
+- One coherent change per pull request. A rename and a bug fix in the same
+  branch is two pull requests wearing one coat.
+- Every check below has to pass. CI runs the same ones.
+- Explain in the description what you did to convince yourself the tests would
+  catch a regression. That is worth more than a coverage number.
+
 ## Naming
 
 Names in a published package are permanent in a way internal names are not: a
@@ -102,3 +144,15 @@ npm run lint
 npm run format:check
 npm test
 ```
+
+## Reporting a security issue
+
+Please do not open a public issue. See [SECURITY.md](./SECURITY.md) — GitHub's
+private vulnerability reporting gives us a private thread and a private fork to
+prepare a fix in.
+
+## Behaviour
+
+This project follows the [Contributor Covenant](./CODE_OF_CONDUCT.md). It
+applies in issues, pull requests, discussions, and anywhere else the project is
+represented.
