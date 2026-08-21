@@ -75,3 +75,11 @@ export {
   type ProviderResult,
   type TokenUsage,
 } from './provider.js';
+
+export {
+  createMemorySpecCache,
+  createNullSpecCache,
+  specCacheKey,
+  type MemorySpecCacheOptions,
+  type SpecCache,
+} from './spec-cache.js';
