@@ -26,3 +26,8 @@ been published.
 - The deterministic selector and fallback component, which render when no model
   does and act as the control arm for evaluation.
 - The language-model port, keeping the package free of any vendor SDK.
+- The spec cache: a store port plus an in-memory implementation, keyed on the
+  whole signal digest so no field can drift out of the key.
+- The model prompt: a cacheable instruction half and a per-shopper half, with
+  every host-supplied value quoted and escaped so it cannot introduce prompt
+  structure.

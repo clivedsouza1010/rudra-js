@@ -62,8 +62,10 @@ without the second half is not a posture.
 
 ### The short version
 
-The model has no tools, no network, no data access, and no ability to name a
-product the shop did not supply. It emits a fixed JSON shape and nothing else.
+The model has no tools, no network and no data access. It emits a fixed JSON
+shape and nothing else, and it cannot **place** a product the shop did not
+supply — every SKU is checked against the shop's own list. It can still write a
+product name into prose, which nothing prevents.
 An injection that fully succeeds — one where the model does exactly what the
 attacker's text says — can change the wording and the ordering of a
 recommendation block. It cannot reach anything.
@@ -101,14 +103,23 @@ proportionate when the primary model can act. This one cannot.
 ### Residual risk, stated plainly
 
 - **Wording.** Roughly a kilobyte of model-written prose reaches the page per
-  render. It is length-clamped, cannot contain markup, and cannot state a price
-  or a stock level — but a successful injection could still make it odd,
-  off-brand, or embarrassing. There is no classifier reading it.
+  render. It is length-clamped and cannot contain markup, because the schema has
+  no field that carries markup. It **can** contain anything else the model
+  writes: a price, a discount, a stock claim, or a competitor's product name.
+  The prompt instructs against all of those, and instruction is not enforcement
+  — this is the one place the design relies on persuading the model rather than
+  constraining it. There is no classifier reading the output.
 - **Instruction disclosure.** A determined injection could get fragments of the
   instruction half echoed back inside a text field. Those instructions are open
   source and in this repository, so the loss is small, but it is not zero.
-- **Monitoring.** Per-request logging and rate limiting are not here yet. The
-  generator emits events for it; the aggregation is not built.
+- **Monitoring.** Per-request logging and rate limiting are not here yet, and
+  neither is the generator that would emit the events they need.
+
+- **Invisible characters.** The escaping covers every character category that
+  can carry hidden text. A few individual code points that render blank are
+  _letters_ rather than format characters — U+3164 Hangul filler, for one — and
+  are left alone, because they are legitimate in Korean text and cannot encode
+  an instruction on their own. They can pad a value; they cannot smuggle one.
 
 If you find a way past the structural controls — output reaching the page as
 anything but escaped text, a product named from outside the shop's list, or a
