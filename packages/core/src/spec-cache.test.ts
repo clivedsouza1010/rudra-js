@@ -212,3 +212,43 @@ describe('the null cache', () => {
     expect(await cache.get('key')).toBeUndefined();
   });
 });
+
+/**
+ * These are normally supplied as `Number(process.env.SOMETHING)`, and an unset
+ * variable makes that NaN. Every comparison against NaN is false, so an
+ * unchecked cache would never expire an entry and never evict one — growing
+ * forever while serving last week's component, with nothing to report it.
+ */
+describe('rejecting nonsense limits at construction', () => {
+  it.each([
+    ['ttlMs is NaN, as an unset environment variable would give', { ttlMs: Number(undefined) }],
+    ['ttlMs is Infinity', { ttlMs: Number.POSITIVE_INFINITY }],
+    ['ttlMs is negative', { ttlMs: -1 }],
+    ['maxEntries is NaN', { maxEntries: Number('not a number') }],
+    ['maxEntries is Infinity', { maxEntries: Number.POSITIVE_INFINITY }],
+    ['maxEntries is negative', { maxEntries: -1 }],
+    ['maxEntries is fractional', { maxEntries: 2.5 }],
+  ])('refuses to build when %s', (_label, options) => {
+    expect(() => createMemorySpecCache(options)).toThrow(RangeError);
+  });
+
+  it('names the likely cause when the value is NaN', () => {
+    expect(() => createMemorySpecCache({ ttlMs: Number.NaN })).toThrow(/environment variable/);
+  });
+
+  it.each([
+    ['the defaults', {}],
+    ['a zero TTL, which expires immediately', { ttlMs: 0 }],
+    ['a zero ceiling, which keeps nothing', { maxEntries: 0 }],
+    ['ordinary values', { ttlMs: 30_000, maxEntries: 500 }],
+  ])('still accepts %s', (_label, options) => {
+    expect(() => createMemorySpecCache(options)).not.toThrow();
+  });
+
+  it('keeps nothing when the ceiling is zero', async () => {
+    const cache = createMemorySpecCache({ maxEntries: 0 });
+    await cache.set('key', SPEC);
+
+    expect(await cache.get('key')).toBeUndefined();
+  });
+});

@@ -34,6 +34,15 @@ export interface MemorySpecCacheOptions {
   now?: () => number;
 }
 
+function assertFiniteAtLeastZero(name: string, value: number): void {
+  if (Number.isFinite(value) && value >= 0) return;
+
+  const hint = Number.isNaN(value)
+    ? ' (a common cause is Number() on an environment variable that is not set)'
+    : '';
+  throw new RangeError(`${name} must be a finite number of at least 0, received ${value}${hint}`);
+}
+
 interface CacheEntry {
   spec: GeneratedSpec;
   expiresAt: number;
@@ -50,6 +59,19 @@ interface CacheEntry {
 export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): SpecCache {
   const ttlMs = options.ttlMs ?? 60_000;
   const maxEntries = options.maxEntries ?? 10_000;
+
+  // Checked rather than trusted, because the way these are usually supplied is
+  // `Number(process.env.SOMETHING)`, and an unset or misspelled variable makes
+  // that NaN. Every comparison against NaN is false, so the cache would then
+  // never expire an entry and never evict one — it would grow forever while
+  // serving a shopper the component they were given last week, and nothing
+  // would report it. Failing at construction is the only loud option.
+  assertFiniteAtLeastZero('ttlMs', ttlMs);
+  assertFiniteAtLeastZero('maxEntries', maxEntries);
+  if (!Number.isSafeInteger(maxEntries)) {
+    throw new RangeError(`maxEntries must be a whole number, received ${maxEntries}`);
+  }
+
   const now = options.now ?? Date.now;
   const entries = new Map<string, CacheEntry>();
 
