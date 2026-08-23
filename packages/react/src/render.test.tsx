@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { ComponentSpec, GeneratedSpec, Product } from '@rudra/core';
@@ -48,7 +49,7 @@ const spec = (
 const gridSpec = (items = [reference('TR-101')], overrides: Partial<ComponentSpec> = {}) =>
   spec([{ kind: 'grid', title: 'For you', columns: 2, items }], overrides);
 
-const html = (element: React.ReactElement) => renderToStaticMarkup(element);
+const html = (element: ReactElement) => renderToStaticMarkup(element);
 const render = (componentSpec: ComponentSpec, props = {}) =>
   html(<RudraComponent spec={componentSpec} products={CATALOG} {...props} />);
 
