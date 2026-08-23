@@ -80,8 +80,16 @@ export {
   createMemorySpecCache,
   createNullSpecCache,
   specCacheKey,
+  type CachedSpec,
   type MemorySpecCacheOptions,
   type SpecCache,
 } from './spec-cache.js';
 
 export { SYSTEM_PROMPT, buildPrompt, type PromptPair } from './model-prompt.js';
+
+export {
+  createComponentGenerator,
+  type ComponentGenerator,
+  type ComponentGeneratorOptions,
+  type GenerationEvent,
+} from './component-generator.js';

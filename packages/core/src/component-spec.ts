@@ -191,7 +191,11 @@ export interface ComponentSpec extends GeneratedSpec {
   provider: string | null;
   /** Model identifier, or null when no model was involved. */
   model: string | null;
-  /** Set when the model path was attempted and did not produce a isUsable spec. */
+  /**
+   * Why the deterministic component is showing instead of a generated one.
+   * Present on every fallback, including the ones where no model was involved
+   * at all — no provider configured, or the caller asked for it directly.
+   */
   degradedReason?: string;
 }
 

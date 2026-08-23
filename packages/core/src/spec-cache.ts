@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { GeneratedSpec } from './component-spec.js';
+import { SPEC_VERSION, type GeneratedSpec } from './component-spec.js';
 import type { SignalDigest } from './signal-digest.js';
 
 /**
@@ -20,9 +20,22 @@ import type { SignalDigest } from './signal-digest.js';
  * make the shared store the docs recommend impossible to write, since no Redis
  * or Memcached client can return a value without awaiting.
  */
+/**
+ * A stored generation, with the moment it was produced.
+ *
+ * The timestamp travels with the spec because it cannot be recovered later: a
+ * component served from cache is not newly generated, and `generatedAt` is the
+ * only way anything downstream can tell how stale what it is showing has become.
+ */
+export interface CachedSpec {
+  spec: GeneratedSpec;
+  /** Epoch milliseconds at which the model produced this. */
+  generatedAt: number;
+}
+
 export interface SpecCache {
-  get(key: string): Promise<GeneratedSpec | undefined>;
-  set(key: string, spec: GeneratedSpec): Promise<void>;
+  get(key: string): Promise<CachedSpec | undefined>;
+  set(key: string, cached: CachedSpec): Promise<void>;
 }
 
 export interface MemorySpecCacheOptions {
@@ -44,7 +57,7 @@ function assertFiniteAtLeastZero(name: string, value: number): void {
 }
 
 interface CacheEntry {
-  spec: GeneratedSpec;
+  cached: CachedSpec;
   expiresAt: number;
 }
 
@@ -89,12 +102,12 @@ export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): Spe
       // the eviction below least-recently-used rather than oldest-written.
       entries.delete(key);
       entries.set(key, entry);
-      return entry.spec;
+      return entry.cached;
     },
 
-    async set(key, spec) {
+    async set(key, cached) {
       entries.delete(key);
-      entries.set(key, { spec, expiresAt: now() + ttlMs });
+      entries.set(key, { cached, expiresAt: now() + ttlMs });
 
       while (entries.size > maxEntries) {
         const oldest = entries.keys().next();
@@ -166,7 +179,9 @@ export function specCacheKey(
   providerId: string,
 ): string {
   const material = canonicalise({
-    version: 1,
+    // The spec's own version, so a shape change cannot read entries written by
+    // the previous shape out of a shared store that outlives a deploy.
+    specVersion: SPEC_VERSION,
     provider: providerId,
     digest,
     candidates: candidateSkus.toSorted(),
