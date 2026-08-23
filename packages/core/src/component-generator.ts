@@ -33,19 +33,33 @@ import {
  * be loud.
  */
 
-/** Reported for every generation, so cost and hit rate are measurable. */
-export type GenerationEvent =
-  | { type: 'cache_hit'; key: string; elapsedMs: number }
-  | {
-      type: 'generated';
-      key: string;
-      elapsedMs: number;
-      provider: string;
-      model: string;
-      violations: string[];
-      usage?: TokenUsage;
-    }
-  | { type: 'fallback'; key: string | null; elapsedMs: number; reason: string };
+/**
+ * Reported exactly once per call to `generate`, whatever happened.
+ *
+ * One flat shape rather than a variant per outcome, because the numbers the
+ * evaluation needs are ratios over all calls — hit rate, fallback share, model
+ * calls and cost per thousand views. A variant that some callers do not emit
+ * makes every one of those ratios wrong by however many it skipped, which is
+ * what happened when requests that joined an in-flight generation reported
+ * nothing at all.
+ */
+export interface GenerationEvent {
+  /** Null when no key was computed, which means no provider was configured. */
+  key: string | null;
+  source: SpecSource;
+  /** Wall-clock milliseconds for the whole call. */
+  elapsedMs: number;
+  /**
+   * True only for the caller that actually reached the model. Requests that
+   * joined an in-flight generation share its answer and its usage figures, so
+   * cost must be summed over this flag rather than over every event.
+   */
+  calledModel: boolean;
+  /** What reconciliation removed. Absent when no spec was reconciled. */
+  violations?: string[];
+  usage?: TokenUsage;
+  degradedReason?: string;
+}
 
 export interface ComponentGeneratorOptions {
   /**
@@ -125,6 +139,8 @@ function createSingleFlight<T>() {
   const inFlight = new Map<string, Promise<T>>();
 
   return {
+    isRunning: (key: string) => inFlight.has(key),
+
     run(key: string, task: () => Promise<T>): Promise<T> {
       const existing = inFlight.get(key);
       if (existing) return existing;
@@ -134,6 +150,12 @@ function createSingleFlight<T>() {
       return started;
     },
   };
+}
+
+/** What the model said, plus what it cost. */
+interface ModelAnswer {
+  spec: GeneratedSpec;
+  usage?: TokenUsage;
 }
 
 /** Attaches the provenance the server owns. The model never supplies any of it. */
@@ -151,7 +173,7 @@ export function createComponentGenerator(
   const cache = options.cache ?? createMemorySpecCache();
   const modelTimeoutMs = options.modelTimeoutMs ?? 1_500;
   const cacheTimeoutMs = options.cacheTimeoutMs ?? 50;
-  const singleFlight = createSingleFlight<GeneratedSpec | null>();
+  const singleFlight = createSingleFlight<ModelAnswer | null>();
 
   const report = (event: GenerationEvent): void => {
     if (!options.onEvent) return;
@@ -162,31 +184,47 @@ export function createComponentGenerator(
     }
   };
 
-  const deterministic = (
+  const buildDeterministic = (
     input: TrackingInput,
     digest: SignalDigest,
     startedAt: number,
     key: string | null,
-    reason: string,
+    degradedReason: string,
   ): ComponentSpec => {
-    const elapsedMs = Date.now() - startedAt;
-    report({ type: 'fallback', key, elapsedMs, reason });
+    const finishedAt = Date.now();
+    report({
+      key,
+      source: 'fallback',
+      elapsedMs: finishedAt - startedAt,
+      calledModel: false,
+      degradedReason,
+    });
 
     return withProvenance(buildFallbackSpec(input, digest), {
       slot: digest.slot,
       source: 'fallback',
-      generatedAt: Date.now(),
-      latencyMs: elapsedMs,
+      generatedAt: finishedAt,
+      latencyMs: finishedAt - startedAt,
       provider: null,
       model: null,
-      degradedReason: reason,
+      degradedReason,
     });
   };
 
-  /** Reads the cache, treating any failure as a miss. */
+  /**
+   * Reads the cache, treating anything unexpected as a miss.
+   *
+   * The value is re-validated because a store is a port a host implements, and
+   * what comes back is no more trustworthy than what a model returns — a shared
+   * store outlives a deploy, so it can hold entries written by an older shape of
+   * the spec. Generating again is always safe; handing an unvalidated object to
+   * reconciliation is not.
+   */
   const readCache = async (key: string): Promise<GeneratedSpec | undefined> => {
     try {
-      return await withinBudget('cache read', cacheTimeoutMs, () => cache.get(key));
+      const stored = await withinBudget('cache read', cacheTimeoutMs, () => cache.get(key));
+      const parsed = generatedSpecSchema.safeParse(stored);
+      return parsed.success ? parsed.data : undefined;
     } catch {
       // A store that is down or slow degrades to generating, not to an error
       // page. Nothing here is worth failing a render over.
@@ -195,17 +233,38 @@ export function createComponentGenerator(
   };
 
   /**
-   * Asks the model, and returns null when it produced nothing usable — which is
-   * different from throwing, which means it failed.
+   * Writes to the cache without the render waiting for it.
+   *
+   * The spec is already in hand; nothing downstream needs the write to finish.
+   * Awaiting it put a second unbounded call to a host-implemented store on the
+   * render path, which is the failure this module exists to prevent arriving
+   * through the other door. The `Promise.resolve` wrapper is what catches a
+   * store that throws synchronously rather than rejecting.
+   */
+  const storeInBackground = (key: string, spec: GeneratedSpec): void => {
+    void Promise.resolve()
+      .then(() => cache.set(key, spec))
+      .catch(() => {
+        // A store that cannot be written is not a reason to fail a render.
+      });
+  };
+
+  /**
+   * Asks the model.
+   *
+   * Deliberately does not decide whether the answer is usable. That depends on
+   * the asking shopper's live facts — stock, dislikes, what is in their basket
+   * — and none of those are in the cache key, so a verdict reached here would
+   * be handed to every request that joined this one. Returns null only when the
+   * answer does not satisfy the schema, which is a fault of the adapter rather
+   * than a judgement about any shopper.
    */
   const askModel = async (
     active: ComponentProvider,
     input: TrackingInput,
     digest: SignalDigest,
-    key: string,
-  ): Promise<GeneratedSpec | null> => {
+  ): Promise<ModelAnswer | null> => {
     const { system, user } = buildPrompt(input, digest);
-    const askedAt = Date.now();
 
     const result = await withinBudget('generation', modelTimeoutMs, (signal) =>
       active.generate({ system, user, schema: generatedSpecSchema, signal }),
@@ -215,25 +274,14 @@ export function createComponentGenerator(
     const parsed = generatedSpecSchema.safeParse(result.spec);
     if (!parsed.success) return null;
 
-    const reconciled = reconcileSpec(parsed.data, input, digest);
-    report({
-      type: 'generated',
-      key,
-      elapsedMs: Date.now() - askedAt,
-      provider: active.name,
-      model: active.model,
-      violations: reconciled.violations,
-      ...(result.usage ? { usage: result.usage } : {}),
-    });
-
-    return reconciled.isUsable ? parsed.data : null;
+    return { spec: parsed.data, ...(result.usage ? { usage: result.usage } : {}) };
   };
 
   return {
     generateDeterministic(draft) {
       const startedAt = Date.now();
       const input = parseTrackingInput(draft);
-      return deterministic(input, buildDigest(input), startedAt, null, 'requested');
+      return buildDeterministic(input, buildDigest(input), startedAt, null, 'requested');
     },
 
     async generate(draft) {
@@ -244,7 +292,7 @@ export function createComponentGenerator(
       const digest = buildDigest(input);
 
       if (!provider) {
-        return deterministic(input, digest, startedAt, null, 'no-provider');
+        return buildDeterministic(input, digest, startedAt, null, 'no-provider');
       }
 
       const key = specCacheKey(
@@ -253,49 +301,63 @@ export function createComponentGenerator(
         `${provider.name}:${provider.model}`,
       );
 
-      let spec = await readCache(key);
-      let source: SpecSource = 'cache';
+      const cached = await readCache(key);
+      let calledModel = false;
+      let answer: ModelAnswer;
 
-      if (spec) {
-        report({ type: 'cache_hit', key, elapsedMs: Date.now() - startedAt });
+      if (cached) {
+        answer = { spec: cached };
       } else {
-        source = 'llm';
+        // Asked before joining, because by the time the shared promise settles
+        // the entry is gone and there is no way to tell a leader from a
+        // follower — and they must not both be counted as a model call.
+        calledModel = !singleFlight.isRunning(key);
+
+        let fresh: ModelAnswer | null;
         try {
-          spec =
-            (await singleFlight.run(key, () => askModel(provider, input, digest, key))) ??
-            undefined;
+          fresh = await singleFlight.run(key, () => askModel(provider, input, digest));
         } catch (error) {
           const reason = error instanceof TimeoutError ? 'timeout' : 'provider-error';
-          return deterministic(input, digest, startedAt, key, reason);
+          return buildDeterministic(input, digest, startedAt, key, reason);
         }
 
-        if (!spec) {
-          return deterministic(input, digest, startedAt, key, 'unusable-generation');
+        if (!fresh) {
+          return buildDeterministic(input, digest, startedAt, key, 'invalid-generation');
         }
+        answer = fresh;
 
-        // Stored unreconciled on purpose. Reconciliation checks stock and the
-        // shopper's live signals, and both move independently of this key — a
-        // product can sell out without the candidate list changing. Reconciling
-        // on the way out rather than on the way in means a cached component can
-        // never outlive the facts it was checked against.
-        await cache.set(key, spec).catch(() => {
-          // A store that cannot be written is not a reason to fail a render.
-        });
+        // Stored unreconciled on purpose, and stored even when it is unusable
+        // for this shopper. Reconciliation narrows a spec to one shopper's live
+        // facts, and those move independently of the key — a product can sell
+        // out and come back without the candidate list changing. Keeping what
+        // the model said means the restock is picked up from cache rather than
+        // paid for again.
+        if (calledModel) storeInBackground(key, fresh.spec);
       }
 
-      // One place where anything is served, whether it came from the model a
-      // moment ago or from the cache a minute ago. Both are checked against the
-      // same live facts.
-      const reconciled = reconcileSpec(spec, input, digest);
+      // One place where anything is served, whichever side of the cache it came
+      // from, and always against the facts of the shopper asking now.
+      const reconciled = reconcileSpec(answer.spec, input, digest);
       if (!reconciled.isUsable) {
-        return deterministic(input, digest, startedAt, key, 'unusable-on-serve');
+        return buildDeterministic(input, digest, startedAt, key, 'unusable-on-serve');
       }
+
+      const finishedAt = Date.now();
+      const source: SpecSource = cached ? 'cache' : 'llm';
+      report({
+        key,
+        source,
+        elapsedMs: finishedAt - startedAt,
+        calledModel,
+        violations: reconciled.violations,
+        ...(answer.usage ? { usage: answer.usage } : {}),
+      });
 
       return withProvenance(reconciled.spec, {
         slot: digest.slot,
         source,
-        generatedAt: Date.now(),
-        latencyMs: Date.now() - startedAt,
+        generatedAt: finishedAt,
+        latencyMs: finishedAt - startedAt,
         provider: provider.name,
         model: provider.model,
       });

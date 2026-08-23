@@ -31,3 +31,5 @@ been published.
 - The model prompt: a cacheable instruction half and a per-shopper half, with
   every host-supplied value quoted and escaped so it cannot introduce prompt
   structure.
+- The component generator: the order every other module goes in, which always
+  returns something renderable and never waits unbounded on a model or a store.

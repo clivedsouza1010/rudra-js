@@ -125,8 +125,12 @@ describe('always returns something renderable', () => {
     expect(await reasonFor({})).toBe('no-provider');
     expect(await reasonFor({ provider: throwingProvider() })).toBe('provider-error');
     expect(await reasonFor({ provider: hangingProvider(), modelTimeoutMs: 20 })).toBe('timeout');
-    expect(await reasonFor({ provider: respondingWith({ bad: true }) })).toBe(
-      'unusable-generation',
+    // A malformed answer is the adapter's fault; an answer that names nothing
+    // this shopper can be shown is the model's. They want different responses,
+    // so they get different reasons.
+    expect(await reasonFor({ provider: respondingWith({ bad: true }) })).toBe('invalid-generation');
+    expect(await reasonFor({ provider: respondingWith(modelSpec(['GHOST-1'])) })).toBe(
+      'unusable-on-serve',
     );
   });
 
@@ -216,6 +220,76 @@ describe('the cache', () => {
 
     expect(placedSkus(before)).toContain('TR-101');
     expect(placedSkus(after)).not.toContain('TR-101');
+    expect(after.source).toBe('cache');
+    expect(counted.calls).toBe(1);
+  });
+
+  it('picks a restocked product back up, without asking the model again', async () => {
+    const counted = countingProvider(modelSpec(['TR-101', 'TR-102']));
+    const generator = createComponentGenerator({
+      provider: counted.provider,
+      cache: createMemorySpecCache(),
+    });
+
+    // This is why the cache holds what the model said rather than what was
+    // servable at the time. Storing the narrowed form would lose TR-101 for the
+    // life of the entry, and no test would have noticed.
+    const soldOut = await generator.generate(
+      payload({ candidates: [product('TR-101', { isInStock: false }), product('TR-102')] }),
+    );
+    const restocked = await generator.generate(payload());
+
+    expect(placedSkus(soldOut)).not.toContain('TR-101');
+    expect(placedSkus(restocked)).toContain('TR-101');
+    expect(restocked.source).toBe('cache');
+    expect(counted.calls).toBe(1);
+  });
+
+  it('falls back when a cached spec has nothing left this shopper can see', async () => {
+    const counted = countingProvider(modelSpec(['TR-101']));
+    const generator = createComponentGenerator({
+      provider: counted.provider,
+      cache: createMemorySpecCache(),
+    });
+
+    await generator.generate(payload());
+    const after = await generator.generate(
+      payload({ candidates: [product('TR-101', { isInStock: false }), product('TR-102')] }),
+    );
+
+    expect(after.source).toBe('fallback');
+    expect(after.degradedReason).toBe('unusable-on-serve');
+  });
+
+  it.each([
+    [
+      'a store that hangs on write',
+      { get: async () => undefined, set: () => new Promise<void>(() => {}) },
+    ],
+    [
+      'a store that throws synchronously on write',
+      {
+        get: async () => undefined,
+        set: () => {
+          throw new Error('cannot serialise');
+        },
+      },
+    ],
+    [
+      'a store returning an entry of the wrong shape',
+      {
+        get: async () => ({ tone: 'neutral', headline: 'H', blocks: 'not-an-array' }),
+        set: async () => {},
+      },
+    ],
+  ])('still renders against %s', async (_label, brokenCache) => {
+    const generator = createComponentGenerator({
+      provider: countingProvider().provider,
+      cache: brokenCache as never,
+      cacheTimeoutMs: 20,
+    });
+
+    await expect(generator.generate(payload())).resolves.toMatchObject({ source: 'llm' });
   });
 
   it('never serves a cached product the shopper has since disliked', async () => {
@@ -327,11 +401,27 @@ describe('provenance', () => {
     expect(spec.model).toBeNull();
   });
 
-  it('reports how long it took', async () => {
-    const spec = await generatorWith({ provider: countingProvider().provider }).generate(payload());
+  it('reports how long it actually took', async () => {
+    const slow: ComponentProvider = {
+      name: 'slow',
+      model: 'slow-model',
+      generate: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return { spec: modelSpec(['TR-101']) };
+      },
+    };
 
-    expect(spec.latencyMs).toBeGreaterThanOrEqual(0);
-    expect(spec.generatedAt).toBeGreaterThan(0);
+    const before = Date.now();
+    const spec = await generatorWith({ provider: slow }).generate(payload());
+    const after = Date.now();
+
+    // A hardcoded zero satisfies "at least zero", so the figure has to be
+    // pinned against something that actually elapsed.
+    expect(spec.latencyMs).toBeGreaterThanOrEqual(35);
+    // Stamped when the spec was produced, not when the request arrived — so it
+    // has to be past the time the model spent, not merely inside the window.
+    expect(spec.generatedAt).toBeGreaterThanOrEqual(before + 35);
+    expect(spec.generatedAt).toBeLessThanOrEqual(after);
   });
 });
 
@@ -347,38 +437,70 @@ describe('what it reports', () => {
     return events;
   };
 
-  it('reports a generation, with what it cost', async () => {
-    const events = await collect({ provider: countingProvider().provider });
-    const generated = events.find((event) => event.type === 'generated');
-
-    // Cost per thousand page views is computed from this and nothing else.
-    expect(generated).toMatchObject({ provider: 'test', usage: { inputTokens: 10 } });
+  it.each([
+    ['a generation', { provider: countingProvider().provider }, 1],
+    ['a fallback', { provider: throwingProvider() }, 1],
+    ['no provider at all', {}, 1],
+    ['two runs, one cached', { provider: countingProvider().provider }, 2],
+  ])('reports exactly one event for %s', async (_label, options, runs) => {
+    // Every ratio the evaluation computes is over all calls, so a call that
+    // reports nothing makes every one of them wrong.
+    expect(await collect(options, runs)).toHaveLength(runs);
   });
 
-  it('reports a cache hit separately from a generation', async () => {
+  it('reports what a generation cost, and that it was a real model call', async () => {
+    const [event] = await collect({ provider: countingProvider().provider });
+
+    expect(event).toMatchObject({ source: 'llm', calledModel: true, usage: { inputTokens: 10 } });
+  });
+
+  it('does not count a cache hit as a model call', async () => {
     const events = await collect({ provider: countingProvider().provider }, 2);
 
-    expect(events.filter((event) => event.type === 'generated')).toHaveLength(1);
-    expect(events.filter((event) => event.type === 'cache_hit')).toHaveLength(1);
+    expect(events[1]).toMatchObject({ source: 'cache', calledModel: false });
   });
 
-  it('reports a fallback with the reason', async () => {
-    const events = await collect({ provider: throwingProvider() });
+  it('reports a fallback with its reason, and no model call', async () => {
+    const [event] = await collect({ provider: throwingProvider() });
 
-    expect(events.find((event) => event.type === 'fallback')).toMatchObject({
-      reason: 'provider-error',
+    expect(event).toMatchObject({
+      source: 'fallback',
+      calledModel: false,
+      degradedReason: 'provider-error',
     });
   });
 
   it('reports what reconciliation removed', async () => {
-    const events = await collect({
+    const [event] = await collect({
       provider: respondingWith(modelSpec(['TR-101', 'GHOST-1'])),
     });
-    const generated = events.find((event) => event.type === 'generated');
 
-    expect(generated).toMatchObject({
-      violations: expect.arrayContaining(['unknown-sku:GHOST-1']),
+    expect(event?.violations).toContain('unknown-sku:GHOST-1');
+  });
+
+  it('counts one model call when eight requests share one generation', async () => {
+    const events: GenerationEvent[] = [];
+    const provider: ComponentProvider = {
+      name: 'slow',
+      model: 'slow-model',
+      generate: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        return { spec: modelSpec(['TR-101']), usage: { outputTokens: 7 } };
+      },
+    };
+    const generator = createComponentGenerator({
+      provider,
+      cache: createMemorySpecCache(),
+      onEvent: (event) => events.push(event),
     });
+
+    await Promise.all(Array.from({ length: 8 }, () => generator.generate(payload())));
+
+    // Eight events, because eight callers asked. One model call, because seven
+    // of them shared the first one's answer — cost is summed over the flag, not
+    // over the events.
+    expect(events).toHaveLength(8);
+    expect(events.filter((event) => event.calledModel)).toHaveLength(1);
   });
 
   it('survives a reporting hook that throws', async () => {

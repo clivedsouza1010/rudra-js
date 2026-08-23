@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { GeneratedSpec } from './component-spec.js';
+import { SPEC_VERSION, type GeneratedSpec } from './component-spec.js';
 import type { SignalDigest } from './signal-digest.js';
 
 /**
@@ -166,7 +166,9 @@ export function specCacheKey(
   providerId: string,
 ): string {
   const material = canonicalise({
-    version: 1,
+    // The spec's own version, so a shape change cannot read entries written by
+    // the previous shape out of a shared store that outlives a deploy.
+    specVersion: SPEC_VERSION,
     provider: providerId,
     digest,
     candidates: candidateSkus.toSorted(),
