@@ -1,7 +1,3 @@
-import type { BannerBlock, CarouselBlock, CopyBlock, GridBlock, HeroBlock } from '@rudra/core';
-import type { BlockRenderContext } from '../render-context.js';
-import { ProductCard } from './product-card.js';
-
 /**
  * The five block renderers.
  *
@@ -10,6 +6,10 @@ import { ProductCard } from './product-card.js';
  * — that is what keeps generated output to the role of deciding layout, order
  * and wording.
  */
+
+import type { BannerBlock, CarouselBlock, CopyBlock, GridBlock, HeroBlock } from '@rudra/core';
+import type { BlockRenderContext } from '../render-context.js';
+import { ProductCard } from './product-card.js';
 
 export function HeroRenderer({
   block,
@@ -34,7 +34,10 @@ export function HeroRenderer({
           <span className="rudra-hero__price">{context.formatPrice(product)}</span>
         </a>
       ) : null}
-      {block.ctaLabel ? <span className="rudra-hero__cta">{block.ctaLabel}</span> : null}
+      {/* Only alongside a product: a "Shop now" with no destination is worse
+          than no call to action, and the model can set one for a SKU the
+          catalog does not have. */}
+      {product && block.ctaLabel ? <span className="rudra-hero__cta">{block.ctaLabel}</span> : null}
     </section>
   );
 }
@@ -79,16 +82,16 @@ export function CarouselRenderer({
   );
 }
 
-export function BannerRenderer({ block }: { block: BannerBlock; context: BlockRenderContext }) {
+export function BannerRenderer({ block }: { block: BannerBlock }) {
   return (
-    <aside className="rudra-banner" data-rudra-tone={block.tone}>
+    <aside className="rudra-banner" data-rudra-banner-tone={block.tone}>
       <span className="rudra-banner__text">{block.text}</span>
       {block.ctaLabel ? <span className="rudra-banner__cta">{block.ctaLabel}</span> : null}
     </aside>
   );
 }
 
-export function CopyRenderer({ block }: { block: CopyBlock; context: BlockRenderContext }) {
+export function CopyRenderer({ block }: { block: CopyBlock }) {
   return (
     <section className="rudra-copy">
       {block.title ? <h3 className="rudra-copy__title">{block.title}</h3> : null}

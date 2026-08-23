@@ -5,17 +5,18 @@ import type { Product } from '@rudra/core';
  *
  * Note what is absent from the spec and present here: a price, a title, an
  * image, a link. Those are resolved from the host's own catalog, keyed by a SKU
- * that reconciliation has already proved exists and is in stock. That division
+ * that `selectProducts` drew from that same catalog and `reconcileSpec` proved
+ * the model did not invent — both in stock at the time. That division
  * is the whole reason a generated component is safe to put in a page — the
  * model decides what to show and how to describe it, and the shop decides what
  * is true about a product.
  */
 export interface BlockRenderContext {
-  /** The host's catalog, keyed by SKU. */
-  products: Map<string, Product>;
+  /** The host's catalog, keyed by SKU. Read-only: it is the caller's own map. */
+  readonly products: ReadonlyMap<string, Product>;
   /** Host-owned link construction. */
-  hrefForSku: (sku: string) => string;
-  formatPrice: (product: Product) => string;
+  readonly hrefForSku: (sku: string) => string;
+  readonly formatPrice: (product: Product) => string;
 }
 
 export function defaultHrefForSku(sku: string): string {
@@ -36,17 +37,33 @@ export function defaultHrefForSku(sku: string): string {
  * the shopper's — a shop serving more than one should pass the shopper's.
  */
 export function defaultFormatPrice(product: Product, locale?: string): string {
+  // A price that is not a finite number is a broken catalog, not a formatting
+  // problem, and Intl will happily render it: null becomes 0 and prints as a
+  // free product, undefined prints as NaN. Neither belongs on a shop page, and
+  // both mean the catalog skipped the validation this package documents as a
+  // precondition. Failing here is a bug report; rendering it is an incident.
+  if (!Number.isFinite(product.price)) {
+    throw new TypeError(
+      `price for SKU ${product.sku} is ${String(product.price)}, not a finite number — ` +
+        'catalog objects must satisfy productSchema from @rudra/core',
+    );
+  }
+
+  let formatter: Intl.NumberFormat;
   try {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: product.currency,
-    }).format(product.price);
+    // Only the constructor is guarded. Wrapping format() as well would swallow
+    // a throwing getter on a host's own Product object and render the resulting
+    // mess as a price.
+    formatter = new Intl.NumberFormat(locale, { style: 'currency', currency: product.currency });
   } catch {
-    // Reachable through `locale`, which is a host prop and is not validated
-    // anywhere: Intl throws on a malformed language tag. A currency code cannot
-    // get here — the payload contract already requires three letters, and Intl
-    // accepts any three-letter code it does not know. A price nobody can
+    // Two things reach this. A malformed `locale`, which is a host prop nothing
+    // validates. And a malformed `currency` — which productSchema would have
+    // rejected, but this package takes a catalog directly, so a hand-built
+    // object can carry one. Intl accepts any three-letter code it does not
+    // know, so 'ZZZ' formats; 'us$' and '' do not. A price nobody can
     // punctuate is still a price worth showing.
     return `${product.currency} ${product.price}`;
   }
+
+  return formatter.format(product.price);
 }

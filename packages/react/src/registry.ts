@@ -1,14 +1,3 @@
-import type { ReactNode } from 'react';
-import type { Block, BlockKind } from '@rudra/core';
-import type { BlockRenderContext } from './render-context.js';
-import {
-  BannerRenderer,
-  CarouselRenderer,
-  CopyRenderer,
-  GridRenderer,
-  HeroRenderer,
-} from './blocks/block-renderers.js';
-
 /**
  * What each kind of block actually renders.
  *
@@ -19,6 +8,17 @@ import {
  * without giving the model any new ability — it still cannot say anything
  * outside the vocabulary.
  */
+
+import type { ReactNode } from 'react';
+import type { Block, BlockKind } from '@rudra/core';
+import type { BlockRenderContext } from './render-context.js';
+import {
+  BannerRenderer,
+  CarouselRenderer,
+  CopyRenderer,
+  GridRenderer,
+  HeroRenderer,
+} from './blocks/block-renderers.js';
 
 export type BlockRenderer<Kind extends BlockKind> = (props: {
   block: Extract<Block, { kind: Kind }>;
@@ -37,7 +37,20 @@ export const defaultRegistry: BlockRegistry = {
   copy: CopyRenderer,
 };
 
-/** Replaces some renderers and keeps the rest. */
+/**
+ * Replaces some renderers and keeps the rest.
+ *
+ * Written out kind by kind rather than spread: a spread lets
+ * `{ hero: maybeRenderer }` put an explicit `undefined` over the default, and
+ * the page then renders every hero as nothing. Here an absent override means
+ * the default, however it was written.
+ */
 export function extendRegistry(overrides: Partial<BlockRegistry>): BlockRegistry {
-  return { ...defaultRegistry, ...overrides };
+  return {
+    hero: overrides.hero ?? defaultRegistry.hero,
+    grid: overrides.grid ?? defaultRegistry.grid,
+    carousel: overrides.carousel ?? defaultRegistry.carousel,
+    banner: overrides.banner ?? defaultRegistry.banner,
+    copy: overrides.copy ?? defaultRegistry.copy,
+  };
 }

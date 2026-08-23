@@ -32,31 +32,62 @@ Product facts are resolved at render time from `products`, keyed by a SKU
 reconciliation has already checked. Everything the model writes is rendered as
 text and escaped by React.
 
-**`products` must be catalog objects that passed `parseTrackingInput`, or ones
-validated the same way.** It is a second door into the framework: `imageUrl`
-lands in an `<img src>`, and the payload contract is what rejects a
-`javascript:` one.
+**Validate `products` with `productSchema` from `@rudra/core`** — the same
+schema your candidates already passed. It is a second door into the framework:
+`imageUrl` lands in an `<img src>`, and `productSchema` is what rejects a
+protocol-relative `//evil.example/pixel.png` or a `data:` URL. React neutralises
+a `javascript:` URL by itself, but not those. A price that is not a finite
+number throws rather than rendering the product as free.
 
 ## Styling
 
 The package ships no CSS, on purpose — a stylesheet would fight whatever your
-site already has. Every element carries a class you can target:
+site already has. Every element it emits carries a class, and this is all of
+them:
 
-| Class                                                                           | Element                                             |
-| ------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `.rudra`                                                                        | the wrapper                                         |
-| `.rudra__headline`, `.rudra__subheadline`                                       | the header                                          |
-| `.rudra-hero`, `.rudra-grid`, `.rudra-carousel`, `.rudra-banner`, `.rudra-copy` | one per block kind                                  |
-| `.rudra-card`, `.rudra-card--featured`                                          | a product, and the one the model chose to lead with |
-| `.rudra-card__image`, `__title`, `__price`, `__reason`, `__badge`               | inside a product                                    |
+| Where          | Classes                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The wrapper    | `.rudra`, `.rudra__header`, `.rudra__headline`, `.rudra__subheadline`, `.rudra__rationale`                                                                                 |
+| A hero         | `.rudra-hero`, `.rudra-hero__headline`, `.rudra-hero__body`, `.rudra-hero__link`, `.rudra-hero__price`, `.rudra-hero__cta`                                                 |
+| A grid         | `.rudra-grid`, `.rudra-grid__title`, `.rudra-grid__items`                                                                                                                  |
+| A carousel     | `.rudra-carousel`, `.rudra-carousel__title`, `.rudra-carousel__track`                                                                                                      |
+| A banner       | `.rudra-banner`, `.rudra-banner__text`, `.rudra-banner__cta`                                                                                                               |
+| A copy block   | `.rudra-copy`, `.rudra-copy__title`, `.rudra-copy__body`                                                                                                                   |
+| A product card | `.rudra-card`, `.rudra-card--featured`, `.rudra-card__image`, `.rudra-card__body`, `.rudra-card__title`, `.rudra-card__price`, `.rudra-card__reason`, `.rudra-card__badge` |
 
-`className` is added alongside `rudra` rather than replacing it, so the child
-classes keep working.
+`.rudra__rationale` only appears under `hasDiagnostics`. `className` is added
+alongside `rudra` rather than replacing it, so the child classes keep working.
 
-Two attributes are worth styling against: `data-rudra-columns` on a grid carries
-the column count the model chose, and `.rudra-carousel__track` is expected to
+Two of these need something from you. `.rudra-carousel__track` is expected to
 scroll horizontally — give it `overflow-x: auto`, since nothing here uses
-JavaScript to scroll it.
+JavaScript to scroll it. `.rudra-card--featured` is applied alongside
+`.rudra-card`, so write it as `.rudra-card--featured { ... }` after the base
+rule rather than instead of it.
+
+### Attributes
+
+The same markup carries what the model decided, for styling and for analytics.
+
+| Attribute                | On                | Value                                                      |
+| ------------------------ | ----------------- | ---------------------------------------------------------- |
+| `data-rudra-slot`        | the wrapper       | The slot the spec was generated for                        |
+| `data-rudra-source`      | the wrapper       | `llm`, `cache` or `fallback`                               |
+| `data-rudra-tone`        | the wrapper       | The tone the model chose for the component                 |
+| `data-rudra-banner-tone` | a banner          | A banner's own tone, a different vocabulary from the above |
+| `data-rudra-columns`     | a grid            | The column count the model chose                           |
+| `data-rudra-sku`         | a card, hero link | The product, for click attribution                         |
+| `data-rudra-basis`       | a card            | Why the product was picked — `most_viewed`, `popular`, …   |
+
+`data-rudra-source` is public on purpose: hit rate and fallback share can be
+read straight off a rendered page. Everything more specific appears only under
+`hasDiagnostics`, since it tells a visitor what you run and when it is failing:
+
+| Attribute               | On          | Value                         |
+| ----------------------- | ----------- | ----------------------------- |
+| `data-rudra-provider`   | the wrapper | The model vendor, or `none`   |
+| `data-rudra-model`      | the wrapper | The model name, or `none`     |
+| `data-rudra-latency-ms` | the wrapper | How long generation took      |
+| `data-rudra-degraded`   | the wrapper | Why it fell back, when it did |
 
 ## Replacing a renderer
 
@@ -79,7 +110,7 @@ const registry = extendRegistry({
 | Prop             | Notes                                                                                                                                                                      |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `spec`           | Required. From `@rudra/core`.                                                                                                                                              |
-| `products`       | Required. Array or `Map`, keyed by SKU. See the warning above.                                                                                                             |
+| `products`       | Required. Array, or a `Map` keyed by SKU. See the warning above.                                                                                                           |
 | `registry`       | Replace some or all block renderers.                                                                                                                                       |
 | `hrefForSku`     | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                 |
 | `formatPrice`    | Defaults to `Intl.NumberFormat`, which knows each currency's own number of decimal places.                                                                                 |
@@ -87,7 +118,9 @@ const registry = extendRegistry({
 | `hasDiagnostics` | Adds the provider, the model name, the latency and the model's own reasoning to the markup. Off by default: it tells a visitor which model you use and when it is failing. |
 | `className`      | Added alongside `rudra`.                                                                                                                                                   |
 
-A spec with no blocks renders nothing at all. An empty recommendation area takes
+The component renders nothing at all when there is nothing to show — a spec with
+no blocks, or one whose every product has left your catalog since it was
+generated. An empty recommendation area, or a headline over an empty box, takes
 up space and tells the shopper the page is broken.
 
 ## Licence

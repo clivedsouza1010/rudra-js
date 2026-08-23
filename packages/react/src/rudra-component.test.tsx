@@ -1,9 +1,10 @@
+import { readFileSync } from 'node:fs';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { ComponentSpec, GeneratedSpec, Product } from '@rudra/core';
 import { RudraComponent } from './rudra-component.js';
-import { extendRegistry } from './registry.js';
+import { extendRegistry, type BlockRegistry } from './registry.js';
 
 const product = (sku: string, overrides: Partial<Product> = {}): Product => ({
   sku,
@@ -79,8 +80,11 @@ describe('what generated text can do to the page', () => {
       () => spec([{ kind: 'hero', headline: 'Trail', body: hostile, sku: null, ctaLabel: null }]),
     ],
     [
+      // With a SKU: a call to action is only rendered next to a product it can
+      // lead to.
       'a hero call to action',
-      () => spec([{ kind: 'hero', headline: 'Trail', body: null, sku: null, ctaLabel: hostile }]),
+      () =>
+        spec([{ kind: 'hero', headline: 'Trail', body: null, sku: 'TR-101', ctaLabel: hostile }]),
     ],
     [
       'a carousel title',
@@ -152,9 +156,9 @@ describe('where product facts come from', () => {
       products: [product('TR-101', { imageUrl: 'https://cdn.example.com/tr-101.png' })],
     });
 
-    // <img src> is the highest-risk sink here. The payload contract is what
-    // rejects a javascript: or an empty one, and nothing in the spec can reach
-    // this attribute at all.
+    // <img src> is the highest-risk sink here. `productSchema` is what rejects a
+    // protocol-relative or `data:` URL on the way in, and nothing in the spec
+    // can reach this attribute at all.
     expect(markup).toContain('src="https://cdn.example.com/tr-101.png"');
   });
 
@@ -162,12 +166,51 @@ describe('where product facts come from', () => {
     expect(render(gridSpec())).not.toContain('<img');
   });
 
-  it('renders nothing for a SKU the catalog does not have', () => {
+  it('ignores product facts carried on the spec itself', () => {
+    // Nothing in the schema allows these, so a spec carrying them is either a
+    // newer core or a tampered cache entry. Either way the catalog wins: this
+    // is the assertion that a renderer never learned to read a price from the
+    // model.
+    const markup = render(
+      gridSpec([
+        reference('TR-101', {
+          title: 'Free Trail Shoe',
+          price: 0,
+          imageUrl: 'https://evil.example/pixel.png',
+        }),
+      ]),
+      { products: [product('TR-101', { title: 'Switchback', price: 199 })], locale: 'en-US' },
+    );
+
+    expect(markup).toContain('Switchback');
+    expect(markup).toContain('199.00');
+    expect(markup).not.toContain('Free Trail Shoe');
+    expect(markup).not.toContain('evil.example');
+  });
+
+  it('renders nothing for a SKU the catalog does not have, and keeps the rest', () => {
     // Reconciliation should have removed it, so this is the second line of
     // defence rather than the first.
-    const markup = render(gridSpec([reference('GHOST-1')]));
+    const markup = render(gridSpec([reference('GHOST-1'), reference('TR-102')]));
 
     expect(markup).not.toContain('GHOST-1');
+    expect(markup).toContain('Product TR-102');
+    // One card, not two with a hole in one of them.
+    expect(markup.match(/rudra-card"/g)).toHaveLength(1);
+  });
+
+  it('links a hero product with the host function too, not only a card', () => {
+    const markup = render(
+      spec([{ kind: 'hero', headline: 'Trail season', body: null, sku: 'TR-101', ctaLabel: null }]),
+      { hrefForSku: (sku: string) => `/shop/${sku}` },
+    );
+
+    expect(markup).toContain('href="/shop/TR-101"');
+    expect(markup).toContain('data-rudra-sku="TR-101"');
+  });
+
+  it('marks each card with its SKU, so a click can be attributed to it', () => {
+    expect(render(gridSpec())).toContain('data-rudra-sku="TR-101"');
   });
 
   it('escapes a SKU on its way into a link', () => {
@@ -187,12 +230,15 @@ describe('what the markup says about itself', () => {
     expect(markup).toContain('data-rudra-source="llm"');
   });
 
-  it('keeps the vendor and the degradation state out of the page by default', () => {
+  it('publishes that it fell back, without saying which model or why', () => {
     const markup = render(
       gridSpec([reference('TR-101')], { source: 'fallback', degradedReason: 'timeout' }),
     );
 
-    // These tell a visitor which model a shop uses and when it is not working.
+    // Where the component came from is deliberately public: fallback share is
+    // readable off a rendered page. Which vendor, which model and why it fell
+    // back are not — those tell a visitor what a shop runs and when it is down.
+    expect(markup).toContain('data-rudra-source="fallback"');
     expect(markup).not.toContain('claude-opus-5');
     expect(markup).not.toContain('anthropic');
     expect(markup).not.toContain('timeout');
@@ -210,6 +256,25 @@ describe('what the markup says about itself', () => {
     expect(render(gridSpec(), { hasDiagnostics: true })).toContain(
       'Leaned on the category affinity',
     );
+  });
+
+  it('says nothing about degradation for a healthy spec under diagnostics', () => {
+    const markup = render(gridSpec([reference('TR-101')]), { hasDiagnostics: true });
+
+    expect(markup).not.toContain('data-rudra-degraded');
+  });
+
+  it('separates a banner tone from the tone of the component', () => {
+    const markup = render(
+      spec([{ kind: 'banner', tone: 'promo', text: 'Free returns', ctaLabel: null }], {
+        tone: 'urgent',
+      }),
+    );
+
+    // Two different vocabularies. Sharing one attribute name would make a
+    // stylesheet rule written for one silently match the other.
+    expect(markup).toContain('data-rudra-tone="urgent"');
+    expect(markup).toContain('data-rudra-banner-tone="promo"');
   });
 
   it('records why each product was chosen, for click attribution', () => {
@@ -271,6 +336,45 @@ describe('the component as a whole', () => {
     expect(render(fromTheFuture)).toContain('rudra-grid');
   });
 
+  it('renders blocks in the order the model chose', () => {
+    const markup = render(
+      spec([
+        { kind: 'copy', title: null, body: 'First' },
+        { kind: 'banner', tone: 'info', text: 'Second', ctaLabel: null },
+        { kind: 'copy', title: null, body: 'Third' },
+      ]),
+    );
+
+    // Order is the model's main lever over what a shopper sees first, so it has
+    // to survive rendering.
+    expect(markup.indexOf('First')).toBeLessThan(markup.indexOf('Second'));
+    expect(markup.indexOf('Second')).toBeLessThan(markup.indexOf('Third'));
+  });
+
+  it('renders products in the order the model ranked them', () => {
+    const markup = render(gridSpec([reference('TR-102'), reference('TR-101')]));
+
+    expect(markup.indexOf('Product TR-102')).toBeLessThan(markup.indexOf('Product TR-101'));
+  });
+
+  it('renders nothing at all when every product in the spec has left the catalog', () => {
+    // A headline over an empty box reads as a broken page, which is worse than
+    // no recommendation area.
+    expect(render(gridSpec([reference('GHOST-1'), reference('GHOST-2')]))).toBe('');
+    expect(
+      render(spec([{ kind: 'carousel', title: 'Start here', items: [reference('GHOST-1')] }])),
+    ).toBe('');
+  });
+
+  it('renders no call to action on a hero with no product to lead to', () => {
+    const markup = render(
+      spec([{ kind: 'hero', headline: 'Trail season', body: null, sku: null, ctaLabel: 'Shop' }]),
+    );
+
+    expect(markup).toContain('Trail season');
+    expect(markup).not.toContain('Shop');
+  });
+
   it('lets a host replace one renderer and keep the rest', () => {
     const registry = extendRegistry({
       grid: ({ block }) => <div className="my-own-grid">{block.items.length} items</div>,
@@ -286,6 +390,21 @@ describe('the component as a whole', () => {
 
     expect(markup).toContain('my-own-grid');
     expect(markup).toContain('Still the default renderer.');
+  });
+
+  it('keeps the default renderer when an override is present but undefined', () => {
+    // `extendRegistry({ grid: overrides.grid })` with an optional value. A
+    // spread would put the undefined over the default and render every grid as
+    // nothing.
+    // Written this way because `exactOptionalPropertyTypes` will not let this
+    // file pass an explicit undefined directly. A JavaScript consumer has no
+    // such protection, and neither does a TypeScript one without that flag.
+    const overrides: Partial<BlockRegistry> = {};
+    Object.assign(overrides, { grid: undefined });
+
+    const registry = extendRegistry(overrides);
+
+    expect(render(gridSpec(), { registry })).toContain('rudra-grid');
   });
 });
 
@@ -312,11 +431,22 @@ describe('formatting a price', () => {
     expect(priceOf('EUR', 1234.5, 'de-DE')).toContain('1.234,50');
   });
 
-  it('shows an unfamiliar currency code as itself', () => {
+  it('shows an unfamiliar currency code as itself, with the amount intact', () => {
     // Intl accepts any three-letter code it does not know, so this formats
     // rather than throwing — the payload contract already guarantees three
     // letters.
-    expect(priceOf('ZZZ', 42, 'en-US')).toContain('ZZZ');
+    const markup = priceOf('ZZZ', 1234.5, 'en-US');
+
+    expect(markup).toContain('ZZZ');
+    expect(markup).toContain('1,234.50');
+  });
+
+  it('refuses a price that is not a number rather than pricing it at zero', () => {
+    // The failure this prevents is the expensive one: Intl renders null as
+    // 0 and undefined as NaN, so a catalog built by hand puts a free product on
+    // a live page. A hand-built catalog is exactly what skips `productSchema`.
+    expect(() => priceOf('USD', null as unknown as number)).toThrow(TypeError);
+    expect(() => priceOf('USD', undefined as unknown as number)).toThrow(/not a finite number/);
   });
 
   it('still shows a price when the host passes a locale Intl rejects', () => {
@@ -382,5 +512,65 @@ describe('a few behaviours the code asserts', () => {
     const markup = render(gridSpec(), { className: 'my-rail' });
 
     expect(markup).toContain('class="rudra my-rail"');
+  });
+});
+
+/**
+ * The class names are a published contract: a shop writes a stylesheet against
+ * them, and renaming one silently breaks that shop's page. Reading the README
+ * back is what keeps the contract and the markup from drifting apart.
+ */
+describe('the styling contract', () => {
+  const everything = () =>
+    render(
+      spec(
+        [
+          {
+            kind: 'hero',
+            headline: 'Trail season',
+            body: 'Wet rock',
+            sku: 'TR-101',
+            ctaLabel: 'Shop',
+          },
+          {
+            kind: 'grid',
+            title: 'For you',
+            columns: 3,
+            items: [reference('TR-101', { emphasis: 'featured', badge: 'New' })],
+          },
+          { kind: 'carousel', title: 'Start here', items: [reference('TR-102')] },
+          { kind: 'banner', tone: 'restock', text: 'Back in stock', ctaLabel: 'See more' },
+          { kind: 'copy', title: 'Why these', body: 'Built for wet rock.' },
+        ],
+        { subheadline: 'Based on what you viewed' },
+      ),
+      {
+        products: [
+          product('TR-101', { imageUrl: 'https://cdn.example.com/a.png' }),
+          product('TR-102'),
+        ],
+        hasDiagnostics: true,
+      },
+    );
+
+  it('documents every class it emits', () => {
+    const emitted = new Set(
+      [...everything().matchAll(/class="([^"]+)"/g)].flatMap((match) => match[1]!.split(' ')),
+    );
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+
+    expect(emitted.size).toBeGreaterThan(20);
+    for (const className of emitted) {
+      expect(readme, `.${className} is emitted but not documented`).toContain(`\`.${className}\``);
+    }
+  });
+
+  it('documents every attribute it emits', () => {
+    const emitted = new Set([...everything().matchAll(/(data-rudra-[a-z-]+)=/g)].map((m) => m[1]!));
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+
+    for (const attribute of emitted) {
+      expect(readme, `${attribute} is emitted but not documented`).toContain(`\`${attribute}\``);
+    }
   });
 });

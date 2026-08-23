@@ -6,28 +6,23 @@ import {
 } from './render-context.js';
 import { defaultRegistry, type BlockRegistry } from './registry.js';
 
-/**
- * Renders a component specification.
- *
- * These are Server Components: no hooks, no state, no effects, and therefore no
- * client bundle and no hydration for the recommendation area. The whole
- * component arrives in the initial HTML response, which is what removes the
- * pop-in a client-fetched recommendation rail has — and what makes the content
- * visible to a crawler that does not run JavaScript.
- */
-
 export interface RudraComponentProps {
   spec: ComponentSpec;
   /**
    * The host catalog. Every product fact on the page comes from here rather
    * than from the specification.
    *
-   * These must be products that passed `parseTrackingInput`, or ones validated
-   * the same way. This is a second door into the framework: `imageUrl` lands in
-   * an `<img src>`, and the payload contract is what rejects a `javascript:`
-   * one. A catalog object built by hand skips that check.
+   * Validate them with `productSchema` from `@rudra/core` — the same schema
+   * your candidates already passed — not with `parseTrackingInput`, which
+   * parses a whole tracking payload and will reject a bare catalog.
+   *
+   * This is a second door into the framework. `imageUrl` lands in an
+   * `<img src>`, and `productSchema` is the only thing that rejects a
+   * protocol-relative `//evil.example/pixel.png` or a `data:` URL — React
+   * neutralises `javascript:` on its own, but not those. A price that is not a
+   * finite number throws rather than rendering as free.
    */
-  products: readonly Product[] | Map<string, Product>;
+  products: ProductCatalog;
   registry?: BlockRegistry;
   hrefForSku?: (sku: string) => string;
   formatPrice?: (product: Product) => string;
@@ -47,9 +42,41 @@ export interface RudraComponentProps {
   className?: string;
 }
 
-function toProductMap(products: readonly Product[] | Map<string, Product>): Map<string, Product> {
-  if (products instanceof Map) return products;
-  return new Map(products.map((product) => [product.sku, product]));
+type ProductCatalog = readonly Product[] | ReadonlyMap<string, Product>;
+
+// A bare `instanceof Map` narrows the true branch but not the false one, since a
+// ReadonlyMap need not be a Map. Array.isArray has the mirror problem with a
+// readonly array. Naming the predicate settles both branches.
+function isKeyedBySku(catalog: ProductCatalog): catalog is ReadonlyMap<string, Product> {
+  return catalog instanceof Map;
+}
+
+function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
+  if (isKeyedBySku(catalog)) return catalog;
+  return new Map(catalog.map((product) => [product.sku, product]));
+}
+
+/**
+ * Whether a block still has anything to say once the catalog is applied.
+ *
+ * Only the two product blocks can come up empty: reconciliation ran against the
+ * catalog as it was when the spec was generated, and a SKU can sell out between
+ * then and this render. The rest carry their own words.
+ */
+function hasContent(block: Block, products: ReadonlyMap<string, Product>): boolean {
+  switch (block.kind) {
+    case 'grid':
+    case 'carousel':
+      return block.items.some((reference) => products.has(reference.sku));
+    case 'hero':
+    case 'banner':
+    case 'copy':
+      return true;
+    default:
+      // A kind this renderer predates renders nothing, so it counts as nothing.
+      block satisfies never;
+      return false;
+  }
 }
 
 function renderBlock(
@@ -70,13 +97,25 @@ function renderBlock(
     case 'copy':
       return <registry.copy key={index} block={block} context={context} />;
     default:
-      // Unreachable for a spec this version validated. A spec written by hand,
-      // or produced by a newer core carrying a block kind this renderer predates,
-      // loses that block rather than the page.
+      // A newer core carrying a block kind this renderer predates loses that
+      // block rather than the page. In this repo the assertion below fails the
+      // build instead, which is the moment it is cheap to notice.
+      block satisfies never;
       return null;
   }
 }
 
+/**
+ * Renders a component specification.
+ *
+ * A Server Component: no hooks, no state, no effects, and therefore no client
+ * bundle and no hydration for the recommendation area. The whole component
+ * arrives in the initial HTML response, which is what removes the pop-in a
+ * client-fetched recommendation rail has — and what makes the content visible
+ * to a crawler that does not run JavaScript.
+ *
+ * Renders nothing at all when no block produced markup.
+ */
 export function RudraComponent({
   spec,
   products,
@@ -87,15 +126,30 @@ export function RudraComponent({
   hasDiagnostics = false,
   className,
 }: RudraComponentProps) {
-  // An empty recommendation area is worse than none: it takes up space and
-  // tells the shopper the page is broken.
-  if (spec.blocks.length === 0) return null;
-
   const context: BlockRenderContext = {
     products: toProductMap(products),
     hrefForSku,
     formatPrice: formatPrice ?? ((product) => defaultFormatPrice(product, locale)),
   };
+
+  // An empty recommendation area is worse than none: it takes up space and
+  // tells the shopper the page is broken. That includes the subtler version —
+  // a headline and an empty box, because every product in the spec has sold out
+  // since it was generated — which is why this asks what is left rather than
+  // how many blocks arrived.
+  const visible = spec.blocks.filter((block) => hasContent(block, context.products));
+  if (visible.length === 0) return null;
+
+  // React omits a data-* attribute whose value is undefined, so degradedReason
+  // needs no branch of its own.
+  const diagnosticAttributes = hasDiagnostics
+    ? {
+        'data-rudra-provider': spec.provider ?? 'none',
+        'data-rudra-model': spec.model ?? 'none',
+        'data-rudra-latency-ms': String(spec.latencyMs),
+        'data-rudra-degraded': spec.degradedReason,
+      }
+    : undefined;
 
   return (
     <section
@@ -103,27 +157,21 @@ export function RudraComponent({
       // `rudra`, and the package ships no stylesheet, so a host will pass one.
       className={className ? `rudra ${className}` : 'rudra'}
       data-rudra-slot={spec.slot}
-      // Where the component came from travels with the markup, so hit rate and
-      // fallback share can be read off a rendered page. The vendor's name and
-      // the degradation state do not, unless diagnostics are asked for — those
-      // tell a visitor which model a shop uses and when it is not working.
+      // Where the component came from travels with the markup on purpose, so
+      // hit rate and fallback share can be read off a rendered page — which
+      // means `source="fallback"` is public. What stays behind the diagnostics
+      // flag is everything more specific than that: which vendor, which model,
+      // how slow, and why it fell back.
       data-rudra-source={spec.source}
       data-rudra-tone={spec.tone}
-      {...(hasDiagnostics
-        ? {
-            'data-rudra-provider': spec.provider ?? 'none',
-            'data-rudra-model': spec.model ?? 'none',
-            'data-rudra-latency-ms': String(spec.latencyMs),
-            ...(spec.degradedReason ? { 'data-rudra-degraded': spec.degradedReason } : {}),
-          }
-        : {})}
+      {...diagnosticAttributes}
     >
       <header className="rudra__header">
         <h2 className="rudra__headline">{spec.headline}</h2>
         {spec.subheadline ? <p className="rudra__subheadline">{spec.subheadline}</p> : null}
       </header>
 
-      {spec.blocks.map((block, index) => renderBlock(block, context, registry, index))}
+      {visible.map((block, index) => renderBlock(block, context, registry, index))}
 
       {hasDiagnostics ? <p className="rudra__rationale">{spec.rationale}</p> : null}
     </section>
