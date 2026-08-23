@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { ComponentSpec, GeneratedSpec, Product } from '@rudra/core';
-import { RudraComponent } from './render.js';
+import { RudraComponent } from './rudra-component.js';
 import { extendRegistry } from './registry.js';
 
 const product = (sku: string, overrides: Partial<Product> = {}): Product => ({
@@ -63,13 +63,35 @@ describe('what generated text can do to the page', () => {
 
   it.each([
     ['a headline', () => gridSpec([reference('TR-101')], { headline: hostile })],
+    ['a subheadline', () => gridSpec([reference('TR-101')], { subheadline: hostile })],
     [
-      'a block title',
+      'a grid title',
       () => spec([{ kind: 'grid', title: hostile, columns: 2, items: [reference('TR-101')] }]),
     ],
     ['a product reason', () => gridSpec([reference('TR-101', { reason: hostile })])],
     ['a product badge', () => gridSpec([reference('TR-101', { badge: hostile })])],
+    [
+      'a hero headline',
+      () => spec([{ kind: 'hero', headline: hostile, body: null, sku: null, ctaLabel: null }]),
+    ],
+    [
+      'a hero body',
+      () => spec([{ kind: 'hero', headline: 'Trail', body: hostile, sku: null, ctaLabel: null }]),
+    ],
+    [
+      'a hero call to action',
+      () => spec([{ kind: 'hero', headline: 'Trail', body: null, sku: null, ctaLabel: hostile }]),
+    ],
+    [
+      'a carousel title',
+      () => spec([{ kind: 'carousel', title: hostile, items: [reference('TR-101')] }]),
+    ],
     ['banner text', () => spec([{ kind: 'banner', tone: 'info', text: hostile, ctaLabel: null }])],
+    [
+      'a banner call to action',
+      () => spec([{ kind: 'banner', tone: 'info', text: 'Free returns', ctaLabel: hostile }]),
+    ],
+    ['a copy title', () => spec([{ kind: 'copy', title: hostile, body: 'Built for rock.' }])],
     ['copy body', () => spec([{ kind: 'copy', title: null, body: hostile }])],
   ])('escapes markup in %s', (_label, build) => {
     const markup = render(build());
@@ -88,8 +110,10 @@ describe('what generated text can do to the page', () => {
       ]),
     );
 
+    // Both of these bind: a real <script> tag and a real javascript: href do
+    // appear in the output when the source emits them. An `onclick` check would
+    // not — renderToStaticMarkup drops handlers whatever the source says.
     expect(markup).not.toContain('<script');
-    expect(markup).not.toContain('onclick');
     expect(markup).not.toContain('javascript:');
   });
 });
@@ -121,6 +145,21 @@ describe('where product facts come from', () => {
     const markup = render(gridSpec(), { formatPrice: () => 'FROM £99' });
 
     expect(markup).toContain('FROM £99');
+  });
+
+  it('takes the image from the catalog, and only from the catalog', () => {
+    const markup = render(gridSpec(), {
+      products: [product('TR-101', { imageUrl: 'https://cdn.example.com/tr-101.png' })],
+    });
+
+    // <img src> is the highest-risk sink here. The payload contract is what
+    // rejects a javascript: or an empty one, and nothing in the spec can reach
+    // this attribute at all.
+    expect(markup).toContain('src="https://cdn.example.com/tr-101.png"');
+  });
+
+  it('renders no image element when the catalog has no image', () => {
+    expect(render(gridSpec())).not.toContain('<img');
   });
 
   it('renders nothing for a SKU the catalog does not have', () => {
@@ -160,7 +199,7 @@ describe('what the markup says about itself', () => {
   });
 
   it('includes them when diagnostics are asked for', () => {
-    const markup = render(gridSpec(), { showDiagnostics: true });
+    const markup = render(gridSpec(), { hasDiagnostics: true });
 
     expect(markup).toContain('data-rudra-model="claude-opus-5"');
     expect(markup).toContain('data-rudra-latency-ms="42"');
@@ -168,7 +207,7 @@ describe('what the markup says about itself', () => {
 
   it('keeps the model reasoning off the page by default', () => {
     expect(render(gridSpec())).not.toContain('Leaned on the category affinity');
-    expect(render(gridSpec(), { showDiagnostics: true })).toContain(
+    expect(render(gridSpec(), { hasDiagnostics: true })).toContain(
       'Leaned on the category affinity',
     );
   });
@@ -221,6 +260,17 @@ describe('the component as a whole', () => {
     expect(render(gridSpec(), { products: asMap })).toContain('Product TR-101');
   });
 
+  it('loses only the unknown block when a spec carries a kind it does not know', () => {
+    const fromTheFuture = spec([
+      { kind: 'timeline', title: null } as never,
+      { kind: 'grid', title: null, columns: 2, items: [reference('TR-101')] },
+    ]);
+
+    // A newer core could add a block kind an older renderer predates. Losing
+    // that block beats losing the page.
+    expect(render(fromTheFuture)).toContain('rudra-grid');
+  });
+
   it('lets a host replace one renderer and keep the rest', () => {
     const registry = extendRegistry({
       grid: ({ block }) => <div className="my-own-grid">{block.items.length} items</div>,
@@ -236,5 +286,101 @@ describe('the component as a whole', () => {
 
     expect(markup).toContain('my-own-grid');
     expect(markup).toContain('Still the default renderer.');
+  });
+});
+
+/**
+ * Money is the one thing on the page that has to be exactly right, and it comes
+ * from the catalog. Two decimal places is a dollar-and-cent assumption that is
+ * wrong in both directions.
+ */
+describe('formatting a price', () => {
+  const priceOf = (currency: string, price: number, locale?: string) =>
+    render(gridSpec(), { products: [product('TR-101', { currency, price })], locale });
+
+  it.each([
+    ['a three-decimal currency keeps its third digit', 'KWD', 1.234, '1.234'],
+    ['a three-decimal currency gains its third digit', 'BHD', 174, '174.000'],
+    ['a currency with no subunit gains no decimals', 'JPY', 1200, '1,200'],
+    ['a two-decimal currency is unchanged', 'USD', 174, '174.00'],
+  ])('%s', (_label, currency, price, expected) => {
+    expect(priceOf(currency, price, 'en-US')).toContain(expected);
+  });
+
+  it('punctuates in the locale the host asked for', () => {
+    // A German shopper reads 1.234,50 €, not €1,234.50.
+    expect(priceOf('EUR', 1234.5, 'de-DE')).toContain('1.234,50');
+  });
+
+  it('shows an unfamiliar currency code as itself', () => {
+    // Intl accepts any three-letter code it does not know, so this formats
+    // rather than throwing — the payload contract already guarantees three
+    // letters.
+    expect(priceOf('ZZZ', 42, 'en-US')).toContain('ZZZ');
+  });
+
+  it('still shows a price when the host passes a locale Intl rejects', () => {
+    // `locale` is a host prop and nothing validates it. Intl throws on a
+    // malformed language tag, and a page must not go down over punctuation.
+    const markup = priceOf('USD', 42, 'not a locale');
+
+    expect(markup).toContain('USD');
+    expect(markup).toContain('42');
+  });
+
+  it('lets the host format prices itself', () => {
+    expect(render(gridSpec(), { formatPrice: () => 'FROM 99' })).toContain('FROM 99');
+  });
+});
+
+describe('a few behaviours the code asserts', () => {
+  it('marks a featured product differently from an ordinary one', () => {
+    const featured = render(gridSpec([reference('TR-101', { emphasis: 'featured' })]));
+
+    expect(featured).toContain('rudra-card--featured');
+    expect(render(gridSpec())).not.toContain('rudra-card--featured');
+  });
+
+  it('records the column count the model chose', () => {
+    const markup = render(
+      spec([{ kind: 'grid', title: null, columns: 4, items: [reference('TR-101')] }]),
+    );
+
+    expect(markup).toContain('data-rudra-columns="4"');
+  });
+
+  it('says why it fell back, but only under diagnostics', () => {
+    const degraded = gridSpec([reference('TR-101')], {
+      source: 'fallback',
+      degradedReason: 'timeout',
+    });
+
+    expect(render(degraded, { hasDiagnostics: true })).toContain('data-rudra-degraded="timeout"');
+    expect(render(degraded)).not.toContain('data-rudra-degraded');
+  });
+
+  it('names the vendor only under diagnostics', () => {
+    expect(render(gridSpec(), { hasDiagnostics: true })).toContain(
+      'data-rudra-provider="anthropic"',
+    );
+  });
+
+  it('resolves the hero product from the catalog, price and all', () => {
+    const markup = render(
+      spec([{ kind: 'hero', headline: 'Trail season', body: null, sku: 'TR-101', ctaLabel: null }]),
+      {
+        products: [product('TR-101', { title: 'Switchback', price: 199, currency: 'USD' })],
+        locale: 'en-US',
+      },
+    );
+
+    expect(markup).toContain('Switchback');
+    expect(markup).toContain('199.00');
+  });
+
+  it('adds a host class without losing the namespace the child classes hang off', () => {
+    const markup = render(gridSpec(), { className: 'my-rail' });
+
+    expect(markup).toContain('class="rudra my-rail"');
   });
 });

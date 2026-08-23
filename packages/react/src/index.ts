@@ -5,7 +5,7 @@
  * HTML response and needs no hydration.
  */
 
-export { RudraComponent, type RudraComponentProps } from './render.js';
+export { RudraComponent, type RudraComponentProps } from './rudra-component.js';
 
 export {
   defaultRegistry,
@@ -26,6 +26,6 @@ export {
   CopyRenderer,
   GridRenderer,
   HeroRenderer,
-} from './blocks/index.js';
+} from './blocks/block-renderers.js';
 
 export { ProductCard } from './blocks/product-card.js';

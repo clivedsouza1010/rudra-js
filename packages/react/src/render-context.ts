@@ -16,23 +16,37 @@ export interface BlockRenderContext {
   /** Host-owned link construction. */
   hrefForSku: (sku: string) => string;
   formatPrice: (product: Product) => string;
-  /** Rendered onto the wrapper, for click attribution and benchmarks. */
-  slot: string;
 }
 
 export function defaultHrefForSku(sku: string): string {
   return `/product/${encodeURIComponent(sku)}`;
 }
 
-export function defaultFormatPrice(product: Product): string {
+/**
+ * Formats a price the way the currency itself is written.
+ *
+ * No digit count is specified on purpose. Two decimal places is a dollar-and-
+ * cent assumption, and forcing it is wrong in both directions: Kuwaiti dinar and
+ * Bahraini dinar have three, so a real digit of the price disappears, and yen has
+ * none, so a price gains a fraction that does not exist. Intl already knows the
+ * right number for each currency.
+ *
+ * `locale` decides how the number is punctuated and where the symbol sits.
+ * Left undefined it falls back to the server's locale, which is almost never
+ * the shopper's — a shop serving more than one should pass the shopper's.
+ */
+export function defaultFormatPrice(product: Product, locale?: string): string {
   try {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: product.currency,
-      maximumFractionDigits: 2,
     }).format(product.price);
   } catch {
-    // A currency code Intl does not recognise must not take down a page.
-    return `${product.currency} ${product.price.toFixed(2)}`;
+    // Reachable through `locale`, which is a host prop and is not validated
+    // anywhere: Intl throws on a malformed language tag. A currency code cannot
+    // get here — the payload contract already requires three letters, and Intl
+    // accepts any three-letter code it does not know. A price nobody can
+    // punctuate is still a price worth showing.
+    return `${product.currency} ${product.price}`;
   }
 }

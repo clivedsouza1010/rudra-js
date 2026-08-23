@@ -31,7 +31,7 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@rudra/core": "0.1.0",
+    "@rudra/core": "^0.1.0",
     "react": "^19.0.0"
   },
   "devDependencies": {

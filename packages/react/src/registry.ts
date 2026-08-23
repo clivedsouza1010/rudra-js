@@ -7,7 +7,7 @@ import {
   CopyRenderer,
   GridRenderer,
   HeroRenderer,
-} from './blocks/index.js';
+} from './blocks/block-renderers.js';
 
 /**
  * What each kind of block actually renders.

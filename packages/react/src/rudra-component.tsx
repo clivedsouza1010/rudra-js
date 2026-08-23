@@ -18,18 +18,32 @@ import { defaultRegistry, type BlockRegistry } from './registry.js';
 
 export interface RudraComponentProps {
   spec: ComponentSpec;
-  /** The host catalog. Every SKU in the spec is resolved against this. */
+  /**
+   * The host catalog. Every product fact on the page comes from here rather
+   * than from the specification.
+   *
+   * These must be products that passed `parseTrackingInput`, or ones validated
+   * the same way. This is a second door into the framework: `imageUrl` lands in
+   * an `<img src>`, and the payload contract is what rejects a `javascript:`
+   * one. A catalog object built by hand skips that check.
+   */
   products: readonly Product[] | Map<string, Product>;
   registry?: BlockRegistry;
   hrefForSku?: (sku: string) => string;
   formatPrice?: (product: Product) => string;
+  /**
+   * The shopper's locale, used to punctuate prices. Defaults to the server's,
+   * which is almost never the shopper's — pass it if the shop serves more than
+   * one. Ignored when `formatPrice` is supplied.
+   */
+  locale?: string;
   /**
    * Adds the model's own reasoning, the provider and the model name to the
    * markup. Useful while developing and while benchmarking; it publishes which
    * vendor a shop uses and whether the component is currently degraded, so it
    * is off unless asked for.
    */
-  showDiagnostics?: boolean;
+  hasDiagnostics?: boolean;
   className?: string;
 }
 
@@ -42,22 +56,23 @@ function renderBlock(
   block: Block,
   context: BlockRenderContext,
   registry: BlockRegistry,
-  key: number,
+  index: number,
 ) {
   switch (block.kind) {
     case 'hero':
-      return <registry.hero key={key} block={block} context={context} />;
+      return <registry.hero key={index} block={block} context={context} />;
     case 'grid':
-      return <registry.grid key={key} block={block} context={context} />;
+      return <registry.grid key={index} block={block} context={context} />;
     case 'carousel':
-      return <registry.carousel key={key} block={block} context={context} />;
+      return <registry.carousel key={index} block={block} context={context} />;
     case 'banner':
-      return <registry.banner key={key} block={block} context={context} />;
+      return <registry.banner key={index} block={block} context={context} />;
     case 'copy':
-      return <registry.copy key={key} block={block} context={context} />;
+      return <registry.copy key={index} block={block} context={context} />;
     default:
-      // Unreachable for a validated spec, but a host with a partial custom
-      // registry should lose one block rather than the whole page.
+      // Unreachable for a spec this version validated. A spec written by hand,
+      // or produced by a newer core carrying a block kind this renderer predates,
+      // loses that block rather than the page.
       return null;
   }
 }
@@ -67,8 +82,9 @@ export function RudraComponent({
   products,
   registry = defaultRegistry,
   hrefForSku = defaultHrefForSku,
-  formatPrice = defaultFormatPrice,
-  showDiagnostics = false,
+  formatPrice,
+  locale,
+  hasDiagnostics = false,
   className,
 }: RudraComponentProps) {
   // An empty recommendation area is worse than none: it takes up space and
@@ -78,13 +94,14 @@ export function RudraComponent({
   const context: BlockRenderContext = {
     products: toProductMap(products),
     hrefForSku,
-    formatPrice,
-    slot: spec.slot,
+    formatPrice: formatPrice ?? ((product) => defaultFormatPrice(product, locale)),
   };
 
   return (
     <section
-      className={className ?? 'rudra'}
+      // Extended rather than replaced: every child class is namespaced under
+      // `rudra`, and the package ships no stylesheet, so a host will pass one.
+      className={className ? `rudra ${className}` : 'rudra'}
       data-rudra-slot={spec.slot}
       // Where the component came from travels with the markup, so hit rate and
       // fallback share can be read off a rendered page. The vendor's name and
@@ -92,7 +109,7 @@ export function RudraComponent({
       // tell a visitor which model a shop uses and when it is not working.
       data-rudra-source={spec.source}
       data-rudra-tone={spec.tone}
-      {...(showDiagnostics
+      {...(hasDiagnostics
         ? {
             'data-rudra-provider': spec.provider ?? 'none',
             'data-rudra-model': spec.model ?? 'none',
@@ -108,7 +125,7 @@ export function RudraComponent({
 
       {spec.blocks.map((block, index) => renderBlock(block, context, registry, index))}
 
-      {showDiagnostics ? <p className="rudra__rationale">{spec.rationale}</p> : null}
+      {hasDiagnostics ? <p className="rudra__rationale">{spec.rationale}</p> : null}
     </section>
   );
 }

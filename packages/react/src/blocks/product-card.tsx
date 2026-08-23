@@ -31,12 +31,7 @@ export function ProductCard({
       className={isFeatured ? 'rudra-card rudra-card--featured' : 'rudra-card'}
     >
       {product.imageUrl ? (
-        <img
-          className="rudra-card__image"
-          src={product.imageUrl}
-          alt={product.title}
-          loading="lazy"
-        />
+        <img className="rudra-card__image" src={product.imageUrl} alt="" loading="lazy" />
       ) : null}
 
       <span className="rudra-card__body">
