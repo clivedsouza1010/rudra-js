@@ -6,7 +6,8 @@
     "incremental": false,
     "declaration": false,
     "declarationMap": false,
-    "sourceMap": false
+    "sourceMap": false,
+    "jsx": "react-jsx"
   },
   "include": ["packages/*/src/**/*", "vitest.config.ts"]
 }

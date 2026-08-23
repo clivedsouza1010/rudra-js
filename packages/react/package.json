@@ -1,0 +1,44 @@
+{
+  "name": "@rudra/react",
+  "version": "0.1.0",
+  "description": "Renders a rudra component specification as React Server Components",
+  "license": "MIT",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clivedsouza1010/rudra-js.git",
+    "directory": "packages/react"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@rudra/core": "0.1.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@rudra/core": "0.1.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}
