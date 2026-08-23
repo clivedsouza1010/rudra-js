@@ -4,13 +4,16 @@ import { buildDigest, type SignalDigest } from './signal-digest.js';
 import { createMemorySpecCache, createNullSpecCache, specCacheKey } from './spec-cache.js';
 import { parseTrackingInput } from './tracking-input.js';
 
-const SPEC: GeneratedSpec = {
+const GENERATED: GeneratedSpec = {
   tone: 'neutral',
   headline: 'Back to the trail',
   subheadline: null,
   blocks: [],
   rationale: 'Cached fixture.',
 };
+
+/** What the cache actually stores: the spec plus when it was produced. */
+const SPEC = { spec: GENERATED, generatedAt: 1_700_000_000_000 };
 
 /** A shopper with every kind of signal, so no digest field is left unset. */
 function richDigest(): SignalDigest {
@@ -197,9 +200,9 @@ describe('the in-memory cache', () => {
   it('overwrites rather than duplicating a key', async () => {
     const cache = createMemorySpecCache({ maxEntries: 1 });
     await cache.set('key', SPEC);
-    await cache.set('key', { ...SPEC, headline: 'Something else' });
+    await cache.set('key', { ...SPEC, spec: { ...GENERATED, headline: 'Something else' } });
 
-    expect((await cache.get('key'))?.headline).toBe('Something else');
+    expect((await cache.get('key'))?.spec.headline).toBe('Something else');
   });
 });
 

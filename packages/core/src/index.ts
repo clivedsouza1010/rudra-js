@@ -80,6 +80,7 @@ export {
   createMemorySpecCache,
   createNullSpecCache,
   specCacheKey,
+  type CachedSpec,
   type MemorySpecCacheOptions,
   type SpecCache,
 } from './spec-cache.js';

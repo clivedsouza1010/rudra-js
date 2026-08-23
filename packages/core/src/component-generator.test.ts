@@ -460,6 +460,22 @@ describe('what it reports', () => {
     expect(events[1]).toMatchObject({ source: 'cache', calledModel: false });
   });
 
+  it('still counts the model call when the answer turns out unusable', async () => {
+    const [event] = await collect({
+      provider: respondingWith(modelSpec(['GHOST-1'])),
+    });
+
+    // The model was asked and billed. Reporting calledModel: false here would
+    // hide exactly the calls worth knowing about — the ones that produced
+    // nothing renderable.
+    expect(event).toMatchObject({
+      source: 'fallback',
+      degradedReason: 'unusable-on-serve',
+      calledModel: true,
+    });
+    expect(event?.violations).toContain('unknown-sku:GHOST-1');
+  });
+
   it('reports a fallback with its reason, and no model call', async () => {
     const [event] = await collect({ provider: throwingProvider() });
 
@@ -514,6 +530,38 @@ describe('what it reports', () => {
 
     // A broken metrics hook must not take down a page.
     await expect(generator.generate(payload())).resolves.toMatchObject({ source: 'llm' });
+  });
+});
+
+describe('when the component was generated', () => {
+  it('reports the original moment on a cache hit, not the moment it was served', async () => {
+    const generator = createComponentGenerator({
+      provider: countingProvider().provider,
+      cache: createMemorySpecCache(),
+    });
+
+    const first = await generator.generate(payload());
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const cached = await generator.generate(payload());
+
+    // A cached component is not newly generated. Stamping it with the serve
+    // time makes any measure of how stale a page is showing read as zero.
+    expect(cached.source).toBe('cache');
+    expect(cached.generatedAt).toBe(first.generatedAt);
+  });
+
+  it('still reports the real time spent serving it', async () => {
+    const generator = createComponentGenerator({
+      provider: countingProvider().provider,
+      cache: createMemorySpecCache(),
+    });
+
+    await generator.generate(payload());
+    const cached = await generator.generate(payload());
+
+    // generatedAt is about the spec; latencyMs is about this request.
+    expect(cached.latencyMs).toBeGreaterThanOrEqual(0);
+    expect(cached.latencyMs).toBeLessThan(100);
   });
 });
 
