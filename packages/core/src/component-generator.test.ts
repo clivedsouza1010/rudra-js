@@ -64,11 +64,26 @@ function countingProvider(spec: GeneratedSpec = modelSpec(['TR-101'])) {
   };
 }
 
-/** A provider that never answers, to exercise the deadline. */
+/** A provider that never answers and ignores its signal, to exercise the deadline. */
 const hangingProvider = (): ComponentProvider => ({
   name: 'slow',
   model: 'slow-model',
   generate: () => new Promise(() => {}),
+});
+
+/**
+ * A provider that never answers but does stop when told to, which is what the
+ * `ComponentProvider` contract asks for. It rejects from inside the deadline's
+ * own `abort()` call, so its rejection reaches the caller ahead of the
+ * deadline's — the case a provider that ignores its signal cannot exercise.
+ */
+const abortingProvider = (): ComponentProvider => ({
+  name: 'obedient',
+  model: 'obedient-model',
+  generate: ({ signal }) =>
+    new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason));
+    }),
 });
 
 const throwingProvider = (error: Error = new Error('upstream is down')): ComponentProvider => ({
@@ -153,6 +168,24 @@ describe('the deadline', () => {
     await generatorWith({ provider: hangingProvider(), modelTimeoutMs: 30 }).generate(payload());
 
     expect(Date.now() - startedAt).toBeLessThan(500);
+  });
+
+  /**
+   * Guards against blaming the vendor for the caller's own deadline. The
+   * better-behaved the adapter, the more it used to happen: an adapter that
+   * honours `signal` rejects before the deadline does, so classifying on the
+   * error that arrives reported every one of its timeouts as 'provider-error'.
+   */
+  it('calls a timeout a timeout, even when the provider stops on its own', async () => {
+    const events: GenerationEvent[] = [];
+    const spec = await generatorWith({
+      provider: abortingProvider(),
+      modelTimeoutMs: 20,
+      onEvent: (event) => events.push(event),
+    }).generate(payload());
+
+    expect(spec.degradedReason).toBe('timeout');
+    expect(events.map((event) => event.degradedReason)).toEqual(['timeout']);
   });
 
   it('tells the provider to stop, rather than only ignoring it', async () => {

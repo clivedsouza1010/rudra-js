@@ -110,6 +110,13 @@ class TimeoutError extends Error {
  * The deadline is enforced here rather than trusted to the thing being waited
  * on. A provider that ignores its abort signal, or a store that never settles,
  * must still not hold a page open.
+ *
+ * Once the deadline has fired the caller is told so, whatever the race
+ * actually settled with. Aborting is what makes that necessary: a provider
+ * honouring its half of the contract rejects from inside the `abort()` below,
+ * so its rejection reaches the race first and the deadline's own never wins.
+ * Reporting the error that happened to arrive would blame the vendor for the
+ * caller's deadline — and blame it most often on the best-behaved adapters.
  */
 async function withinBudget<T>(
   label: string,
@@ -118,16 +125,20 @@ async function withinBudget<T>(
 ): Promise<T> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let expired: TimeoutError | undefined;
 
   const deadline = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
+      expired = new TimeoutError(label, milliseconds);
       controller.abort();
-      reject(new TimeoutError(label, milliseconds));
+      reject(expired);
     }, milliseconds);
   });
 
   try {
     return await Promise.race([start(controller.signal), deadline]);
+  } catch (error) {
+    throw expired ?? error;
   } finally {
     clearTimeout(timer);
   }
