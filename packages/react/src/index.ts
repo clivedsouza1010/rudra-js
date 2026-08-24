@@ -5,7 +5,11 @@
  * HTML response and needs no hydration.
  */
 
-export { RudraComponent, type RudraComponentProps } from './rudra-component.js';
+export {
+  RudraComponent,
+  type ProductCatalog,
+  type RudraComponentProps,
+} from './rudra-component.js';
 
 export {
   defaultRegistry,

@@ -12,6 +12,10 @@ export interface RudraComponentProps {
    * The host catalog. Every product fact on the page comes from here rather
    * than from the specification.
    *
+   * A list of products, or anything keyed by SKU — a `Map`, or your own view
+   * over a catalog too large to hold in one. The renderers only ever call
+   * `get(sku)` and `has(sku)`, so a view needs nothing else to be fast.
+   *
    * Validate them with `productSchema` from `@rudra/core` — the same schema
    * your candidates already passed — not with `parseTrackingInput`, which
    * parses a whole tracking payload and will reject a bare catalog.
@@ -42,17 +46,41 @@ export interface RudraComponentProps {
   className?: string;
 }
 
-type ProductCatalog = readonly Product[] | ReadonlyMap<string, Product>;
+/** A list of products, or anything keyed by SKU that answers `get` and `has`. */
+export type ProductCatalog = readonly Product[] | ReadonlyMap<string, Product>;
 
-// A bare `instanceof Map` narrows the true branch but not the false one, since a
-// ReadonlyMap need not be a Map. Array.isArray has the mirror problem with a
-// readonly array. Naming the predicate settles both branches.
+/**
+ * Whether the catalog is already keyed by SKU.
+ *
+ * Asks what the renderers actually call rather than which class the host
+ * happened to construct. `instanceof Map` was wrong twice over: a Map that
+ * crossed a realm boundary — a `node:vm` context, a worker — fails it, and so
+ * does a host's own `ReadonlyMap`, which the prop type has always allowed. Both
+ * then fell into the list branch, where `catalog.map is not a function` throws
+ * while the render context is being built, before any block renders. That takes
+ * down the whole page, not just this component.
+ *
+ * Keyed before list, because a collection can answer both: an Immutable.js map
+ * has `map`, and converting through it yields a catalog whose every value is a
+ * `[sku, product]` pair rather than a product.
+ */
 function isKeyedBySku(catalog: ProductCatalog): catalog is ReadonlyMap<string, Product> {
-  return catalog instanceof Map;
+  const candidate = catalog as { get?: unknown; has?: unknown };
+  return typeof candidate.get === 'function' && typeof candidate.has === 'function';
 }
 
 function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
   if (isKeyedBySku(catalog)) return catalog;
+  if (typeof (catalog as { map?: unknown }).map !== 'function') {
+    // A Set of products, a plain object keyed by SKU, a Map that has been
+    // through JSON. Refusing here names the prop while the stack still points
+    // at it. Carried through instead, a grid renders nothing and a banner
+    // renders a healthy-looking page, and the shop finds out from a dashboard.
+    throw new TypeError(
+      'the `products` prop must be a list of products, or keyed by SKU with `get` and `has` — ' +
+        `received ${Object.prototype.toString.call(catalog)}`,
+    );
+  }
   return new Map(catalog.map((product) => [product.sku, product]));
 }
 

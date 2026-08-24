@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -572,5 +573,93 @@ describe('the styling contract', () => {
     for (const attribute of emitted) {
       expect(readme, `${attribute} is emitted but not documented`).toContain(`\`${attribute}\``);
     }
+  });
+});
+
+/**
+ * The `products` prop has always been typed `readonly Product[] | ReadonlyMap`,
+ * and `ReadonlyMap` is an interface: plenty of things satisfy it without being
+ * a `Map`. Getting this wrong does not degrade the component — it throws while
+ * the render context is being built, which takes down the host's whole page.
+ */
+describe('what a catalog may be', () => {
+  /** Implements the interface the prop asks for, and nothing more. */
+  class SkuIndex implements ReadonlyMap<string, Product> {
+    readonly #entries: Map<string, Product>;
+
+    constructor(products: readonly Product[]) {
+      this.#entries = new Map(products.map((entry) => [entry.sku, entry]));
+    }
+
+    get size() {
+      return this.#entries.size;
+    }
+    get(sku: string) {
+      return this.#entries.get(sku);
+    }
+    has(sku: string) {
+      return this.#entries.has(sku);
+    }
+    keys() {
+      return this.#entries.keys();
+    }
+    values() {
+      return this.#entries.values();
+    }
+    entries() {
+      return this.#entries.entries();
+    }
+    forEach(callback: (value: Product, key: string, map: ReadonlyMap<string, Product>) => void) {
+      this.#entries.forEach(callback);
+    }
+    [Symbol.iterator]() {
+      return this.#entries[Symbol.iterator]();
+    }
+  }
+
+  it('takes a catalog that satisfies ReadonlyMap without being a Map', () => {
+    // A shop with a million SKUs indexes its own way rather than copying the
+    // catalog into a Map on every request.
+    expect(render(gridSpec(), { products: new SkuIndex(CATALOG) })).toContain('Product TR-101');
+  });
+
+  it('takes a Map built in another realm', () => {
+    // `instanceof` is per-realm, so a Map that arrives from a vm context, a
+    // worker or a plugin sandbox is not `instanceof Map` here. This is the
+    // sharp version of the test above: it cannot be satisfied by accident.
+    const foreign = runInNewContext('new Map(entries)', {
+      entries: CATALOG.map((entry) => [entry.sku, entry]),
+    }) as ReadonlyMap<string, Product>;
+
+    expect(foreign instanceof Map).toBe(false);
+    expect(render(gridSpec(), { products: foreign })).toContain('Product TR-101');
+  });
+
+  it('reads a collection that answers both `get` and `map` as the keyed one', () => {
+    // Immutable.js maps have a `map` method. Treated as a list, every value in
+    // the resulting catalog is a `[sku, product]` pair, and the page renders a
+    // product with no title at `$undefined` rather than failing.
+    const keyedAndMappable = {
+      get: (sku: string) => CATALOG.find((entry) => entry.sku === sku),
+      has: (sku: string) => CATALOG.some((entry) => entry.sku === sku),
+      map: (project: (entry: Product) => unknown) => CATALOG.map(project),
+    } as unknown as ReadonlyMap<string, Product>;
+
+    const markup = render(gridSpec(), { products: keyedAndMappable });
+
+    expect(markup).toContain('Product TR-101');
+    expect(markup).not.toContain('undefined');
+  });
+
+  it.each([
+    ['a set of products', () => new Set(CATALOG)],
+    ['a plain object keyed by SKU', () => Object.fromEntries(CATALOG.map((e) => [e.sku, e]))],
+    ['a map that has been through JSON', () => JSON.parse(JSON.stringify(new Map())) as unknown],
+  ])('refuses %s, naming the prop', (_label, build) => {
+    // Each of these is a plausible misreading of "keyed by SKU", and each one
+    // carried through would render a grid as nothing and a banner as a page
+    // that looks fine. The shop should hear about it on the first request.
+    expect(() => render(gridSpec(), { products: build() })).toThrow(TypeError);
+    expect(() => render(gridSpec(), { products: build() })).toThrow(/`products` prop/);
   });
 });

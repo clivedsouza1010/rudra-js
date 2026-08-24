@@ -110,13 +110,27 @@ const registry = extendRegistry({
 | Prop             | Notes                                                                                                                                                                      |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `spec`           | Required. From `@rudra/core`.                                                                                                                                              |
-| `products`       | Required. Array, or a `Map` keyed by SKU. See the warning above.                                                                                                           |
+| `products`       | Required. A list of products, or anything keyed by SKU. See below, and the warning above.                                                                                  |
 | `registry`       | Replace some or all block renderers.                                                                                                                                       |
 | `hrefForSku`     | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                 |
 | `formatPrice`    | Defaults to `Intl.NumberFormat`, which knows each currency's own number of decimal places.                                                                                 |
 | `locale`         | Punctuates prices. Defaults to the **server's** locale, which is rarely the shopper's — pass it if you serve more than one.                                                |
 | `hasDiagnostics` | Adds the provider, the model name, the latency and the model's own reasoning to the markup. Off by default: it tells a visitor which model you use and when it is failing. |
 | `className`      | Added alongside `rudra`.                                                                                                                                                   |
+
+### What `products` may be
+
+A list of products, or anything keyed by SKU that answers `get(sku)` and
+`has(sku)` — a `Map`, or your own index. Those two methods are the only ones the
+renderers call, so a shop with a catalog too large to copy into a `Map` on every
+request can pass a view over its own store instead.
+
+The check is on those two methods rather than on `instanceof Map`, which is
+per-realm: a `Map` arriving from a worker or a `node:vm` sandbox is a perfectly
+good catalog and fails `instanceof`. Anything that is neither a list nor keyed —
+a `Set` of products, a plain object, a `Map` that has been through JSON — is
+refused on the spot with an error naming the prop, rather than quietly rendering
+an empty recommendation area.
 
 The component renders nothing at all when there is nothing to show — a spec with
 no blocks, or one whose every product has left your catalog since it was
