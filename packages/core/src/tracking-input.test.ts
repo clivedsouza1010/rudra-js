@@ -219,18 +219,36 @@ describe('unknown fields', () => {
     expect(result.success).toBe(true);
   });
 
-  it.each(['__proto__', 'constructor'])(
-    'rejects %s as a meta key rather than dropping it',
-    (key) => {
-      const meta = JSON.parse(`{"${key}": "x"}`) as Record<string, string>;
+  it('rejects __proto__ as a meta key rather than dropping it', () => {
+    // JSON.parse makes __proto__ an own property; an object literal would have
+    // set the prototype here in the test instead of reaching the schema at all.
+    const meta = JSON.parse('{"__proto__": "x"}') as Record<string, string>;
+    expect(Object.getPrototypeOf(meta)).toBe(Object.prototype);
 
-      const result = safeParseTrackingInput(
-        minimalPayload({ signals: { interactions: [{ type: 'filter_applied', meta }] } }),
-      );
+    const result = safeParseTrackingInput(
+      minimalPayload({ signals: { interactions: [{ type: 'filter_applied', meta }] } }),
+    );
 
-      expect(result.success).toBe(false);
-    },
-  );
+    expect(result.success).toBe(false);
+  });
+
+  // 'constructor' and 'prototype' are ordinary own properties: assigning them
+  // shadows, it does not mutate. A host emitting a facet or CMS field by either
+  // name is not a bug, and rejecting it would throw a render the fallback path
+  // exists to prevent.
+  it.each(['constructor', 'prototype'])('carries %s through as ordinary meta', (key) => {
+    const meta = JSON.parse(`{"${key}": "acme", "a": "y"}`) as Record<string, string>;
+
+    const input = parseTrackingInput(
+      minimalPayload({ signals: { interactions: [{ type: 'filter_applied', meta }] } }),
+    );
+
+    const parsed = input.signals.interactions[0]?.meta;
+    expect(parsed).toBeDefined();
+    expect(Object.getOwnPropertyNames(parsed)).toEqual([key, 'a']);
+    expect(parsed?.[key]).toBe('acme');
+    expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
+  });
 });
 
 /**
