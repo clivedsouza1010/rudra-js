@@ -509,14 +509,74 @@ describe('what it reports', () => {
     expect(event?.violations).toContain('unknown-sku:GHOST-1');
   });
 
-  it('reports a fallback with its reason, and no model call', async () => {
-    const [event] = await collect({ provider: throwingProvider() });
+  /**
+   * A call that fails still went out, and a vendor that charges for tokens has
+   * already charged for it. Reporting `calledModel: false` on these paths made
+   * the calls that produce nothing the only ones missing from the count — the
+   * exact opposite of what the flag exists for.
+   */
+  it.each([
+    ['the provider errors', { provider: throwingProvider() }, 'provider-error'],
+    ['the deadline fires', { provider: hangingProvider(), modelTimeoutMs: 20 }, 'timeout'],
+    [
+      'the provider stops when told',
+      { provider: abortingProvider(), modelTimeoutMs: 20 },
+      'timeout',
+    ],
+    [
+      'the answer does not parse',
+      { provider: respondingWith({ not: 'a spec' }) },
+      'invalid-generation',
+    ],
+  ])('counts the model call when %s', async (_label, options, degradedReason) => {
+    const [event] = await collect(options);
+
+    expect(event).toMatchObject({ source: 'fallback', calledModel: true, degradedReason });
+  });
+
+  it('reports what an unparseable answer cost', async () => {
+    // The tokens are spent by the time the schema rejects it. Dropping the
+    // usage here loses the spend on the answers a vendor is worst at.
+    const [event] = await collect({
+      provider: {
+        name: 'odd',
+        model: 'odd-model',
+        generate: async () => ({
+          spec: { not: 'a spec' } as unknown as GeneratedSpec,
+          usage: { inputTokens: 11, outputTokens: 3 },
+        }),
+      },
+    });
 
     expect(event).toMatchObject({
-      source: 'fallback',
-      calledModel: false,
-      degradedReason: 'provider-error',
+      degradedReason: 'invalid-generation',
+      calledModel: true,
+      usage: { inputTokens: 11, outputTokens: 3 },
     });
+  });
+
+  it('counts one model call when eight requests share a generation that fails', async () => {
+    // The flag separates the caller that sent the request from the ones that
+    // joined it. A failure must not turn one call into eight.
+    const events: GenerationEvent[] = [];
+    const generator = createComponentGenerator({
+      cache: createNullSpecCache(),
+      onEvent: (event) => events.push(event),
+      provider: {
+        name: 'broken',
+        model: 'broken-model',
+        generate: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          throw new Error('upstream is down');
+        },
+      },
+    });
+
+    await Promise.all(Array.from({ length: 8 }, () => generator.generate(payload())));
+
+    expect(events).toHaveLength(8);
+    expect(events.filter((event) => event.calledModel)).toHaveLength(1);
+    expect(events.every((event) => event.degradedReason === 'provider-error')).toBe(true);
   });
 
   it('reports what reconciliation removed', async () => {

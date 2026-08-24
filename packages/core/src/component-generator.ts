@@ -56,9 +56,16 @@ export interface GenerationEvent {
   /** Wall-clock milliseconds for the whole call. */
   elapsedMs: number;
   /**
-   * True only for the caller that actually reached the model. Requests that
-   * joined an in-flight generation share its answer and its usage figures, so
-   * cost must be summed over this flag rather than over every event.
+   * True for the caller that sent the request, on every outcome — including a
+   * call that timed out, errored or came back unparseable. Requests that joined
+   * an in-flight generation share its answer and its usage figures, so cost
+   * must be summed over this flag rather than over every event.
+   *
+   * It counts requests sent, which is an upper bound on requests billed: an
+   * adapter that throws before it reaches the vendor looks the same from here
+   * as one that throws after. An upper bound is the useful direction — the
+   * calls that produce nothing are the ones worth seeing, and reporting them as
+   * no call at all hides them completely.
    */
   calledModel: boolean;
   /** What reconciliation removed. Absent when no spec was reconciled. */
@@ -176,9 +183,21 @@ const cachedSpecSchema = z.object({
 });
 
 /** What the model said, plus what it cost. */
-interface ModelAnswer {
-  spec: GeneratedSpec;
+/**
+ * What one call to the model produced.
+ *
+ * `spec` is null when the answer did not satisfy the schema. `usage` is carried
+ * either way: the request went out and was paid for whether or not anything
+ * usable came back, and those are the calls most worth seeing.
+ */
+interface ModelCall {
+  spec: GeneratedSpec | null;
   usage?: TokenUsage;
+}
+
+/** A model call whose answer can be reconciled and served. */
+interface ModelAnswer extends ModelCall {
+  spec: GeneratedSpec;
 }
 
 /** Attaches the provenance the server owns. The model never supplies any of it. */
@@ -196,7 +215,7 @@ export function createComponentGenerator(
   const cache = options.cache ?? createMemorySpecCache();
   const modelTimeoutMs = options.modelTimeoutMs ?? 1_500;
   const cacheTimeoutMs = options.cacheTimeoutMs ?? 50;
-  const singleFlight = createSingleFlight<ModelAnswer | null>();
+  const singleFlight = createSingleFlight<ModelCall>();
 
   const report = (event: GenerationEvent): void => {
     if (!options.onEvent) return;
@@ -287,15 +306,16 @@ export function createComponentGenerator(
    * Deliberately does not decide whether the answer is usable. That depends on
    * the asking shopper's live facts — stock, dislikes, what is in their basket
    * — and none of those are in the cache key, so a verdict reached here would
-   * be handed to every request that joined this one. Returns null only when the
-   * answer does not satisfy the schema, which is a fault of the adapter rather
-   * than a judgement about any shopper.
+   * be handed to every request that joined this one. A null `spec` in the
+   * result means the answer did not satisfy the schema, which is a fault of the
+   * adapter rather than a judgement about any shopper — and is still a call
+   * that happened, so its usage comes back with it.
    */
   const askModel = async (
     active: ComponentProvider,
     input: TrackingInput,
     digest: SignalDigest,
-  ): Promise<ModelAnswer | null> => {
+  ): Promise<ModelCall> => {
     const { system, user } = buildPrompt(input, digest);
 
     const result = await withinBudget('generation', modelTimeoutMs, (signal) =>
@@ -304,9 +324,11 @@ export function createComponentGenerator(
 
     // Providers return parsed objects, but the shape is still model output.
     const parsed = generatedSpecSchema.safeParse(result.spec);
-    if (!parsed.success) return null;
 
-    return { spec: parsed.data, ...(result.usage ? { usage: result.usage } : {}) };
+    return {
+      spec: parsed.success ? parsed.data : null,
+      ...(result.usage ? { usage: result.usage } : {}),
+    };
   };
 
   return {
@@ -350,18 +372,25 @@ export function createComponentGenerator(
         // follower — and they must not both be counted as a model call.
         calledModel = !singleFlight.isRunning(key);
 
-        let fresh: ModelAnswer | null;
+        let call: ModelCall;
         try {
-          fresh = await singleFlight.run(key, () => askModel(provider, input, digest));
+          call = await singleFlight.run(key, () => askModel(provider, input, digest));
         } catch (error) {
           const reason = error instanceof TimeoutError ? 'timeout' : 'provider-error';
-          return buildDeterministic(input, digest, startedAt, key, reason);
+          // The request went out. Leaving `calledModel` to default here reported
+          // every failed call as no call at all, so the calls that cost money
+          // and produced nothing were the only ones missing from the count.
+          return buildDeterministic(input, digest, startedAt, key, reason, { calledModel });
         }
 
-        if (!fresh) {
-          return buildDeterministic(input, digest, startedAt, key, 'invalid-generation');
+        if (!call.spec) {
+          return buildDeterministic(input, digest, startedAt, key, 'invalid-generation', {
+            calledModel,
+            ...(call.usage ? { usage: call.usage } : {}),
+          });
         }
-        answer = fresh;
+
+        answer = { spec: call.spec, ...(call.usage ? { usage: call.usage } : {}) };
         generatedAt = Date.now();
 
         // Stored unreconciled on purpose, and stored even when it is unusable
@@ -370,7 +399,7 @@ export function createComponentGenerator(
         // out and come back without the candidate list changing. Keeping what
         // the model said means the restock is picked up from cache rather than
         // paid for again.
-        if (calledModel) storeInBackground(key, { spec: fresh.spec, generatedAt });
+        if (calledModel) storeInBackground(key, { spec: answer.spec, generatedAt });
       }
 
       // One place where anything is served, whichever side of the cache it came
