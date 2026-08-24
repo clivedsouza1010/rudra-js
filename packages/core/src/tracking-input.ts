@@ -42,8 +42,8 @@ export const FIELD_LIMITS = {
   candidates: 200,
 } as const;
 
-/** Assigning these as object keys mutates the prototype instead of the object. */
-const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+/** Assigning this as an object key mutates the prototype instead of the object. */
+const RESERVED_META_KEY = '__proto__';
 
 /** Upper bound on any timestamp: 2100-01-01. */
 const MAX_EPOCH_MS = Date.UTC(2100, 0, 1);
@@ -122,18 +122,22 @@ export const purchaseSignalSchema = skuSignalSchema.extend({
 export type PurchaseSignal = z.infer<typeof purchaseSignalSchema>;
 
 /**
- * `meta` is the one dynamic shape in the contract, so its keys are checked
- * before the record is parsed rather than after. Zod builds its result by
- * assigning each key, and assigning `__proto__` sets the prototype instead of
- * adding a key — so the entry would vanish from the parsed output with no
- * error, which is the silent drop this module exists to prevent.
+ * `meta` is the one dynamic shape in the contract, so its key is checked before
+ * the record is parsed rather than after. Zod builds its result by assigning
+ * each key, and assigning `__proto__` sets the prototype instead of adding a
+ * key — so the entry would vanish from the parsed output with no error, which
+ * is the silent drop this module exists to prevent.
+ *
+ * `__proto__` is the only key that behaves this way. `constructor` and
+ * `prototype` are ordinary own properties: assigning either shadows it on that
+ * one object and leaves the prototype alone, so both survive a parse intact and
+ * are accepted. `meta` is a host-defined vocabulary, and a shop with a facet,
+ * filter, or CMS field by either name should get a component, not a throw.
  */
 const metaKeysAreSafe = z.custom<Record<string, string | number | boolean>>(
   (value) =>
-    typeof value === 'object' &&
-    value !== null &&
-    !Object.getOwnPropertyNames(value).some((key) => RESERVED_KEYS.has(key)),
-  { message: `meta may not use the reserved keys ${[...RESERVED_KEYS].join(', ')}` },
+    typeof value === 'object' && value !== null && !Object.hasOwn(value, RESERVED_META_KEY),
+  { message: `meta may not use the reserved key ${RESERVED_META_KEY}` },
 );
 
 // `z.record` bounds key and value shape but not how many entries a record may
