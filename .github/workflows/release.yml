@@ -45,6 +45,12 @@ jobs:
       #
       # Core first: @rudra/react declares it as a peer, so a registry that has
       # the second without the first cannot satisfy an install.
+      #
+      # npm has no transactional multi-publish. If core succeeds and react then
+      # fails, the tag cannot simply be re-run — npm rejects republishing a
+      # version that exists, so the job would fail on core before reaching
+      # react. Recover by publishing react by hand, or by tagging a new patch
+      # version.
       - run: npm publish --provenance --access public
         working-directory: packages/core
         env:

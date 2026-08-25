@@ -9,6 +9,17 @@ response and needs no hydration, which is what removes the pop-in of a
 client-fetched recommendation rail and what makes the content visible to a
 crawler that does not run JavaScript.
 
+## Install
+
+```sh
+npm install @rudra/react @rudra/core react
+```
+
+Both `@rudra/core` and `react` are peer dependencies: the specification you pass
+in comes from your copy of core, and the elements this renders have to come from
+the same React your app renders. Two copies of either would mean a spec that
+fails its own type check, or a component tree React refuses to render.
+
 ```tsx
 import { RudraComponent } from '@rudra/react';
 
