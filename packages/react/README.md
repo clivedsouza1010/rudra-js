@@ -1,6 +1,7 @@
 # @rudra/react
 
-Renders a component specification from [`@rudra/core`](../core) as React Server
+Renders a component specification from
+[`@rudra/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core) as React Server
 Components.
 
 No client JavaScript. The recommendation area arrives in the initial HTML
@@ -139,4 +140,4 @@ up space and tells the shopper the page is broken.
 
 ## Licence
 
-[MIT](../../LICENSE)
+[MIT](./LICENSE)

@@ -2,7 +2,26 @@
   "name": "@rudra/core",
   "version": "0.1.0",
   "description": "The contracts and logic that turn one tracking payload into one renderable component specification",
+  "keywords": [
+    "llm",
+    "server-components",
+    "recommendations",
+    "ecommerce",
+    "personalization",
+    "ssr",
+    "zod"
+  ],
   "license": "MIT",
+  "author": "Clive Dsouza",
+  "homepage": "https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/clivedsouza1010/rudra-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clivedsouza1010/rudra-js.git",
+    "directory": "packages/core"
+  },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
@@ -13,20 +32,19 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx"
   ],
+  "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/clivedsouza1010/rudra-js.git",
-    "directory": "packages/core"
-  },
-  "sideEffects": false,
   "publishConfig": {
     "access": "public"
   },

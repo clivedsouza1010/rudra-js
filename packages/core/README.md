@@ -100,3 +100,7 @@ Every fixed-shape object is a `strictObject`. A host that misspells
 `recentSearches` gets an error, not a shopper who silently looks like a
 first-time visitor. `interaction.meta` is the one dynamic shape — an open
 record, minus the keys that would mutate a prototype instead of the object.
+
+## Licence
+
+[MIT](./LICENSE)

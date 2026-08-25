@@ -4,6 +4,10 @@
   "private": true,
   "description": "A framework of server side components built dynamically and rendered in real time",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clivedsouza1010/rudra-js.git"
+  },
   "type": "module",
   "workspaces": [
     "packages/*"

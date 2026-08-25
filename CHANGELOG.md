@@ -10,8 +10,8 @@ break them.
 
 ## [Unreleased]
 
-Nothing released yet. `@rudra/core` is being built module by module and has not
-been published.
+Nothing released yet. Both packages are being built module by module and
+neither has been published.
 
 ### Added
 
