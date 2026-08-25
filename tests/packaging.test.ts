@@ -172,13 +172,14 @@ function collectExportTargets(exports: Record<string, unknown>): string[] {
   );
 }
 
+/** Only steps that actually run — a commented-out line is not a step. */
+function stepsOf(workflow: string): string[] {
+  return [...workflow.matchAll(/^\s*- run: (.+)$/gm)].map((match) => match[1]!.trim());
+}
+
 describe('the release workflow', () => {
   const releaseWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/release.yml'), 'utf8');
   const ciWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8');
-
-  /** Only steps that actually run — a commented-out line is not a step. */
-  const stepsOf = (workflow: string): string[] =>
-    [...workflow.matchAll(/^\s*- run: (.+)$/gm)].map((match) => match[1]!.trim());
 
   it.each(PACKAGES)('publishes @rudra/%s with provenance', (packageName) => {
     // The directory alone is not evidence of publishing: any step can carry it.
