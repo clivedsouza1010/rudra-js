@@ -37,6 +37,7 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
+      - run: npm run verify:consumer
 
       # Provenance links the published tarball to this commit, this workflow and
       # this runner, so a consumer can check where it came from. It requires a

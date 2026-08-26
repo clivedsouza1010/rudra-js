@@ -22,6 +22,7 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",
+    "verify:consumer": "node scripts/verify-consumer.mjs",
     "test:watch": "vitest",
     "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo"
   },

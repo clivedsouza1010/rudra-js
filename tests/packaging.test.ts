@@ -32,8 +32,10 @@ const ALLOWED = /^(LICENSE|README\.md|package\.json|dist\/.+|src\/.+\.tsx?)$/;
 const IS_TEST_FILE = /\.(test|spec)\.|(^|\/)__(tests|mocks)__\//;
 
 interface Manifest {
+  version: string;
   main: string;
   types: string;
+  peerDependencies?: Record<string, string>;
   exports: Record<string, unknown>;
   files: string[];
 }
@@ -156,6 +158,19 @@ describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
     expect(readManifest(packageName).exports['./package.json']).toBe('./package.json');
   });
 
+  it('declares a peer range on core that the published core satisfies', () => {
+    const manifest = readManifest(packageName);
+    const range = manifest.peerDependencies?.['@rudra-js/core'];
+    if (!range) return;
+
+    // Inside the workspace this range is never evaluated — npm links
+    // node_modules/@rudra-js/core straight at packages/core, so a range naming
+    // a version that does not exist resolves anyway. A consumer installing both
+    // gets ERESOLVE and nothing else in the pipeline sees it. release.yml
+    // publishes both packages from one tag, so lockstep is the contract.
+    expect(range).toBe(`^${readManifest('core').version}`);
+  });
+
   it('builds before it packs, so a tarball is never source without a build', () => {
     // `dist` is gitignored. Publishing from a clean checkout without a build
     // now ships a full `src/` tree, which looks populated while every entry
@@ -202,6 +217,7 @@ describe('the release workflow', () => {
       'npm run lint',
       'npm run format:check',
       'npm test',
+      'npm run verify:consumer',
     ]);
 
     for (const step of stepsOf(ciWorkflow)) {
