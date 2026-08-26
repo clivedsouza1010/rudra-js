@@ -16,10 +16,10 @@ Components Using Real-Time Data_.
 
 ## Packages
 
-| Package                          | What it does                                                                                       |
-| -------------------------------- | -------------------------------------------------------------------------------------------------- |
-| [`@rudra/core`](packages/core)   | The contracts and logic that turn one tracking payload into one renderable component specification |
-| [`@rudra/react`](packages/react) | Renders that specification as React Server Components, with no client JavaScript                   |
+| Package                             | What it does                                                                                       |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------- |
+| [`@rudra-js/core`](packages/core)   | The contracts and logic that turn one tracking payload into one renderable component specification |
+| [`@rudra-js/react`](packages/react) | Renders that specification as React Server Components, with no client JavaScript                   |
 
 ## Development
 

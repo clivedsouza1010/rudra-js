@@ -1,5 +1,5 @@
 /**
- * @rudra/react — renders a component specification as React Server Components.
+ * @rudra-js/react — renders a component specification as React Server Components.
  *
  * Carries no client JavaScript. The recommendation area arrives in the initial
  * HTML response and needs no hydration.

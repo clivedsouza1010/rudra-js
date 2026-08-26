@@ -1,4 +1,4 @@
-import type { Product } from '@rudra/core';
+import type { Product } from '@rudra-js/core';
 
 /**
  * Everything a block renderer needs that does not come from the specification.
@@ -45,7 +45,7 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
   if (!Number.isFinite(product.price)) {
     throw new TypeError(
       `price for SKU ${product.sku} is ${String(product.price)}, not a finite number — ` +
-        'catalog objects must satisfy productSchema from @rudra/core',
+        'catalog objects must satisfy productSchema from @rudra-js/core',
     );
   }
 

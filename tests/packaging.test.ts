@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
  *
  * `src` ships so those maps resolve and so go-to-definition lands on real code.
  * A consumer on `moduleResolution: node10` can therefore deep-import
- * `@rudra/core/src/tracking-input` and compile it under their own settings.
+ * `@rudra-js/core/src/tracking-input` and compile it under their own settings.
  * That is unsupported, not intended — the `exports` map is the contract.
  */
 
@@ -78,7 +78,7 @@ const PACKED = Object.fromEntries(PACKAGES.map((name) => [name, listPackedFiles(
 
 const LICENCE_TEXT = readFileSync(join(REPO_ROOT, 'LICENSE'), 'utf8');
 
-describe.each(PACKAGES)('the @rudra/%s tarball', (packageName) => {
+describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
   const files = PACKED[packageName];
 
   it('carries the licence text, not just the licence field', () => {
@@ -181,7 +181,7 @@ describe('the release workflow', () => {
   const releaseWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/release.yml'), 'utf8');
   const ciWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8');
 
-  it.each(PACKAGES)('publishes @rudra/%s with provenance', (packageName) => {
+  it.each(PACKAGES)('publishes @rudra-js/%s with provenance', (packageName) => {
     // The directory alone is not evidence of publishing: any step can carry it.
     // Asserting the pair is what fails when a publish becomes an `echo`.
     expect(releaseWorkflow).toMatch(

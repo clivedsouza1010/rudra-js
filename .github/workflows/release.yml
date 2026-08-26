@@ -43,7 +43,7 @@ jobs:
       # public `repository` field in package.json matching this repo, which both
       # packages have.
       #
-      # Core first: @rudra/react declares it as a peer, so a registry that has
+      # Core first: @rudra-js/react declares it as a peer, so a registry that has
       # the second without the first cannot satisfy an install.
       #
       # npm has no transactional multi-publish. If core succeeds and react then

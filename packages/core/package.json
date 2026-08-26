@@ -1,5 +1,5 @@
 {
-  "name": "@rudra/core",
+  "name": "@rudra-js/core",
   "version": "0.1.0",
   "description": "The contracts and logic that turn one tracking payload into one renderable component specification",
   "keywords": [

@@ -97,7 +97,7 @@ Enforced by `unicorn/filename-case`.
 
 **5. An exported name has to make sense with no other context.**
 
-The reader sees `import { Block } from '@rudra/core'` and nothing else. If the
+The reader sees `import { Block } from '@rudra-js/core'` and nothing else. If the
 name only makes sense next to its neighbours in the file, it is too short.
 
 **6. Match the name to the shape.** A function returning a boolean reads as a

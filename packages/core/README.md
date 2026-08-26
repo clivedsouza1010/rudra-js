@@ -1,4 +1,4 @@
-# @rudra/core
+# @rudra-js/core
 
 The contracts and logic that turn one tracking payload into one renderable
 component specification. No React, no model-vendor SDK — importable from any
@@ -7,7 +7,7 @@ server runtime.
 ## Install
 
 ```sh
-npm install @rudra/core zod
+npm install @rudra-js/core zod
 ```
 
 `zod` is a peer dependency: the package's public API _is_ zod schemas, so your
@@ -20,7 +20,7 @@ stores and aggregates nothing — the host owns its tracking pipeline and hands
 the framework one JSON object per render.
 
 ```ts
-import { parseTrackingInput } from '@rudra/core';
+import { parseTrackingInput } from '@rudra-js/core';
 
 const input = parseTrackingInput({
   user: { id: 'shopper-1' },

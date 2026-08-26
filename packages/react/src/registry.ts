@@ -10,7 +10,7 @@
  */
 
 import type { ReactNode } from 'react';
-import type { Block, BlockKind } from '@rudra/core';
+import type { Block, BlockKind } from '@rudra-js/core';
 import type { BlockRenderContext } from './render-context.js';
 import {
   BannerRenderer,
