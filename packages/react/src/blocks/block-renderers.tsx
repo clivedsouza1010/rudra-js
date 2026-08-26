@@ -7,7 +7,7 @@
  * and wording.
  */
 
-import type { BannerBlock, CarouselBlock, CopyBlock, GridBlock, HeroBlock } from '@rudra/core';
+import type { BannerBlock, CarouselBlock, CopyBlock, GridBlock, HeroBlock } from '@rudra-js/core';
 import type { BlockRenderContext } from '../render-context.js';
 import { ProductCard } from './product-card.js';
 

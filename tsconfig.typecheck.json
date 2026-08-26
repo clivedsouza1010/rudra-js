@@ -9,5 +9,5 @@
     "sourceMap": false,
     "jsx": "react-jsx"
   },
-  "include": ["packages/*/src/**/*", "vitest.config.ts"]
+  "include": ["packages/*/src/**/*", "tests/**/*", "vitest.config.ts"]
 }

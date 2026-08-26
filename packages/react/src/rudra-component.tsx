@@ -1,4 +1,4 @@
-import type { Block, ComponentSpec, Product } from '@rudra/core';
+import type { Block, ComponentSpec, Product } from '@rudra-js/core';
 import {
   defaultFormatPrice,
   defaultHrefForSku,
@@ -16,7 +16,7 @@ export interface RudraComponentProps {
    * over a catalog too large to hold in one. The renderers only ever call
    * `get(sku)` and `has(sku)`, so a view needs nothing else to be fast.
    *
-   * Validate them with `productSchema` from `@rudra/core` — the same schema
+   * Validate them with `productSchema` from `@rudra-js/core` — the same schema
    * your candidates already passed — not with `parseTrackingInput`, which
    * parses a whole tracking payload and will reject a bare catalog.
    *

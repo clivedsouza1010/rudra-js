@@ -10,8 +10,8 @@ break them.
 
 ## [Unreleased]
 
-Nothing released yet. `@rudra/core` is being built module by module and has not
-been published.
+Nothing released yet. Both packages are being built module by module and
+neither has been published.
 
 ### Added
 
@@ -33,6 +33,6 @@ been published.
   structure.
 - The component generator: the order every other module goes in, which always
   returns something renderable and never waits unbounded on a model or a store.
-- `@rudra/react`: renders a specification as React Server Components. Product
+- `@rudra-js/react`: renders a specification as React Server Components. Product
   facts come from the shop's catalog at render time, never from the model, and
   the recommendation area needs no client JavaScript.

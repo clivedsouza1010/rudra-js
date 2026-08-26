@@ -1,8 +1,27 @@
 {
-  "name": "@rudra/react",
+  "name": "@rudra-js/react",
   "version": "0.1.0",
   "description": "Renders a rudra component specification as React Server Components",
+  "keywords": [
+    "react",
+    "react-server-components",
+    "rsc",
+    "llm",
+    "recommendations",
+    "ecommerce",
+    "ssr"
+  ],
   "license": "MIT",
+  "author": "Clive Dsouza",
+  "homepage": "https://github.com/clivedsouza1010/rudra-js/tree/main/packages/react#readme",
+  "bugs": {
+    "url": "https://github.com/clivedsouza1010/rudra-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clivedsouza1010/rudra-js.git",
+    "directory": "packages/react"
+  },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
@@ -13,29 +32,30 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx"
   ],
-  "scripts": {
-    "build": "tsc -p tsconfig.json"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/clivedsouza1010/rudra-js.git",
-    "directory": "packages/react"
-  },
   "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build"
+  },
   "publishConfig": {
     "access": "public"
   },
   "peerDependencies": {
-    "@rudra/core": "^0.1.0",
+    "@rudra-js/core": "^0.1.0",
     "react": "^19.0.0"
   },
   "devDependencies": {
-    "@rudra/core": "0.1.0",
+    "@rudra-js/core": "0.1.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "react": "^19.2.8",

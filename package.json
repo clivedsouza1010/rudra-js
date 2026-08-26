@@ -4,6 +4,10 @@
   "private": true,
   "description": "A framework of server side components built dynamically and rendered in real time",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clivedsouza1010/rudra-js.git"
+  },
   "type": "module",
   "workspaces": [
     "packages/*"
@@ -18,6 +22,7 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",
+    "verify:consumer": "node scripts/verify-consumer.mjs",
     "test:watch": "vitest",
     "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo"
   },

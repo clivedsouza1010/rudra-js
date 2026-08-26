@@ -1,4 +1,4 @@
-import type { ProductReference } from '@rudra/core';
+import type { ProductReference } from '@rudra-js/core';
 import type { BlockRenderContext } from '../render-context.js';
 
 /**

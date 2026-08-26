@@ -11,15 +11,15 @@ in a page.
 It is the reference implementation of the architecture in _AI-Driven Server Side Rendering of Web
 Components Using Real-Time Data_.
 
-> **Status: early, and not published.** `@rudra/core` is being built one module at a time and its
-> contracts are still moving. Please do not depend on it yet.
+> **Status: early, and not published.** Both packages are being built one module at a time and
+> their contracts are still moving. Please do not depend on them yet.
 
 ## Packages
 
-| Package                          | What it does                                                                                       |
-| -------------------------------- | -------------------------------------------------------------------------------------------------- |
-| [`@rudra/core`](packages/core)   | The contracts and logic that turn one tracking payload into one renderable component specification |
-| [`@rudra/react`](packages/react) | Renders that specification as React Server Components, with no client JavaScript                   |
+| Package                             | What it does                                                                                       |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------- |
+| [`@rudra-js/core`](packages/core)   | The contracts and logic that turn one tracking payload into one renderable component specification |
+| [`@rudra-js/react`](packages/react) | Renders that specification as React Server Components, with no client JavaScript                   |
 
 ## Development
 

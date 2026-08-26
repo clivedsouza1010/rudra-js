@@ -1,6 +1,7 @@
-# @rudra/react
+# @rudra-js/react
 
-Renders a component specification from [`@rudra/core`](../core) as React Server
+Renders a component specification from
+[`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core) as React Server
 Components.
 
 No client JavaScript. The recommendation area arrives in the initial HTML
@@ -8,8 +9,19 @@ response and needs no hydration, which is what removes the pop-in of a
 client-fetched recommendation rail and what makes the content visible to a
 crawler that does not run JavaScript.
 
+## Install
+
+```sh
+npm install @rudra-js/react @rudra-js/core react
+```
+
+Both `@rudra-js/core` and `react` are peer dependencies: the specification you pass
+in comes from your copy of core, and the elements this renders have to come from
+the same React your app renders. Two copies of either would mean a spec that
+fails its own type check, or a component tree React refuses to render.
+
 ```tsx
-import { RudraComponent } from '@rudra/react';
+import { RudraComponent } from '@rudra-js/react';
 
 <RudraComponent spec={spec} products={catalog} locale="en-GB" />;
 ```
@@ -32,7 +44,7 @@ Product facts are resolved at render time from `products`, keyed by a SKU
 reconciliation has already checked. Everything the model writes is rendered as
 text and escaped by React.
 
-**Validate `products` with `productSchema` from `@rudra/core`** — the same
+**Validate `products` with `productSchema` from `@rudra-js/core`** — the same
 schema your candidates already passed. It is a second door into the framework:
 `imageUrl` lands in an `<img src>`, and `productSchema` is what rejects a
 protocol-relative `//evil.example/pixel.png` or a `data:` URL. React neutralises
@@ -96,7 +108,7 @@ and the specification does not change, so this gives it no new ability — it ca
 still only choose from the same fixed vocabulary.
 
 ```tsx
-import { RudraComponent, extendRegistry } from '@rudra/react';
+import { RudraComponent, extendRegistry } from '@rudra-js/react';
 
 const registry = extendRegistry({
   grid: ({ block, context }) => <MyProductGrid items={block.items} context={context} />,
@@ -109,7 +121,7 @@ const registry = extendRegistry({
 
 | Prop             | Notes                                                                                                                                                                      |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `spec`           | Required. From `@rudra/core`.                                                                                                                                              |
+| `spec`           | Required. From `@rudra-js/core`.                                                                                                                                           |
 | `products`       | Required. A list of products, or anything keyed by SKU. See below, and the warning above.                                                                                  |
 | `registry`       | Replace some or all block renderers.                                                                                                                                       |
 | `hrefForSku`     | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                 |
@@ -139,4 +151,4 @@ up space and tells the shopper the page is broken.
 
 ## Licence
 
-[MIT](../../LICENSE)
+[MIT](./LICENSE)

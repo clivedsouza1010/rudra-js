@@ -31,15 +31,33 @@ jobs:
       - run: npm run build
 
       # Publishing an artefact nobody verified is how a broken release ships.
+      # The same five checks CI runs, in the same order — a release must not be
+      # held to a lower standard than a pull request.
       - run: npm run typecheck
       - run: npm run lint
+      - run: npm run format:check
       - run: npm test
+      - run: npm run verify:consumer
 
       # Provenance links the published tarball to this commit, this workflow and
       # this runner, so a consumer can check where it came from. It requires a
-      # public `repository` field in package.json matching this repo, which
-      # @rudra/core has.
+      # public `repository` field in package.json matching this repo, which both
+      # packages have.
+      #
+      # Core first: @rudra-js/react declares it as a peer, so a registry that has
+      # the second without the first cannot satisfy an install.
+      #
+      # npm has no transactional multi-publish. If core succeeds and react then
+      # fails, the tag cannot simply be re-run — npm rejects republishing a
+      # version that exists, so the job would fail on core before reaching
+      # react. Recover by publishing react by hand, or by tagging a new patch
+      # version.
       - run: npm publish --provenance --access public
         working-directory: packages/core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - run: npm publish --provenance --access public
+        working-directory: packages/react
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

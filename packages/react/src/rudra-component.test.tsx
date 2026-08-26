@@ -3,7 +3,7 @@ import { runInNewContext } from 'node:vm';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { ComponentSpec, GeneratedSpec, Product } from '@rudra/core';
+import type { ComponentSpec, GeneratedSpec, Product } from '@rudra-js/core';
 import { RudraComponent } from './rudra-component.js';
 import { extendRegistry, type BlockRegistry } from './registry.js';
 

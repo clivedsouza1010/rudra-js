@@ -4,7 +4,7 @@ import type { GeneratedSpec } from './component-spec.js';
 /**
  * The language-model port.
  *
- * `@rudra/core` depends on no vendor SDK. Adapters live in their own packages,
+ * `@rudra-js/core` depends on no vendor SDK. Adapters live in their own packages,
  * so a host installs exactly one and the rest never reach its dependency tree.
  * Anything satisfying this interface works — a hosted API, a self-hosted model,
  * an in-tenancy deployment, or a recorded fixture.
