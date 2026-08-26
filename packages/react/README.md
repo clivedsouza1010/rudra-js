@@ -94,12 +94,12 @@ The same markup carries what the model decided, for styling and for analytics.
 read straight off a rendered page. Everything more specific appears only under
 `hasDiagnostics`, since it tells a visitor what you run and when it is failing:
 
-| Attribute               | On          | Value                         |
-| ----------------------- | ----------- | ----------------------------- |
-| `data-rudra-provider`   | the wrapper | The model vendor, or `none`   |
-| `data-rudra-model`      | the wrapper | The model name, or `none`     |
-| `data-rudra-latency-ms` | the wrapper | How long generation took      |
-| `data-rudra-degraded`   | the wrapper | Why it fell back, when it did |
+| Attribute               | On          | Value                                                                                                                  |
+| ----------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `data-rudra-provider`   | the wrapper | The model vendor, or `none`                                                                                            |
+| `data-rudra-model`      | the wrapper | The model name, or `none`                                                                                              |
+| `data-rudra-latency-ms` | the wrapper | How long generation took                                                                                               |
+| `data-rudra-degraded`   | the wrapper | Why it fell back: `no-provider`, `provider-error`, `timeout`, `invalid-generation`, `unusable-on-serve` or `requested` |
 
 ## Replacing a renderer
 

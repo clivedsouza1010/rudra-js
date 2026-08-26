@@ -3,6 +3,7 @@ import {
   SPEC_VERSION,
   generatedSpecSchema,
   type ComponentSpec,
+  type DegradedReason,
   type GeneratedSpec,
   type SpecSource,
 } from './component-spec.js';
@@ -71,7 +72,7 @@ export interface GenerationEvent {
   /** What reconciliation removed. Absent when no spec was reconciled. */
   violations?: string[];
   usage?: TokenUsage;
-  degradedReason?: string;
+  degradedReason?: DegradedReason;
 }
 
 export interface ComponentGeneratorOptions {
@@ -231,7 +232,7 @@ export function createComponentGenerator(
     digest: SignalDigest,
     startedAt: number,
     key: string | null,
-    degradedReason: string,
+    degradedReason: DegradedReason,
     /**
      * What the model call cost, when there was one. A generation that is
      * unusable for this shopper was still asked for and still billed, so
