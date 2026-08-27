@@ -43,6 +43,17 @@ const request = (signal = new AbortController().signal) => ({
   signal,
 });
 
+/** Both the schema test and the cache_control test need the sent request body. */
+const sentBodyOf = (fetch: typeof globalThis.fetch) =>
+  JSON.parse(
+    String(
+      (fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]![1].body,
+    ),
+  ) as {
+    system: { cache_control?: unknown }[];
+    tools: { input_schema: { type?: string; required?: string[] } }[];
+  };
+
 describe('the Anthropic adapter', () => {
   it('returns the spec the model produced', async () => {
     const provider = createAnthropicProvider({ apiKey: 'k', fetch: answer(toolAnswer(spec)) });
@@ -69,13 +80,30 @@ describe('the Anthropic adapter', () => {
 
     await provider.generate(request());
 
-    const [, init] = (fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock
-      .calls[0]!;
-    const sent = JSON.parse(String(init.body)) as { tools: { input_schema: unknown }[] };
+    const sent = sentBodyOf(fetch);
 
     // Restating the shape here is how a vocabulary drifts: the reconciler would
     // enforce one thing and the model would be told another.
-    expect(sent.tools[0]!.input_schema).toEqual(z.toJSONSchema(generatedSpecSchema));
+    expect(sent.tools[0]!.input_schema).toEqual(
+      z.toJSONSchema(generatedSpecSchema, { io: 'input' }),
+    );
+    // Assertions that hold whatever core's schema evolves into, so this test
+    // still means something if the two ever drift apart.
+    expect(sent.tools[0]!.input_schema).toMatchObject({ type: 'object' });
+    expect(sent.tools[0]!.input_schema.required).toEqual(
+      expect.arrayContaining(['tone', 'headline', 'blocks']),
+    );
+  });
+
+  it('marks the system prompt as the cached prefix', async () => {
+    // Nothing else here would notice a dropped cache_control: the response
+    // still parses, and a higher bill is the only symptom.
+    const fetch = answer(toolAnswer(spec));
+    const provider = createAnthropicProvider({ apiKey: 'k', fetch });
+
+    await provider.generate(request());
+
+    expect(sentBodyOf(fetch).system[0]?.cache_control).toEqual({ type: 'ephemeral' });
   });
 
   it('rejects when the vendor errors, rather than returning a broken spec', async () => {
@@ -87,6 +115,20 @@ describe('the Anthropic adapter', () => {
     await expect(provider.generate(request())).rejects.toThrow(/529/);
   });
 
+  it('keeps the status code even when the error body fails to read', async () => {
+    // The read sits inside the throw; if it rejects, that rejection must not
+    // replace the status error and erase which HTTP code this was.
+    const fetch = vi.fn(async () => ({
+      ok: false,
+      status: 529,
+      text: () => Promise.reject(new Error('stream reset')),
+    })) as unknown as typeof globalThis.fetch;
+
+    const provider = createAnthropicProvider({ apiKey: 'k', fetch });
+
+    await expect(provider.generate(request())).rejects.toThrow(/529/);
+  });
+
   it('rejects when the answer carries no tool use', async () => {
     const provider = createAnthropicProvider({
       apiKey: 'k',
@@ -94,6 +136,49 @@ describe('the Anthropic adapter', () => {
     });
 
     await expect(provider.generate(request())).rejects.toThrow(/tool/i);
+  });
+
+  it('names the vendor, not its own internals, when content is not an array', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer({ content: 'not-an-array' }),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/tool/i);
+  });
+
+  it('names the vendor, not its own internals, when a content block is not an object', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer({ content: [null] }),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/tool/i);
+  });
+
+  it('rejects distinctly when the model hits its max_tokens budget mid-answer', async () => {
+    // On this model, thinking runs by default and shares the same output
+    // budget as the tool call — a low cap can be spent reasoning before the
+    // tool block is ever emitted. That is a budget setting, not the model
+    // declining to use the tool, so it must not read as "no tool use".
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer({
+        content: [{ type: 'text', text: 'thinking out loud...' }],
+        stop_reason: 'max_tokens',
+      }),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/max_tokens/i);
+  });
+
+  it('rejects distinctly when the model refuses', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer({ content: [], stop_reason: 'refusal' }),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/refusal/i);
   });
 
   it('stops when the caller aborts', async () => {
@@ -111,7 +196,10 @@ describe('the Anthropic adapter', () => {
     const pending = provider.generate(request(controller.signal));
     controller.abort();
 
-    await expect(pending).rejects.toThrow();
+    // A matcher, not a bare `.rejects.toThrow()`: without one this test could
+    // pass on any unrelated rejection, or on a 5-second timeout instead of an
+    // actual assertion.
+    await expect(pending).rejects.toThrow(/abort/i);
   });
 
   it('names itself and its model, because both are recorded on every spec', async () => {
