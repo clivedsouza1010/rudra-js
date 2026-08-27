@@ -202,6 +202,22 @@ describe('the Anthropic adapter', () => {
     await expect(pending).rejects.toThrow(/abort/i);
   });
 
+  it('does not call out when the caller has already given up', async () => {
+    // The other direction of obligation three. `fetch` covers this on its own
+    // when it is the platform's, but this adapter takes an injected one — and
+    // every test here, plus any caller-supplied transport, is exactly that.
+    const controller = new AbortController();
+    controller.abort();
+    const fetch = vi.fn(
+      async () => new Response(JSON.stringify(toolAnswer(spec))),
+    ) as unknown as typeof globalThis.fetch;
+
+    const provider = createAnthropicProvider({ apiKey: 'k', fetch });
+
+    await expect(provider.generate(request(controller.signal))).rejects.toThrow(/abort/i);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('names itself and its model, because both are recorded on every spec', async () => {
     const provider = createAnthropicProvider({
       apiKey: 'k',

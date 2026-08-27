@@ -62,6 +62,12 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
     model,
 
     async generate(request: ProviderRequest): Promise<ProviderResult> {
+      // The half of obligation three that `fetch` does not cover. The real
+      // `fetch` rejects an already-aborted signal on its own, but `fetch` is an
+      // injected seam here, and a caller's own transport has no such duty — so
+      // without this, a call the caller has already given up on goes out.
+      request.signal.throwIfAborted();
+
       const response = await call(`${baseUrl}/v1/messages`, {
         method: 'POST',
         headers: {
