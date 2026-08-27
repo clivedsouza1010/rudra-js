@@ -176,6 +176,27 @@ export type GeneratedSpec = z.infer<typeof generatedSpecSchema>;
 /** How a spec came to exist. Surfaced for benchmarking and observability. */
 export type SpecSource = 'llm' | 'cache' | 'fallback';
 
+/**
+ * Why a component is not what the model would have produced.
+ *
+ * A closed set, like `SpecSource`: it is rendered into pages as
+ * `data-rudra-degraded` and counted in dashboards, so a host needs to know what
+ * it can receive without reading the generator.
+ */
+export type DegradedReason =
+  /** No provider was configured, so nothing was ever asked. */
+  | 'no-provider'
+  /** The provider errored, or threw before it reached the vendor. */
+  | 'provider-error'
+  /** The deadline fired before an answer arrived. */
+  | 'timeout'
+  /** An answer came back that did not satisfy the schema. */
+  | 'invalid-generation'
+  /** A usable answer reconciled down to nothing for this shopper. */
+  | 'unusable-on-serve'
+  /** The caller asked for the deterministic component on purpose. */
+  | 'requested';
+
 export const SPEC_VERSION = '1' as const;
 
 /** A generated spec plus the provenance the server owns. This is what renders. */
@@ -196,7 +217,7 @@ export interface ComponentSpec extends GeneratedSpec {
    * Present on every fallback, including the ones where no model was involved
    * at all — no provider configured, or the caller asked for it directly.
    */
-  degradedReason?: string;
+  degradedReason?: DegradedReason;
 }
 
 /** Throws a `ZodError` if the value is not a well-formed generated spec. */

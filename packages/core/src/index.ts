@@ -61,6 +61,7 @@ export {
   type HeroBlock,
   type ProductReference,
   type RecommendationBasis,
+  type DegradedReason,
   type SpecSource,
 } from './component-spec.js';
 

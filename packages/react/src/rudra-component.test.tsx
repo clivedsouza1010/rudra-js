@@ -543,7 +543,10 @@ describe('the styling contract', () => {
           { kind: 'banner', tone: 'restock', text: 'Back in stock', ctaLabel: 'See more' },
           { kind: 'copy', title: 'Why these', body: 'Built for wet rock.' },
         ],
-        { subheadline: 'Based on what you viewed' },
+        // Degraded as well as diagnostic: `data-rudra-degraded` is emitted
+        // only in this state, so a healthy fixture never sees it and the
+        // README could drop it unnoticed.
+        { subheadline: 'Based on what you viewed', source: 'fallback', degradedReason: 'timeout' },
       ),
       {
         products: [

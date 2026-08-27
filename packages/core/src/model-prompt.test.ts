@@ -8,7 +8,11 @@ import {
 } from './component-spec.js';
 import { SYSTEM_PROMPT, UNTRUSTED_BEGIN, UNTRUSTED_END, buildPrompt } from './model-prompt.js';
 import { buildDigest } from './signal-digest.js';
-import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
+import {
+  parseTrackingInput,
+  type TrackingInput,
+  type TrackingInputDraft,
+} from './tracking-input.js';
 
 /**
  * Collapses line breaks, so an assertion about a phrase does not depend on
@@ -369,5 +373,39 @@ describe('candidates', () => {
 
     expect(user).toContain('rated 4.5');
     expect(user).toContain('"waterproof"');
+  });
+});
+
+/**
+ * The README says `interaction.value` and `interaction.meta` are capped for a
+ * different reason from every other field: they are bounded so a payload has a
+ * known worst case, not to keep a prompt cheap, because neither one reaches a
+ * model at all. That is a claim about behaviour, so it is asserted here.
+ */
+const withMeta = (): TrackingInput =>
+  parseTrackingInput({
+    user: { id: 'shopper-1' },
+    context: { surface: 'pdp' },
+    candidates: [{ sku: 'TR-101', title: 'Trail Shoe', category: 'Trail Running', price: 174 }],
+    signals: {
+      interactions: [
+        {
+          type: 'add_to_cart',
+          value: 'VALUE-MARKER',
+          meta: { 'META-KEY-MARKER': 'META-VALUE-MARKER' },
+        },
+      ],
+    },
+  });
+
+describe('what an interaction contributes', () => {
+  it('counts the type and forwards nothing else', () => {
+    const input = withMeta();
+    const { system, user } = buildPrompt(input, buildDigest(input));
+
+    expect(user).toContain('add_to_cart');
+    for (const marker of ['VALUE-MARKER', 'META-KEY-MARKER', 'META-VALUE-MARKER']) {
+      expect(`${system}${user}`).not.toContain(marker);
+    }
   });
 });
