@@ -42,4 +42,20 @@ describe('the tracking payload the shop builds', () => {
     // This pins down the specific field a cache key would be built from.
     expect(first.user.id).not.toBe(second.user.id);
   });
+
+  it('never recommends the product being viewed, even when its category has no other in-stock member', () => {
+    // Forces the fallback branch: the primary category filter comes up empty,
+    // so this only exercises anything when that fallback also excludes the
+    // viewed SKU.
+    const viewed = catalog.find((product) => product.isInStock)!;
+    const otherCategoryProducts = catalog.filter(
+      (product) => product.category !== viewed.category && product.isInStock,
+    );
+    const catalogWithoutCategoryPeers = [viewed, ...otherCategoryProducts];
+
+    const input = buildTrackingInput(shoppers[0]!, viewed.sku, catalogWithoutCategoryPeers);
+
+    expect(input.candidates.length).toBeGreaterThan(0);
+    expect(input.candidates.some((candidate) => candidate.sku === viewed.sku)).toBe(false);
+  });
 });

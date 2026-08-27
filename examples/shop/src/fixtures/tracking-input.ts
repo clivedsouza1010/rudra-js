@@ -43,6 +43,8 @@ export function buildTrackingInput(
       recentSearches: shopper.searches,
     },
     candidates:
-      candidates.length > 0 ? candidates : catalog.filter((p) => p.isInStock).slice(0, 24),
+      candidates.length > 0
+        ? candidates
+        : catalog.filter((product) => product.isInStock && product.sku !== currentSku).slice(0, 24),
   };
 }
