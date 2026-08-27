@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { productSchema } from '@rudra-js/core';
-import { generateCatalog } from './catalog.js';
+import { generateCatalog } from './catalog';
 
 describe('the generated catalog', () => {
   it('is identical for the same seed', () => {

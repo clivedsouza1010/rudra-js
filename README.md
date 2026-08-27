@@ -59,6 +59,12 @@ fallback component, so the page never breaks. That degradation is worth watching
 relying on — a test in the example fails once a transcript is committed if the page it belongs to is
 ever served from the fallback instead.
 
+Expect the first render of a page with a key to be slow. The shop gives the model 60 seconds rather
+than core's 1.5-second default, because this model reasons before it answers and a spec does not
+come back inside a second and a half — and since a transcript is written only once the call returns,
+that default would mean no recording could ever be made. Nothing after that first render waits: the
+same page comes from the in-process cache, and a keyless clone comes from the transcript.
+
 **What this slice does not prove.** The example's test that the recommendation area sends no
 JavaScript calls the page as a plain function and inspects the output directly — it never runs
 through Next's own build and render pipeline, so it cannot fail on a bootstrap `<script>` tag Next

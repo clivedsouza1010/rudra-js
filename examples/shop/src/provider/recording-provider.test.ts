@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generatedSpecSchema, type ComponentProvider, type GeneratedSpec } from '@rudra-js/core';
-import { createRecordingProvider, createReplayProvider } from './recording-provider.js';
+import { createRecordingProvider, createReplayProvider } from './recording-provider';
 
 const spec: GeneratedSpec = {
   tone: 'neutral',

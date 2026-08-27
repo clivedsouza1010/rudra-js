@@ -1,5 +1,5 @@
 import type { Product, TrackingInputDraft } from '@rudra-js/core';
-import type { Shopper } from './shoppers.js';
+import type { Shopper } from './shoppers';
 
 /** Fixed so a page is reproducible: a moving clock would move every cache key. */
 const AT = 1_700_000_000_000;

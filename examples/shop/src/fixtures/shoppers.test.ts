@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateCatalog } from './catalog.js';
-import { generateShoppers } from './shoppers.js';
+import { generateCatalog } from './catalog';
+import { generateShoppers } from './shoppers';
 
 const catalog = generateCatalog(1, 200);
 

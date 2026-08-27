@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { parseTrackingInput } from '@rudra-js/core';
-import { generateCatalog } from './catalog.js';
-import { generateShoppers } from './shoppers.js';
-import { buildTrackingInput } from './tracking-input.js';
+import { generateCatalog } from './catalog';
+import { generateShoppers } from './shoppers';
+import { buildTrackingInput } from './tracking-input';
 
 const catalog = generateCatalog(1, 200);
 const shoppers = generateShoppers(9, catalog, 50);
@@ -21,7 +21,7 @@ describe('the tracking payload the shop builds', () => {
     // spends prompt budget on products that cannot be placed.
     const input = buildTrackingInput(shoppers[0]!, 'RJ-00001', catalog);
 
-    expect(input.candidates?.every((candidate) => candidate.isInStock !== false)).toBe(true);
+    expect(input.candidates?.every((candidate) => candidate.isInStock === true)).toBe(true);
   });
 
   it('puts the product being viewed in the context, not in the signals', () => {

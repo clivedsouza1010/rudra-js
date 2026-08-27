@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ComponentProvider, ProviderRequest, ProviderResult } from '@rudra-js/core';
+import type { ComponentProvider, PromptPair, ProviderResult } from '@rudra-js/core';
 
 /**
  * Record and replay, so a clone with no API key still exercises generation.
@@ -18,12 +18,22 @@ interface Transcript {
   result: ProviderResult;
 }
 
-/** The same material the spec cache keys on, so a transcript maps to one page. */
-function transcriptName(model: string, request: ProviderRequest): string {
-  return `${createHash('sha256')
-    .update(JSON.stringify({ model, system: request.system, user: request.user }))
+/**
+ * Where the transcript for one prompt lives.
+ *
+ * A function of the same input the spec cache keys on, by way of the rendered
+ * prompt: the cache keys on the digest, the candidate SKUs and the provider,
+ * and the prompt is built from those — so one page maps to one file. Exported
+ * because the replay-miss guard has to ask whether this page's transcript is
+ * the one that got committed.
+ */
+export function transcriptPath(directory: string, model: string, prompt: PromptPair): string {
+  const name = createHash('sha256')
+    .update(JSON.stringify({ model, system: prompt.system, user: prompt.user }))
     .digest('hex')
-    .slice(0, 32)}.json`;
+    .slice(0, 32);
+
+  return join(directory, `${name}.json`);
 }
 
 export function createRecordingProvider(
@@ -45,7 +55,7 @@ export function createRecordingProvider(
         result,
       };
       writeFileSync(
-        join(directory, transcriptName(inner.model, request)),
+        transcriptPath(directory, inner.model, request),
         `${JSON.stringify(transcript, null, 2)}\n`,
       );
 
@@ -64,7 +74,7 @@ export function createReplayProvider(options: {
     model: options.model,
 
     async generate(request) {
-      const path = join(options.directory, transcriptName(options.model, request));
+      const path = transcriptPath(options.directory, options.model, request);
 
       if (!existsSync(path)) {
         const message = `no recording for this request at ${path}`;

@@ -1,6 +1,6 @@
 import { RudraComponent } from '@rudra-js/react';
-import { getShopContext } from '../../../shop.js';
-import { buildTrackingInput } from '../../../fixtures/tracking-input.js';
+import { getShopContext } from '../../../shop';
+import { buildTrackingInput } from '../../../fixtures/tracking-input';
 
 export default async function ProductPage({
   params,
