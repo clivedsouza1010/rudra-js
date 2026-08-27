@@ -38,7 +38,7 @@ npm run format:check
 npm test
 ```
 
-CI runs all five on every pull request.
+CI runs all six on every pull request, and builds the example shop in a second job.
 
 ## Example
 
