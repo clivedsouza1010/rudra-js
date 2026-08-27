@@ -1,0 +1,59 @@
+{
+  "name": "@rudra-js/anthropic",
+  "version": "0.1.0",
+  "description": "An Anthropic adapter for @rudra-js/core, with no vendor SDK and no dependencies",
+  "keywords": [
+    "anthropic",
+    "claude",
+    "llm",
+    "rudra",
+    "server-components"
+  ],
+  "license": "MIT",
+  "author": "Clive Dsouza",
+  "homepage": "https://github.com/clivedsouza1010/rudra-js/tree/main/packages/anthropic#readme",
+  "bugs": {
+    "url": "https://github.com/clivedsouza1010/rudra-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clivedsouza1010/rudra-js.git",
+    "directory": "packages/anthropic"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@rudra-js/core": "^0.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@rudra-js/core": "0.1.0",
+    "zod": "^4.4.3"
+  }
+}

@@ -25,7 +25,7 @@ import { describe, expect, it } from 'vitest';
  */
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
-const PACKAGES = ['core', 'react'] as const;
+const PACKAGES = ['core', 'react', 'anthropic'] as const;
 
 /** Everything a tarball may contain. Anything else is a packaging mistake. */
 const ALLOWED = /^(LICENSE|README\.md|package\.json|dist\/.+|src\/.+\.tsx?)$/;
