@@ -76,7 +76,15 @@ export function createReplayProvider(options: {
         throw new Error(message);
       }
 
-      const transcript = JSON.parse(readFileSync(path, 'utf8')) as Transcript;
+      let transcript: Transcript;
+      try {
+        transcript = JSON.parse(readFileSync(path, 'utf8')) as Transcript;
+      } catch (cause) {
+        // These files are committed and hand-edited; a bare SyntaxError names
+        // a byte offset and nothing else, so name the file instead.
+        throw new Error(`recording is not valid JSON: ${path}`, { cause });
+      }
+
       return { ...transcript.result, spec: request.schema.parse(transcript.result.spec) };
     },
   };

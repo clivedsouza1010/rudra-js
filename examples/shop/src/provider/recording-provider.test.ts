@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -62,6 +62,20 @@ describe('recording a provider', () => {
 
     expect(readdirSync(directory)).toHaveLength(2);
   });
+
+  it('writes one transcript when the same request is made twice', async () => {
+    // The other half of the naming contract: a nondeterministic name (a
+    // timestamp, a counter) would pass the distinct-request test above while
+    // silently breaking replay for every clone, since replay recomputes this
+    // same name and expects to find exactly one file under it.
+    const directory = scratch();
+    const provider = createRecordingProvider(inner(), directory);
+
+    await provider.generate(request());
+    await provider.generate(request());
+
+    expect(readdirSync(directory)).toHaveLength(1);
+  });
 });
 
 describe('replaying a provider', () => {
@@ -80,10 +94,10 @@ describe('replaying a provider', () => {
   });
 
   it('throws on a miss when asked to, so a run cannot silently measure the fallback', async () => {
-    // Degrading quietly here is how a benchmark reports one arm under another
-    // arm's label — the failure ADR-0005 exists to prevent. A CI miss must
-    // stay silent, unlike the 'fallback' mode below — a warning here would be
-    // as easy to miss in CI output as no signal at all.
+    // A run that quietly falls back to a live call measures one configuration
+    // while reporting another's label. A CI miss must stay silent, unlike the
+    // 'fallback' mode below — a warning here would be as easy to miss in CI
+    // output as no signal at all.
     const replay = createReplayProvider({
       directory: scratch(),
       model: 'test-model',
@@ -104,8 +118,20 @@ describe('replaying a provider', () => {
     });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await expect(replay.generate(request())).rejects.toThrow();
+    await expect(replay.generate(request())).rejects.toThrow(/no recording/i);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it('fails with a clear message when a recorded transcript is not valid JSON', async () => {
+    const directory = scratch();
+    const recorded = inner();
+    await createRecordingProvider(recorded, directory).generate(request());
+    const [file] = readdirSync(directory);
+    writeFileSync(join(directory, file!), 'not valid json');
+
+    const replay = createReplayProvider({ directory, model: 'test-model', onMiss: 'throw' });
+
+    await expect(replay.generate(request())).rejects.toThrow(/recording is not valid json/i);
   });
 });
