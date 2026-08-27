@@ -4,7 +4,21 @@ import { generateCatalog } from './catalog.js';
 
 describe('the generated catalog', () => {
   it('is identical for the same seed', () => {
-    expect(generateCatalog(1, 50)).toEqual(generateCatalog(1, 50));
+    // Pinned to one product captured from a real run, not cross-checked
+    // against a second call: a generator that ignored `seed` and always
+    // started from one hardcoded state would leave both sides equally wrong,
+    // and two live invocations agreeing with each other would not catch that.
+    expect(generateCatalog(1, 50)[0]).toEqual({
+      sku: 'RJ-00001',
+      title: 'Traverse Cordura Backpacks',
+      category: 'Backpacks',
+      price: 484.82,
+      currency: 'USD',
+      imageUrl: '/images/rj-00001.webp',
+      rating: 1.4,
+      isInStock: true,
+      tags: [],
+    });
   });
 
   it('differs for a different seed', () => {
