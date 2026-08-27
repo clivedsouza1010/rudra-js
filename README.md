@@ -40,6 +40,36 @@ npm test
 
 CI runs all five on every pull request.
 
+## Example
+
+[`examples/shop`](examples/shop) is a small Next.js storefront that puts the architecture through a
+real page: a product page asks a language model for a recommendation component and server-renders
+the result into the same HTML response, rather than fetching it after the page loads.
+
+```sh
+npm run dev --workspace @rudra-js/example-shop
+# then visit http://localhost:3000/product/RJ-00001?shopper=S-0001
+```
+
+Set `ANTHROPIC_API_KEY` in the environment and it calls Claude for real, saving each answer as a
+transcript under `examples/shop/recordings/`. Without a key it replays those committed transcripts
+instead — so a clone with no key still exercises generation, deterministically, for free. A request
+nothing was recorded for degrades the same way any other model failure does: to a deterministic
+fallback component, so the page never breaks. That degradation is worth watching for rather than
+relying on — a test in the example fails once a transcript is committed if the page it belongs to is
+ever served from the fallback instead.
+
+**What this slice does not prove.** The example's test that the recommendation area sends no
+JavaScript calls the page as a plain function and inspects the output directly — it never runs
+through Next's own build and render pipeline, so it cannot fail on a bootstrap `<script>` tag Next
+might add elsewhere on the page. The area genuinely ships no client JavaScript today, but that test
+is not what proves it; the real check — markup present in the first chunk of the response, in its
+final DOM position, with JavaScript disabled in the browser — belongs to later benchmark work and
+does not exist yet. Separately, visiting a SKU that is not in the catalog currently renders a
+different product instead of a 404: a real 404 needs Next's `notFound()`, which throws a
+control-flow error that the example's plain-function test setup would report as a crash rather than
+a passing case. Both are known limitations of the example, not the architecture.
+
 ## Getting help
 
 - **Questions and ideas** — open a [discussion](https://github.com/clivedsouza1010/rudra-js/discussions).

@@ -28,6 +28,12 @@ describe('a product page', () => {
   });
 
   it('sends no JavaScript for the recommendation area', async () => {
+    // This cannot fail. `render` calls the page function directly and pipes
+    // its output through `renderToStaticMarkup` — a bootstrap `<script>` tag
+    // is something Next's own pipeline adds, and that pipeline never runs
+    // here. The page genuinely ships no client JavaScript for this area
+    // today, but this test is not what proves it; see the README for the
+    // check that would.
     const markup = await render('RJ-00001', 'S-0001');
 
     expect(markup).not.toContain('<script');

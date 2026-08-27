@@ -192,6 +192,29 @@ function stepsOf(workflow: string): string[] {
   return [...workflow.matchAll(/^\s*- run: (.+)$/gm)].map((match) => match[1]!.trim());
 }
 
+/**
+ * The `- run:` steps of one job, not the whole workflow.
+ *
+ * `ci.yml` carries a second job (`shop`) that builds the example, which the
+ * release workflow must not be held to — it publishes packages, not an
+ * example app. Scoping the slice to `verify` keeps this a value assertion
+ * instead of a substring search: the expected array below still has to match
+ * exactly, it just no longer has to also enumerate every other job in the
+ * file.
+ */
+function jobStepsOf(workflow: string, jobName: string): string[] {
+  const header = new RegExp(`^  ${jobName}:$`, 'm').exec(workflow);
+  if (!header) throw new Error(`no \`${jobName}:\` job found`);
+
+  const afterHeader = workflow.slice(header.index + header[0].length);
+  // The next job header at the same two-space indentation, if there is one —
+  // that is what ends this job's slice rather than the end of the file.
+  const nextJob = /^  \S.*:$/m.exec(afterHeader);
+  const body = nextJob ? afterHeader.slice(0, nextJob.index) : afterHeader;
+
+  return stepsOf(body);
+}
+
 describe('the release workflow', () => {
   const releaseWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/release.yml'), 'utf8');
   const ciWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8');
@@ -210,7 +233,11 @@ describe('the release workflow', () => {
     // Asserted as a value rather than as a relation between two scrapes: a
     // check added to CI under a name this list does not have would otherwise be
     // invisible, and the test would keep claiming parity it no longer has.
-    expect(stepsOf(ciWorkflow)).toEqual([
+    //
+    // Scoped to the `verify` job rather than the whole file: `ci.yml` also
+    // carries a `shop` job that builds the example, and release must not be
+    // held to that — it publishes packages, not an example app.
+    expect(jobStepsOf(ciWorkflow, 'verify')).toEqual([
       'npm ci --ignore-scripts',
       'npm run build',
       'npm run typecheck',
@@ -220,7 +247,7 @@ describe('the release workflow', () => {
       'npm run verify:consumer',
     ]);
 
-    for (const step of stepsOf(ciWorkflow)) {
+    for (const step of jobStepsOf(ciWorkflow, 'verify')) {
       expect(stepsOf(releaseWorkflow), `release.yml is missing \`${step}\``).toContain(step);
     }
   });
@@ -231,7 +258,7 @@ describe('the release workflow', () => {
     expect(firstPublish).toBeGreaterThan(-1);
 
     // A check that runs after the publish protects nothing.
-    for (const step of stepsOf(ciWorkflow)) {
+    for (const step of jobStepsOf(ciWorkflow, 'verify')) {
       expect(steps.indexOf(step), `\`${step}\` runs after publishing`).toBeLessThan(firstPublish);
     }
   });
