@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { generateCatalog } from '../../../fixtures/catalog';
 import type { Shopper } from '../../../fixtures/shoppers';
 import { getShopContext } from '../../../shop';
+import ProductPage from './page';
 import { ProductPageContent } from '../../../product-page';
 
 const SKU = 'RJ-00001';
@@ -104,4 +105,24 @@ it('renders nothing for a SKU the catalog does not have, so the route can answer
   // Substituting a different product would show, and track, something the
   // shopper never asked for.
   return expect(ProductPageContent({ sku: 'NOT-A-SKU', shopperId: undefined })).resolves.toBeNull();
+});
+
+/**
+ * The route, not the render.
+ *
+ * `notFound()` signals by throwing, which is why this was originally left
+ * untested — but a throw is assertable, and without these two the guard could
+ * be inverted or deleted and the suite would not notice.
+ */
+const route = (sku: string) =>
+  ProductPage({ params: Promise.resolve({ sku }), searchParams: Promise.resolve({}) });
+
+describe('the route itself', () => {
+  it('answers a SKU the catalog does not have with a 404', async () => {
+    await expect(route('NOT-A-SKU')).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK|NEXT_NOT_FOUND|404/);
+  });
+
+  it('does not 404 a product that exists', async () => {
+    await expect(route(SKU)).resolves.toBeTruthy();
+  });
 });

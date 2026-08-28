@@ -46,18 +46,20 @@ export function createRecordingProvider(
 
     async generate(request) {
       const result = await inner.generate(request);
-      mkdirSync(directory, { recursive: true });
 
-      const transcript: Transcript = {
-        model: inner.model,
-        system: request.system,
-        user: request.user,
-        result,
-      };
-      writeFileSync(
-        transcriptPath(directory, inner.model, request),
-        `${JSON.stringify(transcript, null, 2)}\n`,
-      );
+      // A write that fails must not discard an answer already paid for. The
+      // generator treats any rejection from a provider as a model failure and
+      // degrades the page, so an unwritable directory would look exactly like
+      // the vendor being down — while the bill still arrives.
+      try {
+        mkdirSync(directory, { recursive: true });
+        writeFileSync(
+          transcriptPath(directory, inner.model, request),
+          `${JSON.stringify({ model: inner.model, system: request.system, user: request.user, result }, null, 2)}\n`,
+        );
+      } catch (error) {
+        console.error(`could not write a transcript to ${directory}:`, error);
+      }
 
       return result;
     },
@@ -93,6 +95,18 @@ export function createReplayProvider(options: {
         // These files are committed and hand-edited; a bare SyntaxError names
         // a byte offset and nothing else, so name the file instead.
         throw new Error(`recording is not valid JSON: ${path}`, { cause });
+      }
+
+      if (
+        typeof transcript !== 'object' ||
+        transcript === null ||
+        !('result' in transcript) ||
+        typeof (transcript as { result?: unknown }).result !== 'object'
+      ) {
+        // Valid JSON of the wrong shape: the sibling case above already names
+        // the file, and a hand-edited transcript deserves the same courtesy
+        // rather than a TypeError about a property access.
+        throw new Error(`the recording at ${path} has no result to replay`);
       }
 
       return { ...transcript.result, spec: request.schema.parse(transcript.result.spec) };

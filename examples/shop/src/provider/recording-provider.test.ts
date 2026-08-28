@@ -135,3 +135,21 @@ describe('replaying a provider', () => {
     await expect(replay.generate(request())).rejects.toThrow(/recording is not valid json/i);
   });
 });
+
+describe('when the transcript cannot be written', () => {
+  it('still returns the answer the model was already paid for', async () => {
+    // A directory that cannot be created: the scratch path is a file, so
+    // mkdirSync fails with ENOTDIR. Throwing here would make a local disk fault
+    // indistinguishable from the vendor being down — the generator degrades the
+    // page either way, and the bill still arrives.
+    const file = join(scratch(), 'not-a-directory');
+    writeFileSync(file, 'x');
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const provider = createRecordingProvider(inner(), join(file, 'recordings'));
+
+    await expect(provider.generate(request())).resolves.toMatchObject({ spec });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});

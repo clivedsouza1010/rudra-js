@@ -36,9 +36,10 @@ npm run typecheck    # includes test files, which the build does not
 npm run lint
 npm run format:check
 npm test
+npm run verify:consumer   # packs both packages and uses them from outside the repo
 ```
 
-CI runs all six on every pull request, and builds the example shop in a second job.
+CI runs all six of these on every pull request, and builds the example shop in a second job.
 
 ## Example
 
@@ -71,10 +72,8 @@ through Next's own build and render pipeline, so it cannot fail on a bootstrap `
 might add elsewhere on the page. The area genuinely ships no client JavaScript today, but that test
 is not what proves it; the real check — markup present in the first chunk of the response, in its
 final DOM position, with JavaScript disabled in the browser — belongs to later benchmark work and
-does not exist yet. Separately, visiting a SKU that is not in the catalog currently renders a
-different product instead of a 404: a real 404 needs Next's `notFound()`, which throws a
-control-flow error that the example's plain-function test setup would report as a crash rather than
-a passing case. Both are known limitations of the example, not the architecture.
+does not exist yet. That is a known limitation of the example, not of the
+architecture.
 
 ## Getting help
 

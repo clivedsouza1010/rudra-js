@@ -31,6 +31,9 @@ const answer = (body: unknown, status = 200): typeof globalThis.fetch =>
     async () => new Response(JSON.stringify(body), { status }),
   ) as unknown as typeof globalThis.fetch;
 
+const answerText = (body: string, status: number): typeof globalThis.fetch =>
+  vi.fn(async () => new Response(body, { status })) as unknown as typeof globalThis.fetch;
+
 const toolAnswer = (input: unknown, usage?: Record<string, number>) => ({
   content: [{ type: 'tool_use', name: 'emit_component_spec', input }],
   usage: usage ?? { input_tokens: 11, output_tokens: 3 },
@@ -235,5 +238,51 @@ describe('the Anthropic adapter', () => {
 
     expect(provider.name).toBe('anthropic');
     expect(provider.model).toBe('claude-opus-5');
+  });
+});
+
+describe('what reaches the caller on a failure', () => {
+  it('keeps the vendor error category but not the body it came in', async () => {
+    // Anthropic's 400s quote the offending field back, and for this framework
+    // that field carries a shopper's own search terms. An adopter doing the
+    // ordinary thing with a rejection would otherwise log them.
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer(
+        {
+          type: 'error',
+          error: { type: 'invalid_request_error', message: 'user said: SHOPPER-SEARCH-TERM' },
+        },
+        400,
+      ),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/400 \(invalid_request_error\)/);
+    await expect(provider.generate(request())).rejects.not.toThrow(/SHOPPER-SEARCH-TERM/);
+  });
+
+  it('still names the status when the body is not JSON at all', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answerText('<html>502</html>', 502),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/anthropic responded 502/);
+  });
+});
+
+describe('the base URL', () => {
+  it('trims every trailing slash, not just one', async () => {
+    const fetch = answer(toolAnswer(spec));
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      baseUrl: 'https://proxy.internal///',
+      fetch,
+    });
+
+    await provider.generate(request());
+
+    const [url] = (fetch as unknown as { mock: { calls: [string][] } }).mock.calls[0]!;
+    expect(url).toBe('https://proxy.internal/v1/messages');
   });
 });

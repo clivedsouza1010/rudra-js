@@ -110,8 +110,15 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
         // failed, and the body itself is untrusted: Anthropic's 400s echo the
         // offending field back, which for us can be `request.user` — a
         // shopper's own content — so it is capped rather than logged whole.
-        const detail = await response.text().catch(() => '<unreadable>');
-        throw new Error(`anthropic responded ${response.status}: ${detail.slice(0, 500)}`);
+        // Only the status and the vendor's own error category. Anthropic's 400s
+        // echo the offending field back, and for this framework that field can be
+        // `request.user` — a shopper's search terms and browsing history. An
+        // adopter doing the ordinary thing with a rejection, `console.error(err)`,
+        // would otherwise capture it, and Node prints an Error's extra properties
+        // too, so attaching the body rather than interpolating it would not help.
+        const category = await errorCategory(response);
+
+        throw new Error(`anthropic responded ${response.status}${category}`);
       }
 
       const parsed: unknown = await response.json();
@@ -163,6 +170,24 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       return { spec, ...(usage ? { usage } : {}) };
     },
   };
+}
+
+/**
+ * The vendor's error type, when it sent one — never its message.
+ *
+ * `invalid_request_error` is a category. The message beside it is free text the
+ * vendor composes, and it is the part that quotes the request back.
+ */
+async function errorCategory(response: Response): Promise<string> {
+  try {
+    const body: unknown = JSON.parse(await response.text());
+    const type = (body as { error?: { type?: unknown } })?.error?.type;
+    return typeof type === 'string' ? ` (${type})` : '';
+  } catch {
+    // A body that is unreadable or not JSON tells us nothing extra. The status
+    // is still in the message.
+    return '';
+  }
 }
 
 function toUsage(usage: Record<string, unknown> | undefined): TokenUsage | undefined {

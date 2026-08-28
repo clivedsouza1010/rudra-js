@@ -1,7 +1,14 @@
 import type { Product, TrackingInputDraft } from '@rudra-js/core';
 import type { Shopper } from './shoppers';
 
-/** Fixed so a page is reproducible: a moving clock would move every cache key. */
+/**
+ * Fixed so a page is reproducible.
+ *
+ * Not because it reaches a key — the digest carries no timestamp, so neither
+ * the cache key nor the prompt nor a transcript hash ever sees this value. It
+ * orders signals against each other, and one shared constant keeps that order
+ * stable from run to run.
+ */
 const AT = 1_700_000_000_000;
 
 /**

@@ -80,13 +80,13 @@ const generator = createComponentGenerator({
 });
 
 export function getShopContext(): {
-  catalog: Product[];
+  catalog: readonly Product[];
   /**
    * The whole population, so a caller can choose a shopper by what they have
    * done rather than by id — which is the difference between a test that
    * exercises the cold-start path and one that is merely named for it.
    */
-  shoppers: Shopper[];
+  shoppers: readonly Shopper[];
   findShopper: (id: string | undefined) => Shopper;
   generator: ReturnType<typeof createComponentGenerator>;
 } {
