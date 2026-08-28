@@ -61,3 +61,8 @@ jobs:
         working-directory: packages/react
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - run: npm publish --provenance --access public
+        working-directory: packages/anthropic
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

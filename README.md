@@ -36,9 +36,44 @@ npm run typecheck    # includes test files, which the build does not
 npm run lint
 npm run format:check
 npm test
+npm run verify:consumer   # packs both packages and uses them from outside the repo
 ```
 
-CI runs all five on every pull request.
+CI runs all six of these on every pull request, and builds the example shop in a second job.
+
+## Example
+
+[`examples/shop`](examples/shop) is a small Next.js storefront that puts the architecture through a
+real page: a product page asks a language model for a recommendation component and server-renders
+the result into the same HTML response, rather than fetching it after the page loads.
+
+```sh
+npm run dev --workspace @rudra-js/example-shop
+# then visit http://localhost:3000/product/RJ-00001?shopper=S-0001
+```
+
+Set `ANTHROPIC_API_KEY` in the environment and it calls Claude for real, saving each answer as a
+transcript under `examples/shop/recordings/`. Without a key it replays those committed transcripts
+instead — so a clone with no key still exercises generation, deterministically, for free. A request with no
+recorded transcript degrades the same way any other model failure does: to a deterministic
+fallback component, so the page never breaks. That degradation is worth watching for rather than
+relying on — a test in the example fails once a transcript is committed if the page it belongs to is
+ever served from the fallback instead.
+
+Expect the first render of a page with a key to be slow. The shop gives the model 60 seconds rather
+than core's 1.5-second default, because this model reasons before it answers and a spec does not
+come back inside a second and a half — and since a transcript is written only once the call returns,
+that default would mean no recording could ever be made. Nothing after that first render waits: the
+same page comes from the in-process cache, and a keyless clone comes from the transcript.
+
+**What this slice does not prove.** The example's test that the recommendation area sends no
+JavaScript calls the page as a plain function and inspects the output directly — it never runs
+through Next's own build and render pipeline, so it cannot fail on a bootstrap `<script>` tag Next
+might add elsewhere on the page. The area genuinely ships no client JavaScript today, but that test
+is not what proves it; the real check — markup present in the first chunk of the response, in its
+final DOM position, with JavaScript disabled in the browser — belongs to later benchmark work and
+does not exist yet. That is a known limitation of the example, not of the
+architecture.
 
 ## Getting help
 

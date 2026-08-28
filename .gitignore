@@ -4,3 +4,7 @@ dist/
 .env
 .env.local
 .DS_Store
+
+# Next writes both on every build of examples/shop.
+.next/
+next-env.d.ts

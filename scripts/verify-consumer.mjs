@@ -26,7 +26,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
-const PACKAGES = ['core', 'react'];
+const PACKAGES = ['core', 'react', 'anthropic'];
 
 /**
  * Needed to render, but not a dependency of anything published: nothing under
@@ -99,6 +99,7 @@ import {
   type ComponentSpec,
 } from '@rudra-js/core';
 import { RudraComponent, type ProductCatalog } from '@rudra-js/react';
+import { createAnthropicProvider } from '@rudra-js/anthropic';
 
 const catalog: ProductCatalog = [
   productSchema.parse({
@@ -127,6 +128,16 @@ const markup = renderToStaticMarkup(
 
 if (!markup.includes('$174.00')) {
   throw new Error(\`rendered markup has no price in it: \${markup.slice(0, 200)}\`);
+}
+
+// Proves the package's entry point and types resolve for a real consumer under
+// nodenext, without ever making a network call.
+const anthropicProvider = createAnthropicProvider({
+  apiKey: 'not-a-real-key',
+  fetch: async () => new Response('{}'),
+});
+if (typeof anthropicProvider.name !== 'string' || typeof anthropicProvider.model !== 'string') {
+  throw new Error('@rudra-js/anthropic provider has no name/model strings');
 }
 
 // The consumer must not be able to reach the repository's own dependency tree —

@@ -1,2 +1,5 @@
 dist
 package-lock.json
+
+# Scratch for plan execution: git-ignored, and not the formatter's business.
+.superpowers

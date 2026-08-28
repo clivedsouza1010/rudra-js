@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -10,6 +11,16 @@ export default defineConfig({
       // never run.
       'tests/**/*.test.ts',
       'tests/**/*.test.tsx',
+      'examples/*/src/**/*.test.ts',
+      'examples/*/src/**/*.test.tsx',
     ],
+    env: {
+      // The shop anchors its recordings on `process.cwd()`, because Next
+      // bundles server modules and `import.meta.url` then points into `.next/`.
+      // Vitest runs from this directory instead, so it has to be told where the
+      // shop is — otherwise every replay is a miss and the guard that watches
+      // for a silent fallback never arms.
+      RUDRA_SHOP_RECORDINGS: fileURLToPath(new URL('examples/shop/recordings/', import.meta.url)),
+    },
   },
 });
