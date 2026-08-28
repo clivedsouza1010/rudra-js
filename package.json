@@ -28,8 +28,8 @@
     "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
-    "oxlint": "^1.79.0",
+    "@types/node": "^26.3.0",
+    "oxlint": "^1.80.0",
     "prettier": "^3.9.6",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
