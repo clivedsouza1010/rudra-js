@@ -11,35 +11,18 @@ const SHOPPER_SEED = 9;
 export const MODEL_ID = 'claude-opus-5';
 
 /**
- * Where transcripts live, anchored on the working directory.
- *
- * Not on `import.meta.url`. Next bundles server modules, so at run time that
- * URL names a chunk under `.next/` rather than this file — and it does not even
- * get that far: Turbopack reads `new URL('../recordings/', import.meta.url)` as
- * a module request and fails the build with `Can't resolve '../recordings/'`.
- * `process.cwd()` is what Next documents for reading files at run time, and npm
- * runs a workspace script from the workspace's own directory — so `next dev`,
- * `next build` and `next start` all resolve this to `examples/shop/recordings`.
- *
- * Vitest neither bundles nor changes directory; it runs from the repository
- * root, so it passes the directory in. See the `env` block in
- * `vitest.config.ts`.
+ * Anchored on the working directory, not `import.meta.url`: Next bundles server
+ * modules, and Turbopack rejects `new URL('../recordings/', import.meta.url)`
+ * as a module request outright. Vitest runs from the repository root instead, so
+ * it passes the directory in — see `vitest.config.ts`.
  */
 export const RECORDINGS_DIRECTORY =
   process.env['RUDRA_SHOP_RECORDINGS'] ?? join(process.cwd(), 'recordings');
 
 /**
- * How long the model gets before the page renders the deterministic component
- * instead.
- *
- * Core defaults this to 1500ms, which this shop cannot use: the model runs
- * adaptive thinking, and a full component spec does not come back inside a
- * second and a half. Every live call would abort at the deadline — and since a
- * transcript is written only once the call resolves, no recording could ever be
- * made, which takes record/replay with it.
- *
- * Generous on purpose. The page still degrades safely if it is exceeded, so the
- * only cost of a large number is a slow first render on a cache miss.
+ * Core defaults to 1500ms, which a thinking model cannot meet — and since a
+ * transcript is only written once a call resolves, every recording would fail.
+ * Generous because the page degrades safely if it is exceeded.
  */
 const MODEL_TIMEOUT_MS = 60_000;
 

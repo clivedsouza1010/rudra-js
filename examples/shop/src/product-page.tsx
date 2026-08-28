@@ -1,14 +1,10 @@
 import { RudraComponent } from '@rudra-js/react';
-import { getShopContext } from './shop';
+import { getShopContext } from './shop-context';
 import { buildTrackingInput } from './fixtures/tracking-input';
 
 /**
- * The page itself, separated from the route.
- *
- * The route has to be able to answer a bad URL with a 404, and `notFound()`
- * signals that by throwing — which a test calling the route as a plain function
- * would report as a failure. Returning null for an unknown SKU keeps the
- * decision in the route and leaves everything else testable by rendering it.
+ * Separated from the route so the route can answer `notFound()` — which signals
+ * by throwing — while this half stays testable by rendering it.
  */
 export async function ProductPageContent({
   sku,

@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { generateCatalog } from '../../../fixtures/catalog';
 import type { Shopper } from '../../../fixtures/shoppers';
-import { getShopContext } from '../../../shop';
+import { getShopContext } from '../../../shop-context';
 import ProductPage from './page';
 import { ProductPageContent } from '../../../product-page';
 
@@ -12,13 +12,9 @@ const render = async (sku: string, shopper: string) =>
   renderToStaticMarkup(await ProductPageContent({ sku, shopperId: shopper }));
 
 /**
- * Shoppers are chosen by what they have done, never by id.
- *
- * Naming `S-0001` pins a test to one seed: the four ids this file used to
- * iterate all had a browsing history, so the case named for the cold-start path
- * never took it. Selecting by property keeps the meaning when the seed or the
- * cold-start rate moves, and fails loudly rather than quietly if the population
- * ever stops containing one.
+ * Shoppers are chosen by what they have done, never by id: naming `S-0001` pins
+ * a test to one seed, and the case named for the cold-start path once took it
+ * only by luck.
  */
 const { shoppers } = getShopContext();
 
@@ -107,13 +103,7 @@ it('renders nothing for a SKU the catalog does not have, so the route can answer
   return expect(ProductPageContent({ sku: 'NOT-A-SKU', shopperId: undefined })).resolves.toBeNull();
 });
 
-/**
- * The route, not the render.
- *
- * `notFound()` signals by throwing, which is why this was originally left
- * untested — but a throw is assertable, and without these two the guard could
- * be inverted or deleted and the suite would not notice.
- */
+/** `notFound()` signals by throwing, and a throw is assertable. */
 const route = (sku: string) =>
   ProductPage({ params: Promise.resolve({ sku }), searchParams: Promise.resolve({}) });
 

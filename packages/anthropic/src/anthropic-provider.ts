@@ -44,10 +44,9 @@ function isToolUseBlock(candidate: unknown): candidate is ToolUseBlock {
 /**
  * Adapts the Anthropic Messages API to `ComponentProvider`.
  *
- * The tool schema is derived from the schema core exports rather than written
- * out here. A second copy would be a second vocabulary: the reconciler would
- * enforce one thing and the model would be told another, and the drift would
- * show up as unexplained `invalid-generation` events.
+ * The tool schema is derived from the schema core exports rather than restated
+ * here: a second copy is a second vocabulary, and the drift shows up as
+ * unexplained `invalid-generation` events.
  */
 export function createAnthropicProvider(options: AnthropicProviderOptions): ComponentProvider {
   const model = options.model ?? 'claude-opus-5';
@@ -106,16 +105,9 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       });
 
       if (!response.ok) {
-        // Read failure must not swallow the status that already told us this
-        // failed, and the body itself is untrusted: Anthropic's 400s echo the
-        // offending field back, which for us can be `request.user` — a
-        // shopper's own content — so it is capped rather than logged whole.
-        // Only the status and the vendor's own error category. Anthropic's 400s
-        // echo the offending field back, and for this framework that field can be
-        // `request.user` — a shopper's search terms and browsing history. An
-        // adopter doing the ordinary thing with a rejection, `console.error(err)`,
-        // would otherwise capture it, and Node prints an Error's extra properties
-        // too, so attaching the body rather than interpolating it would not help.
+        // Status and the vendor's error category only. Its message quotes the
+        // request back, and for this framework that can be a shopper's own search
+        // terms — which an adopter's `console.error(err)` would then capture.
         const category = await errorCategory(response);
 
         throw new Error(`anthropic responded ${response.status}${category}`);
@@ -138,10 +130,9 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
         stop_reason?: string;
       };
 
-      // Checked before the tool block: both of these are ordinary 200s with
-      // no tool_use, and reporting them as "no tool use" would blame the
-      // model for a budget or a policy this adapter controls. Thinking is
-      // left on — turning it off is a product decision, not a transport one.
+      // Before the tool-block lookup: both are ordinary 200s with no tool_use,
+      // and reporting them as "no tool use" blames the model for a budget or a
+      // policy this adapter controls.
       if (body.stop_reason === 'max_tokens') {
         throw new Error(
           `anthropic stopped at the max_tokens budget (${maxTokens}) before returning a tool use`,
@@ -172,12 +163,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
   };
 }
 
-/**
- * The vendor's error type, when it sent one — never its message.
- *
- * `invalid_request_error` is a category. The message beside it is free text the
- * vendor composes, and it is the part that quotes the request back.
- */
+/** The vendor's error category, never its message — the message quotes the request. */
 async function errorCategory(response: Response): Promise<string> {
   try {
     const body: unknown = JSON.parse(await response.text());

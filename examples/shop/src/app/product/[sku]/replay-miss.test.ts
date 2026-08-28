@@ -4,33 +4,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { buildTrackingInput } from '../../../fixtures/tracking-input';
 import { transcriptPath } from '../../../provider/recording-provider';
-import { MODEL_ID, RECORDINGS_DIRECTORY, getShopContext } from '../../../shop';
+import { MODEL_ID, RECORDINGS_DIRECTORY, getShopContext } from '../../../shop-context';
 import ProductPage from './page';
 
 const SKU = 'RJ-00001';
 const SHOPPER = 'S-0001';
 
 /**
- * The design says a replay miss is a hard error in CI. It cannot be, in the
- * literal sense: `createReplayProvider` does throw, but `@rudra-js/core`'s
- * generator catches provider errors and degrades to the fallback component by
- * design — that is what lets the site stay up when a model or a store misbehaves
- * in production. The throw never reaches this test.
- *
- * What is enforceable is the effect the design actually cares about: once a
- * transcript is committed, the page it belongs to must be served from that
- * transcript rather than silently sliding into the fallback.
- *
- * So this arms on the transcript for *this* page, found the way the replay
- * provider finds it, rather than on any JSON under `recordings/`. Recording a
- * different page — which is what the first `?shopper=` other than this one
- * does — would otherwise fail this test for a reason unrelated to the rule it
- * enforces, and a test that fails for the wrong reason gets weakened rather
- * than read.
- *
- * If core ever changes how a prompt is written, this name changes with it and
- * the guard goes dormant again. That is the honest answer: the committed
- * transcript would no longer be replayable for this page either.
+ * A replay miss cannot fail this test directly: the provider throws, but core's
+ * generator catches provider errors and degrades by design. So this asserts the
+ * effect instead — once a transcript exists for this page, the page must be
+ * served from it. Armed on this page's own transcript, not on any JSON.
  */
 const { catalog, findShopper } = getShopContext();
 const input = parseTrackingInput(buildTrackingInput(findShopper(SHOPPER), SKU, catalog));

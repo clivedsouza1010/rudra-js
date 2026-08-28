@@ -1,11 +1,9 @@
 /**
- * A small deterministic generator (mulberry32).
- *
- * `Math.random()` cannot be seeded, and a fixture that changes between runs
- * turns every failure into a question about the fixture. This is not a source
- * of randomness for anything that matters — it exists so a catalog is a
- * function of its seed.
+ * A seeded generator (mulberry32), so a fixture is a function of its seed.
+ * `Math.random()` cannot be seeded, and a fixture that moves between runs turns
+ * every failure into a question about the fixture.
  */
+
 export function createSeededRandom(seed: number): () => number {
   let state = seed >>> 0;
 
