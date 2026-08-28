@@ -53,8 +53,8 @@ npm run dev --workspace @rudra-js/example-shop
 
 Set `ANTHROPIC_API_KEY` in the environment and it calls Claude for real, saving each answer as a
 transcript under `examples/shop/recordings/`. Without a key it replays those committed transcripts
-instead — so a clone with no key still exercises generation, deterministically, for free. A request
-nothing was recorded for degrades the same way any other model failure does: to a deterministic
+instead — so a clone with no key still exercises generation, deterministically, for free. A request with no
+recorded transcript degrades the same way any other model failure does: to a deterministic
 fallback component, so the page never breaks. That degradation is worth watching for rather than
 relying on — a test in the example fails once a transcript is committed if the page it belongs to is
 ever served from the fallback instead.

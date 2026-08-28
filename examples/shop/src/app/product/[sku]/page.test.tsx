@@ -3,17 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { generateCatalog } from '../../../fixtures/catalog';
 import type { Shopper } from '../../../fixtures/shoppers';
 import { getShopContext } from '../../../shop';
-import ProductPage from './page';
+import { ProductPageContent } from '../../../product-page';
 
 const SKU = 'RJ-00001';
 
 const render = async (sku: string, shopper: string) =>
-  renderToStaticMarkup(
-    await ProductPage({
-      params: Promise.resolve({ sku }),
-      searchParams: Promise.resolve({ shopper }),
-    }),
-  );
+  renderToStaticMarkup(await ProductPageContent({ sku, shopperId: shopper }));
 
 /**
  * Shoppers are chosen by what they have done, never by id.
@@ -103,4 +98,10 @@ describe('a product page', () => {
   it('renders when the shopper is unknown', async () => {
     expect(await render(SKU, 'NOT-A-SHOPPER')).toContain('data-rudra-slot');
   });
+});
+
+it('renders nothing for a SKU the catalog does not have, so the route can answer 404', () => {
+  // Substituting a different product would show, and track, something the
+  // shopper never asked for.
+  return expect(ProductPageContent({ sku: 'NOT-A-SKU', shopperId: undefined })).resolves.toBeNull();
 });

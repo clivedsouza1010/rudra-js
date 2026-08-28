@@ -52,9 +52,13 @@ function isToolUseBlock(candidate: unknown): candidate is ToolUseBlock {
 export function createAnthropicProvider(options: AnthropicProviderOptions): ComponentProvider {
   const model = options.model ?? 'claude-opus-5';
   const call = options.fetch ?? globalThis.fetch;
-  // Trimmed once so a caller-supplied `baseUrl` ending in `/` cannot turn into
-  // `//v1/messages`.
-  const baseUrl = (options.baseUrl ?? 'https://api.anthropic.com').replace(/\/+$/, '');
+  // Trimmed so a caller-supplied `baseUrl` ending in `/` cannot turn into
+  // `//v1/messages`. Done with a loop rather than `/\/+$/`: that pattern
+  // backtracks on a string of many trailing slashes, which is a denial of
+  // service in a published package even though the value comes from the caller
+  // rather than from a request.
+  let baseUrl = options.baseUrl ?? 'https://api.anthropic.com';
+  while (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
   return {
@@ -110,7 +114,18 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
         throw new Error(`anthropic responded ${response.status}: ${detail.slice(0, 500)}`);
       }
 
-      const body = (await response.json()) as {
+      const parsed: unknown = await response.json();
+
+      // `response.json()` yields whatever the body held, and `null` is valid
+      // JSON — reading `stop_reason` off it would throw a TypeError naming this
+      // adapter rather than the vendor that sent it.
+      if (typeof parsed !== 'object' || parsed === null) {
+        throw new Error(
+          `anthropic returned ${parsed === null ? 'null' : typeof parsed}, not an object`,
+        );
+      }
+
+      const body = parsed as {
         content?: unknown;
         usage?: Record<string, unknown>;
         stop_reason?: string;

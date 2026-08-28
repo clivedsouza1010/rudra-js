@@ -129,6 +129,14 @@ describe('the Anthropic adapter', () => {
     await expect(provider.generate(request())).rejects.toThrow(/529/);
   });
 
+  it('rejects when the body is null rather than reading a field off it', async () => {
+    // `null` is valid JSON. Reading `stop_reason` off it throws a TypeError
+    // naming this adapter, when the fault is the vendor's.
+    const provider = createAnthropicProvider({ apiKey: 'k', fetch: answer(null) });
+
+    await expect(provider.generate(request())).rejects.toThrow(/null, not an object/);
+  });
+
   it('rejects when the answer carries no tool use', async () => {
     const provider = createAnthropicProvider({
       apiKey: 'k',

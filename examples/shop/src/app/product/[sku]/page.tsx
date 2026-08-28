@@ -1,6 +1,5 @@
-import { RudraComponent } from '@rudra-js/react';
-import { getShopContext } from '../../../shop';
-import { buildTrackingInput } from '../../../fixtures/tracking-input';
+import { notFound } from 'next/navigation';
+import { ProductPageContent } from '../../../product-page';
 
 export default async function ProductPage({
   params,
@@ -10,26 +9,12 @@ export default async function ProductPage({
   searchParams: Promise<{ shopper?: string }>;
 }) {
   const { sku } = await params;
-  const { shopper: shopperId } = await searchParams;
-  const { catalog, findShopper, generator } = getShopContext();
+  const { shopper } = await searchParams;
 
-  const product = catalog.find((candidate) => candidate.sku === sku) ?? catalog[0]!;
-  const shopper = findShopper(shopperId);
-  const spec = await generator.generate(buildTrackingInput(shopper, product.sku, catalog));
+  const content = await ProductPageContent({ sku, shopperId: shopper });
+  // A URL naming a product the catalog does not have is a 404, not an excuse to
+  // show a different product and track it as though the shopper asked for it.
+  if (content === null) notFound();
 
-  return (
-    <main>
-      <article>
-        <h1>{product.title}</h1>
-        <p>{product.category}</p>
-        <p>
-          {new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency }).format(
-            product.price,
-          )}
-        </p>
-      </article>
-
-      <RudraComponent spec={spec} products={catalog} locale="en-US" />
-    </main>
-  );
+  return content;
 }
