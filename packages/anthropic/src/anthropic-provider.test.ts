@@ -287,11 +287,11 @@ describe('the base URL', () => {
   });
 });
 
-describe('an identity-linked key', () => {
-  const headersOf = (fetch: typeof globalThis.fetch) =>
-    ((fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]![1].headers ??
-      {}) as Record<string, string>;
+const headersOf = (fetch: typeof globalThis.fetch) =>
+  ((fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]![1].headers ??
+    {}) as Record<string, string>;
 
+describe('an identity-linked key', () => {
   it('sends the workspace the request acts in, when one is configured', async () => {
     // Without it the API answers 400: such a key belongs to a person across
     // several workspaces, so it cannot infer which one.
