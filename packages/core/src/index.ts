@@ -67,6 +67,7 @@ export {
 
 export { neverRecommend, reconcileSpec, type ReconcileResult } from './reconciliation.js';
 export { selectProducts, type ProductPick } from './product-selection.js';
+export { fitToShopper } from './fit-to-shopper.js';
 export { buildFallbackSpec } from './fallback-component.js';
 
 export {
