@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { GeneratedSpec } from './component-spec.js';
 import { buildDigest, type SignalDigest } from './signal-digest.js';
-import { createMemorySpecCache, createNullSpecCache, specCacheKey } from './spec-cache.js';
+import {
+  cohortCacheKey,
+  createMemorySpecCache,
+  createNullSpecCache,
+  specCacheKey,
+} from './spec-cache.js';
 import { parseTrackingInput } from './tracking-input.js';
 
 const GENERATED: GeneratedSpec = {
@@ -253,5 +258,92 @@ describe('rejecting nonsense limits at construction', () => {
     await cache.set('key', SPEC);
 
     expect(await cache.get('key')).toBeUndefined();
+  });
+});
+
+type Shopper = {
+  id?: string;
+  segment?: string;
+  surface?: string;
+  slot?: string;
+  locale?: string;
+  maxItems?: number;
+  likedSku?: string;
+  likedCategory?: string;
+  hasSignals?: boolean;
+  likesSomethingNotOnThisPage?: boolean;
+};
+
+function signalsFor(shopper: Shopper, likedSku: string) {
+  if (shopper.hasSignals === false) return {};
+  // A like on a product this page does not merchandise: real history, but no
+  // category affinity comes out of it.
+  if (shopper.likesSomethingNotOnThisPage) return { likes: [{ sku: 'ELSEWHERE', at: 1 }] };
+  return { likes: [{ sku: likedSku, at: 1_700_000_000_000 }] };
+}
+
+function cohortDigest(shopper: Shopper = {}): SignalDigest {
+  const likedCategory = shopper.likedCategory ?? 'Trail Running';
+  const likedSku = shopper.likedSku ?? 'TR-101';
+
+  return buildDigest(
+    parseTrackingInput({
+      user: { id: shopper.id ?? 'S-0001', segment: shopper.segment ?? 'loyalty' },
+      context: {
+        surface: shopper.surface ?? 'pdp',
+        slot: shopper.slot ?? 'recommendations',
+        locale: shopper.locale ?? 'en-US',
+        maxItems: shopper.maxItems ?? 4,
+      },
+      candidates: [
+        { sku: likedSku, title: 'Liked', category: likedCategory, price: 100 },
+        { sku: 'TR-999', title: 'Other', category: 'Tents', price: 100 },
+      ],
+      signals: signalsFor(shopper, likedSku),
+    }),
+  );
+}
+
+describe('a cohort key', () => {
+  it('is the same for two shoppers who differ only as individuals', () => {
+    const first = cohortCacheKey(cohortDigest({ id: 'S-0001', likedSku: 'TR-101' }), 'p:m');
+    const second = cohortCacheKey(cohortDigest({ id: 'S-0999', likedSku: 'TR-101' }), 'p:m');
+
+    expect(first).toBe(second);
+  });
+
+  it.each([
+    ['segment', { segment: 'lapsed' }],
+    ['surface', { surface: 'home' }],
+    ['slot', { slot: 'below-fold' }],
+    ['locale', { locale: 'de-DE' }],
+    ['maxItems', { maxItems: 2 }],
+    ['top category', { likedCategory: 'Tents' }],
+  ])('changes with %s', (_label, shopper) => {
+    expect(cohortCacheKey(cohortDigest(shopper), 'p:m')).not.toBe(
+      cohortCacheKey(cohortDigest(), 'p:m'),
+    );
+  });
+
+  it('separates a first-time visitor from someone with history we cannot use', () => {
+    // Both end up with no top category, so this only passes if cold start is in
+    // the key on its own. Liking a product that is not on this page is normal.
+    const firstTime = cohortCacheKey(cohortDigest({ hasSignals: false }), 'p:m');
+    const likedElsewhere = cohortCacheKey(
+      cohortDigest({ likesSomethingNotOnThisPage: true }),
+      'p:m',
+    );
+
+    expect(likedElsewhere).not.toBe(firstTime);
+  });
+
+  it('changes with the provider', () => {
+    expect(cohortCacheKey(cohortDigest(), 'other:model')).not.toBe(
+      cohortCacheKey(cohortDigest(), 'p:m'),
+    );
+  });
+
+  it('is 32 hex characters', () => {
+    expect(cohortCacheKey(cohortDigest(), 'p:m')).toMatch(/^[0-9a-f]{32}$/);
   });
 });

@@ -189,3 +189,23 @@ export function specCacheKey(
 
   return createHash('sha256').update(material).digest('hex').slice(0, 32);
 }
+
+// Leaves out the fields that make a key personal: who the shopper is, what they
+// liked, viewed or searched for. Candidates go too, because every shopper's list
+// is different — that is safe because the SKUs in a cohort spec get replaced
+// before the page is served.
+export function cohortCacheKey(digest: SignalDigest, providerId: string): string {
+  const material = canonicalise({
+    specVersion: SPEC_VERSION,
+    provider: providerId,
+    segment: digest.segment ?? null,
+    surface: digest.surface,
+    slot: digest.slot,
+    locale: digest.locale,
+    maxItems: digest.maxItems,
+    isColdStart: digest.isColdStart,
+    topCategory: digest.categoryAffinity[0]?.category ?? null,
+  });
+
+  return createHash('sha256').update(material).digest('hex').slice(0, 32);
+}

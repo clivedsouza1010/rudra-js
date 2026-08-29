@@ -5,8 +5,8 @@
   "result": {
     "spec": {
       "tone": "neutral",
-      "headline": "More from the backpack range",
-      "subheadline": "Close alternatives to the one you're looking at",
+      "headline": "More from backpacks",
+      "subheadline": "A few picks from the category you've been browsing",
       "blocks": [
         {
           "kind": "grid",
@@ -25,19 +25,19 @@
               "basis": "similar_to_current",
               "reason": "another backpack close to the one you're viewing",
               "badge": null,
-              "emphasis": "featured"
+              "emphasis": "normal"
             },
             {
               "sku": "RJ-00021",
               "basis": "liked_category",
-              "reason": "from Backpacks, the category you keep coming back to",
+              "reason": "a merino pick from the backpacks you keep browsing",
               "badge": null,
               "emphasis": "normal"
             },
             {
-              "sku": "RJ-00116",
+              "sku": "RJ-00011",
               "basis": "liked_category",
-              "reason": "from Backpacks, the category you keep coming back to",
+              "reason": "from the backpacks category you've spent the most time in",
               "badge": null,
               "emphasis": "normal"
             }
@@ -46,16 +46,16 @@
         {
           "kind": "copy",
           "title": "Why these",
-          "body": "A short list drawn from the same backpack range you're browsing, including a merino-lined option in case that's the direction you're heading."
+          "body": "Backpacks are where most of your browsing has landed, so this is a short list from that same category — including a merino option, in case that's still the fabric you're after."
         }
       ],
-      "rationale": "Shopper is on a Backpacks PDP with Backpacks as their only category interest; all candidates are backpacks, so I led with close alternatives to the viewed item and added two liked-category picks, one merino to echo the \"merino base layer\" search. Current item, basket item and liked SKUs excluded. Neutral tone and no urgency since the only other signal is lapsed status."
+      "rationale": "Shopper is on a Backpacks PDP with Backpacks as their only category interest; all candidates are in that category, so I led with two close matches to the viewed item (highest-rated to keep the short list credible), then a merino option echoing the \"merino base layer\" search and one more category pick. Kept tone neutral and the list to four given the lapsed segment and thin, single-category signals; no basis claimed beyond current-item similarity and category interest."
     },
     "usage": {
       "inputTokens": 1736,
-      "outputTokens": 613,
-      "cacheReadTokens": 2852,
-      "cacheWriteTokens": 0
+      "outputTokens": 643,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 2852
     }
   }
 }

@@ -80,6 +80,7 @@ export {
 export {
   createMemorySpecCache,
   createNullSpecCache,
+  cohortCacheKey,
   specCacheKey,
   type CachedSpec,
   type MemorySpecCacheOptions,
