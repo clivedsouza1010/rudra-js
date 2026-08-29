@@ -70,10 +70,7 @@ them:
 `.rudra__rationale` only appears under `hasDiagnostics`. `className` is added
 alongside `rudra` rather than replacing it, so the child classes keep working.
 
-Two of these need something from you. `.rudra-carousel__track` is expected to
-scroll horizontally — give it `overflow-x: auto`, since nothing here uses
-JavaScript to scroll it. `.rudra-card--featured` is applied alongside
-`.rudra-card`, so write it as `.rudra-card--featured { ... }` after the base
+`.rudra-carousel__track` is expected to scroll horizontally — give it `overflow-x: auto`, since nothing here uses JavaScript to scroll it. `.rudra-card--featured` is applied alongside `.rudra-card`, so write it as `.rudra-card--featured { ... }` after the base
 rule rather than instead of it.
 
 ### Attributes

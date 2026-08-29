@@ -4,19 +4,11 @@ An Anthropic adapter for
 [`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core)'s
 `ComponentProvider`.
 
-No vendor SDK, no dependencies. It speaks the Messages API over `fetch`, which
-is what makes its contract obligations testable with no network and no SDK
-version to track.
-
 ## Install
 
 ```sh
 npm install @rudra-js/anthropic @rudra-js/core zod
 ```
-
-Both `@rudra-js/core` and `zod` are peer dependencies: the schema this adapter
-sends to the model comes from your copy of core, and it is converted with your
-copy of zod.
 
 ```ts
 import { createAnthropicProvider } from '@rudra-js/anthropic';
