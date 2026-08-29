@@ -123,7 +123,7 @@ describe('always returns something renderable', () => {
     ['the provider answers with null', { provider: respondingWith(null) }],
     [
       'the provider names only products that do not exist',
-      { provider: respondingWith(modelSpec(['GHOST-1'])) },
+      { provider: respondingWith(modelSpec(['GHOST-1'])), generation: 'per-shopper' as const },
     ],
   ])('falls back to the deterministic component when %s', async (_label, options) => {
     const spec = await generatorWith(options).generate(payload());
@@ -144,9 +144,12 @@ describe('always returns something renderable', () => {
     // this shopper can be shown is the model's. They want different responses,
     // so they get different reasons.
     expect(await reasonFor({ provider: respondingWith({ bad: true }) })).toBe('invalid-generation');
-    expect(await reasonFor({ provider: respondingWith(modelSpec(['GHOST-1'])) })).toBe(
-      'unusable-on-serve',
-    );
+    expect(
+      await reasonFor({
+        provider: respondingWith(modelSpec(['GHOST-1'])),
+        generation: 'per-shopper',
+      }),
+    ).toBe('unusable-on-serve');
   });
 
   it('rejects only for a malformed payload, which is a caller bug', async () => {
@@ -283,6 +286,7 @@ describe('the cache', () => {
     const generator = createComponentGenerator({
       provider: counted.provider,
       cache: createMemorySpecCache(),
+      generation: 'per-shopper',
     });
 
     await generator.generate(payload());
@@ -496,6 +500,7 @@ describe('what it reports', () => {
   it('still counts the model call when the answer turns out unusable', async () => {
     const [event] = await collect({
       provider: respondingWith(modelSpec(['GHOST-1'])),
+      generation: 'per-shopper',
     });
 
     // The model was asked and billed. Reporting calledModel: false here would
@@ -582,6 +587,7 @@ describe('what it reports', () => {
   it('reports what reconciliation removed', async () => {
     const [event] = await collect({
       provider: respondingWith(modelSpec(['TR-101', 'GHOST-1'])),
+      generation: 'per-shopper',
     });
 
     expect(event?.violations).toContain('unknown-sku:GHOST-1');
@@ -675,5 +681,86 @@ describe('generateDeterministic', () => {
     const spec = createComponentGenerator().generateDeterministic(payload());
 
     expect(spec.headline.length).toBeGreaterThan(0);
+  });
+});
+
+// Two shoppers who look the same to a cohort: same segment, same surface, and
+// both interested in the same category. They differ only as individuals.
+const cohortMate = (id: string, likedSku: string): TrackingInputDraft =>
+  payload({
+    user: { id, segment: 'loyalty' },
+    signals: { likes: [{ sku: likedSku, at: 1_700_000_000_000 }] },
+  });
+
+describe('generation modes', () => {
+  it('asks the model once for a whole cohort', async () => {
+    const counting = countingProvider();
+    const generator = createComponentGenerator({
+      provider: counting.provider,
+      cache: createMemorySpecCache(),
+    });
+
+    await generator.generate(cohortMate('S-0001', 'TR-101'));
+    await generator.generate(cohortMate('S-0002', 'TR-102'));
+
+    expect(counting.calls).toBe(1);
+  });
+
+  it('asks once per shopper when told to', async () => {
+    const counting = countingProvider();
+    const generator = createComponentGenerator({
+      provider: counting.provider,
+      cache: createMemorySpecCache(),
+      generation: 'per-shopper',
+    });
+
+    await generator.generate(cohortMate('S-0001', 'TR-101'));
+    await generator.generate(cohortMate('S-0002', 'TR-102'));
+
+    expect(counting.calls).toBe(2);
+  });
+
+  it('serves the second shopper from cache, with products of their own', async () => {
+    const generator = createComponentGenerator({
+      provider: countingProvider().provider,
+      cache: createMemorySpecCache(),
+    });
+
+    const first = await generator.generate(cohortMate('S-0001', 'TR-101'));
+    const second = await generator.generate(cohortMate('S-0002', 'TR-102'));
+
+    expect(first.source).toBe('llm');
+    expect(second.source).toBe('cache');
+    expect(placedSkus(second).length).toBeGreaterThan(0);
+  });
+
+  it('renders even when the model names products that do not exist', async () => {
+    // In cohort mode the model's SKUs are replaced before anything checks them,
+    // so it cannot put a made-up product on a page. In per-shopper mode the same
+    // answer falls back.
+    const generator = createComponentGenerator({
+      provider: respondingWith(modelSpec(['GHOST-1', 'GHOST-2'])),
+      cache: createNullSpecCache(),
+    });
+
+    const spec = await generator.generate(payload());
+
+    expect(spec.source).toBe('llm');
+    expect(placedSkus(spec)).toEqual(['TR-101', 'TR-102']);
+  });
+
+  it('picks from what is in stock now, not what the cohort was generated with', async () => {
+    const generator = createComponentGenerator({
+      provider: countingProvider(modelSpec(['TR-101'])).provider,
+      cache: createMemorySpecCache(),
+    });
+
+    await generator.generate(payload());
+    const after = await generator.generate(
+      payload({ candidates: [product('TR-101', { isInStock: false }), product('TR-102')] }),
+    );
+
+    expect(after.source).toBe('cache');
+    expect(placedSkus(after)).toEqual(['TR-102']);
   });
 });

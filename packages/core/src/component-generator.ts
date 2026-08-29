@@ -11,9 +11,12 @@ import { buildFallbackSpec } from './fallback-component.js';
 import { buildPrompt } from './model-prompt.js';
 import type { ComponentProvider, TokenUsage } from './provider.js';
 import { reconcileSpec } from './reconciliation.js';
+import { selectProducts } from './product-selection.js';
+import { fitToShopper } from './fit-to-shopper.js';
 import { buildDigest, type SignalDigest } from './signal-digest.js';
 import {
   createMemorySpecCache,
+  cohortCacheKey,
   specCacheKey,
   type CachedSpec,
   type SpecCache,
@@ -95,6 +98,10 @@ export interface ComponentGeneratorOptions {
    * hold the page open, which is exactly what this module exists to prevent.
    */
   cacheTimeoutMs?: number;
+  // 'cohort' shares one generated component between shoppers who look alike and
+  // fills in each shopper's own products. 'per-shopper' generates for the
+  // individual, which is what the benchmark compares against.
+  generation?: 'cohort' | 'per-shopper';
   /** Observability. Never allowed to break a render. */
   onEvent?: (event: GenerationEvent) => void;
 }
@@ -214,6 +221,7 @@ export function createComponentGenerator(
 ): ComponentGenerator {
   const provider = options.provider ?? null;
   const cache = options.cache ?? createMemorySpecCache();
+  const generation = options.generation ?? 'cohort';
   const modelTimeoutMs = options.modelTimeoutMs ?? 1_500;
   const cacheTimeoutMs = options.cacheTimeoutMs ?? 50;
   const singleFlight = createSingleFlight<ModelCall>();
@@ -350,11 +358,15 @@ export function createComponentGenerator(
         return buildDeterministic(input, digest, startedAt, null, 'no-provider');
       }
 
-      const key = specCacheKey(
-        digest,
-        input.candidates.map((product) => product.sku),
-        `${provider.name}:${provider.model}`,
-      );
+      const providerId = `${provider.name}:${provider.model}`;
+      const key =
+        generation === 'cohort'
+          ? cohortCacheKey(digest, providerId)
+          : specCacheKey(
+              digest,
+              input.candidates.map((product) => product.sku),
+              providerId,
+            );
 
       const cached = await readCache(key);
       let calledModel = false;
@@ -405,7 +417,13 @@ export function createComponentGenerator(
 
       // One place where anything is served, whichever side of the cache it came
       // from, and always against the facts of the shopper asking now.
-      const reconciled = reconcileSpec(answer.spec, input, digest);
+      // A cohort spec names products chosen for whoever asked first.
+      const served =
+        generation === 'cohort'
+          ? fitToShopper(answer.spec, selectProducts(input, digest), digest.maxItems)
+          : answer.spec;
+
+      const reconciled = reconcileSpec(served, input, digest);
       if (!reconciled.isUsable) {
         return buildDeterministic(input, digest, startedAt, key, 'unusable-on-serve', {
           calledModel,
