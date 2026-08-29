@@ -8,9 +8,6 @@ HTML response. The model never returns markup: it returns a specification drawn 
 vocabulary, which a registry of components renders. That is what makes generated output safe to put
 in a page.
 
-It is the reference implementation of the architecture in _AI-Driven Server Side Rendering of Web
-Components Using Real-Time Data_.
-
 > **Status: early, and not published.** Both packages are being built one module at a time and
 > their contracts are still moving. Please do not depend on them yet.
 
@@ -52,7 +49,7 @@ npm run dev --workspace @rudra-js/example-shop
 # then visit http://localhost:3000/product/RJ-00001?shopper=S-0001
 ```
 
-Set `ANTHROPIC_API_KEY` in the environment and it calls Claude for real, saving each answer as a
+Set `ANTHROPIC_API_KEY` and `ANTHROPIC_WORKSPACE_ID` in the environment and it calls Claude for real, saving each answer as a
 transcript under `examples/shop/recordings/`. Without a key it replays those committed transcripts
 instead — so a clone with no key still exercises generation, deterministically, for free. A request with no
 recorded transcript degrades the same way any other model failure does: to a deterministic
@@ -65,15 +62,6 @@ than core's 1.5-second default, because this model reasons before it answers and
 come back inside a second and a half — and since a transcript is written only once the call returns,
 that default would mean no recording could ever be made. Nothing after that first render waits: the
 same page comes from the in-process cache, and a keyless clone comes from the transcript.
-
-**What this slice does not prove.** The example's test that the recommendation area sends no
-JavaScript calls the page as a plain function and inspects the output directly — it never runs
-through Next's own build and render pipeline, so it cannot fail on a bootstrap `<script>` tag Next
-might add elsewhere on the page. The area genuinely ships no client JavaScript today, but that test
-is not what proves it; the real check — markup present in the first chunk of the response, in its
-final DOM position, with JavaScript disabled in the browser — belongs to later benchmark work and
-does not exist yet. That is a known limitation of the example, not of the
-architecture.
 
 ## Getting help
 

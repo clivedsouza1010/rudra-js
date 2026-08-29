@@ -1,5 +1,10 @@
 import { join } from 'node:path';
-import { createComponentGenerator, createMemorySpecCache, type Product } from '@rudra-js/core';
+import {
+  createComponentGenerator,
+  createMemorySpecCache,
+  type ComponentProvider,
+  type Product,
+} from '@rudra-js/core';
 import { createAnthropicProvider } from '@rudra-js/anthropic';
 import { generateCatalog } from './fixtures/catalog';
 import { generateShoppers, type Shopper } from './fixtures/shoppers';
@@ -36,6 +41,30 @@ const catalog = generateCatalog(CATALOG_SEED);
 const shoppers = generateShoppers(SHOPPER_SEED, catalog);
 const byId = new Map(shoppers.map((shopper) => [shopper.id, shopper]));
 
+/**
+ * Says why a call failed, which nothing else will.
+ *
+ * The generator degrades on any provider rejection and reports only a reason
+ * code, and the adapter deliberately keeps the vendor's message out of the
+ * error it throws — that message can quote a shopper's own search terms back,
+ * and an adopter's logs should not collect them. An operator running this
+ * example needs the detail, so it is logged here rather than widened there.
+ */
+function withVisibleFailures(provider: ComponentProvider): ComponentProvider {
+  return {
+    name: provider.name,
+    model: provider.model,
+    async generate(request) {
+      try {
+        return await provider.generate(request);
+      } catch (error) {
+        console.error('[rudra] provider failed:', error instanceof Error ? error.message : error);
+        throw error;
+      }
+    },
+  };
+}
+
 function chooseProvider() {
   const apiKey = process.env['ANTHROPIC_API_KEY'];
 
@@ -44,7 +73,17 @@ function chooseProvider() {
   // run measuring something other than what it says.
   if (apiKey) {
     return createRecordingProvider(
-      createAnthropicProvider({ apiKey, model: MODEL_ID }),
+      withVisibleFailures(
+        createAnthropicProvider({
+          apiKey,
+          model: MODEL_ID,
+          // An identity-linked key belongs to a person across several workspaces,
+          // so the API cannot infer which one a request acts in.
+          ...(process.env['ANTHROPIC_WORKSPACE_ID']
+            ? { workspaceId: process.env['ANTHROPIC_WORKSPACE_ID'] }
+            : {}),
+        }),
+      ),
       RECORDINGS_DIRECTORY,
     );
   }
@@ -59,6 +98,13 @@ function chooseProvider() {
 const generator = createComponentGenerator({
   provider: chooseProvider(),
   cache: createMemorySpecCache(),
+  // Without this a failed model call is invisible: the generator degrades to
+  // the deterministic component by design and says nothing, so the page looks
+  // right and the terminal stays silent.
+  onEvent: (event) => {
+    const detail = event.degradedReason ? ` (${event.degradedReason})` : '';
+    console.log(`[rudra] ${event.source}${detail} in ${event.elapsedMs}ms`);
+  },
   modelTimeoutMs: MODEL_TIMEOUT_MS,
 });
 

@@ -1,8 +1,7 @@
 # @rudra-js/core
 
 The contracts and logic that turn one tracking payload into one renderable
-component specification. No React, no model-vendor SDK — importable from any
-server runtime.
+component specification.
 
 ## Install
 

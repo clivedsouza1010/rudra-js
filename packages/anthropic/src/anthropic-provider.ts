@@ -12,6 +12,12 @@ export interface AnthropicProviderOptions {
   model?: string;
   maxTokens?: number;
   baseUrl?: string;
+  /**
+   * Required when the key is identity-linked rather than workspace-scoped —
+   * such a key belongs to a person across several workspaces, so the API cannot
+   * infer which one a request acts in and rejects it with a 400.
+   */
+  workspaceId?: string;
   /** Injected so the adapter is testable without a network or an SDK. */
   fetch?: typeof globalThis.fetch;
 }
@@ -77,6 +83,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
           'content-type': 'application/json',
           'x-api-key': options.apiKey,
           'anthropic-version': '2023-06-01',
+          ...(options.workspaceId ? { 'anthropic-workspace-id': options.workspaceId } : {}),
         },
         // The caller's deadline, handed straight to the transport: the contract
         // asks an adapter to stop, not merely to stop caring about the answer.
