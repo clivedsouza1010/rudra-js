@@ -28,6 +28,27 @@ const generator = createComponentGenerator({ provider });
 
 `model` defaults to the current Claude model this package was written against;
 pass it to pin a different one. `maxTokens` and `baseUrl` are also optional.
+
+### An identity-linked key needs a workspace
+
+A key created against your identity rather than inside a workspace belongs to
+you across several of them, so the API cannot infer which one a request acts in
+and answers:
+
+```
+400 invalid_request_error — anthropic-workspace-id is required when
+authenticating with an identity-linked API key
+```
+
+Pass the workspace, or create the key from inside a workspace instead:
+
+```ts
+createAnthropicProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  workspaceId: process.env.ANTHROPIC_WORKSPACE_ID!,
+});
+```
+
 `fetch` is injectable, which is what the test suite uses in place of a network
 call.
 
