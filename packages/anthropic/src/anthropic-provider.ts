@@ -77,7 +77,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       // without this, a call the caller has already given up on goes out.
       request.signal.throwIfAborted();
 
-      const response = await call(`${baseUrl}/v1/messages`, {
+      const response = await send(call, `${baseUrl}/v1/messages`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -168,6 +168,32 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       return { spec, ...(usage ? { usage } : {}) };
     },
   };
+}
+
+/**
+ * Calls the transport, and says what went wrong when it never answered.
+ *
+ * `fetch` reports every transport fault as the same `TypeError: fetch failed`
+ * and hides the reason in `cause` — so a refused connection, a DNS failure and
+ * a socket reset are indistinguishable in a log. An operator needs to tell
+ * those apart, and none of them carries request content.
+ */
+async function send(call: typeof globalThis.fetch, url: string, init: RequestInit) {
+  try {
+    return await call(url, init);
+  } catch (error) {
+    // The caller's own deadline. It means something specific upstream, so it
+    // travels unchanged.
+    if (init.signal?.aborted) throw error;
+
+    const cause = error instanceof Error ? (error.cause ?? error) : error;
+    const detail =
+      cause && typeof cause === 'object' && 'code' in cause
+        ? String((cause as { code: unknown }).code)
+        : String(cause instanceof Error ? cause.message : cause);
+
+    throw new Error(`anthropic did not answer: ${detail}`, { cause: error });
+  }
 }
 
 /** The vendor's error category, never its message — the message quotes the request. */
