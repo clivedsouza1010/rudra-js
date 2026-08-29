@@ -44,7 +44,15 @@ function chooseProvider() {
   // run measuring something other than what it says.
   if (apiKey) {
     return createRecordingProvider(
-      createAnthropicProvider({ apiKey, model: MODEL_ID }),
+      createAnthropicProvider({
+        apiKey,
+        model: MODEL_ID,
+        // An identity-linked key belongs to a person across several workspaces,
+        // so the API cannot infer which one a request acts in.
+        ...(process.env['ANTHROPIC_WORKSPACE_ID']
+          ? { workspaceId: process.env['ANTHROPIC_WORKSPACE_ID'] }
+          : {}),
+      }),
       RECORDINGS_DIRECTORY,
     );
   }
@@ -59,6 +67,13 @@ function chooseProvider() {
 const generator = createComponentGenerator({
   provider: chooseProvider(),
   cache: createMemorySpecCache(),
+  // Without this a failed model call is invisible: the generator degrades to
+  // the deterministic component by design and says nothing, so the page looks
+  // right and the terminal stays silent.
+  onEvent: (event) => {
+    const detail = event.degradedReason ? ` (${event.degradedReason})` : '';
+    console.log(`[rudra] ${event.source}${detail} in ${event.elapsedMs}ms`);
+  },
   modelTimeoutMs: MODEL_TIMEOUT_MS,
 });
 

@@ -286,3 +286,29 @@ describe('the base URL', () => {
     expect(url).toBe('https://proxy.internal/v1/messages');
   });
 });
+
+describe('an identity-linked key', () => {
+  const headersOf = (fetch: typeof globalThis.fetch) =>
+    ((fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]![1].headers ??
+      {}) as Record<string, string>;
+
+  it('sends the workspace the request acts in, when one is configured', async () => {
+    // Without it the API answers 400: such a key belongs to a person across
+    // several workspaces, so it cannot infer which one.
+    const fetch = answer(toolAnswer(spec));
+    const provider = createAnthropicProvider({ apiKey: 'k', workspaceId: 'wrkspc_1', fetch });
+
+    await provider.generate(request());
+
+    expect(headersOf(fetch)['anthropic-workspace-id']).toBe('wrkspc_1');
+  });
+
+  it('sends no workspace header when none is configured', async () => {
+    const fetch = answer(toolAnswer(spec));
+    const provider = createAnthropicProvider({ apiKey: 'k', fetch });
+
+    await provider.generate(request());
+
+    expect(headersOf(fetch)).not.toHaveProperty('anthropic-workspace-id');
+  });
+});
