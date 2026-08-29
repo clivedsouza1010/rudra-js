@@ -312,3 +312,44 @@ describe('an identity-linked key', () => {
     expect(headersOf(fetch)).not.toHaveProperty('anthropic-workspace-id');
   });
 });
+
+describe('when the call never reaches the vendor', () => {
+  it('names the transport fault instead of reporting a bare fetch failure', async () => {
+    // undici reports every transport fault as `TypeError: fetch failed` and puts
+    // the reason in `cause`, so a refused connection and a DNS failure read
+    // identically in a log.
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: async () => {
+        throw Object.assign(new TypeError('fetch failed'), {
+          cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+        });
+      },
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/did not answer: ECONNREFUSED/);
+  });
+
+  it("lets the caller's own abort through unchanged", async () => {
+    // A deadline that fired means something specific upstream; dressing it as a
+    // transport fault would lose that.
+    const controller = new AbortController();
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: (_url, init) =>
+        new Promise((_resolve, reject) =>
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted by caller'))),
+        ),
+    });
+
+    const pending = provider.generate(request(controller.signal));
+    controller.abort();
+
+    // Asserted as the whole message, not a substring: a wrapped error would
+    // still contain these words, so `toThrow(/aborted by caller/)` would pass
+    // whether the abort travelled through or not.
+    await expect(pending).rejects.toThrow(
+      expect.objectContaining({ message: 'aborted by caller' }),
+    );
+  });
+});
