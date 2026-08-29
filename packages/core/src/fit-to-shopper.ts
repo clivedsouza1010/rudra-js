@@ -14,18 +14,10 @@ export function fitToShopper(
 
   const blocks: Block[] = [];
   for (const block of spec.blocks) {
-    if (block.kind === 'hero') {
-      if (block.sku === null) {
-        blocks.push(block);
-      } else if (next < limit) {
-        blocks.push({ ...block, sku: picks[next]!.product.sku });
-        next += 1;
-      } else {
-        // Nothing left to point at, so keep the words and drop the link.
-        blocks.push({ ...block, sku: null });
-      }
-      continue;
-    }
+    // A hero is left alone. Its headline and body were written about the
+    // product it names, so swapping the product would leave copy that describes
+    // something else. Reconciliation drops the link if this shopper cannot see
+    // that product, and the words stay.
 
     if (block.kind === 'grid' || block.kind === 'carousel') {
       const items: ProductReference[] = [];

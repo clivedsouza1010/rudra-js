@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { buildDigest, buildPrompt, parseTrackingInput } from '@rudra-js/core';
+import { buildDigest, buildPrompt, parseTrackingInput, toCohortDigest } from '@rudra-js/core';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { buildTrackingInput } from '../../../fixtures/tracking-input';
@@ -21,7 +21,8 @@ const input = parseTrackingInput(buildTrackingInput(findShopper(SHOPPER), SKU, c
 const transcript = transcriptPath(
   RECORDINGS_DIRECTORY,
   MODEL_ID,
-  buildPrompt(input, buildDigest(input)),
+  // The shop runs in cohort mode, so this is the prompt it actually sends.
+  buildPrompt(input, toCohortDigest(buildDigest(input))),
 );
 const hasTranscript = existsSync(transcript);
 

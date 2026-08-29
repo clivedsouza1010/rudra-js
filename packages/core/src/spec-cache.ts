@@ -204,6 +204,9 @@ export function cohortCacheKey(digest: SignalDigest, providerId: string): string
     locale: digest.locale,
     maxItems: digest.maxItems,
     isColdStart: digest.isColdStart,
+    // The page being looked at, so copy written for a backpack page is not
+    // served on a tent page.
+    currentCategory: digest.currentCategory ?? null,
     topCategory: digest.categoryAffinity[0]?.category ?? null,
   });
 

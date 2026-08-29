@@ -33,6 +33,7 @@ export {
 export {
   DIGEST_LIMITS,
   buildDigest,
+  toCohortDigest,
   type CategoryAffinity,
   type InteractionCount,
   type SignalDigest,

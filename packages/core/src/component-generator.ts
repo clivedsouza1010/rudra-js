@@ -13,7 +13,7 @@ import type { ComponentProvider, TokenUsage } from './provider.js';
 import { reconcileSpec } from './reconciliation.js';
 import { selectProducts } from './product-selection.js';
 import { fitToShopper } from './fit-to-shopper.js';
-import { buildDigest, type SignalDigest } from './signal-digest.js';
+import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import {
   createMemorySpecCache,
   cohortCacheKey,
@@ -323,9 +323,9 @@ export function createComponentGenerator(
   const askModel = async (
     active: ComponentProvider,
     input: TrackingInput,
-    digest: SignalDigest,
+    promptDigest: SignalDigest,
   ): Promise<ModelCall> => {
-    const { system, user } = buildPrompt(input, digest);
+    const { system, user } = buildPrompt(input, promptDigest);
 
     const result = await withinBudget('generation', modelTimeoutMs, (signal) =>
       active.generate({ system, user, schema: generatedSpecSchema, signal }),
@@ -387,7 +387,9 @@ export function createComponentGenerator(
 
         let call: ModelCall;
         try {
-          call = await singleFlight.run(key, () => askModel(provider, input, digest));
+          call = await singleFlight.run(key, () =>
+            askModel(provider, input, generation === 'cohort' ? toCohortDigest(digest) : digest),
+          );
         } catch (error) {
           const reason = error instanceof TimeoutError ? 'timeout' : 'provider-error';
           // The request went out. Leaving `calledModel` to default here reported

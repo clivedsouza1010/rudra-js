@@ -764,3 +764,45 @@ describe('generation modes', () => {
     expect(placedSkus(after)).toEqual(['TR-102']);
   });
 });
+
+describe('what one shopper can put in another shopper page', () => {
+  // A provider that writes the prompt it was given into the component, so a
+  // test can see exactly what reached the model.
+  const echoingProvider = (): ComponentProvider => ({
+    name: 'echo',
+    model: 'echo-model',
+    generate: async ({ user }) => ({
+      spec: { ...modelSpec(['TR-101']), rationale: user.slice(0, 2000) },
+    }),
+  });
+
+  it('keeps one shopper searches out of the component the next one gets', async () => {
+    const generator = createComponentGenerator({
+      provider: echoingProvider(),
+      cache: createMemorySpecCache(),
+    });
+
+    await generator.generate(
+      payload({
+        user: { id: 'S-0001', segment: 'loyalty' },
+        signals: {
+          likes: [{ sku: 'TR-101', at: 1_700_000_000_000 }],
+          recentSearches: ['maternity leggings'],
+        },
+      }),
+    );
+
+    const second = await generator.generate(
+      payload({
+        user: { id: 'S-0002', segment: 'loyalty' },
+        signals: {
+          likes: [{ sku: 'TR-101', at: 1_700_000_000_000 }],
+          recentSearches: ['hiking poles'],
+        },
+      }),
+    );
+
+    expect(second.source).toBe('cache');
+    expect(JSON.stringify(second)).not.toContain('maternity leggings');
+  });
+});

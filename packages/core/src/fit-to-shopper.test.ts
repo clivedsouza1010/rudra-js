@@ -93,33 +93,37 @@ describe('fitting a shared component to one shopper', () => {
     expect(block.items).toHaveLength(2);
   });
 
-  it('anchors a hero to a pick', () => {
+  it('leaves a hero alone, so its words and its product stay together', () => {
+    // The headline was written about the product the hero names. Swapping the
+    // product would leave copy describing something else, and nothing here can
+    // rewrite the copy. Reconciliation drops the link if this shopper cannot
+    // see that product.
+    const hero = {
+      kind: 'hero' as const,
+      headline: 'The Switchback is back',
+      body: null,
+      sku: 'MODEL-1',
+      ctaLabel: 'Shop',
+    };
+
+    const fitted = fitToShopper(spec([hero]), [pick('PICK-1')], 4);
+
+    expect(fitted.blocks[0]).toEqual(hero);
+  });
+
+  it('spends no pick on a hero, so the grid still gets the best one', () => {
     const fitted = fitToShopper(
       spec([
-        { kind: 'hero', headline: 'Trail season', body: null, sku: 'MODEL-1', ctaLabel: 'Shop' },
+        { kind: 'hero', headline: 'Trail season', body: null, sku: 'MODEL-1', ctaLabel: null },
+        ...grid(1),
       ]),
       [pick('PICK-1')],
       4,
     );
 
-    const block = fitted.blocks[0]!;
-    if (block.kind !== 'hero') throw new Error('expected a hero');
-    expect(block.sku).toBe('PICK-1');
-  });
-
-  it('keeps a hero with nothing left to point at, minus the link', () => {
-    const fitted = fitToShopper(
-      spec([
-        { kind: 'hero', headline: 'Trail season', body: null, sku: 'MODEL-1', ctaLabel: 'Shop' },
-      ]),
-      [],
-      4,
-    );
-
-    const block = fitted.blocks[0]!;
-    if (block.kind !== 'hero') throw new Error('expected a hero');
-    expect(block.headline).toBe('Trail season');
-    expect(block.sku).toBeNull();
+    const block = fitted.blocks[1]!;
+    if (block.kind !== 'grid') throw new Error('expected a grid');
+    expect(block.items[0]!.sku).toBe('PICK-1');
   });
 
   it('leaves blocks that name no product alone', () => {

@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { GeneratedSpec } from './component-spec.js';
-import { buildDigest, type SignalDigest } from './signal-digest.js';
+import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import {
   cohortCacheKey,
   createMemorySpecCache,
   createNullSpecCache,
   specCacheKey,
 } from './spec-cache.js';
-import { parseTrackingInput } from './tracking-input.js';
+import { buildPrompt } from './model-prompt.js';
+import { parseTrackingInput, type TrackingInput } from './tracking-input.js';
 
 const GENERATED: GeneratedSpec = {
   tone: 'neutral',
@@ -272,7 +273,27 @@ type Shopper = {
   likedCategory?: string;
   hasSignals?: boolean;
   likesSomethingNotOnThisPage?: boolean;
+  page?: string;
 };
+
+// Two shoppers on the same page with the same candidates, differing only in
+// what they personally did.
+function cohortInput(shopper: { id: string; search: string; sku: string }): TrackingInput {
+  return parseTrackingInput({
+    user: { id: shopper.id, segment: 'loyalty' },
+    context: { surface: 'pdp', currentCategory: 'Trail Running' },
+    candidates: [
+      { sku: 'TR-101', title: 'Shoe', category: 'Trail Running', price: 100 },
+      { sku: 'TR-102', title: 'Other shoe', category: 'Trail Running', price: 100 },
+    ],
+    signals: {
+      likes: [{ sku: shopper.sku, at: 1_700_000_000_000 }],
+      mostViewed: [{ sku: shopper.sku, at: 1_700_000_000_000, views: 4 }],
+      cart: [{ sku: shopper.sku, at: 1_700_000_000_000 }],
+      recentSearches: [shopper.search],
+    },
+  });
+}
 
 function signalsFor(shopper: Shopper, likedSku: string) {
   if (shopper.hasSignals === false) return {};
@@ -290,6 +311,7 @@ function cohortDigest(shopper: Shopper = {}): SignalDigest {
     parseTrackingInput({
       user: { id: shopper.id ?? 'S-0001', segment: shopper.segment ?? 'loyalty' },
       context: {
+        currentCategory: shopper.page ?? 'Trail Running',
         surface: shopper.surface ?? 'pdp',
         slot: shopper.slot ?? 'recommendations',
         locale: shopper.locale ?? 'en-US',
@@ -335,6 +357,37 @@ describe('a cohort key', () => {
     );
 
     expect(likedElsewhere).not.toBe(firstTime);
+  });
+
+  it('changes with the page the shopper is on', () => {
+    // Copy written for a backpack page must not be served on a tent page.
+    expect(cohortCacheKey(cohortDigest({ page: 'Tents' }), 'p:m')).not.toBe(
+      cohortCacheKey(cohortDigest({ page: 'Backpacks' }), 'p:m'),
+    );
+  });
+
+  it('sends the same prompt to everyone in the cohort', () => {
+    // The real rule: anything the key leaves out has to leave the prompt too.
+    // Otherwise the first shopper's searches shape copy the whole cohort gets.
+    const first = cohortInput({ id: 'S-0001', search: 'maternity leggings', sku: 'TR-101' });
+    const second = cohortInput({ id: 'S-0002', search: 'hiking poles', sku: 'TR-102' });
+
+    expect(cohortCacheKey(buildDigest(first), 'p:m')).toBe(
+      cohortCacheKey(buildDigest(second), 'p:m'),
+    );
+    expect(buildPrompt(first, toCohortDigest(buildDigest(first))).user).toBe(
+      buildPrompt(second, toCohortDigest(buildDigest(second))).user,
+    );
+  });
+
+  it('would send different prompts without that step', () => {
+    // Proves the test above is not passing for free.
+    const first = cohortInput({ id: 'S-0001', search: 'maternity leggings', sku: 'TR-101' });
+    const second = cohortInput({ id: 'S-0002', search: 'hiking poles', sku: 'TR-102' });
+
+    expect(buildPrompt(first, buildDigest(first)).user).not.toBe(
+      buildPrompt(second, buildDigest(second)).user,
+    );
   });
 
   it('changes with the provider', () => {
