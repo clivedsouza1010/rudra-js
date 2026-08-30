@@ -326,10 +326,16 @@ function cohortDigest(shopper: Shopper = {}): SignalDigest {
   );
 }
 
+const CANDIDATES = ['TR-101', 'TR-102'];
+
+// the two candidates every cohortDigest() shopper is offered
+const cohortKeyFor = (digest: SignalDigest, provider = 'p:m') =>
+  cohortCacheKey(digest, ['TR-101', 'TR-999'], provider);
+
 describe('a cohort key', () => {
   it('is the same for two shoppers who differ only as individuals', () => {
-    const first = cohortCacheKey(cohortDigest({ id: 'S-0001', likedSku: 'TR-101' }), 'p:m');
-    const second = cohortCacheKey(cohortDigest({ id: 'S-0999', likedSku: 'TR-101' }), 'p:m');
+    const first = cohortKeyFor(cohortDigest({ id: 'S-0001', likedSku: 'TR-101' }), 'p:m');
+    const second = cohortKeyFor(cohortDigest({ id: 'S-0999', likedSku: 'TR-101' }), 'p:m');
 
     expect(first).toBe(second);
   });
@@ -342,27 +348,24 @@ describe('a cohort key', () => {
     ['maxItems', { maxItems: 2 }],
     ['top category', { likedCategory: 'Tents' }],
   ])('changes with %s', (_label, shopper) => {
-    expect(cohortCacheKey(cohortDigest(shopper), 'p:m')).not.toBe(
-      cohortCacheKey(cohortDigest(), 'p:m'),
+    expect(cohortKeyFor(cohortDigest(shopper), 'p:m')).not.toBe(
+      cohortKeyFor(cohortDigest(), 'p:m'),
     );
   });
 
   it('separates a first-time visitor from someone with history we cannot use', () => {
     // Both end up with no top category, so this only passes if cold start is in
     // the key on its own. Liking a product that is not on this page is normal.
-    const firstTime = cohortCacheKey(cohortDigest({ hasSignals: false }), 'p:m');
-    const likedElsewhere = cohortCacheKey(
-      cohortDigest({ likesSomethingNotOnThisPage: true }),
-      'p:m',
-    );
+    const firstTime = cohortKeyFor(cohortDigest({ hasSignals: false }), 'p:m');
+    const likedElsewhere = cohortKeyFor(cohortDigest({ likesSomethingNotOnThisPage: true }));
 
     expect(likedElsewhere).not.toBe(firstTime);
   });
 
   it('changes with the page the shopper is on', () => {
     // Copy written for a backpack page must not be served on a tent page.
-    expect(cohortCacheKey(cohortDigest({ page: 'Tents' }), 'p:m')).not.toBe(
-      cohortCacheKey(cohortDigest({ page: 'Backpacks' }), 'p:m'),
+    expect(cohortKeyFor(cohortDigest({ page: 'Tents' }), 'p:m')).not.toBe(
+      cohortKeyFor(cohortDigest({ page: 'Backpacks' }), 'p:m'),
     );
   });
 
@@ -372,8 +375,8 @@ describe('a cohort key', () => {
     const first = cohortInput({ id: 'S-0001', search: 'maternity leggings', sku: 'TR-101' });
     const second = cohortInput({ id: 'S-0002', search: 'hiking poles', sku: 'TR-102' });
 
-    expect(cohortCacheKey(buildDigest(first), 'p:m')).toBe(
-      cohortCacheKey(buildDigest(second), 'p:m'),
+    expect(cohortCacheKey(buildDigest(first), CANDIDATES, 'p:m')).toBe(
+      cohortCacheKey(buildDigest(second), CANDIDATES, 'p:m'),
     );
     expect(buildPrompt(first, toCohortDigest(buildDigest(first))).user).toBe(
       buildPrompt(second, toCohortDigest(buildDigest(second))).user,
@@ -390,13 +393,27 @@ describe('a cohort key', () => {
     );
   });
 
+  it('changes when the model is shown different products', () => {
+    // The model writes copy about these, so two shoppers who were offered
+    // different products must not share the copy.
+    expect(cohortCacheKey(cohortDigest(), ['TR-101'], 'p:m')).not.toBe(
+      cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m'),
+    );
+  });
+
+  it('does not care what order the products arrive in', () => {
+    expect(cohortCacheKey(cohortDigest(), ['TR-999', 'TR-101'], 'p:m')).toBe(
+      cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m'),
+    );
+  });
+
   it('changes with the provider', () => {
-    expect(cohortCacheKey(cohortDigest(), 'other:model')).not.toBe(
-      cohortCacheKey(cohortDigest(), 'p:m'),
+    expect(cohortKeyFor(cohortDigest(), 'other:model')).not.toBe(
+      cohortKeyFor(cohortDigest(), 'p:m'),
     );
   });
 
   it('is 32 hex characters', () => {
-    expect(cohortCacheKey(cohortDigest(), 'p:m')).toMatch(/^[0-9a-f]{32}$/);
+    expect(cohortKeyFor(cohortDigest(), 'p:m')).toMatch(/^[0-9a-f]{32}$/);
   });
 });

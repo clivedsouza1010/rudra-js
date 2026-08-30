@@ -80,6 +80,12 @@ they are a first-time visitor, and the category they lean towards. Everything
 that makes a person an individual — who they are, what they liked, viewed or
 searched for — is left out, which is what lets many page views reuse one call.
 
+The candidate list is part of the cohort too, because the model is shown those
+products and writes about them. In most shops candidates come from the page, so
+everyone looking at it shares them. A shop that picks candidates per shopper
+gets smaller cohorts, which is the honest outcome: its prompt really is
+personal.
+
 Pass `generation: 'per-shopper'` to generate for the individual instead. Then
 the model chooses the products too, and every shopper pays for their own call.
 
