@@ -29,12 +29,16 @@ export type BlockRegistry = {
   [Kind in BlockKind]: BlockRenderer<Kind>;
 };
 
+// Task 4 replaces this with the real renderer. For now a bundle shows nothing.
+const BundleRenderer: BlockRenderer<'bundle'> = () => null;
+
 export const defaultRegistry: BlockRegistry = {
   hero: HeroRenderer,
   grid: GridRenderer,
   carousel: CarouselRenderer,
   banner: BannerRenderer,
   copy: CopyRenderer,
+  bundle: BundleRenderer,
 };
 
 /**
@@ -52,5 +56,6 @@ export function extendRegistry(overrides: Partial<BlockRegistry>): BlockRegistry
     carousel: overrides.carousel ?? defaultRegistry.carousel,
     banner: overrides.banner ?? defaultRegistry.banner,
     copy: overrides.copy ?? defaultRegistry.copy,
+    bundle: overrides.bundle ?? defaultRegistry.bundle,
   };
 }

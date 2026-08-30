@@ -100,6 +100,9 @@ function hasContent(block: Block, products: ReadonlyMap<string, Product>): boole
     case 'banner':
     case 'copy':
       return true;
+    case 'bundle':
+      // Task 4 gives this a real renderer. For now it shows nothing.
+      return false;
     default:
       // A kind this renderer predates renders nothing, so it counts as nothing.
       block satisfies never;
@@ -124,6 +127,8 @@ function renderBlock(
       return <registry.banner key={index} block={block} context={context} />;
     case 'copy':
       return <registry.copy key={index} block={block} context={context} />;
+    case 'bundle':
+      return <registry.bundle key={index} block={block} context={context} />;
     default:
       // A newer core carrying a block kind this renderer predates loses that
       // block rather than the page. In this repo the assertion below fails the

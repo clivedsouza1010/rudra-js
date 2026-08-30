@@ -315,6 +315,11 @@ function reconcileBlock(
         body,
       };
     }
+
+    // Task 3 does the real work here: picks the bundle and sets bundleId.
+    // Nothing to check it against yet, so it passes through as-is.
+    case 'bundle':
+      return block;
   }
 }
 

@@ -56,6 +56,7 @@ export {
   type BannerBlock,
   type Block,
   type BlockKind,
+  type BundleBlock,
   type CarouselBlock,
   type ComponentSpec,
   type CopyBlock,

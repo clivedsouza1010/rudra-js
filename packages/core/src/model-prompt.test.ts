@@ -113,6 +113,11 @@ describe('the vocabulary the model is shown', () => {
     expect(SYSTEM_PROMPT).toContain('popular');
     expect(asOneLine(SYSTEM_PROMPT)).toContain('checked against the shopper');
   });
+
+  it('tells the model a bundle exists and that it does not choose one', () => {
+    expect(SYSTEM_PROMPT).toContain('"bundle"');
+    expect(SYSTEM_PROMPT).toMatch(/bundleId/);
+  });
 });
 
 /**

@@ -138,6 +138,16 @@ const copyBlockSchema = z.object({
   body: z.string(),
 });
 
+/** A set the shop sells together. The shop picks which one; this only asks for it. */
+const bundleBlockSchema = z.object({
+  kind: z.literal('bundle'),
+  title: z.string().nullable(),
+  body: z.string().nullable(),
+  ctaLabel: z.string().nullable(),
+  // Filled in per request. Whatever the model puts here is thrown away.
+  bundleId: z.string().nullable(),
+});
+
 /** Blocks do not nest. The vocabulary is closed on purpose. */
 export const blockSchema = z.discriminatedUnion('kind', [
   heroBlockSchema,
@@ -145,6 +155,7 @@ export const blockSchema = z.discriminatedUnion('kind', [
   carouselBlockSchema,
   bannerBlockSchema,
   copyBlockSchema,
+  bundleBlockSchema,
 ]);
 export type Block = z.infer<typeof blockSchema>;
 export type BlockKind = Block['kind'];
@@ -154,6 +165,7 @@ export type GridBlock = z.infer<typeof gridBlockSchema>;
 export type CarouselBlock = z.infer<typeof carouselBlockSchema>;
 export type BannerBlock = z.infer<typeof bannerBlockSchema>;
 export type CopyBlock = z.infer<typeof copyBlockSchema>;
+export type BundleBlock = z.infer<typeof bundleBlockSchema>;
 
 /**
  * Exactly what the model must return. Provenance — version, slot, latency, which
