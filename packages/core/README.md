@@ -71,6 +71,22 @@ does not exist or is not merchandised for this shopper. SKUs must be unique.
 | `mostViewed[].views`       | `1`                 |
 | `lastPurchased[].quantity` | `1`                 |
 
+### Cohorts
+
+By default one generated component is shared between shoppers who look alike,
+and each shopper's own products are filled in per request. A cohort is the
+shopper's segment, the surface and slot, the locale, the item count, whether
+they are a first-time visitor, and the category they lean towards. Everything
+that makes a person an individual — who they are, what they liked, viewed or
+searched for — is left out, which is what lets many page views reuse one call.
+
+Pass `generation: 'per-shopper'` to generate for the individual instead. Then
+the model chooses the products too, and every shopper pays for their own call.
+
+```ts
+createComponentGenerator({ provider, generation: 'per-shopper' });
+```
+
 ### Limits
 
 Every free-text field and every array is capped, because host strings end up

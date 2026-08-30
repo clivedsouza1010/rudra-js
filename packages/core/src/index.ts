@@ -33,6 +33,7 @@ export {
 export {
   DIGEST_LIMITS,
   buildDigest,
+  toCohortDigest,
   type CategoryAffinity,
   type InteractionCount,
   type SignalDigest,
@@ -67,6 +68,7 @@ export {
 
 export { neverRecommend, reconcileSpec, type ReconcileResult } from './reconciliation.js';
 export { selectProducts, type ProductPick } from './product-selection.js';
+export { fitToShopper } from './fit-to-shopper.js';
 export { buildFallbackSpec } from './fallback-component.js';
 
 export {
@@ -80,6 +82,7 @@ export {
 export {
   createMemorySpecCache,
   createNullSpecCache,
+  cohortCacheKey,
   specCacheKey,
   type CachedSpec,
   type MemorySpecCacheOptions,

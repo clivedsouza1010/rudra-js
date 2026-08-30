@@ -302,3 +302,32 @@ export function buildDigest(input: TrackingInput): SignalDigest {
     isColdStart: evidenceCount === 0,
   };
 }
+
+// Everything the cohort key leaves out has to leave the prompt too, or the
+// first shopper's searches and history end up shaping copy that is cached and
+// served to everyone else in their cohort.
+export function toCohortDigest(digest: SignalDigest): SignalDigest {
+  // Listed rather than spread, so what survives is the thing you read.
+  const cohort: SignalDigest = {
+    userId: 'cohort',
+    isReturning: false,
+    surface: digest.surface,
+    slot: digest.slot,
+    locale: digest.locale,
+    maxItems: digest.maxItems,
+    likedSkus: [],
+    dislikedSkus: [],
+    purchasedSkus: [],
+    cartSkus: [],
+    topViewed: [],
+    recentSearches: [],
+    categoryAffinity: digest.categoryAffinity,
+    interactionCounts: [],
+    isColdStart: digest.isColdStart,
+  };
+
+  if (digest.segment !== undefined) cohort.segment = digest.segment;
+  if (digest.currentCategory !== undefined) cohort.currentCategory = digest.currentCategory;
+
+  return cohort;
+}
