@@ -361,7 +361,11 @@ export function createComponentGenerator(
       const providerId = `${provider.name}:${provider.model}`;
       const key =
         generation === 'cohort'
-          ? cohortCacheKey(digest, providerId)
+          ? cohortCacheKey(
+              digest,
+              input.candidates.map((product) => product.sku),
+              providerId,
+            )
           : specCacheKey(
               digest,
               input.candidates.map((product) => product.sku),
