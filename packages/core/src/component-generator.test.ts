@@ -106,6 +106,14 @@ const placedSkus = (spec: { blocks: GeneratedSpec['blocks'] }): string[] =>
     block.kind === 'grid' || block.kind === 'carousel' ? block.items.map((item) => item.sku) : [],
   );
 
+/** The set reconciliation chose, if the spec ended up with a bundle at all. */
+const bundleIdOf = (spec: { blocks: GeneratedSpec['blocks'] }): string | null => {
+  for (const block of spec.blocks) {
+    if (block.kind === 'bundle') return block.bundleId;
+  }
+  return null;
+};
+
 const generatorWith = (options: ComponentGeneratorOptions = {}) =>
   createComponentGenerator({ cache: createNullSpecCache(), ...options });
 
@@ -747,6 +755,42 @@ describe('generation modes', () => {
 
     expect(spec.source).toBe('llm');
     expect(placedSkus(spec)).toEqual(['TR-101', 'TR-102']);
+  });
+
+  it('shows two shoppers in one cohort a bundle each, chosen for them', async () => {
+    // The bundle is picked in reconciliation, which runs per request against
+    // the facts of the shopper asking. Moving that choice into `fitToShopper`,
+    // or caching the reconciled spec, would break this quietly.
+    const bundleSpec: GeneratedSpec = {
+      tone: 'neutral',
+      headline: 'Buy them together',
+      subheadline: null,
+      blocks: [{ kind: 'bundle', title: 'Get set up', body: null, ctaLabel: null, bundleId: null }],
+      rationale: 'Test fixture.',
+    };
+
+    const withBundles = (id: string, cartSku: string): TrackingInputDraft => ({
+      user: { id, segment: 'loyalty' },
+      context: { surface: 'pdp' },
+      candidates: [product('A'), product('B'), product('C'), product('D')],
+      bundles: [
+        { id: 'BUN-AB', skus: ['A', 'B'], price: 10 },
+        { id: 'BUN-CD', skus: ['C', 'D'], price: 20 },
+      ],
+      signals: { cart: [{ sku: cartSku, at: 1_700_000_000_000 }] },
+    });
+
+    const generator = createComponentGenerator({
+      provider: countingProvider(bundleSpec).provider,
+      cache: createMemorySpecCache(),
+    });
+
+    const first = await generator.generate(withBundles('S-0001', 'A'));
+    const second = await generator.generate(withBundles('S-0002', 'C'));
+
+    expect(second.source).toBe('cache');
+    expect(bundleIdOf(first)).toBe('BUN-AB');
+    expect(bundleIdOf(second)).toBe('BUN-CD');
   });
 
   it('picks from what is in stock now, not what the cohort was generated with', async () => {
