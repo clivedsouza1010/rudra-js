@@ -118,6 +118,24 @@ describe('the vocabulary the model is shown', () => {
     expect(SYSTEM_PROMPT).toContain('"bundle"');
     expect(SYSTEM_PROMPT).toMatch(/bundleId/);
   });
+
+  it('tells the model to write about the offer, not the set it never sees', () => {
+    // The shop picks the set after the words are written, so anything
+    // describing the products in it can end up beside something else.
+    expect(asOneLine(SYSTEM_PROMPT)).toContain('Write about the offer, not about the products');
+  });
+
+  it('forbids claiming a saving, which the model is never told', () => {
+    // Nothing in the prompt carries a price, so any figure would be invented,
+    // and no later step can check a claim about money.
+    expect(asOneLine(SYSTEM_PROMPT)).toContain('Never say a set saves money');
+  });
+
+  it('tells the model a set spends a product slot for each thing in it', () => {
+    // Without this the model counts only the SKUs it names, and a bundle after
+    // a full grid is dropped every time.
+    expect(asOneLine(SYSTEM_PROMPT)).toContain('spends one of your product slots');
+  });
 });
 
 /**

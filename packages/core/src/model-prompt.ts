@@ -74,7 +74,12 @@ Blocks never nest.
   selection helps more than another product tile would.
 - "bundle" — a set the shop sells together, shown as one offer. Set "bundleId"
   to null: the shop picks which set, not you. Use it when buying more than one
-  thing at once makes sense on this page.
+  thing at once makes sense on this page. Write about the offer, not about the
+  products: you are never shown which set the shop will pick, so words about
+  the things in it end up beside a different set. Never say a set saves money,
+  and never say by how much — you are not told any of the prices. Every product
+  in a set spends one of your product slots, and a set holds two to five of
+  them.
 
 Each product you place carries an "emphasis" of ${quotedList(EMPHASIS)}.
 
