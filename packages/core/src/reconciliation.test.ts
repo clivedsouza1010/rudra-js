@@ -352,6 +352,24 @@ describe('usability', () => {
     expect(reconcile(grid([ref('TR-101')])).isUsable).toBe(true);
   });
 
+  it('is isUsable when a bundle is the only block carrying products', () => {
+    // A bundle puts products on the page and spends the item budget for them,
+    // so a spec built around one is not an empty component.
+    const result = reconcile(
+      specWith([
+        { kind: 'banner', tone: 'info', text: 'Free returns', ctaLabel: null },
+        { kind: 'bundle', title: 'Get set up', body: null, ctaLabel: null, bundleId: null },
+      ]),
+      {
+        candidates: [product('A'), product('B')],
+        bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+      },
+    );
+
+    expect(result.isUsable).toBe(true);
+    expect(result.violations).not.toContain('unusable:no-products');
+  });
+
   it('is isUsable on a hero that kept its product', () => {
     const result = reconcile(
       specWith([
@@ -541,6 +559,48 @@ describe('choosing a bundle', () => {
     });
 
     expect(result.spec.blocks[0]).toMatchObject({ bundleId: 'CART' });
+  });
+
+  it('prefers one product in the cart over three the shopper only viewed', () => {
+    // The order is steps, not points. However many weaker matches a set has,
+    // it never overtakes a set holding something in the basket.
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B'), product('C'), product('D'), product('E')],
+      bundles: [
+        { id: 'VIEWED', skus: ['C', 'D', 'E'], price: 60 },
+        { id: 'CART', skus: ['A', 'B'], price: 40 },
+      ],
+      signals: {
+        cart: [{ sku: 'A' }],
+        mostViewed: [
+          { sku: 'C', views: 4 },
+          { sku: 'D', views: 3 },
+          { sku: 'E', views: 2 },
+        ],
+      },
+    });
+
+    expect(result.spec.blocks[0]).toMatchObject({ bundleId: 'CART' });
+  });
+
+  it('prefers one viewed product over three in the category being browsed', () => {
+    const result = reconcile(specWith([block]), {
+      candidates: [
+        product('A'),
+        product('B', { category: 'Nutrition' }),
+        product('C'),
+        product('D'),
+        product('E'),
+      ],
+      bundles: [
+        { id: 'CATEGORY', skus: ['C', 'D', 'E'], price: 60 },
+        { id: 'VIEWED', skus: ['A', 'B'], price: 40 },
+      ],
+      context: { surface: 'pdp', currentCategory: 'Trail Running' },
+      signals: { mostViewed: [{ sku: 'A', views: 2 }] },
+    });
+
+    expect(result.spec.blocks[0]).toMatchObject({ bundleId: 'VIEWED' });
   });
 });
 

@@ -224,6 +224,44 @@ function reconcileItems(
   return kept;
 }
 
+/**
+ * How well one set matches the shopper, counted one step at a time.
+ *
+ * Kept as three counts rather than one number because the steps are an order,
+ * not a sum. Added up, a set holding three products the shopper glanced at
+ * would beat a set holding the thing in their basket, and the basket is the
+ * stronger signal however many glances the other one has.
+ */
+interface BundleFit {
+  cartHits: number;
+  viewedHits: number;
+  categoryHits: number;
+}
+
+function fitOf(
+  bundle: Bundle,
+  digest: SignalDigest,
+  candidatesBySku: Map<string, Product>,
+): BundleFit {
+  const fit: BundleFit = { cartHits: 0, viewedHits: 0, categoryHits: 0 };
+
+  for (const sku of bundle.skus) {
+    if (digest.cartSkus.includes(sku)) fit.cartHits += 1;
+    else if (digest.topViewed.some((viewed) => viewed.sku === sku)) fit.viewedHits += 1;
+    else if (candidatesBySku.get(sku)?.category === digest.currentCategory) fit.categoryHits += 1;
+  }
+
+  return fit;
+}
+
+/** In the cart beats recently viewed, which beats the category being looked at. */
+function isBetterFit(fit: BundleFit, best: BundleFit | undefined): boolean {
+  if (!best) return true;
+  if (fit.cartHits !== best.cartHits) return fit.cartHits > best.cartHits;
+  if (fit.viewedHits !== best.viewedHits) return fit.viewedHits > best.viewedHits;
+  return fit.categoryHits > best.categoryHits;
+}
+
 // The shop knows which sets exist. This only picks the one that fits the
 // shopper best out of what the shop already offered.
 function chooseBundle(
@@ -234,7 +272,7 @@ function chooseBundle(
   tracker: PlacementTracker,
 ): Bundle | undefined {
   let best: Bundle | undefined;
-  let bestScore = -1;
+  let bestFit: BundleFit | undefined;
 
   for (const bundle of bundles) {
     // A set is only a set whole, so it needs room for every part at once.
@@ -251,18 +289,11 @@ function chooseBundle(
     }
     if (!isPlaceable) continue;
 
-    // In the cart beats recently viewed, which beats the category being looked
-    // at. Every step checks something we hold.
-    let score = 0;
-    for (const sku of bundle.skus) {
-      if (digest.cartSkus.includes(sku)) score += 4;
-      else if (digest.topViewed.some((viewed) => viewed.sku === sku)) score += 2;
-      else if (candidatesBySku.get(sku)?.category === digest.currentCategory) score += 1;
-    }
-
-    if (score > bestScore) {
+    // Every step checks something we hold.
+    const fit = fitOf(bundle, digest, candidatesBySku);
+    if (isBetterFit(fit, bestFit)) {
       best = bundle;
-      bestScore = score;
+      bestFit = fit;
     }
   }
 
@@ -389,7 +420,10 @@ function showsAnyProduct(blocks: Block[]): boolean {
     (block) =>
       (block.kind === 'grid' && block.items.length > 0) ||
       (block.kind === 'carousel' && block.items.length > 0) ||
-      (block.kind === 'hero' && block.sku !== null),
+      (block.kind === 'hero' && block.sku !== null) ||
+      // A bundle puts two to five products on the page and spends the item
+      // budget for them, so it counts like any other block that shows one.
+      (block.kind === 'bundle' && block.bundleId !== null),
   );
 }
 
