@@ -485,27 +485,28 @@ describe('formatting a bundle price', () => {
     expect(defaultFormatBundlePrice(bundle, catalog, 'de-DE')).toBe('300,00 €');
   });
 
-  it('refuses a set whose members are priced in different currencies', () => {
-    // One price under the wrong symbol is a false claim about money, and the
-    // host that mixed them is the only one who can say what it should read.
+  it('reads the currency off the first member present, when members disagree', () => {
+    // Core has no rule that a bundle's members agree on currency, so this is
+    // reachable data, not a hand-built edge case. Throwing over it took a
+    // whole page down; reading the first member's currency does not.
     const catalog = catalogOf(
       product('TR-101', { currency: 'USD' }),
       product('TR-102', { currency: 'EUR' }),
     );
 
-    expect(() => defaultFormatBundlePrice(bundle, catalog, 'en-US')).toThrow(TypeError);
-    expect(() => defaultFormatBundlePrice(bundle, catalog, 'en-US')).toThrow(/BUN-1/);
+    expect(defaultFormatBundlePrice(bundle, catalog, 'en-US')).toBe('$300.00');
   });
 
-  it('refuses a set with a member the catalog does not have, rather than guessing dollars', () => {
+  it('skips a member the catalog does not have, and prices from the one that is there', () => {
     const catalog = catalogOf(product('TR-101', { currency: 'EUR' }));
 
-    expect(() => defaultFormatBundlePrice(bundle, catalog, 'en-US')).toThrow(TypeError);
+    expect(defaultFormatBundlePrice(bundle, catalog, 'de-DE')).toBe('300,00 €');
   });
 
   it('refuses a set with nothing in it', () => {
     // The payload contract asks for two products, but this is exported and a
-    // hand-built set skips it.
+    // hand-built set skips it. No member means nothing to repair, which is
+    // the one case reconciliation itself still fails outright.
     expect(() => defaultFormatBundlePrice({ ...bundle, skus: [] }, catalogOf(), 'en-US')).toThrow(
       TypeError,
     );
@@ -758,6 +759,20 @@ describe('a bundle', () => {
 
     expect(markup).toContain('Product TR-101');
     expect(markup).toContain('Product TR-102');
+  });
+
+  it('renders instead of crashing when the set mixes currencies', () => {
+    // Core has no rule that a bundle's members agree on currency, so a page
+    // is reachable here without any host doing anything wrong. Discarding
+    // the whole tree over it is worse than a price read in one member's
+    // currency.
+    const markup = render(bundleSpec(), {
+      bundles: BUNDLES,
+      products: [product('TR-101', { currency: 'USD' }), product('TR-102', { currency: 'EUR' })],
+    });
+
+    expect(markup).not.toBe('');
+    expect(markup).toContain('$300.00');
   });
 
   it('renders nothing when the host passed no such bundle', () => {

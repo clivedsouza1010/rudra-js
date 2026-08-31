@@ -77,13 +77,17 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
  * Formats the shop's own bundle price, the same way `defaultFormatPrice` does.
  *
  * A bundle carries no currency of its own — only an id, its SKUs and a price —
- * so this reads the currency off its members, and they all have to agree.
- * Guessing was worse than failing in both directions it could guess: a member
- * missing from the catalog used to make the set dollars, and a set holding one
- * dollar product and one euro one used to print the euro price under a dollar
- * sign. A price under the wrong symbol is a false claim about money, and only
- * the shop that mixed them can say what it should read — which it now can,
- * through the `formatBundlePrice` prop.
+ * so this reads the currency off the first member it finds in the catalog.
+ * `bundleSchema` has no rule that a bundle's members agree on currency, and
+ * nothing reconciles one — a mismatched set is data core accepts and hands
+ * this package to draw. Refusing to draw it used to throw and take the whole
+ * page down over a formatting choice, which is worse than a price shown in
+ * one member's currency. That is this package's own rule, stated in
+ * `reconciliation.ts`: repair, not rejection, is the default, and a clipped
+ * result beats a discarded one. A member missing from the catalog is skipped
+ * the same way, rather than failing the whole price over one absent part. A
+ * host that wants different behaviour — a per-currency total, its own pick of
+ * which member wins — has `formatBundlePrice` to say so.
  */
 export function defaultFormatBundlePrice(
   bundle: Bundle,
@@ -93,21 +97,14 @@ export function defaultFormatBundlePrice(
   let currency: string | undefined;
   for (const sku of bundle.skus) {
     const product = products.get(sku);
-    if (!product) {
-      throw new TypeError(
-        `bundle ${bundle.id} names SKU ${sku}, which the catalog does not have — ` +
-          'a bundle price can only be formatted in the currency of its own members',
-      );
+    if (product) {
+      currency = product.currency;
+      break;
     }
-    if (currency !== undefined && product.currency !== currency) {
-      throw new TypeError(
-        `bundle ${bundle.id} mixes ${currency} and ${product.currency} — ` +
-          'pass `formatBundlePrice` to say how a set priced in two currencies should read',
-      );
-    }
-    currency = product.currency;
   }
 
+  // Only a bundle with no known member at all has nothing to repair — the
+  // same case reconciliation calls out as the one that still fails outright.
   if (currency === undefined) {
     throw new TypeError(`bundle ${bundle.id} holds no products, so it has no price to show`);
   }

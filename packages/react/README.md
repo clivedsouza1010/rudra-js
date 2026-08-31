@@ -119,18 +119,18 @@ const registry = extendRegistry({
 
 ## Props
 
-| Prop                | Notes                                                                                                                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `spec`              | Required. From `@rudra-js/core`.                                                                                                                                           |
-| `products`          | Required. A list of products, or anything keyed by SKU. See below, and the warning above.                                                                                  |
-| `bundles`           | The sets your shop sells together. Only needed if a spec can carry a bundle block.                                                                                         |
-| `registry`          | Replace some or all block renderers.                                                                                                                                       |
-| `hrefForSku`        | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                 |
-| `formatPrice`       | Defaults to `Intl.NumberFormat`, which knows each currency's own number of decimal places. It formats products, not bundles.                                               |
-| `formatBundlePrice` | The same for a bundle's own price. The default reads the currency off the set's members, and throws if they disagree.                                                      |
-| `locale`            | Punctuates prices. Defaults to the **server's** locale, which is rarely the shopper's — pass it if you serve more than one.                                                |
-| `hasDiagnostics`    | Adds the provider, the model name, the latency and the model's own reasoning to the markup. Off by default: it tells a visitor which model you use and when it is failing. |
-| `className`         | Added alongside `rudra`.                                                                                                                                                   |
+| Prop                | Notes                                                                                                                                                                                                                                                             |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spec`              | Required. From `@rudra-js/core`.                                                                                                                                                                                                                                  |
+| `products`          | Required. A list of products, or anything keyed by SKU. See below, and the warning above.                                                                                                                                                                         |
+| `bundles`           | The sets your shop sells together. Only needed if a spec can carry a bundle block.                                                                                                                                                                                |
+| `registry`          | Replace some or all block renderers.                                                                                                                                                                                                                              |
+| `hrefForSku`        | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                                                                                                        |
+| `formatPrice`       | Defaults to `Intl.NumberFormat`, which knows each currency's own number of decimal places. It formats products, not bundles.                                                                                                                                      |
+| `formatBundlePrice` | The same for a bundle's own price. The default reads the currency off the first member it finds in the catalog; members that disagree, or one missing from the catalog, do not stop it. Throws only when no member is known at all, so there is nothing to price. |
+| `locale`            | Punctuates prices. Defaults to the **server's** locale, which is rarely the shopper's — pass it if you serve more than one.                                                                                                                                       |
+| `hasDiagnostics`    | Adds the provider, the model name, the latency and the model's own reasoning to the markup. Off by default: it tells a visitor which model you use and when it is failing.                                                                                        |
+| `className`         | Added alongside `rudra`.                                                                                                                                                                                                                                          |
 
 ### What `products` may be
 
