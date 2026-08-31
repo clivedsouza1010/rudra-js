@@ -41,7 +41,10 @@ neither has been published.
   ask for the block and write the words around it, and the framework picks which
   set when the page is served, from the shopper's own basket, views and
   category. The set's members are drawn from the same catalog every other block
-  uses, and the price shown is always the shop's, never a sum of the parts.
+  uses, and the price shown is always the shop's, never a sum of the parts. The
+  model's own words for the block are steered by the prompt — write about the
+  offer, never state a saving — but not checked afterwards; pass a `label` on
+  the bundle to give the set a name the framework can vouch for.
 
 ### Changed
 

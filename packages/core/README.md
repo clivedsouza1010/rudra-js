@@ -68,6 +68,14 @@ bundle block and writes the words around it; the framework picks which set when
 the page is served, from what the shopper has in their basket, has looked at,
 or is browsing now.
 
+The words the model writes for that block are the one claim on the page this
+framework does not check. The prompt tells it to write about the offer, not
+the products in it, and never to say it saves money or by how much — but
+nothing verifies that afterwards, the way every other claim on the page is
+verified against your data. Pass a `label` on the bundle if you want the set
+to carry a name the framework can vouch for; it renders ahead of the model's
+own words, as the one part of the block that is checked.
+
 ### Defaults
 
 | Field                      | Default             |
