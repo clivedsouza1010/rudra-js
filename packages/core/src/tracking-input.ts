@@ -202,7 +202,15 @@ export type TrackingSignals = z.infer<typeof trackingSignalsSchema>;
 /** A set the shop sells together. The shop knows these; the model never invents one. */
 export const bundleSchema = z.strictObject({
   id: identifier(),
-  skus: z.array(identifier()).min(2).max(FIELD_LIMITS.productsPerBundle),
+  // SKUs must be unique. The same product listed twice draws twice on the page
+  // and spends two of the shopper's item slots for one thing.
+  skus: z
+    .array(identifier())
+    .min(2)
+    .max(FIELD_LIMITS.productsPerBundle)
+    .refine((skus) => new Set(skus).size === skus.length, {
+      message: 'a bundle must not list the same product twice',
+    }),
   // The shop's price for the set. Nothing here works it out from the parts,
   // because the saving is the point and only the shop knows it.
   price: z.number().nonnegative(),
@@ -242,7 +250,20 @@ export const trackingInputSchema = z
           message: 'candidates must have unique SKUs',
         },
       ),
-    bundles: z.array(bundleSchema).max(FIELD_LIMITS.bundles).default([]),
+    /**
+     * Sets the shop sells together. Ids must be unique: core checks a whole
+     * bundle — stock, dislikes, repeats, budget — and then hands the renderer
+     * nothing but the id. With one id on two sets the page can draw the other
+     * set, at the other price, under an id whose checks were done against this
+     * one.
+     */
+    bundles: z
+      .array(bundleSchema)
+      .max(FIELD_LIMITS.bundles)
+      .refine((bundles) => new Set(bundles.map((bundle) => bundle.id)).size === bundles.length, {
+        message: 'bundles must have unique ids',
+      })
+      .default([]),
   })
   .refine(
     (input) => {

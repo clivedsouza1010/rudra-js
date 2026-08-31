@@ -373,4 +373,25 @@ describe('bundles', () => {
       parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: -1 }])),
     ).toThrow();
   });
+
+  it('refuses two sets with the same id', () => {
+    // Core checks a whole bundle and hands the renderer only the id. With the
+    // id used twice the page can draw the other set, at the other price, under
+    // an id whose checks were done against this one.
+    expect(() =>
+      parseTrackingInput(
+        withBundles([
+          { id: 'BUN-1', skus: ['A', 'B'], price: 25 },
+          { id: 'BUN-1', skus: ['B', 'A'], price: 99 },
+        ]),
+      ),
+    ).toThrow();
+  });
+
+  it('refuses a set that lists the same product twice', () => {
+    // It renders the product twice and spends two slots for one thing.
+    expect(() =>
+      parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'A'], price: 25 }])),
+    ).toThrow();
+  });
 });
