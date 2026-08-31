@@ -34,16 +34,19 @@ export function buildTrackingInput(
       ? candidates
       : catalog.filter((product) => product.isInStock && product.sku !== currentSku).slice(0, 24);
 
-  // A bundle whose members are not all candidates would make the tracking
-  // input contract throw, so only pass along the ones that fit.
+  // A bundle with a member outside the candidates would fail the tracking
+  // input contract, so only pass along the ones that fit.
   const candidateSkus = new Set(finalCandidates.map((product) => product.sku));
   const offered: Bundle[] = [];
   for (const bundle of bundles) {
-    let isOffered = true;
+    let hasEveryMember = true;
     for (const sku of bundle.skus) {
-      if (!candidateSkus.has(sku)) isOffered = false;
+      if (!candidateSkus.has(sku)) {
+        hasEveryMember = false;
+        break;
+      }
     }
-    if (isOffered) offered.push(bundle);
+    if (hasEveryMember) offered.push(bundle);
   }
 
   return {

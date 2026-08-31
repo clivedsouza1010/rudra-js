@@ -758,9 +758,7 @@ describe('generation modes', () => {
   });
 
   it('shows two shoppers in one cohort a bundle each, chosen for them', async () => {
-    // The bundle is picked in reconciliation, which runs per request against
-    // the facts of the shopper asking. Moving that choice into `fitToShopper`,
-    // or caching the reconciled spec, would break this quietly.
+    // The bundle is picked per request in reconciliation, not cached with the spec.
     const bundleSpec: GeneratedSpec = {
       tone: 'neutral',
       headline: 'Buy them together',

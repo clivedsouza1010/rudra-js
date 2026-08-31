@@ -33,11 +33,7 @@ export interface RudraComponentProps {
   registry?: BlockRegistry;
   hrefForSku?: (sku: string) => string;
   formatPrice?: (product: Product) => string;
-  /**
-   * The same for a bundle's own price, which is the shop's and not a sum of the
-   * parts. Separate from `formatPrice` because a bundle is not a product: it
-   * carries no currency of its own, so the default reads one off its members.
-   */
+  /** Same as `formatPrice`, but for a bundle — the shop's price, not a sum of the parts. */
   formatBundlePrice?: (bundle: Bundle) => string;
   /**
    * The shopper's locale, used to punctuate prices. Defaults to the server's,

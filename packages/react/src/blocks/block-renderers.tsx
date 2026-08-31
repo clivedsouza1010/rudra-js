@@ -1,7 +1,6 @@
 /**
- * Five of the six block renderers. The bundle one is next door, in
- * `bundle-block.tsx`, because it draws a set the shop supplied rather than
- * products the model picked.
+ * Five of the six block renderers. The bundle one lives in `bundle-block.tsx`,
+ * next door, since it draws a set the shop picked rather than the model.
  *
  * Each takes a block the model produced and a context the host owns. None of
  * them interpolate markup, and none of them read a product fact from the block

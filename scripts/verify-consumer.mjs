@@ -154,7 +154,7 @@ if (!markup.includes('$174.00')) {
 }
 
 // The bundle half of the public surface: the block kind, the \`bundles\` prop,
-// the shop's own name for the set and the shop's own price for it.
+// and the shop's own name and price for the set.
 const bundleSpec: ComponentSpec = {
   ...spec,
   blocks: [{ kind: 'bundle', title: 'Get set up', body: null, ctaLabel: null, bundleId: 'BUN-1' }],

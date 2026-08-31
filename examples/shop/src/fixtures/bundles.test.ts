@@ -5,7 +5,7 @@ import { generateBundles } from './bundles.js';
 
 const catalog = generateCatalog(1, 200);
 
-/** Small enough to work out the right answer by hand. */
+// Small enough to work out the right answer by hand.
 const handBuilt = [
   { sku: 'TR-1', title: 'Trail one', category: 'Trail Running', price: 100 },
   { sku: 'TR-2', title: 'Trail two', category: 'Trail Running', price: 50 },
@@ -16,8 +16,8 @@ const handBuilt = [
 
 describe('the generated bundles', () => {
   it('pairs the two cheapest in stock in a category, at a tenth off', () => {
-    // Trail Running: 50 and 70, cheapest first. The 10 is out of stock, and
-    // Tents has only one product, so it gets no set at all.
+    // Trail Running: 50 and 70 are the two cheapest in stock. The 10 is out
+    // of stock. Tents has only one product, so it gets no set.
     expect(generateBundles(handBuilt)).toEqual([
       {
         id: 'BUN-Trail-Running',

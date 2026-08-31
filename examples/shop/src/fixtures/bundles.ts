@@ -14,25 +14,25 @@ export function generateBundles(catalog: readonly Product[]): Bundle[] {
   for (const [category, group] of byCategory) {
     if (group.length < 2) continue;
 
-    // The two cheapest in one pass, so nothing has to sort the whole group.
-    let first: Product | undefined;
-    let second: Product | undefined;
+    // Track the two cheapest as we scan, so nothing has to sort the group.
+    let cheapest: Product | undefined;
+    let secondCheapest: Product | undefined;
     for (const product of group) {
-      if (!first || product.price < first.price) {
-        second = first;
-        first = product;
-      } else if (!second || product.price < second.price) {
-        second = product;
+      if (!cheapest || product.price < cheapest.price) {
+        secondCheapest = cheapest;
+        cheapest = product;
+      } else if (!secondCheapest || product.price < secondCheapest.price) {
+        secondCheapest = product;
       }
     }
-    const cheapest = [first!, second!];
+    const twoCheapest = [cheapest!, secondCheapest!];
 
     let sum = 0;
-    for (const product of cheapest) sum += product.price;
+    for (const product of twoCheapest) sum += product.price;
 
     bundles.push({
       id: `BUN-${category.replaceAll(' ', '-')}`,
-      skus: cheapest.map((product) => product.sku),
+      skus: twoCheapest.map((product) => product.sku),
       price: Math.round(sum * 0.9 * 100) / 100,
       label: `${category} starter set`,
     });

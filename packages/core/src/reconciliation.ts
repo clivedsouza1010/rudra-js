@@ -224,14 +224,8 @@ function reconcileItems(
   return kept;
 }
 
-/**
- * How well one set matches the shopper, counted one step at a time.
- *
- * Kept as three counts rather than one number because the steps are an order,
- * not a sum. Added up, a set holding three products the shopper glanced at
- * would beat a set holding the thing in their basket, and the basket is the
- * stronger signal however many glances the other one has.
- */
+// Three separate counts, not one score — cart beats views beats category
+// regardless of how the counts compare, so they can't be summed.
 interface BundleFit {
   cartHits: number;
   viewedHits: number;
@@ -262,8 +256,6 @@ function isBetterFit(fit: BundleFit, best: BundleFit | undefined): boolean {
   return fit.categoryHits > best.categoryHits;
 }
 
-// The shop knows which sets exist. This only picks the one that fits the
-// shopper best out of what the shop already offered.
 function chooseBundle(
   bundles: readonly Bundle[],
   allowlist: Allowlist,
@@ -275,21 +267,18 @@ function chooseBundle(
   let bestFit: BundleFit | undefined;
 
   for (const bundle of bundles) {
-    // A set is only a set whole, so it needs room for every part at once.
+    // A bundle needs room for every product at once.
     if (bundle.skus.length > tracker.remaining) continue;
 
-    // Stock is the bar, not the whole blocked set: a set is meant to hold what
-    // is in the cart or on the page. A thumbs-down still keeps the set out.
     let isPlaceable = true;
     for (const sku of bundle.skus) {
       if (!allowlist.allowed.has(sku)) isPlaceable = false;
       if (digest.dislikedSkus.includes(sku)) isPlaceable = false;
-      // An earlier block already showed this one. Twice on a page looks broken.
+      // Already shown by an earlier block — twice on a page looks broken.
       if (tracker.hasPlaced(sku)) isPlaceable = false;
     }
     if (!isPlaceable) continue;
 
-    // Every step checks something we hold.
     const fit = fitOf(bundle, digest, candidatesBySku);
     if (isBetterFit(fit, bestFit)) {
       best = bundle;
@@ -421,8 +410,7 @@ function showsAnyProduct(blocks: Block[]): boolean {
       (block.kind === 'grid' && block.items.length > 0) ||
       (block.kind === 'carousel' && block.items.length > 0) ||
       (block.kind === 'hero' && block.sku !== null) ||
-      // A bundle puts two to five products on the page and spends the item
-      // budget for them, so it counts like any other block that shows one.
+      // A bundle shows products too, so it counts the same as grid/carousel/hero.
       (block.kind === 'bundle' && block.bundleId !== null),
   );
 }

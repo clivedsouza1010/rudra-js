@@ -467,11 +467,7 @@ describe('formatting a price', () => {
   });
 });
 
-/**
- * A bundle carries no currency of its own, so the default formatter reads one
- * off its members. Exported, so it is called with catalogs `RudraComponent`
- * would never build.
- */
+/** Exported, so this is called with catalogs `RudraComponent` would never build. */
 describe('formatting a bundle price', () => {
   const bundle = { id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300 };
 
@@ -486,9 +482,7 @@ describe('formatting a bundle price', () => {
   });
 
   it('reads the currency off the first member present, when members disagree', () => {
-    // Core has no rule that a bundle's members agree on currency, so this is
-    // reachable data, not a hand-built edge case. Throwing over it took a
-    // whole page down; reading the first member's currency does not.
+    // Core allows members with different currencies — this is real data, not a made-up edge case.
     const catalog = catalogOf(
       product('TR-101', { currency: 'USD' }),
       product('TR-102', { currency: 'EUR' }),
@@ -504,9 +498,7 @@ describe('formatting a bundle price', () => {
   });
 
   it('refuses a set with nothing in it', () => {
-    // The payload contract asks for two products, but this is exported and a
-    // hand-built set skips it. No member means nothing to repair, which is
-    // the one case reconciliation itself still fails outright.
+    // Exported, so a hand-built bundle can skip the two-product contract and arrive empty.
     expect(() => defaultFormatBundlePrice({ ...bundle, skus: [] }, catalogOf(), 'en-US')).toThrow(
       TypeError,
     );
@@ -762,10 +754,7 @@ describe('a bundle', () => {
   });
 
   it('renders instead of crashing when the set mixes currencies', () => {
-    // Core has no rule that a bundle's members agree on currency, so a page
-    // is reachable here without any host doing anything wrong. Discarding
-    // the whole tree over it is worse than a price read in one member's
-    // currency.
+    // Mixed currencies are valid data, not a host mistake.
     const markup = render(bundleSpec(), {
       bundles: BUNDLES,
       products: [product('TR-101', { currency: 'USD' }), product('TR-102', { currency: 'EUR' })],
@@ -787,8 +776,7 @@ describe('a bundle', () => {
   });
 
   it('names the set with the shop own label, ahead of the words the model wrote', () => {
-    // The label is the one name for the set the shop can vouch for, so it is
-    // what identifies the set. The model's title reads as the pitch under it.
+    // The shop's label identifies the set; the model's title is the pitch under it.
     const markup = render(bundleSpec(), {
       bundles: [{ ...BUNDLES[0]!, label: 'Trail starter set' }],
     });
@@ -817,8 +805,7 @@ describe('a bundle', () => {
   });
 
   it('renders nothing at all when a member of the set has left the catalog', () => {
-    // A set missing one of its parts is not that set — a headline over an
-    // empty box reads as a broken page, the same as an empty grid or carousel.
+    // A set missing a part is not that set — same as an empty grid or carousel.
     expect(
       render(bundleSpec(), {
         bundles: BUNDLES,

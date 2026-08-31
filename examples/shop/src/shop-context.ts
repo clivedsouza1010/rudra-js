@@ -113,10 +113,8 @@ const generator = createComponentGenerator({
 
 export function getShopContext(): {
   catalog: readonly Product[];
-  /**
-   * Every set the shop sells together. `buildTrackingInput` narrows this down
-   * to the ones a given page's candidates can actually support.
-   */
+  // Every set the shop sells together. buildTrackingInput narrows this down
+  // to what a given page's candidates can support.
   bundles: readonly Bundle[];
   /**
    * The whole population, so a caller can choose a shopper by what they have

@@ -7,8 +7,7 @@ import type { Bundle, Product } from '@rudra-js/core';
  * image, a link. Those are resolved from the host's own catalog, keyed by a SKU
  * that `selectProducts` drew from that same catalog and `reconcileSpec` proved
  * the model did not invent — both in stock at the time. A bundle member's SKU
- * takes a different road to the same place: it comes from the set the shop
- * itself supplied, and the model never names one. That division
+ * comes from the set the shop supplied, not from the model. That division
  * is the whole reason a generated component is safe to put in a page — the
  * model decides what to show and how to describe it, and the shop decides what
  * is true about a product.
@@ -74,20 +73,10 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
 }
 
 /**
- * Formats the shop's own bundle price, the same way `defaultFormatPrice` does.
- *
- * A bundle carries no currency of its own — only an id, its SKUs and a price —
- * so this reads the currency off the first member it finds in the catalog.
- * `bundleSchema` has no rule that a bundle's members agree on currency, and
- * nothing reconciles one — a mismatched set is data core accepts and hands
- * this package to draw. Refusing to draw it used to throw and take the whole
- * page down over a formatting choice, which is worse than a price shown in
- * one member's currency. That is this package's own rule, stated in
- * `reconciliation.ts`: repair, not rejection, is the default, and a clipped
- * result beats a discarded one. A member missing from the catalog is skipped
- * the same way, rather than failing the whole price over one absent part. A
- * host that wants different behaviour — a per-currency total, its own pick of
- * which member wins — has `formatBundlePrice` to say so.
+ * Formats a bundle's price. A bundle has no currency of its own, so this reads
+ * it off the first member found in the catalog, and throws only if none of
+ * the bundle's SKUs are in the catalog. Pass `formatBundlePrice` to total a
+ * mixed-currency set yourself, or to choose which member sets the currency.
  */
 export function defaultFormatBundlePrice(
   bundle: Bundle,
@@ -103,8 +92,6 @@ export function defaultFormatBundlePrice(
     }
   }
 
-  // Only a bundle with no known member at all has nothing to repair — the
-  // same case reconciliation calls out as the one that still fails outright.
   if (currency === undefined) {
     throw new TypeError(`bundle ${bundle.id} holds no products, so it has no price to show`);
   }
@@ -112,8 +99,7 @@ export function defaultFormatBundlePrice(
   try {
     return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(bundle.price);
   } catch {
-    // Same reasoning as defaultFormatPrice: a malformed locale must not take
-    // the page down over punctuation.
+    // A bad locale should not crash the page.
     return `${currency} ${bundle.price}`;
   }
 }

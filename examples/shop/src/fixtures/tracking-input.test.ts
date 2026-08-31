@@ -67,8 +67,7 @@ describe('the tracking payload the shop builds', () => {
   });
 
   describe('the bundles it offers', () => {
-    // A small, hand-picked catalog rather than the generated one, so which
-    // SKUs land in the candidate list is a fact of the test, not a guess.
+    // Small, hand-picked catalog, so we know exactly which SKUs are candidates.
     const smallCatalog = [
       productSchema.parse({ sku: 'current', title: 'Current', category: 'Cat', price: 15 }),
       productSchema.parse({ sku: 'A', title: 'A', category: 'Cat', price: 10 }),

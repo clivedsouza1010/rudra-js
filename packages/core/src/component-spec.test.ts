@@ -239,7 +239,6 @@ describe('a bundle block', () => {
   });
 
   it('names no product of its own', () => {
-    // The whole point: the model asks for a bundle, the shop picks which.
     // A stray `skus` key is stripped, not rejected — same as every other block.
     const parsed = blockSchema.parse({ ...bundleBlock, skus: ['A', 'B'] });
 

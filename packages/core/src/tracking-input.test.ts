@@ -355,8 +355,7 @@ describe('bundles', () => {
   });
 
   it('refuses a bundle naming a product that is not a candidate', () => {
-    // The renderer resolves bundle members from the same catalogue it gets for
-    // candidates, so a member that is not one cannot be drawn.
+    // The renderer resolves bundle members from the candidates list.
     expect(() =>
       parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'GHOST'], price: 25 }])),
     ).toThrow();
@@ -375,9 +374,7 @@ describe('bundles', () => {
   });
 
   it('refuses two sets with the same id', () => {
-    // Core checks a whole bundle and hands the renderer only the id. With the
-    // id used twice the page can draw the other set, at the other price, under
-    // an id whose checks were done against this one.
+    // A duplicate id would let the renderer draw the wrong set at the wrong price.
     expect(() =>
       parseTrackingInput(
         withBundles([

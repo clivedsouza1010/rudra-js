@@ -353,8 +353,6 @@ describe('usability', () => {
   });
 
   it('is isUsable when a bundle is the only block carrying products', () => {
-    // A bundle puts products on the page and spends the item budget for them,
-    // so a spec built around one is not an empty component.
     const result = reconcile(
       specWith([
         { kind: 'banner', tone: 'info', text: 'Free returns', ctaLabel: null },
@@ -487,8 +485,7 @@ describe('choosing a bundle', () => {
   });
 
   it('throws away a bundleId the model tried to set', () => {
-    // The model does not choose. If it did, it could name a set this shopper
-    // was never offered.
+    // Otherwise the model could name a set this shopper was never offered.
     const result = reconcile(specWith([{ ...block, bundleId: 'BUN-MADE-UP' }]), {
       candidates: [product('A'), product('B')],
       bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
@@ -562,8 +559,6 @@ describe('choosing a bundle', () => {
   });
 
   it('prefers one product in the cart over three the shopper only viewed', () => {
-    // The order is steps, not points. However many weaker matches a set has,
-    // it never overtakes a set holding something in the basket.
     const result = reconcile(specWith([block]), {
       candidates: [product('A'), product('B'), product('C'), product('D'), product('E')],
       bundles: [

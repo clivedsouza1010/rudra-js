@@ -1,4 +1,4 @@
-import type { BundleBlock } from '@rudra-js/core';
+import type { BundleBlock, Product } from '@rudra-js/core';
 import type { BlockRenderContext } from '../render-context.js';
 
 export function BundleRenderer({
@@ -11,7 +11,7 @@ export function BundleRenderer({
   const bundle = block.bundleId === null ? undefined : context.bundles.get(block.bundleId);
   if (!bundle) return null;
 
-  const products = [];
+  const products: Product[] = [];
   for (const sku of bundle.skus) {
     const product = context.products.get(sku);
     // A set missing one of its parts is not that set.
@@ -21,9 +21,7 @@ export function BundleRenderer({
 
   return (
     <section className="rudra-bundle">
-      {/* The shop's own name for the set leads, because it is the one name here
-          anything can check. The model wrote its title without ever seeing which
-          set would be picked, so that reads as the pitch underneath. */}
+      {/* The shop's label is the one name here anyone can check, so it leads. */}
       {bundle.label ? <h3 className="rudra-bundle__label">{bundle.label}</h3> : null}
       {block.title ? <p className="rudra-bundle__title">{block.title}</p> : null}
       {block.body ? <p className="rudra-bundle__body">{block.body}</p> : null}
