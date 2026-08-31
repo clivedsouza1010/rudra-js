@@ -6,7 +6,9 @@ import type { Bundle, Product } from '@rudra-js/core';
  * Note what is absent from the spec and present here: a price, a title, an
  * image, a link. Those are resolved from the host's own catalog, keyed by a SKU
  * that `selectProducts` drew from that same catalog and `reconcileSpec` proved
- * the model did not invent — both in stock at the time. That division
+ * the model did not invent — both in stock at the time. A bundle member's SKU
+ * takes a different road to the same place: it comes from the set the shop
+ * itself supplied, and the model never names one. That division
  * is the whole reason a generated component is safe to put in a page — the
  * model decides what to show and how to describe it, and the shop decides what
  * is true about a product.
@@ -75,15 +77,40 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
  * Formats the shop's own bundle price, the same way `defaultFormatPrice` does.
  *
  * A bundle carries no currency of its own — only an id, its SKUs and a price —
- * so this reads the currency off the first member instead.
+ * so this reads the currency off its members, and they all have to agree.
+ * Guessing was worse than failing in both directions it could guess: a member
+ * missing from the catalog used to make the set dollars, and a set holding one
+ * dollar product and one euro one used to print the euro price under a dollar
+ * sign. A price under the wrong symbol is a false claim about money, and only
+ * the shop that mixed them can say what it should read — which it now can,
+ * through the `formatBundlePrice` prop.
  */
 export function defaultFormatBundlePrice(
   bundle: Bundle,
   products: ReadonlyMap<string, Product>,
   locale?: string,
 ): string {
-  const firstSku = bundle.skus[0];
-  const currency = (firstSku === undefined ? undefined : products.get(firstSku)?.currency) ?? 'USD';
+  let currency: string | undefined;
+  for (const sku of bundle.skus) {
+    const product = products.get(sku);
+    if (!product) {
+      throw new TypeError(
+        `bundle ${bundle.id} names SKU ${sku}, which the catalog does not have — ` +
+          'a bundle price can only be formatted in the currency of its own members',
+      );
+    }
+    if (currency !== undefined && product.currency !== currency) {
+      throw new TypeError(
+        `bundle ${bundle.id} mixes ${currency} and ${product.currency} — ` +
+          'pass `formatBundlePrice` to say how a set priced in two currencies should read',
+      );
+    }
+    currency = product.currency;
+  }
+
+  if (currency === undefined) {
+    throw new TypeError(`bundle ${bundle.id} holds no products, so it has no price to show`);
+  }
 
   try {
     return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(bundle.price);

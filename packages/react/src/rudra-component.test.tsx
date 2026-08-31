@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { ComponentSpec, GeneratedSpec, Product } from '@rudra-js/core';
 import { RudraComponent } from './rudra-component.js';
+import { defaultFormatBundlePrice } from './render-context.js';
 import { extendRegistry, type BlockRegistry } from './registry.js';
 
 const product = (sku: string, overrides: Partial<Product> = {}): Product => ({
@@ -19,6 +20,8 @@ const product = (sku: string, overrides: Partial<Product> = {}): Product => ({
 });
 
 const CATALOG = [product('TR-101'), product('TR-102')];
+
+const catalogOf = (...products: Product[]) => new Map(products.map((entry) => [entry.sku, entry]));
 
 const reference = (sku: string, overrides = {}) => ({
   sku,
@@ -464,6 +467,57 @@ describe('formatting a price', () => {
   });
 });
 
+/**
+ * A bundle carries no currency of its own, so the default formatter reads one
+ * off its members. Exported, so it is called with catalogs `RudraComponent`
+ * would never build.
+ */
+describe('formatting a bundle price', () => {
+  const bundle = { id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300 };
+
+  it('prices the set in the currency its members are priced in', () => {
+    const catalog = catalogOf(
+      product('TR-101', { currency: 'EUR' }),
+      product('TR-102', { currency: 'EUR' }),
+    );
+
+    // Intl puts a non-breaking space between the number and the symbol.
+    expect(defaultFormatBundlePrice(bundle, catalog, 'de-DE')).toBe('300,00 €');
+  });
+
+  it('refuses a set whose members are priced in different currencies', () => {
+    // One price under the wrong symbol is a false claim about money, and the
+    // host that mixed them is the only one who can say what it should read.
+    const catalog = catalogOf(
+      product('TR-101', { currency: 'USD' }),
+      product('TR-102', { currency: 'EUR' }),
+    );
+
+    expect(() => defaultFormatBundlePrice(bundle, catalog, 'en-US')).toThrow(TypeError);
+    expect(() => defaultFormatBundlePrice(bundle, catalog, 'en-US')).toThrow(/BUN-1/);
+  });
+
+  it('refuses a set with a member the catalog does not have, rather than guessing dollars', () => {
+    const catalog = catalogOf(product('TR-101', { currency: 'EUR' }));
+
+    expect(() => defaultFormatBundlePrice(bundle, catalog, 'en-US')).toThrow(TypeError);
+  });
+
+  it('refuses a set with nothing in it', () => {
+    // The payload contract asks for two products, but this is exported and a
+    // hand-built set skips it.
+    expect(() => defaultFormatBundlePrice({ ...bundle, skus: [] }, catalogOf(), 'en-US')).toThrow(
+      TypeError,
+    );
+  });
+
+  it('still shows a price when the host passes a locale Intl rejects', () => {
+    const catalog = catalogOf(product('TR-101'), product('TR-102'));
+
+    expect(defaultFormatBundlePrice(bundle, catalog, 'not a locale')).toBe('USD 300');
+  });
+});
+
 describe('a few behaviours the code asserts', () => {
   it('marks a featured product differently from an ordinary one', () => {
     const featured = render(gridSpec([reference('TR-101', { emphasis: 'featured' })]));
@@ -560,7 +614,9 @@ describe('the styling contract', () => {
           product('TR-101', { imageUrl: 'https://cdn.example.com/a.png' }),
           product('TR-102'),
         ],
-        bundles: [{ id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300 }],
+        bundles: [
+          { id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300, label: 'Trail starter set' },
+        ],
         hasDiagnostics: true,
       },
     );
@@ -713,6 +769,36 @@ describe('a bundle', () => {
 
     expect(markup).toContain('Get set up in one go');
     expect(markup).toContain('Add both');
+  });
+
+  it('names the set with the shop own label, ahead of the words the model wrote', () => {
+    // The label is the one name for the set the shop can vouch for, so it is
+    // what identifies the set. The model's title reads as the pitch under it.
+    const markup = render(bundleSpec(), {
+      bundles: [{ ...BUNDLES[0]!, label: 'Trail starter set' }],
+    });
+
+    expect(markup).toContain(
+      '<section class="rudra-bundle">' +
+        '<h3 class="rudra-bundle__label">Trail starter set</h3>' +
+        '<p class="rudra-bundle__title">Get set up in one go</p>',
+    );
+  });
+
+  it('keeps the model words when the shop gave the set no name', () => {
+    const markup = render(bundleSpec(), { bundles: BUNDLES });
+
+    expect(markup).toContain('<p class="rudra-bundle__title">Get set up in one go</p>');
+    expect(markup).not.toContain('rudra-bundle__label');
+  });
+
+  it('lets the host format a bundle price itself', () => {
+    const markup = render(bundleSpec(), {
+      bundles: BUNDLES,
+      formatBundlePrice: () => 'TWO FOR 250',
+    });
+
+    expect(markup).toContain('TWO FOR 250');
   });
 
   it('renders nothing at all when a member of the set has left the catalog', () => {

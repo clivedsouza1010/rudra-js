@@ -57,19 +57,21 @@ The package ships no CSS, on purpose — a stylesheet would fight whatever your
 site already has. Every element it emits carries a class, and this is all of
 them:
 
-| Where          | Classes                                                                                                                                                                    |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The wrapper    | `.rudra`, `.rudra__header`, `.rudra__headline`, `.rudra__subheadline`, `.rudra__rationale`                                                                                 |
-| A hero         | `.rudra-hero`, `.rudra-hero__headline`, `.rudra-hero__body`, `.rudra-hero__link`, `.rudra-hero__price`, `.rudra-hero__cta`                                                 |
-| A grid         | `.rudra-grid`, `.rudra-grid__title`, `.rudra-grid__items`                                                                                                                  |
-| A carousel     | `.rudra-carousel`, `.rudra-carousel__title`, `.rudra-carousel__track`                                                                                                      |
-| A banner       | `.rudra-banner`, `.rudra-banner__text`, `.rudra-banner__cta`                                                                                                               |
-| A copy block   | `.rudra-copy`, `.rudra-copy__title`, `.rudra-copy__body`                                                                                                                   |
-| A bundle       | `.rudra-bundle`, `.rudra-bundle__title`, `.rudra-bundle__body`, `.rudra-bundle__items`, `.rudra-bundle__item`, `.rudra-bundle__price`, `.rudra-bundle__cta`                |
-| A product card | `.rudra-card`, `.rudra-card--featured`, `.rudra-card__image`, `.rudra-card__body`, `.rudra-card__title`, `.rudra-card__price`, `.rudra-card__reason`, `.rudra-card__badge` |
+| Where          | Classes                                                                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The wrapper    | `.rudra`, `.rudra__header`, `.rudra__headline`, `.rudra__subheadline`, `.rudra__rationale`                                                                                          |
+| A hero         | `.rudra-hero`, `.rudra-hero__headline`, `.rudra-hero__body`, `.rudra-hero__link`, `.rudra-hero__price`, `.rudra-hero__cta`                                                          |
+| A grid         | `.rudra-grid`, `.rudra-grid__title`, `.rudra-grid__items`                                                                                                                           |
+| A carousel     | `.rudra-carousel`, `.rudra-carousel__title`, `.rudra-carousel__track`                                                                                                               |
+| A banner       | `.rudra-banner`, `.rudra-banner__text`, `.rudra-banner__cta`                                                                                                                        |
+| A copy block   | `.rudra-copy`, `.rudra-copy__title`, `.rudra-copy__body`                                                                                                                            |
+| A bundle       | `.rudra-bundle`, `.rudra-bundle__label`, `.rudra-bundle__title`, `.rudra-bundle__body`, `.rudra-bundle__items`, `.rudra-bundle__item`, `.rudra-bundle__price`, `.rudra-bundle__cta` |
+| A product card | `.rudra-card`, `.rudra-card--featured`, `.rudra-card__image`, `.rudra-card__body`, `.rudra-card__title`, `.rudra-card__price`, `.rudra-card__reason`, `.rudra-card__badge`          |
 
-`.rudra__rationale` only appears under `hasDiagnostics`. `className` is added
-alongside `rudra` rather than replacing it, so the child classes keep working.
+`.rudra__rationale` only appears under `hasDiagnostics`. `.rudra-bundle__label`
+is your own name for the set, and appears only for a bundle you gave a `label`.
+`className` is added alongside `rudra` rather than replacing it, so the child
+classes keep working.
 
 `.rudra-carousel__track` is expected to scroll horizontally — give it `overflow-x: auto`, since nothing here uses JavaScript to scroll it. `.rudra-card--featured` is applied alongside `.rudra-card`, so write it as `.rudra-card--featured { ... }` after the base
 rule rather than instead of it.
@@ -117,17 +119,18 @@ const registry = extendRegistry({
 
 ## Props
 
-| Prop             | Notes                                                                                                                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `spec`           | Required. From `@rudra-js/core`.                                                                                                                                           |
-| `products`       | Required. A list of products, or anything keyed by SKU. See below, and the warning above.                                                                                  |
-| `bundles`        | The sets your shop sells together. Only needed if a spec can carry a bundle block.                                                                                         |
-| `registry`       | Replace some or all block renderers.                                                                                                                                       |
-| `hrefForSku`     | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                 |
-| `formatPrice`    | Defaults to `Intl.NumberFormat`, which knows each currency's own number of decimal places.                                                                                 |
-| `locale`         | Punctuates prices. Defaults to the **server's** locale, which is rarely the shopper's — pass it if you serve more than one.                                                |
-| `hasDiagnostics` | Adds the provider, the model name, the latency and the model's own reasoning to the markup. Off by default: it tells a visitor which model you use and when it is failing. |
-| `className`      | Added alongside `rudra`.                                                                                                                                                   |
+| Prop                | Notes                                                                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spec`              | Required. From `@rudra-js/core`.                                                                                                                                           |
+| `products`          | Required. A list of products, or anything keyed by SKU. See below, and the warning above.                                                                                  |
+| `bundles`           | The sets your shop sells together. Only needed if a spec can carry a bundle block.                                                                                         |
+| `registry`          | Replace some or all block renderers.                                                                                                                                       |
+| `hrefForSku`        | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                 |
+| `formatPrice`       | Defaults to `Intl.NumberFormat`, which knows each currency's own number of decimal places. It formats products, not bundles.                                               |
+| `formatBundlePrice` | The same for a bundle's own price. The default reads the currency off the set's members, and throws if they disagree.                                                      |
+| `locale`            | Punctuates prices. Defaults to the **server's** locale, which is rarely the shopper's — pass it if you serve more than one.                                                |
+| `hasDiagnostics`    | Adds the provider, the model name, the latency and the model's own reasoning to the markup. Off by default: it tells a visitor which model you use and when it is failing. |
+| `className`         | Added alongside `rudra`.                                                                                                                                                   |
 
 ### What `products` may be
 

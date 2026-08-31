@@ -34,9 +34,15 @@ export interface RudraComponentProps {
   hrefForSku?: (sku: string) => string;
   formatPrice?: (product: Product) => string;
   /**
+   * The same for a bundle's own price, which is the shop's and not a sum of the
+   * parts. Separate from `formatPrice` because a bundle is not a product: it
+   * carries no currency of its own, so the default reads one off its members.
+   */
+  formatBundlePrice?: (bundle: Bundle) => string;
+  /**
    * The shopper's locale, used to punctuate prices. Defaults to the server's,
    * which is almost never the shopper's — pass it if the shop serves more than
-   * one. Ignored when `formatPrice` is supplied.
+   * one. Ignored when `formatPrice` and `formatBundlePrice` are supplied.
    */
   locale?: string;
   /**
@@ -167,6 +173,7 @@ export function RudraComponent({
   registry = defaultRegistry,
   hrefForSku = defaultHrefForSku,
   formatPrice,
+  formatBundlePrice,
   locale,
   hasDiagnostics = false,
   className,
@@ -179,7 +186,8 @@ export function RudraComponent({
     bundles: bundlesById,
     hrefForSku,
     formatPrice: formatPrice ?? ((product) => defaultFormatPrice(product, locale)),
-    formatBundlePrice: (bundle) => defaultFormatBundlePrice(bundle, productMap, locale),
+    formatBundlePrice:
+      formatBundlePrice ?? ((bundle) => defaultFormatBundlePrice(bundle, productMap, locale)),
   };
 
   // An empty recommendation area is worse than none: it takes up space and

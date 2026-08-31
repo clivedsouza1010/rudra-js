@@ -21,7 +21,11 @@ export function BundleRenderer({
 
   return (
     <section className="rudra-bundle">
-      {block.title ? <h3 className="rudra-bundle__title">{block.title}</h3> : null}
+      {/* The shop's own name for the set leads, because it is the one name here
+          anything can check. The model wrote its title without ever seeing which
+          set would be picked, so that reads as the pitch underneath. */}
+      {bundle.label ? <h3 className="rudra-bundle__label">{bundle.label}</h3> : null}
+      {block.title ? <p className="rudra-bundle__title">{block.title}</p> : null}
       {block.body ? <p className="rudra-bundle__body">{block.body}</p> : null}
 
       <ul className="rudra-bundle__items">

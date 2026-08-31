@@ -19,6 +19,7 @@ export {
 } from './registry.js';
 
 export {
+  defaultFormatBundlePrice,
   defaultFormatPrice,
   defaultHrefForSku,
   type BlockRenderContext,
