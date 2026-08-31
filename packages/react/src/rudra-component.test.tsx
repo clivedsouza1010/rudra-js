@@ -715,15 +715,14 @@ describe('a bundle', () => {
     expect(markup).toContain('Add both');
   });
 
-  it('renders nothing when a member of the set has left the catalog', () => {
-    // A set missing one of its parts is not that set — better to show nothing
-    // than a bundle with a hole in it.
-    const markup = render(bundleSpec(), {
-      bundles: BUNDLES,
-      products: [product('TR-101')],
-    });
-
-    expect(markup).not.toContain('rudra-bundle');
-    expect(markup).not.toContain('Product TR-101');
+  it('renders nothing at all when a member of the set has left the catalog', () => {
+    // A set missing one of its parts is not that set — a headline over an
+    // empty box reads as a broken page, the same as an empty grid or carousel.
+    expect(
+      render(bundleSpec(), {
+        bundles: BUNDLES,
+        products: [product('TR-101')],
+      }),
+    ).toBe('');
   });
 });

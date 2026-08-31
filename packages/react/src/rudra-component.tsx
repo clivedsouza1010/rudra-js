@@ -90,9 +90,11 @@ function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
 /**
  * Whether a block still has anything to say once the catalog is applied.
  *
- * Only the two product blocks can come up empty: reconciliation ran against the
- * catalog as it was when the spec was generated, and a SKU can sell out between
- * then and this render. The rest carry their own words.
+ * Three block kinds can come up empty: reconciliation ran against the catalog
+ * as it was when the spec was generated, and a SKU can sell out between then
+ * and this render. Grid and carousel lose just the products that did; a
+ * bundle loses itself entirely if any one of its members did. The rest carry
+ * their own words.
  */
 function hasContent(
   block: Block,
@@ -107,8 +109,11 @@ function hasContent(
     case 'banner':
     case 'copy':
       return true;
-    case 'bundle':
-      return block.bundleId !== null && bundles.has(block.bundleId);
+    case 'bundle': {
+      if (block.bundleId === null) return false;
+      const bundle = bundles.get(block.bundleId);
+      return bundle !== undefined && bundle.skus.every((sku) => products.has(sku));
+    }
     default:
       // A kind this renderer predates renders nothing, so it counts as nothing.
       block satisfies never;
