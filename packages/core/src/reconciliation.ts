@@ -231,17 +231,23 @@ function chooseBundle(
   allowlist: Allowlist,
   digest: SignalDigest,
   candidatesBySku: Map<string, Product>,
+  tracker: PlacementTracker,
 ): Bundle | undefined {
   let best: Bundle | undefined;
   let bestScore = -1;
 
   for (const bundle of bundles) {
+    // A set is only a set whole, so it needs room for every part at once.
+    if (bundle.skus.length > tracker.remaining) continue;
+
     // Stock is the bar, not the whole blocked set: a set is meant to hold what
     // is in the cart or on the page. A thumbs-down still keeps the set out.
     let isPlaceable = true;
     for (const sku of bundle.skus) {
       if (!allowlist.allowed.has(sku)) isPlaceable = false;
       if (digest.dislikedSkus.includes(sku)) isPlaceable = false;
+      // An earlier block already showed this one. Twice on a page looks broken.
+      if (tracker.hasPlaced(sku)) isPlaceable = false;
     }
     if (!isPlaceable) continue;
 
@@ -357,7 +363,7 @@ function reconcileBlock(
     }
 
     case 'bundle': {
-      const chosen = chooseBundle(bundles, allowlist, digest, candidatesBySku);
+      const chosen = chooseBundle(bundles, allowlist, digest, candidatesBySku, tracker);
       if (!chosen) {
         tracker.record('no-bundle');
         return null;

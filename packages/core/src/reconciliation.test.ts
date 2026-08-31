@@ -506,6 +506,30 @@ describe('choosing a bundle', () => {
     expect(result.spec.blocks).toHaveLength(0);
   });
 
+  it('will not show a bundle whose product is already on the page', () => {
+    // The same product twice on one page reads as a mistake.
+    const result = reconcile(
+      specWith([{ kind: 'grid', title: 'For you', columns: 3, items: [ref('A')] }, block]),
+      {
+        candidates: [product('A'), product('B')],
+        bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+      },
+    );
+
+    expect(result.spec.blocks).toHaveLength(1);
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'grid' });
+  });
+
+  it('will not show a bundle bigger than the room left', () => {
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B')],
+      bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+      context: { surface: 'pdp', maxItems: 1 },
+    });
+
+    expect(result.spec.blocks).toHaveLength(0);
+  });
+
   it('prefers a bundle holding something already in the cart', () => {
     const result = reconcile(specWith([block]), {
       candidates: [product('A'), product('B'), product('C')],
