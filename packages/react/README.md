@@ -155,9 +155,21 @@ up space and tells the shopper the page is broken.
 
 The sets your shop sells together, the same way `products` is your catalog. The
 model only asks for a bundle block; it never invents one, and it never sees a
-price. Your host picked which bundle actually fills each block before the spec
-was generated — this prop supplies the bundle's members and its price so the
-component can draw it.
+price.
+
+You offer the sets, and the framework picks which one fills each block. It
+picks when the page is served — after the spec was generated, not before —
+inside `reconcileSpec`, from what this shopper has in their basket, has looked
+at, or is browsing now. The spec then carries the id it picked, and this prop
+supplies that set's members, its price and your name for it so the component
+can draw it.
+
+**Validate `bundles` with `bundleSchema` from `@rudra-js/core`, and pass the
+same list you sent to `parseTrackingInput`.** Core checked that list — every
+member in stock, none of them disliked, no repeats, and the whole set inside
+the item budget — and then hands the renderer nothing but the id it chose. A
+stale or different list here draws a set none of those checks ever saw, under
+an id that was proved against another one.
 
 ## Licence
 

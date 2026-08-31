@@ -36,3 +36,24 @@ neither has been published.
 - `@rudra-js/react`: renders a specification as React Server Components. Product
   facts come from the shop's catalog at render time, never from the model, and
   the recommendation area needs no client JavaScript.
+- The bundle block: a set the shop sells together, shown as one offer at the
+  shop's own price. The shop supplies the sets in `bundles`, the model may only
+  ask for the block and write the words around it, and the framework picks which
+  set when the page is served, from the shopper's own basket, views and
+  category. The set's members are drawn from the same catalog every other block
+  uses, and the price shown is always the shop's, never a sum of the parts.
+
+### Changed
+
+- The block vocabulary now has six kinds rather than five, and the render
+  context has two more fields. Both packages are `0.1.0` and unpublished, so
+  this is a breaking change taken on purpose rather than worked around: the
+  block union is closed so that a spec cannot say anything the renderer has not
+  agreed to, and a new kind is therefore always a breaking change. Three things
+  stop compiling for a host, and each has a one-line fix.
+  - A `switch` over `block.kind` that ends in a `never` default. Add a
+    `case 'bundle'`.
+  - A `BlockRegistry` written out by hand. Add a `bundle` entry, or build it
+    with `extendRegistry`, which keeps the defaults for whatever you leave out.
+  - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
+    by id, and `formatBundlePrice`.
