@@ -1,4 +1,4 @@
-import type { Product, TrackingInputDraft } from '@rudra-js/core';
+import type { Bundle, Product, TrackingInputDraft } from '@rudra-js/core';
 import type { Shopper } from './shoppers';
 
 /**
@@ -22,12 +22,29 @@ export function buildTrackingInput(
   shopper: Shopper,
   currentSku: string,
   catalog: readonly Product[],
+  bundles: readonly Bundle[],
 ): TrackingInputDraft {
   const current = catalog.find((product) => product.sku === currentSku);
   const candidates = catalog
     .filter((product) => product.isInStock && product.sku !== currentSku)
     .filter((product) => !current || product.category === current.category)
     .slice(0, 24);
+  const finalCandidates =
+    candidates.length > 0
+      ? candidates
+      : catalog.filter((product) => product.isInStock && product.sku !== currentSku).slice(0, 24);
+
+  // A bundle whose members are not all candidates would make the tracking
+  // input contract throw, so only pass along the ones that fit.
+  const candidateSkus = new Set(finalCandidates.map((product) => product.sku));
+  const offered: Bundle[] = [];
+  for (const bundle of bundles) {
+    let isOffered = true;
+    for (const sku of bundle.skus) {
+      if (!candidateSkus.has(sku)) isOffered = false;
+    }
+    if (isOffered) offered.push(bundle);
+  }
 
   return {
     user: { id: shopper.id, segment: shopper.segment, isReturning: shopper.isReturning },
@@ -49,9 +66,7 @@ export function buildTrackingInput(
       cart: shopper.cartSkus.map((sku) => ({ sku, at: AT })),
       recentSearches: shopper.searches,
     },
-    candidates:
-      candidates.length > 0
-        ? candidates
-        : catalog.filter((product) => product.isInStock && product.sku !== currentSku).slice(0, 24),
+    candidates: finalCandidates,
+    bundles: offered,
   };
 }

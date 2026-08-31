@@ -13,12 +13,12 @@ export async function ProductPageContent({
   sku: string;
   shopperId: string | undefined;
 }) {
-  const { catalog, findShopper, generator } = getShopContext();
+  const { catalog, bundles, findShopper, generator } = getShopContext();
   const product = catalog.find((candidate) => candidate.sku === sku);
   if (!product) return null;
 
   const shopper = findShopper(shopperId);
-  const spec = await generator.generate(buildTrackingInput(shopper, product.sku, catalog));
+  const spec = await generator.generate(buildTrackingInput(shopper, product.sku, catalog, bundles));
 
   return (
     <main>
@@ -32,7 +32,7 @@ export async function ProductPageContent({
         </p>
       </article>
 
-      <RudraComponent spec={spec} products={catalog} locale="en-US" />
+      <RudraComponent spec={spec} products={catalog} bundles={bundles} locale="en-US" />
     </main>
   );
 }
