@@ -450,6 +450,76 @@ describe('attributing a rejection to its real cause', () => {
   });
 });
 
+describe('choosing a bundle', () => {
+  const block = {
+    kind: 'bundle' as const,
+    title: 'Get set up',
+    body: null,
+    ctaLabel: 'Add both',
+    bundleId: null,
+  };
+
+  it('fills in a bundle the shop offered', () => {
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B')],
+      bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+    });
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'bundle', bundleId: 'BUN-1' });
+  });
+
+  it('throws away a bundleId the model tried to set', () => {
+    // The model does not choose. If it did, it could name a set this shopper
+    // was never offered.
+    const result = reconcile(specWith([{ ...block, bundleId: 'BUN-MADE-UP' }]), {
+      candidates: [product('A'), product('B')],
+      bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+    });
+
+    expect(result.spec.blocks[0]).toMatchObject({ bundleId: 'BUN-1' });
+  });
+
+  it('drops the block when the shop offers no bundles', () => {
+    const result = reconcile(specWith([block]), { candidates: [product('A')], bundles: [] });
+
+    expect(result.spec.blocks).toHaveLength(0);
+  });
+
+  it('will not show a bundle with a product the shopper cannot buy', () => {
+    // A set missing one of its parts is not that set.
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B', { isInStock: false })],
+      bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+    });
+
+    expect(result.spec.blocks).toHaveLength(0);
+  });
+
+  it('will not show a bundle holding something the shopper disliked', () => {
+    // Cart and purchase history are fine in a set. A thumbs-down is not.
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B')],
+      bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+      signals: { dislikes: [{ sku: 'B' }] },
+    });
+
+    expect(result.spec.blocks).toHaveLength(0);
+  });
+
+  it('prefers a bundle holding something already in the cart', () => {
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B'), product('C')],
+      bundles: [
+        { id: 'PLAIN', skus: ['B', 'C'], price: 30 },
+        { id: 'CART', skus: ['A', 'B'], price: 25 },
+      ],
+      signals: { cart: [{ sku: 'A' }] },
+    });
+
+    expect(result.spec.blocks[0]).toMatchObject({ bundleId: 'CART' });
+  });
+});
+
 describe('an empty hero', () => {
   it('is dropped when it has neither a headline nor a product', () => {
     const result = reconcile(

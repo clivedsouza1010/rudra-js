@@ -5,7 +5,7 @@ import type {
   RecommendationBasis,
 } from './component-spec.js';
 import type { SignalDigest } from './signal-digest.js';
-import type { Product, TrackingInput } from './tracking-input.js';
+import type { Bundle, Product, TrackingInput } from './tracking-input.js';
 
 /**
  * Reconciliation — the boundary between what the model said and what renders.
@@ -224,11 +224,51 @@ function reconcileItems(
   return kept;
 }
 
+// The shop knows which sets exist. This only picks the one that fits the
+// shopper best out of what the shop already offered.
+function chooseBundle(
+  bundles: readonly Bundle[],
+  allowlist: Allowlist,
+  digest: SignalDigest,
+  candidatesBySku: Map<string, Product>,
+): Bundle | undefined {
+  let best: Bundle | undefined;
+  let bestScore = -1;
+
+  for (const bundle of bundles) {
+    // Stock is the bar, not the whole blocked set: a set is meant to hold what
+    // is in the cart or on the page. A thumbs-down still keeps the set out.
+    let isPlaceable = true;
+    for (const sku of bundle.skus) {
+      if (!allowlist.allowed.has(sku)) isPlaceable = false;
+      if (digest.dislikedSkus.includes(sku)) isPlaceable = false;
+    }
+    if (!isPlaceable) continue;
+
+    // In the cart beats recently viewed, which beats the category being looked
+    // at. Every step checks something we hold.
+    let score = 0;
+    for (const sku of bundle.skus) {
+      if (digest.cartSkus.includes(sku)) score += 4;
+      else if (digest.topViewed.some((viewed) => viewed.sku === sku)) score += 2;
+      else if (candidatesBySku.get(sku)?.category === digest.currentCategory) score += 1;
+    }
+
+    if (score > bestScore) {
+      best = bundle;
+      bestScore = score;
+    }
+  }
+
+  return best;
+}
+
 function reconcileBlock(
   block: Block,
   allowlist: Allowlist,
   candidatesBySku: Map<string, Product>,
   digest: SignalDigest,
+  bundles: readonly Bundle[],
   tracker: PlacementTracker,
 ): Block | null {
   switch (block.kind) {
@@ -316,10 +356,24 @@ function reconcileBlock(
       };
     }
 
-    // Task 3 does the real work here: picks the bundle and sets bundleId.
-    // Nothing to check it against yet, so it passes through as-is.
-    case 'bundle':
-      return block;
+    case 'bundle': {
+      const chosen = chooseBundle(bundles, allowlist, digest, candidatesBySku);
+      if (!chosen) {
+        tracker.record('no-bundle');
+        return null;
+      }
+
+      for (const sku of chosen.skus) tracker.place(sku);
+
+      return {
+        kind: 'bundle',
+        title: clampNullable(block.title, CLAMP.blockTitle),
+        body: clampNullable(block.body, CLAMP.subheadline),
+        ctaLabel: clampNullable(block.ctaLabel, CLAMP.ctaLabel),
+        // The model's bundleId is ignored on purpose.
+        bundleId: chosen.id,
+      };
+    }
   }
 }
 
@@ -348,7 +402,14 @@ export function reconcileSpec(
 
   const blocks: Block[] = [];
   for (const block of generated.blocks.slice(0, MAX_BLOCKS)) {
-    const reconciled = reconcileBlock(block, allowlist, candidatesBySku, digest, tracker);
+    const reconciled = reconcileBlock(
+      block,
+      allowlist,
+      candidatesBySku,
+      digest,
+      input.bundles,
+      tracker,
+    );
     if (reconciled !== null) blocks.push(reconciled);
   }
 
