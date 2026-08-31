@@ -1,5 +1,6 @@
-import type { Block, ComponentSpec, Product } from '@rudra-js/core';
+import type { Block, Bundle, ComponentSpec, Product } from '@rudra-js/core';
 import {
+  defaultFormatBundlePrice,
   defaultFormatPrice,
   defaultHrefForSku,
   type BlockRenderContext,
@@ -27,6 +28,8 @@ export interface RudraComponentProps {
    * finite number throws rather than rendering as free.
    */
   products: ProductCatalog;
+  /** Sets the shop sells together. Only needed if a spec can carry a bundle block. */
+  bundles?: readonly Bundle[];
   registry?: BlockRegistry;
   hrefForSku?: (sku: string) => string;
   formatPrice?: (product: Product) => string;
@@ -91,7 +94,11 @@ function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
  * catalog as it was when the spec was generated, and a SKU can sell out between
  * then and this render. The rest carry their own words.
  */
-function hasContent(block: Block, products: ReadonlyMap<string, Product>): boolean {
+function hasContent(
+  block: Block,
+  products: ReadonlyMap<string, Product>,
+  bundles: ReadonlyMap<string, Bundle>,
+): boolean {
   switch (block.kind) {
     case 'grid':
     case 'carousel':
@@ -101,8 +108,7 @@ function hasContent(block: Block, products: ReadonlyMap<string, Product>): boole
     case 'copy':
       return true;
     case 'bundle':
-      // Task 4 gives this a real renderer. For now it shows nothing.
-      return false;
+      return block.bundleId !== null && bundles.has(block.bundleId);
     default:
       // A kind this renderer predates renders nothing, so it counts as nothing.
       block satisfies never;
@@ -152,6 +158,7 @@ function renderBlock(
 export function RudraComponent({
   spec,
   products,
+  bundles,
   registry = defaultRegistry,
   hrefForSku = defaultHrefForSku,
   formatPrice,
@@ -159,10 +166,15 @@ export function RudraComponent({
   hasDiagnostics = false,
   className,
 }: RudraComponentProps) {
+  const productMap = toProductMap(products);
+  const bundlesById = new Map((bundles ?? []).map((bundle) => [bundle.id, bundle]));
+
   const context: BlockRenderContext = {
-    products: toProductMap(products),
+    products: productMap,
+    bundles: bundlesById,
     hrefForSku,
     formatPrice: formatPrice ?? ((product) => defaultFormatPrice(product, locale)),
+    formatBundlePrice: (bundle) => defaultFormatBundlePrice(bundle, productMap, locale),
   };
 
   // An empty recommendation area is worse than none: it takes up space and
@@ -170,7 +182,9 @@ export function RudraComponent({
   // a headline and an empty box, because every product in the spec has sold out
   // since it was generated — which is why this asks what is left rather than
   // how many blocks arrived.
-  const visible = spec.blocks.filter((block) => hasContent(block, context.products));
+  const visible = spec.blocks.filter((block) =>
+    hasContent(block, context.products, context.bundles),
+  );
   if (visible.length === 0) return null;
 
   // React omits a data-* attribute whose value is undefined, so degradedReason

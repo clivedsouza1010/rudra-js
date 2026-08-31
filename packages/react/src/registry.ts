@@ -19,6 +19,7 @@ import {
   GridRenderer,
   HeroRenderer,
 } from './blocks/block-renderers.js';
+import { BundleRenderer } from './blocks/bundle-block.js';
 
 export type BlockRenderer<Kind extends BlockKind> = (props: {
   block: Extract<Block, { kind: Kind }>;
@@ -28,9 +29,6 @@ export type BlockRenderer<Kind extends BlockKind> = (props: {
 export type BlockRegistry = {
   [Kind in BlockKind]: BlockRenderer<Kind>;
 };
-
-// Task 4 replaces this with the real renderer. For now a bundle shows nothing.
-const BundleRenderer: BlockRenderer<'bundle'> = () => null;
 
 export const defaultRegistry: BlockRegistry = {
   hero: HeroRenderer,

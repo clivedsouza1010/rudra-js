@@ -65,6 +65,7 @@ them:
 | A carousel     | `.rudra-carousel`, `.rudra-carousel__title`, `.rudra-carousel__track`                                                                                                      |
 | A banner       | `.rudra-banner`, `.rudra-banner__text`, `.rudra-banner__cta`                                                                                                               |
 | A copy block   | `.rudra-copy`, `.rudra-copy__title`, `.rudra-copy__body`                                                                                                                   |
+| A bundle       | `.rudra-bundle`, `.rudra-bundle__title`, `.rudra-bundle__body`, `.rudra-bundle__items`, `.rudra-bundle__item`, `.rudra-bundle__price`, `.rudra-bundle__cta`                |
 | A product card | `.rudra-card`, `.rudra-card--featured`, `.rudra-card__image`, `.rudra-card__body`, `.rudra-card__title`, `.rudra-card__price`, `.rudra-card__reason`, `.rudra-card__badge` |
 
 `.rudra__rationale` only appears under `hasDiagnostics`. `className` is added
@@ -77,15 +78,15 @@ rule rather than instead of it.
 
 The same markup carries what the model decided, for styling and for analytics.
 
-| Attribute                | On                | Value                                                      |
-| ------------------------ | ----------------- | ---------------------------------------------------------- |
-| `data-rudra-slot`        | the wrapper       | The slot the spec was generated for                        |
-| `data-rudra-source`      | the wrapper       | `llm`, `cache` or `fallback`                               |
-| `data-rudra-tone`        | the wrapper       | The tone the model chose for the component                 |
-| `data-rudra-banner-tone` | a banner          | A banner's own tone, a different vocabulary from the above |
-| `data-rudra-columns`     | a grid            | The column count the model chose                           |
-| `data-rudra-sku`         | a card, hero link | The product, for click attribution                         |
-| `data-rudra-basis`       | a card            | Why the product was picked — `most_viewed`, `popular`, …   |
+| Attribute                | On                             | Value                                                      |
+| ------------------------ | ------------------------------ | ---------------------------------------------------------- |
+| `data-rudra-slot`        | the wrapper                    | The slot the spec was generated for                        |
+| `data-rudra-source`      | the wrapper                    | `llm`, `cache` or `fallback`                               |
+| `data-rudra-tone`        | the wrapper                    | The tone the model chose for the component                 |
+| `data-rudra-banner-tone` | a banner                       | A banner's own tone, a different vocabulary from the above |
+| `data-rudra-columns`     | a grid                         | The column count the model chose                           |
+| `data-rudra-sku`         | a card, hero link, bundle item | The product, for click attribution                         |
+| `data-rudra-basis`       | a card                         | Why the product was picked — `most_viewed`, `popular`, …   |
 
 `data-rudra-source` is public on purpose: hit rate and fallback share can be
 read straight off a rendered page. Everything more specific appears only under
@@ -120,6 +121,7 @@ const registry = extendRegistry({
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `spec`           | Required. From `@rudra-js/core`.                                                                                                                                           |
 | `products`       | Required. A list of products, or anything keyed by SKU. See below, and the warning above.                                                                                  |
+| `bundles`        | The sets your shop sells together. Only needed if a spec can carry a bundle block.                                                                                         |
 | `registry`       | Replace some or all block renderers.                                                                                                                                       |
 | `hrefForSku`     | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                 |
 | `formatPrice`    | Defaults to `Intl.NumberFormat`, which knows each currency's own number of decimal places.                                                                                 |
@@ -145,6 +147,14 @@ The component renders nothing at all when there is nothing to show — a spec wi
 no blocks, or one whose every product has left your catalog since it was
 generated. An empty recommendation area, or a headline over an empty box, takes
 up space and tells the shopper the page is broken.
+
+### What `bundles` is
+
+The sets your shop sells together, the same way `products` is your catalog. The
+model only asks for a bundle block; it never invents one, and it never sees a
+price. Your host picked which bundle actually fills each block before the spec
+was generated — this prop supplies the bundle's members and its price so the
+component can draw it.
 
 ## Licence
 

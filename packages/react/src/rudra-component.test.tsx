@@ -542,6 +542,13 @@ describe('the styling contract', () => {
           { kind: 'carousel', title: 'Start here', items: [reference('TR-102')] },
           { kind: 'banner', tone: 'restock', text: 'Back in stock', ctaLabel: 'See more' },
           { kind: 'copy', title: 'Why these', body: 'Built for wet rock.' },
+          {
+            kind: 'bundle',
+            title: 'Get set up in one go',
+            body: 'Both together.',
+            ctaLabel: 'Add both',
+            bundleId: 'BUN-1',
+          },
         ],
         // Degraded as well as diagnostic: `data-rudra-degraded` is emitted
         // only in this state, so a healthy fixture never sees it and the
@@ -553,6 +560,7 @@ describe('the styling contract', () => {
           product('TR-101', { imageUrl: 'https://cdn.example.com/a.png' }),
           product('TR-102'),
         ],
+        bundles: [{ id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300 }],
         hasDiagnostics: true,
       },
     );
@@ -664,5 +672,58 @@ describe('what a catalog may be', () => {
     // that looks fine. The shop should hear about it on the first request.
     expect(() => render(gridSpec(), { products: build() })).toThrow(TypeError);
     expect(() => render(gridSpec(), { products: build() })).toThrow(/`products` prop/);
+  });
+});
+
+describe('a bundle', () => {
+  const bundleSpec = () =>
+    spec([
+      {
+        kind: 'bundle',
+        title: 'Get set up in one go',
+        body: 'Both together.',
+        ctaLabel: 'Add both',
+        bundleId: 'BUN-1',
+      },
+    ]);
+
+  const BUNDLES = [{ id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300 }];
+
+  it('shows the price the shop set, not the sum of the parts', () => {
+    // TR-101 and TR-102 are 174 each. The saving is the whole point.
+    const markup = render(bundleSpec(), { bundles: BUNDLES });
+
+    expect(markup).toContain('$300.00');
+    expect(markup).not.toContain('$348.00');
+  });
+
+  it('shows every product in the set', () => {
+    const markup = render(bundleSpec(), { bundles: BUNDLES });
+
+    expect(markup).toContain('Product TR-101');
+    expect(markup).toContain('Product TR-102');
+  });
+
+  it('renders nothing when the host passed no such bundle', () => {
+    expect(render(bundleSpec(), { bundles: [] })).toBe('');
+  });
+
+  it('keeps the words the model wrote', () => {
+    const markup = render(bundleSpec(), { bundles: BUNDLES });
+
+    expect(markup).toContain('Get set up in one go');
+    expect(markup).toContain('Add both');
+  });
+
+  it('renders nothing when a member of the set has left the catalog', () => {
+    // A set missing one of its parts is not that set — better to show nothing
+    // than a bundle with a hole in it.
+    const markup = render(bundleSpec(), {
+      bundles: BUNDLES,
+      products: [product('TR-101')],
+    });
+
+    expect(markup).not.toContain('rudra-bundle');
+    expect(markup).not.toContain('Product TR-101');
   });
 });

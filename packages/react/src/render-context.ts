@@ -1,4 +1,4 @@
-import type { Product } from '@rudra-js/core';
+import type { Bundle, Product } from '@rudra-js/core';
 
 /**
  * Everything a block renderer needs that does not come from the specification.
@@ -14,9 +14,12 @@ import type { Product } from '@rudra-js/core';
 export interface BlockRenderContext {
   /** The host's catalog, keyed by SKU. Read-only: it is the caller's own map. */
   readonly products: ReadonlyMap<string, Product>;
+  /** Sets the shop sells together, keyed by id. */
+  readonly bundles: ReadonlyMap<string, Bundle>;
   /** Host-owned link construction. */
   readonly hrefForSku: (sku: string) => string;
   readonly formatPrice: (product: Product) => string;
+  readonly formatBundlePrice: (bundle: Bundle) => string;
 }
 
 export function defaultHrefForSku(sku: string): string {
@@ -66,4 +69,27 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
   }
 
   return formatter.format(product.price);
+}
+
+/**
+ * Formats the shop's own bundle price, the same way `defaultFormatPrice` does.
+ *
+ * A bundle carries no currency of its own — only an id, its SKUs and a price —
+ * so this reads the currency off the first member instead.
+ */
+export function defaultFormatBundlePrice(
+  bundle: Bundle,
+  products: ReadonlyMap<string, Product>,
+  locale?: string,
+): string {
+  const firstSku = bundle.skus[0];
+  const currency = (firstSku === undefined ? undefined : products.get(firstSku)?.currency) ?? 'USD';
+
+  try {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(bundle.price);
+  } catch {
+    // Same reasoning as defaultFormatPrice: a malformed locale must not take
+    // the page down over punctuation.
+    return `${currency} ${bundle.price}`;
+  }
 }
