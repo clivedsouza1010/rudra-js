@@ -93,15 +93,16 @@ try {
     `import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
+  bundleSchema,
   createComponentGenerator,
   parseTrackingInput,
   productSchema,
   type ComponentSpec,
 } from '@rudra-js/core';
-import { RudraComponent, type ProductCatalog } from '@rudra-js/react';
+import { RudraComponent, defaultFormatBundlePrice, type ProductCatalog } from '@rudra-js/react';
 import { createAnthropicProvider } from '@rudra-js/anthropic';
 
-const catalog: ProductCatalog = [
+const products = [
   productSchema.parse({
     sku: 'TR-101',
     title: 'Switchback Trail Shoe',
@@ -111,6 +112,26 @@ const catalog: ProductCatalog = [
     isInStock: true,
     tags: [],
   }),
+  productSchema.parse({
+    sku: 'TR-102',
+    title: 'Switchback Trail Sock',
+    category: 'Trail Running',
+    price: 26,
+    currency: 'USD',
+    isInStock: true,
+    tags: [],
+  }),
+];
+const catalog: ProductCatalog = products;
+
+// A set the shop sells together, validated the way a host validates one.
+const bundles = [
+  bundleSchema.parse({
+    id: 'BUN-1',
+    skus: ['TR-101', 'TR-102'],
+    price: 180,
+    label: 'Trail starter set',
+  }),
 ];
 
 const input = parseTrackingInput({
@@ -118,7 +139,9 @@ const input = parseTrackingInput({
   context: { surface: 'pdp' },
   candidates: [
     { sku: 'TR-101', title: 'Switchback Trail Shoe', category: 'Trail Running', price: 174 },
+    { sku: 'TR-102', title: 'Switchback Trail Sock', category: 'Trail Running', price: 26 },
   ],
+  bundles,
 });
 
 const spec: ComponentSpec = await createComponentGenerator().generate(input);
@@ -128,6 +151,40 @@ const markup = renderToStaticMarkup(
 
 if (!markup.includes('$174.00')) {
   throw new Error(\`rendered markup has no price in it: \${markup.slice(0, 200)}\`);
+}
+
+// The bundle half of the public surface: the block kind, the \`bundles\` prop,
+// the shop's own name for the set and the shop's own price for it.
+const bundleSpec: ComponentSpec = {
+  ...spec,
+  blocks: [{ kind: 'bundle', title: 'Get set up', body: null, ctaLabel: null, bundleId: 'BUN-1' }],
+};
+const bundleMarkup = renderToStaticMarkup(
+  createElement(RudraComponent, {
+    spec: bundleSpec,
+    products: catalog,
+    bundles,
+    locale: 'en-US',
+  }),
+);
+
+for (const expected of ['Trail starter set', '$180.00']) {
+  if (!bundleMarkup.includes(expected)) {
+    throw new Error(\`rendered bundle has no \${expected} in it: \${bundleMarkup.slice(0, 300)}\`);
+  }
+}
+
+const [firstBundle] = bundles;
+if (!firstBundle) {
+  throw new Error('bundleSchema.parse returned nothing');
+}
+const bundlePrice = defaultFormatBundlePrice(
+  firstBundle,
+  new Map(products.map((entry) => [entry.sku, entry])),
+  'en-US',
+);
+if (bundlePrice !== '$180.00') {
+  throw new Error(\`defaultFormatBundlePrice returned \${bundlePrice}\`);
 }
 
 // Proves the package's entry point and types resolve for a real consumer under
