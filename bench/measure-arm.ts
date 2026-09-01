@@ -82,3 +82,36 @@ export function summarise(
     violations,
   };
 }
+
+export interface SourceRule {
+  /** 'all' means every view must be a fallback, 'none' means no view may be. */
+  fallback: 'none' | 'all';
+  minCacheHitRate?: number;
+  maxCacheHitRate?: number;
+}
+
+// A run whose sources do not match its arm is a different arm under the wrong
+// name. Throwing is the only way a benchmark can refuse to publish that.
+export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
+  const { fallback } = result.sources;
+  if (rule.fallback === 'none' && fallback > 0) {
+    throw new Error(
+      `arm ${result.arm}: ${fallback} of ${result.views} views used fallback, so this is not the arm it says it is`,
+    );
+  }
+  if (rule.fallback === 'all' && fallback !== result.views) {
+    throw new Error(
+      `arm ${result.arm}: ${result.views - fallback} of ${result.views} views did not use fallback, but this arm uses fallback only`,
+    );
+  }
+  if (rule.minCacheHitRate !== undefined && result.cacheHitRate < rule.minCacheHitRate) {
+    throw new Error(
+      `arm ${result.arm}: cache hit rate ${result.cacheHitRate.toFixed(3)} is below ${rule.minCacheHitRate}`,
+    );
+  }
+  if (rule.maxCacheHitRate !== undefined && result.cacheHitRate > rule.maxCacheHitRate) {
+    throw new Error(
+      `arm ${result.arm}: cache hit rate ${result.cacheHitRate.toFixed(3)} is above ${rule.maxCacheHitRate}`,
+    );
+  }
+}

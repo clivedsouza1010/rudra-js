@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { GenerationEvent } from '@rudra-js/core';
-import { summarise, type TokenPrices } from './measure-arm.js';
+import {
+  assertSourceMix,
+  summarise,
+  type ArmResult,
+  type SourceRule,
+  type TokenPrices,
+} from './measure-arm.js';
 
 const PRICES: TokenPrices = { inputPerMillion: 15, outputPerMillion: 75 };
 
@@ -86,5 +92,65 @@ describe('summarising a run', () => {
     expect(result.modelCalls).toBe(0);
     expect(result.costPerThousandViews).toBe(0);
     expect(result.cacheHitRate).toBe(0);
+  });
+});
+
+const resultWith = (sources: ArmResult['sources']): ArmResult => {
+  const views = sources.llm + sources.cache + sources.fallback;
+  return {
+    arm: 'test',
+    views,
+    sources,
+    cacheHitRate: views === 0 ? 0 : sources.cache / views,
+    modelCalls: sources.llm,
+    modelCallsPerThousand: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    costPerThousandViews: 0,
+    elapsedMs: { median: 0, p95: 0, p99: 0 },
+    violations: {},
+  };
+};
+
+describe('refusing a mislabelled arm', () => {
+  const cohort: SourceRule = { fallback: 'none', minCacheHitRate: 0.5 };
+
+  it('accepts a cohort run that used the model and the cache', () => {
+    expect(() =>
+      assertSourceMix(resultWith({ llm: 10, cache: 90, fallback: 0 }), cohort),
+    ).not.toThrow();
+  });
+
+  it('refuses a cohort run that was really the deterministic arm', () => {
+    // The whole point: this is arm (b) wearing arm (c)'s label.
+    expect(() => assertSourceMix(resultWith({ llm: 0, cache: 0, fallback: 100 }), cohort)).toThrow(
+      /fallback/,
+    );
+  });
+
+  it('refuses a cohort run whose cache barely worked', () => {
+    expect(() => assertSourceMix(resultWith({ llm: 90, cache: 10, fallback: 0 }), cohort)).toThrow(
+      /cache/,
+    );
+  });
+
+  it('refuses a per-shopper run that was really the cohort arm', () => {
+    const perShopper: SourceRule = { fallback: 'none', maxCacheHitRate: 0.1 };
+
+    expect(() =>
+      assertSourceMix(resultWith({ llm: 10, cache: 90, fallback: 0 }), perShopper),
+    ).toThrow(/cache/);
+  });
+
+  it('accepts a deterministic run with nothing but fallbacks', () => {
+    expect(() =>
+      assertSourceMix(resultWith({ llm: 0, cache: 0, fallback: 100 }), { fallback: 'all' }),
+    ).not.toThrow();
+  });
+
+  it('refuses a deterministic run that reached a model', () => {
+    expect(() =>
+      assertSourceMix(resultWith({ llm: 1, cache: 0, fallback: 99 }), { fallback: 'all' }),
+    ).toThrow(/fallback/);
   });
 });
