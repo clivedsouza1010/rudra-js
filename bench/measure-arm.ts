@@ -96,12 +96,12 @@ export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
   const { fallback } = result.sources;
   if (rule.fallback === 'none' && fallback > 0) {
     throw new Error(
-      `arm ${result.arm}: ${fallback} of ${result.views} views used fallback, so this is not the arm it says it is`,
+      `arm ${result.arm}: ${fallback} of ${result.views} views fell back, so this is not the arm it says it is`,
     );
   }
   if (rule.fallback === 'all' && fallback !== result.views) {
     throw new Error(
-      `arm ${result.arm}: ${result.views - fallback} of ${result.views} views did not use fallback, but this arm uses fallback only`,
+      `arm ${result.arm}: ${result.views - fallback} of ${result.views} views reached a model, but this arm runs without one`,
     );
   }
   if (rule.minCacheHitRate !== undefined && result.cacheHitRate < rule.minCacheHitRate) {

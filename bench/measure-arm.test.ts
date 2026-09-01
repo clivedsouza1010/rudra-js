@@ -124,7 +124,7 @@ describe('refusing a mislabelled arm', () => {
   it('refuses a cohort run that was really the deterministic arm', () => {
     // The whole point: this is arm (b) wearing arm (c)'s label.
     expect(() => assertSourceMix(resultWith({ llm: 0, cache: 0, fallback: 100 }), cohort)).toThrow(
-      /fallback/,
+      /fell back/,
     );
   });
 
@@ -151,6 +151,6 @@ describe('refusing a mislabelled arm', () => {
   it('refuses a deterministic run that reached a model', () => {
     expect(() =>
       assertSourceMix(resultWith({ llm: 1, cache: 0, fallback: 99 }), { fallback: 'all' }),
-    ).toThrow(/fallback/);
+    ).toThrow(/reached a model/);
   });
 });
