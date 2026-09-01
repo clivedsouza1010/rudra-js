@@ -11,6 +11,7 @@ export default defineConfig({
       // never run.
       'tests/**/*.test.ts',
       'tests/**/*.test.tsx',
+      'bench/**/*.test.ts',
       'examples/*/src/**/*.test.ts',
       'examples/*/src/**/*.test.tsx',
     ],
