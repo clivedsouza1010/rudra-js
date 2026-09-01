@@ -40,6 +40,8 @@ export const FIELD_LIMITS = {
   metaEntries: 50,
   signalsPerCategory: 500,
   candidates: 200,
+  productsPerBundle: 5,
+  bundles: 20,
 } as const;
 
 /** Assigning this as an object key mutates the prototype instead of the object. */
@@ -197,38 +199,81 @@ export const trackingSignalsSchema = z.strictObject({
 });
 export type TrackingSignals = z.infer<typeof trackingSignalsSchema>;
 
-export const trackingInputSchema = z.strictObject({
-  schemaVersion: z.literal('1').default('1'),
-  user: z.strictObject({
-    id: identifier(),
-    segment: optionalIdentifier(),
-    isReturning: z.boolean().optional(),
-  }),
-  context: renderContextSchema,
-  // A payload with no `signals` block at all is the cold-start case, not an
-  // error. Every category defaults to empty, so a first-time visitor needs no
-  // special handling from the host.
-  signals: trackingSignalsSchema.prefault({}),
-  /**
-   * The only products the generated component may place. Merchandising rules
-   * belong here: whatever the host leaves out cannot be recommended, which is
-   * what makes it impossible to surface a product that does not exist or is not
-   * merchandised for this shopper.
-   *
-   * SKUs must be unique — a duplicate is a host bug that spends prompt budget
-   * twice and invites the same product in two slots.
-   */
-  candidates: z
-    .array(productSchema)
-    .min(1)
-    .max(FIELD_LIMITS.candidates)
-    .refine(
-      (products) => new Set(products.map((product) => product.sku)).size === products.length,
-      {
-        message: 'candidates must have unique SKUs',
-      },
-    ),
+/** A set the shop sells together. The model never picks or invents one. */
+export const bundleSchema = z.strictObject({
+  id: identifier(),
+  skus: z
+    .array(identifier())
+    .min(2)
+    .max(FIELD_LIMITS.productsPerBundle)
+    .refine((skus) => new Set(skus).size === skus.length, {
+      message: 'a bundle must not list the same product twice',
+    }),
+  // The shop's price for the set — not derived from the parts, so the set says
+  // which money it is in rather than borrowing it from a member.
+  price: z.number().nonnegative(),
+  currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/, 'expected a three-letter ISO 4217 code')
+    .default('USD'),
+  label: z.string().min(1).max(FIELD_LIMITS.shortText).optional(),
 });
+export type Bundle = z.infer<typeof bundleSchema>;
+
+export const trackingInputSchema = z
+  .strictObject({
+    schemaVersion: z.literal('1').default('1'),
+    user: z.strictObject({
+      id: identifier(),
+      segment: optionalIdentifier(),
+      isReturning: z.boolean().optional(),
+    }),
+    context: renderContextSchema,
+    // A payload with no `signals` block at all is the cold-start case, not an
+    // error. Every category defaults to empty, so a first-time visitor needs no
+    // special handling from the host.
+    signals: trackingSignalsSchema.prefault({}),
+    /**
+     * The only products the generated component may place. Merchandising rules
+     * belong here: whatever the host leaves out cannot be recommended, which is
+     * what makes it impossible to surface a product that does not exist or is not
+     * merchandised for this shopper.
+     *
+     * SKUs must be unique — a duplicate is a host bug that spends prompt budget
+     * twice and invites the same product in two slots.
+     */
+    candidates: z
+      .array(productSchema)
+      .min(1)
+      .max(FIELD_LIMITS.candidates)
+      .refine(
+        (products) => new Set(products.map((product) => product.sku)).size === products.length,
+        {
+          message: 'candidates must have unique SKUs',
+        },
+      ),
+    // Ids must be unique — the renderer looks a bundle up by id alone, so a
+    // duplicate would let it draw the wrong set at the wrong price.
+    bundles: z
+      .array(bundleSchema)
+      .max(FIELD_LIMITS.bundles)
+      .refine((bundles) => new Set(bundles.map((bundle) => bundle.id)).size === bundles.length, {
+        message: 'bundles must have unique ids',
+      })
+      .default([]),
+  })
+  .refine(
+    (input) => {
+      const candidateSkus = new Set(input.candidates.map((product) => product.sku));
+      for (const bundle of input.bundles) {
+        for (const sku of bundle.skus) {
+          if (!candidateSkus.has(sku)) return false;
+        }
+      }
+      return true;
+    },
+    { message: 'every product in a bundle must also be a candidate' },
+  );
 
 export type TrackingInput = z.infer<typeof trackingInputSchema>;
 

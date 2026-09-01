@@ -57,18 +57,21 @@ The package ships no CSS, on purpose — a stylesheet would fight whatever your
 site already has. Every element it emits carries a class, and this is all of
 them:
 
-| Where          | Classes                                                                                                                                                                    |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The wrapper    | `.rudra`, `.rudra__header`, `.rudra__headline`, `.rudra__subheadline`, `.rudra__rationale`                                                                                 |
-| A hero         | `.rudra-hero`, `.rudra-hero__headline`, `.rudra-hero__body`, `.rudra-hero__link`, `.rudra-hero__price`, `.rudra-hero__cta`                                                 |
-| A grid         | `.rudra-grid`, `.rudra-grid__title`, `.rudra-grid__items`                                                                                                                  |
-| A carousel     | `.rudra-carousel`, `.rudra-carousel__title`, `.rudra-carousel__track`                                                                                                      |
-| A banner       | `.rudra-banner`, `.rudra-banner__text`, `.rudra-banner__cta`                                                                                                               |
-| A copy block   | `.rudra-copy`, `.rudra-copy__title`, `.rudra-copy__body`                                                                                                                   |
-| A product card | `.rudra-card`, `.rudra-card--featured`, `.rudra-card__image`, `.rudra-card__body`, `.rudra-card__title`, `.rudra-card__price`, `.rudra-card__reason`, `.rudra-card__badge` |
+| Where          | Classes                                                                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The wrapper    | `.rudra`, `.rudra__header`, `.rudra__headline`, `.rudra__subheadline`, `.rudra__rationale`                                                                                          |
+| A hero         | `.rudra-hero`, `.rudra-hero__headline`, `.rudra-hero__body`, `.rudra-hero__link`, `.rudra-hero__price`, `.rudra-hero__cta`                                                          |
+| A grid         | `.rudra-grid`, `.rudra-grid__title`, `.rudra-grid__items`                                                                                                                           |
+| A carousel     | `.rudra-carousel`, `.rudra-carousel__title`, `.rudra-carousel__track`                                                                                                               |
+| A banner       | `.rudra-banner`, `.rudra-banner__text`, `.rudra-banner__cta`                                                                                                                        |
+| A copy block   | `.rudra-copy`, `.rudra-copy__title`, `.rudra-copy__body`                                                                                                                            |
+| A bundle       | `.rudra-bundle`, `.rudra-bundle__label`, `.rudra-bundle__title`, `.rudra-bundle__body`, `.rudra-bundle__items`, `.rudra-bundle__item`, `.rudra-bundle__price`, `.rudra-bundle__cta` |
+| A product card | `.rudra-card`, `.rudra-card--featured`, `.rudra-card__image`, `.rudra-card__body`, `.rudra-card__title`, `.rudra-card__price`, `.rudra-card__reason`, `.rudra-card__badge`          |
 
-`.rudra__rationale` only appears under `hasDiagnostics`. `className` is added
-alongside `rudra` rather than replacing it, so the child classes keep working.
+`.rudra__rationale` only appears under `hasDiagnostics`. `.rudra-bundle__label`
+is your own name for the set, and appears only for a bundle you gave a `label`.
+`className` is added alongside `rudra` rather than replacing it, so the child
+classes keep working.
 
 `.rudra-carousel__track` is expected to scroll horizontally — give it `overflow-x: auto`, since nothing here uses JavaScript to scroll it. `.rudra-card--featured` is applied alongside `.rudra-card`, so write it as `.rudra-card--featured { ... }` after the base
 rule rather than instead of it.
@@ -77,15 +80,15 @@ rule rather than instead of it.
 
 The same markup carries what the model decided, for styling and for analytics.
 
-| Attribute                | On                | Value                                                      |
-| ------------------------ | ----------------- | ---------------------------------------------------------- |
-| `data-rudra-slot`        | the wrapper       | The slot the spec was generated for                        |
-| `data-rudra-source`      | the wrapper       | `llm`, `cache` or `fallback`                               |
-| `data-rudra-tone`        | the wrapper       | The tone the model chose for the component                 |
-| `data-rudra-banner-tone` | a banner          | A banner's own tone, a different vocabulary from the above |
-| `data-rudra-columns`     | a grid            | The column count the model chose                           |
-| `data-rudra-sku`         | a card, hero link | The product, for click attribution                         |
-| `data-rudra-basis`       | a card            | Why the product was picked — `most_viewed`, `popular`, …   |
+| Attribute                | On                             | Value                                                      |
+| ------------------------ | ------------------------------ | ---------------------------------------------------------- |
+| `data-rudra-slot`        | the wrapper                    | The slot the spec was generated for                        |
+| `data-rudra-source`      | the wrapper                    | `llm`, `cache` or `fallback`                               |
+| `data-rudra-tone`        | the wrapper                    | The tone the model chose for the component                 |
+| `data-rudra-banner-tone` | a banner                       | A banner's own tone, a different vocabulary from the above |
+| `data-rudra-columns`     | a grid                         | The column count the model chose                           |
+| `data-rudra-sku`         | a card, hero link, bundle item | The product, for click attribution                         |
+| `data-rudra-basis`       | a card                         | Why the product was picked — `most_viewed`, `popular`, …   |
 
 `data-rudra-source` is public on purpose: hit rate and fallback share can be
 read straight off a rendered page. Everything more specific appears only under
@@ -116,16 +119,18 @@ const registry = extendRegistry({
 
 ## Props
 
-| Prop             | Notes                                                                                                                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `spec`           | Required. From `@rudra-js/core`.                                                                                                                                           |
-| `products`       | Required. A list of products, or anything keyed by SKU. See below, and the warning above.                                                                                  |
-| `registry`       | Replace some or all block renderers.                                                                                                                                       |
-| `hrefForSku`     | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                 |
-| `formatPrice`    | Defaults to `Intl.NumberFormat`, which knows each currency's own number of decimal places.                                                                                 |
-| `locale`         | Punctuates prices. Defaults to the **server's** locale, which is rarely the shopper's — pass it if you serve more than one.                                                |
-| `hasDiagnostics` | Adds the provider, the model name, the latency and the model's own reasoning to the markup. Off by default: it tells a visitor which model you use and when it is failing. |
-| `className`      | Added alongside `rudra`.                                                                                                                                                   |
+| Prop                | Notes                                                                                                                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spec`              | Required. From `@rudra-js/core`.                                                                                                                                                              |
+| `products`          | Required. A list of products, or anything keyed by SKU. See below, and the warning above.                                                                                                     |
+| `bundles`           | The sets your shop sells together. Only needed if a spec can carry a bundle block.                                                                                                            |
+| `registry`          | Replace some or all block renderers.                                                                                                                                                          |
+| `hrefForSku`        | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                                    |
+| `formatPrice`       | Defaults to `Intl.NumberFormat`, which knows each currency's own number of decimal places. It formats products, not bundles.                                                                  |
+| `formatBundlePrice` | The same for a bundle's own price, in the currency the shop put on the set. The set's price and its currency come from the same object, so members priced in another currency change nothing. |
+| `locale`            | Punctuates prices. Defaults to the **server's** locale, which is rarely the shopper's — pass it if you serve more than one.                                                                   |
+| `hasDiagnostics`    | Adds the provider, the model name, the latency and the model's own reasoning to the markup. Off by default: it tells a visitor which model you use and when it is failing.                    |
+| `className`         | Added alongside `rudra`.                                                                                                                                                                      |
 
 ### What `products` may be
 
@@ -145,6 +150,26 @@ The component renders nothing at all when there is nothing to show — a spec wi
 no blocks, or one whose every product has left your catalog since it was
 generated. An empty recommendation area, or a headline over an empty box, takes
 up space and tells the shopper the page is broken.
+
+### What `bundles` is
+
+The sets your shop sells together, the same way `products` is your catalog. The
+model only asks for a bundle block; it never invents one, and it never sees a
+price.
+
+You offer the sets, and the framework picks which one fills each block. It
+picks when the page is served — after the spec was generated, not before —
+inside `reconcileSpec`, from what this shopper has in their basket, has looked
+at, or is browsing now. The spec then carries the id it picked, and this prop
+supplies that set's members, its price, the currency that price is in and your
+name for it so the component can draw it.
+
+**Validate `bundles` with `bundleSchema` from `@rudra-js/core`, and pass the
+same list you sent to `parseTrackingInput`.** Core checked that list — every
+member in stock, none of them disliked, no repeats, and the whole set inside
+the item budget — and then hands the renderer nothing but the id it chose. A
+stale or different list here draws a set none of those checks ever saw, under
+an id that was proved against another one.
 
 ## Licence
 

@@ -164,6 +164,31 @@ const capCases: Array<[string, keyof typeof FIELD_LIMITS, (size: number) => Trac
         candidates: sized(size, (index) => ({ ...aProduct, sku: `SKU-${index}` })),
       }),
   ],
+  [
+    'the products in one bundle',
+    'productsPerBundle',
+    (size) =>
+      minimalPayload({
+        candidates: sized(size, (index) => ({ ...aProduct, sku: `SKU-${index}` })),
+        bundles: [{ id: 'BUN-1', skus: sized(size, (index) => `SKU-${index}`), price: 10 }],
+      }),
+  ],
+  [
+    'the bundle set',
+    'bundles',
+    (size) =>
+      minimalPayload({
+        candidates: [
+          { ...aProduct, sku: 'SKU-0' },
+          { ...aProduct, sku: 'SKU-1' },
+        ],
+        bundles: sized(size, (index) => ({
+          id: `BUN-${index}`,
+          skus: ['SKU-0', 'SKU-1'],
+          price: 10,
+        })),
+      }),
+  ],
 ];
 
 it('exercises every entry in FIELD_LIMITS, so a new cap cannot ship untested', () => {
@@ -299,5 +324,98 @@ describe('host-supplied values that are not merely bounded', () => {
     );
 
     expect(result.success).toBe(false);
+  });
+});
+
+const withBundles = (bundles: unknown) => ({
+  user: { id: 'S-1' },
+  context: { surface: 'pdp' },
+  candidates: [
+    { sku: 'A', title: 'A', category: 'Tents', price: 10 },
+    { sku: 'B', title: 'B', category: 'Tents', price: 20 },
+  ],
+  bundles,
+});
+
+describe('bundles', () => {
+  it('accepts a set the shop sells together', () => {
+    const parsed = parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }]));
+
+    expect(parsed.bundles).toEqual([{ id: 'BUN-1', skus: ['A', 'B'], price: 25, currency: 'USD' }]);
+  });
+
+  it('carries the shop own currency for the set', () => {
+    // The set is priced by the shop, so it says which money that price is in.
+    const parsed = parseTrackingInput(
+      withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: 25, currency: 'EUR' }]),
+    );
+
+    expect(parsed.bundles[0]?.currency).toBe('EUR');
+  });
+
+  it('defaults a set to dollars, the same as a product', () => {
+    const parsed = parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }]));
+
+    expect(parsed.bundles[0]?.currency).toBe('USD');
+  });
+
+  it.each([
+    ['an ISO 4217 code', 'EUR', true],
+    ['a lowercase code', 'usd', false],
+    ['a currency name', 'DOLLARS', false],
+  ])('bundle currency: %s', (_label, currency, accepted) => {
+    const result = safeParseTrackingInput(
+      withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: 25, currency }]),
+    );
+
+    expect(result.success).toBe(accepted);
+  });
+
+  it('defaults to none, so a host that has no bundles sends nothing', () => {
+    const parsed = parseTrackingInput({
+      user: { id: 'S-1' },
+      context: { surface: 'pdp' },
+      candidates: [{ sku: 'A', title: 'A', category: 'Tents', price: 10 }],
+    });
+
+    expect(parsed.bundles).toEqual([]);
+  });
+
+  it('refuses a bundle naming a product that is not a candidate', () => {
+    // The renderer resolves bundle members from the candidates list.
+    expect(() =>
+      parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'GHOST'], price: 25 }])),
+    ).toThrow();
+  });
+
+  it('refuses a bundle of one', () => {
+    expect(() =>
+      parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A'], price: 25 }])),
+    ).toThrow();
+  });
+
+  it('refuses a negative price', () => {
+    expect(() =>
+      parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: -1 }])),
+    ).toThrow();
+  });
+
+  it('refuses two sets with the same id', () => {
+    // A duplicate id would let the renderer draw the wrong set at the wrong price.
+    expect(() =>
+      parseTrackingInput(
+        withBundles([
+          { id: 'BUN-1', skus: ['A', 'B'], price: 25 },
+          { id: 'BUN-1', skus: ['B', 'A'], price: 99 },
+        ]),
+      ),
+    ).toThrow();
+  });
+
+  it('refuses a set that lists the same product twice', () => {
+    // It renders the product twice and spends two slots for one thing.
+    expect(() =>
+      parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'A'], price: 25 }])),
+    ).toThrow();
   });
 });

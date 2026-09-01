@@ -1,4 +1,4 @@
-import type { Product } from '@rudra-js/core';
+import type { Bundle, Product } from '@rudra-js/core';
 
 /**
  * Everything a block renderer needs that does not come from the specification.
@@ -6,7 +6,8 @@ import type { Product } from '@rudra-js/core';
  * Note what is absent from the spec and present here: a price, a title, an
  * image, a link. Those are resolved from the host's own catalog, keyed by a SKU
  * that `selectProducts` drew from that same catalog and `reconcileSpec` proved
- * the model did not invent — both in stock at the time. That division
+ * the model did not invent — both in stock at the time. A bundle member's SKU
+ * comes from the set the shop supplied, not from the model. That division
  * is the whole reason a generated component is safe to put in a page — the
  * model decides what to show and how to describe it, and the shop decides what
  * is true about a product.
@@ -14,9 +15,12 @@ import type { Product } from '@rudra-js/core';
 export interface BlockRenderContext {
   /** The host's catalog, keyed by SKU. Read-only: it is the caller's own map. */
   readonly products: ReadonlyMap<string, Product>;
+  /** Sets the shop sells together, keyed by id. */
+  readonly bundles: ReadonlyMap<string, Bundle>;
   /** Host-owned link construction. */
   readonly hrefForSku: (sku: string) => string;
   readonly formatPrice: (product: Product) => string;
+  readonly formatBundlePrice: (bundle: Bundle) => string;
 }
 
 export function defaultHrefForSku(sku: string): string {
@@ -66,4 +70,23 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
   }
 
   return formatter.format(product.price);
+}
+
+/**
+ * Formats a bundle's price, in the currency the shop put on the bundle.
+ *
+ * The price and the currency come from the same object, so a set whose members
+ * are priced in another currency still shows the shop's own price correctly.
+ */
+export function defaultFormatBundlePrice(bundle: Bundle, locale?: string): string {
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: bundle.currency,
+    }).format(bundle.price);
+  } catch {
+    // A bad locale, or a currency code Intl rejects on a hand-built bundle,
+    // should not crash the page. A price nobody can punctuate is still a price.
+    return `${bundle.currency} ${bundle.price}`;
+  }
 }

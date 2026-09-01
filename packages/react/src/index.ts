@@ -19,12 +19,13 @@ export {
 } from './registry.js';
 
 export {
+  defaultFormatBundlePrice,
   defaultFormatPrice,
   defaultHrefForSku,
   type BlockRenderContext,
 } from './render-context.js';
 
-// The five default renderers reach hosts through `defaultRegistry`, which is
+// The six default renderers reach hosts through `defaultRegistry`, which is
 // also the thing they need in order to override one. `ProductCard` is exported
 // on its own because a custom grid renderer still wants the standard card.
 export { ProductCard } from './blocks/product-card.js';

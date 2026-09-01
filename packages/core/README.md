@@ -56,6 +56,36 @@ request. Every category defaults to `[]`, so the host needs no special case.
 be recommended, which is what makes it impossible to surface a product that
 does not exist or is not merchandised for this shopper. SKUs must be unique.
 
+`bundles` is optional: the sets the shop sells together, each with the shop's
+own price for the set, the currency that price is in, and, if you want one,
+your own name for it. Every product in a set must also be a candidate — that is
+what lets the same checks that pass a single product pass a whole set, and what
+lets the renderer look the members up in the catalog it already has. Ids must be
+unique, and one set must not name the same product twice.
+
+The model never picks a set and is never told a price. It only asks for a
+bundle block and writes the words around it; the framework picks which set when
+the page is served, from what the shopper has in their basket, has looked at,
+or is browsing now.
+
+Every word the model writes is read for claims: the headline, the subheadline,
+a hero, a banner, a block title, the copy block, the reason under a product,
+and the words around the set. Text you supplied is never read this way — a
+product title, a category and a bundle `label` are your words, not the model's.
+
+The framework drops text that makes a claim it cannot check. It looks for
+money, a customer score, a delivery date and a count of what is left, and it
+leaves a specification alone even when the specification has a number in it.
+Spotting one is not a guarantee, the way checking a price against your catalog
+is. A field that cannot be empty — a headline, a banner's text — is emptied
+instead of nulled, so the block drops the way any block with no text drops, and
+an emptied page headline makes the whole generation unusable.
+
+For the set the prompt also tells the model to write about the offer, not the
+products in it, and never to say the set saves money or by how much. Pass a
+`label` on the bundle to put your own words on the set: a label is text you
+wrote, not text the model wrote, and it renders ahead of the model's words.
+
 ### Defaults
 
 | Field                      | Default             |
@@ -68,6 +98,8 @@ does not exist or is not merchandised for this shopper. SKUs must be unique.
 | `candidates[].isInStock`   | `true`              |
 | `candidates[].tags`        | `[]`                |
 | `signals.*`                | `[]`                |
+| `bundles`                  | `[]`                |
+| `bundles[].currency`       | `'USD'`             |
 | `mostViewed[].views`       | `1`                 |
 | `lastPurchased[].quantity` | `1`                 |
 
@@ -110,6 +142,8 @@ numbers rather than discovering them from a rejection.
 | `metaEntries`        | 50    | `interaction.meta`                                                  |
 | `signalsPerCategory` | 500   | each array under `signals`                                          |
 | `candidates`         | 200   | `candidates`                                                        |
+| `productsPerBundle`  | 5     | `bundles[].skus`, which also needs at least 2                       |
+| `bundles`            | 20    | `bundles`                                                           |
 
 These bound each field individually; they are not an aggregate prompt budget.
 Fitting a payload into a context window is `digest`'s job, and it trims rather

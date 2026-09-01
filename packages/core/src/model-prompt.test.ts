@@ -113,6 +113,26 @@ describe('the vocabulary the model is shown', () => {
     expect(SYSTEM_PROMPT).toContain('popular');
     expect(asOneLine(SYSTEM_PROMPT)).toContain('checked against the shopper');
   });
+
+  it('tells the model a bundle exists and that it does not choose one', () => {
+    expect(SYSTEM_PROMPT).toContain('"bundle"');
+    expect(SYSTEM_PROMPT).toMatch(/bundleId/);
+  });
+
+  it('tells the model to write about the offer, not the set it never sees', () => {
+    // The shop picks the set after the words are written.
+    expect(asOneLine(SYSTEM_PROMPT)).toContain('Write about the offer, not about the products');
+  });
+
+  it('forbids claiming a saving, which the model is never told', () => {
+    // No price reaches the prompt, so any figure would be invented.
+    expect(asOneLine(SYSTEM_PROMPT)).toContain('Never say a set saves money');
+  });
+
+  it('tells the model a set spends a product slot for each thing in it', () => {
+    // Otherwise the model undercounts and drops a bundle after a full grid.
+    expect(asOneLine(SYSTEM_PROMPT)).toContain('spends one of your product slots');
+  });
 });
 
 /**

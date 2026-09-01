@@ -2,10 +2,12 @@ import { join } from 'node:path';
 import {
   createComponentGenerator,
   createMemorySpecCache,
+  type Bundle,
   type ComponentProvider,
   type Product,
 } from '@rudra-js/core';
 import { createAnthropicProvider } from '@rudra-js/anthropic';
+import { generateBundles } from './fixtures/bundles';
 import { generateCatalog } from './fixtures/catalog';
 import { generateShoppers, type Shopper } from './fixtures/shoppers';
 import { createRecordingProvider, createReplayProvider } from './provider/recording-provider';
@@ -38,6 +40,7 @@ const MODEL_TIMEOUT_MS = 60_000;
  * measurement the later slices take.
  */
 const catalog = generateCatalog(CATALOG_SEED);
+const bundles = generateBundles(catalog);
 const shoppers = generateShoppers(SHOPPER_SEED, catalog);
 const byId = new Map(shoppers.map((shopper) => [shopper.id, shopper]));
 
@@ -110,6 +113,9 @@ const generator = createComponentGenerator({
 
 export function getShopContext(): {
   catalog: readonly Product[];
+  // Every set the shop sells together. buildTrackingInput narrows this down
+  // to what a given page's candidates can support.
+  bundles: readonly Bundle[];
   /**
    * The whole population, so a caller can choose a shopper by what they have
    * done rather than by id — which is the difference between a test that
@@ -121,6 +127,7 @@ export function getShopContext(): {
 } {
   return {
     catalog,
+    bundles,
     shoppers,
     // An unknown shopper is a first-time visitor, which is a real state the
     // framework handles — not an error worth failing a page over.

@@ -1,5 +1,6 @@
-import type { Block, ComponentSpec, Product } from '@rudra-js/core';
+import type { Block, Bundle, ComponentSpec, Product } from '@rudra-js/core';
 import {
+  defaultFormatBundlePrice,
   defaultFormatPrice,
   defaultHrefForSku,
   type BlockRenderContext,
@@ -27,13 +28,17 @@ export interface RudraComponentProps {
    * finite number throws rather than rendering as free.
    */
   products: ProductCatalog;
+  /** Sets the shop sells together. Only needed if a spec can carry a bundle block. */
+  bundles?: readonly Bundle[];
   registry?: BlockRegistry;
   hrefForSku?: (sku: string) => string;
   formatPrice?: (product: Product) => string;
+  /** Same as `formatPrice`, but for a bundle — the shop's price, not a sum of the parts. */
+  formatBundlePrice?: (bundle: Bundle) => string;
   /**
    * The shopper's locale, used to punctuate prices. Defaults to the server's,
    * which is almost never the shopper's — pass it if the shop serves more than
-   * one. Ignored when `formatPrice` is supplied.
+   * one. Ignored when `formatPrice` and `formatBundlePrice` are supplied.
    */
   locale?: string;
   /**
@@ -87,11 +92,17 @@ function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
 /**
  * Whether a block still has anything to say once the catalog is applied.
  *
- * Only the two product blocks can come up empty: reconciliation ran against the
- * catalog as it was when the spec was generated, and a SKU can sell out between
- * then and this render. The rest carry their own words.
+ * Three block kinds can come up empty: reconciliation ran against the catalog
+ * as it was when the spec was generated, and a SKU can sell out between then
+ * and this render. Grid and carousel lose just the products that did; a
+ * bundle loses itself entirely if any one of its members did. The rest carry
+ * their own words.
  */
-function hasContent(block: Block, products: ReadonlyMap<string, Product>): boolean {
+function hasContent(
+  block: Block,
+  products: ReadonlyMap<string, Product>,
+  bundles: ReadonlyMap<string, Bundle>,
+): boolean {
   switch (block.kind) {
     case 'grid':
     case 'carousel':
@@ -100,6 +111,11 @@ function hasContent(block: Block, products: ReadonlyMap<string, Product>): boole
     case 'banner':
     case 'copy':
       return true;
+    case 'bundle': {
+      if (block.bundleId === null) return false;
+      const bundle = bundles.get(block.bundleId);
+      return bundle !== undefined && bundle.skus.every((sku) => products.has(sku));
+    }
     default:
       // A kind this renderer predates renders nothing, so it counts as nothing.
       block satisfies never;
@@ -124,6 +140,8 @@ function renderBlock(
       return <registry.banner key={index} block={block} context={context} />;
     case 'copy':
       return <registry.copy key={index} block={block} context={context} />;
+    case 'bundle':
+      return <registry.bundle key={index} block={block} context={context} />;
     default:
       // A newer core carrying a block kind this renderer predates loses that
       // block rather than the page. In this repo the assertion below fails the
@@ -147,17 +165,24 @@ function renderBlock(
 export function RudraComponent({
   spec,
   products,
+  bundles,
   registry = defaultRegistry,
   hrefForSku = defaultHrefForSku,
   formatPrice,
+  formatBundlePrice,
   locale,
   hasDiagnostics = false,
   className,
 }: RudraComponentProps) {
+  const productMap = toProductMap(products);
+  const bundlesById = new Map((bundles ?? []).map((bundle) => [bundle.id, bundle]));
+
   const context: BlockRenderContext = {
-    products: toProductMap(products),
+    products: productMap,
+    bundles: bundlesById,
     hrefForSku,
     formatPrice: formatPrice ?? ((product) => defaultFormatPrice(product, locale)),
+    formatBundlePrice: formatBundlePrice ?? ((bundle) => defaultFormatBundlePrice(bundle, locale)),
   };
 
   // An empty recommendation area is worse than none: it takes up space and
@@ -165,7 +190,9 @@ export function RudraComponent({
   // a headline and an empty box, because every product in the spec has sold out
   // since it was generated — which is why this asks what is left rather than
   // how many blocks arrived.
-  const visible = spec.blocks.filter((block) => hasContent(block, context.products));
+  const visible = spec.blocks.filter((block) =>
+    hasContent(block, context.products, context.bundles),
+  );
   if (visible.length === 0) return null;
 
   // React omits a data-* attribute whose value is undefined, so degradedReason

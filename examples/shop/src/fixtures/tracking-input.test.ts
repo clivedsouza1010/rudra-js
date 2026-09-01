@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { parseTrackingInput } from '@rudra-js/core';
+import { parseTrackingInput, productSchema } from '@rudra-js/core';
 import { generateCatalog } from './catalog';
 import { generateShoppers } from './shoppers';
+import { generateBundles } from './bundles';
 import { buildTrackingInput } from './tracking-input';
 
 const catalog = generateCatalog(1, 200);
 const shoppers = generateShoppers(9, catalog, 50);
+const bundles = generateBundles(catalog);
 
 describe('the tracking payload the shop builds', () => {
   it('is accepted by the payload contract for every shopper', () => {
     for (const shopper of shoppers) {
       expect(() =>
-        parseTrackingInput(buildTrackingInput(shopper, 'RJ-00001', catalog)),
+        parseTrackingInput(buildTrackingInput(shopper, 'RJ-00001', catalog, bundles)),
       ).not.toThrow();
     }
   });
@@ -19,13 +21,13 @@ describe('the tracking payload the shop builds', () => {
   it('offers only in-stock candidates', () => {
     // Out-of-stock products are dropped by reconciliation anyway; sending them
     // spends prompt budget on products that cannot be placed.
-    const input = buildTrackingInput(shoppers[0]!, 'RJ-00001', catalog);
+    const input = buildTrackingInput(shoppers[0]!, 'RJ-00001', catalog, bundles);
 
     expect(input.candidates?.every((candidate) => candidate.isInStock === true)).toBe(true);
   });
 
   it('puts the product being viewed in the context, not in the signals', () => {
-    const input = buildTrackingInput(shoppers[0]!, 'RJ-00042', catalog);
+    const input = buildTrackingInput(shoppers[0]!, 'RJ-00042', catalog, bundles);
 
     expect(input.context.currentSku).toBe('RJ-00042');
   });
@@ -33,8 +35,8 @@ describe('the tracking payload the shop builds', () => {
   it('gives two different shoppers different payloads', () => {
     // Identical payloads would collapse to one cache key, and every later
     // measurement of hit rate would be measuring the fixture.
-    const first = buildTrackingInput(shoppers[0]!, 'RJ-00001', catalog);
-    const second = buildTrackingInput(shoppers[1]!, 'RJ-00001', catalog);
+    const first = buildTrackingInput(shoppers[0]!, 'RJ-00001', catalog, bundles);
+    const second = buildTrackingInput(shoppers[1]!, 'RJ-00001', catalog, bundles);
 
     expect(first).not.toEqual(second);
     // The two shoppers' other fields (segment, signals, ...) already differ by
@@ -53,9 +55,39 @@ describe('the tracking payload the shop builds', () => {
     );
     const catalogWithoutCategoryPeers = [viewed, ...otherCategoryProducts];
 
-    const input = buildTrackingInput(shoppers[0]!, viewed.sku, catalogWithoutCategoryPeers);
+    const input = buildTrackingInput(
+      shoppers[0]!,
+      viewed.sku,
+      catalogWithoutCategoryPeers,
+      bundles,
+    );
 
     expect(input.candidates.length).toBeGreaterThan(0);
     expect(input.candidates.some((candidate) => candidate.sku === viewed.sku)).toBe(false);
+  });
+
+  describe('the bundles it offers', () => {
+    // Small, hand-picked catalog, so we know exactly which SKUs are candidates.
+    const smallCatalog = [
+      productSchema.parse({ sku: 'current', title: 'Current', category: 'Cat', price: 15 }),
+      productSchema.parse({ sku: 'A', title: 'A', category: 'Cat', price: 10 }),
+      productSchema.parse({ sku: 'B', title: 'B', category: 'Cat', price: 20 }),
+    ];
+
+    it('keeps a bundle whose members are all candidates', () => {
+      const bundle = { id: 'BUN-1', skus: ['A', 'B'], price: 25, currency: 'USD' };
+
+      const input = buildTrackingInput(shoppers[0]!, 'current', smallCatalog, [bundle]);
+
+      expect(input.bundles).toEqual([bundle]);
+    });
+
+    it('drops a bundle that names a product outside the candidates', () => {
+      const bundle = { id: 'BUN-2', skus: ['A', 'not-a-candidate'], price: 5, currency: 'USD' };
+
+      const input = buildTrackingInput(shoppers[0]!, 'current', smallCatalog, [bundle]);
+
+      expect(input.bundles).toEqual([]);
+    });
   });
 });

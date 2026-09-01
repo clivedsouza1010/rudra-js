@@ -16,8 +16,8 @@ const SHOPPER = 'S-0001';
  * effect instead — once a transcript exists for this page, the page must be
  * served from it. Armed on this page's own transcript, not on any JSON.
  */
-const { catalog, findShopper } = getShopContext();
-const input = parseTrackingInput(buildTrackingInput(findShopper(SHOPPER), SKU, catalog));
+const { catalog, bundles, findShopper } = getShopContext();
+const input = parseTrackingInput(buildTrackingInput(findShopper(SHOPPER), SKU, catalog, bundles));
 const transcript = transcriptPath(
   RECORDINGS_DIRECTORY,
   MODEL_ID,

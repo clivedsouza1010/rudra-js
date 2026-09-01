@@ -225,6 +225,33 @@ describe('type surface', () => {
   });
 });
 
+describe('a bundle block', () => {
+  const bundleBlock = {
+    kind: 'bundle',
+    title: 'Get set up in one go',
+    body: 'A tent and the bag to carry it.',
+    ctaLabel: 'Add both',
+    bundleId: null,
+  };
+
+  it('is part of the vocabulary', () => {
+    expect(() => blockSchema.parse(bundleBlock)).not.toThrow();
+  });
+
+  it('names no product of its own', () => {
+    // A stray `skus` key is stripped, not rejected — same as every other block.
+    const parsed = blockSchema.parse({ ...bundleBlock, skus: ['A', 'B'] });
+
+    expect(parsed).not.toHaveProperty('skus');
+  });
+
+  it('accepts a bundleId, because reconciliation fills it in', () => {
+    expect(blockSchema.parse({ ...bundleBlock, bundleId: 'BUN-1' })).toMatchObject({
+      bundleId: 'BUN-1',
+    });
+  });
+});
+
 /**
  * `basis` exists so a claim about the shopper can be checked. Reconciliation
  * does the checking; this pins the shape it depends on.

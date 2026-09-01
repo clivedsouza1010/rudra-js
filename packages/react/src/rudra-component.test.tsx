@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { ComponentSpec, GeneratedSpec, Product } from '@rudra-js/core';
 import { RudraComponent } from './rudra-component.js';
+import { defaultFormatBundlePrice } from './render-context.js';
 import { extendRegistry, type BlockRegistry } from './registry.js';
 
 const product = (sku: string, overrides: Partial<Product> = {}): Product => ({
@@ -464,6 +465,25 @@ describe('formatting a price', () => {
   });
 });
 
+/** Exported, so this is called with bundles `RudraComponent` would never build. */
+describe('formatting a bundle price', () => {
+  const bundle = { id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300, currency: 'USD' };
+
+  it('prices the set in the currency the shop put on the set', () => {
+    // Intl puts a non-breaking space between the number and the symbol.
+    expect(defaultFormatBundlePrice({ ...bundle, currency: 'EUR' }, 'de-DE')).toBe('300,00 €');
+  });
+
+  it('prices a set in a currency that has no decimals', () => {
+    // Yen has none, so a forced two places would invent a fraction that does not exist.
+    expect(defaultFormatBundlePrice({ ...bundle, currency: 'JPY' }, 'en-US')).toBe('¥300');
+  });
+
+  it('still shows a price when the host passes a locale Intl rejects', () => {
+    expect(defaultFormatBundlePrice(bundle, 'not a locale')).toBe('USD 300');
+  });
+});
+
 describe('a few behaviours the code asserts', () => {
   it('marks a featured product differently from an ordinary one', () => {
     const featured = render(gridSpec([reference('TR-101', { emphasis: 'featured' })]));
@@ -542,6 +562,13 @@ describe('the styling contract', () => {
           { kind: 'carousel', title: 'Start here', items: [reference('TR-102')] },
           { kind: 'banner', tone: 'restock', text: 'Back in stock', ctaLabel: 'See more' },
           { kind: 'copy', title: 'Why these', body: 'Built for wet rock.' },
+          {
+            kind: 'bundle',
+            title: 'Get set up in one go',
+            body: 'Both together.',
+            ctaLabel: 'Add both',
+            bundleId: 'BUN-1',
+          },
         ],
         // Degraded as well as diagnostic: `data-rudra-degraded` is emitted
         // only in this state, so a healthy fixture never sees it and the
@@ -552,6 +579,9 @@ describe('the styling contract', () => {
         products: [
           product('TR-101', { imageUrl: 'https://cdn.example.com/a.png' }),
           product('TR-102'),
+        ],
+        bundles: [
+          { id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300, label: 'Trail starter set' },
         ],
         hasDiagnostics: true,
       },
@@ -664,5 +694,97 @@ describe('what a catalog may be', () => {
     // that looks fine. The shop should hear about it on the first request.
     expect(() => render(gridSpec(), { products: build() })).toThrow(TypeError);
     expect(() => render(gridSpec(), { products: build() })).toThrow(/`products` prop/);
+  });
+});
+
+describe('a bundle', () => {
+  const bundleSpec = () =>
+    spec([
+      {
+        kind: 'bundle',
+        title: 'Get set up in one go',
+        body: 'Both together.',
+        ctaLabel: 'Add both',
+        bundleId: 'BUN-1',
+      },
+    ]);
+
+  const BUNDLES = [{ id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300, currency: 'USD' }];
+
+  it('shows the price the shop set, not the sum of the parts', () => {
+    // TR-101 and TR-102 are 174 each. The saving is the whole point.
+    const markup = render(bundleSpec(), { bundles: BUNDLES });
+
+    expect(markup).toContain('$300.00');
+    expect(markup).not.toContain('$348.00');
+  });
+
+  it('shows every product in the set', () => {
+    const markup = render(bundleSpec(), { bundles: BUNDLES });
+
+    expect(markup).toContain('Product TR-101');
+    expect(markup).toContain('Product TR-102');
+  });
+
+  it('prices the set in the currency the shop gave the set, not a member currency', () => {
+    // A member may be priced in another currency. The set says what its own
+    // price is in, so nothing has to read that off a part.
+    const markup = render(bundleSpec(), {
+      bundles: BUNDLES,
+      products: [product('TR-101', { currency: 'EUR' }), product('TR-102', { currency: 'EUR' })],
+    });
+
+    expect(markup).toContain('$300.00');
+    expect(markup).not.toContain('€300.00');
+  });
+
+  it('renders nothing when the host passed no such bundle', () => {
+    expect(render(bundleSpec(), { bundles: [] })).toBe('');
+  });
+
+  it('keeps the words the model wrote', () => {
+    const markup = render(bundleSpec(), { bundles: BUNDLES });
+
+    expect(markup).toContain('Get set up in one go');
+    expect(markup).toContain('Add both');
+  });
+
+  it('names the set with the shop own label, ahead of the words the model wrote', () => {
+    // The shop's label identifies the set; the model's title is the pitch under it.
+    const markup = render(bundleSpec(), {
+      bundles: [{ ...BUNDLES[0]!, label: 'Trail starter set' }],
+    });
+
+    expect(markup).toContain(
+      '<section class="rudra-bundle">' +
+        '<h3 class="rudra-bundle__label">Trail starter set</h3>' +
+        '<p class="rudra-bundle__title">Get set up in one go</p>',
+    );
+  });
+
+  it('keeps the model words when the shop gave the set no name', () => {
+    const markup = render(bundleSpec(), { bundles: BUNDLES });
+
+    expect(markup).toContain('<p class="rudra-bundle__title">Get set up in one go</p>');
+    expect(markup).not.toContain('rudra-bundle__label');
+  });
+
+  it('lets the host format a bundle price itself', () => {
+    const markup = render(bundleSpec(), {
+      bundles: BUNDLES,
+      formatBundlePrice: () => 'TWO FOR 250',
+    });
+
+    expect(markup).toContain('TWO FOR 250');
+  });
+
+  it('renders nothing at all when a member of the set has left the catalog', () => {
+    // A set missing a part is not that set — same as an empty grid or carousel.
+    expect(
+      render(bundleSpec(), {
+        bundles: BUNDLES,
+        products: [product('TR-101')],
+      }),
+    ).toBe('');
   });
 });

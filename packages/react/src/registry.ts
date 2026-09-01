@@ -19,6 +19,7 @@ import {
   GridRenderer,
   HeroRenderer,
 } from './blocks/block-renderers.js';
+import { BundleRenderer } from './blocks/bundle-block.js';
 
 export type BlockRenderer<Kind extends BlockKind> = (props: {
   block: Extract<Block, { kind: Kind }>;
@@ -35,6 +36,7 @@ export const defaultRegistry: BlockRegistry = {
   carousel: CarouselRenderer,
   banner: BannerRenderer,
   copy: CopyRenderer,
+  bundle: BundleRenderer,
 };
 
 /**
@@ -52,5 +54,6 @@ export function extendRegistry(overrides: Partial<BlockRegistry>): BlockRegistry
     carousel: overrides.carousel ?? defaultRegistry.carousel,
     banner: overrides.banner ?? defaultRegistry.banner,
     copy: overrides.copy ?? defaultRegistry.copy,
+    bundle: overrides.bundle ?? defaultRegistry.bundle,
   };
 }
