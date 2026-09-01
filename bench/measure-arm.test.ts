@@ -130,7 +130,7 @@ describe('refusing a mislabelled arm', () => {
 
   it('refuses a cohort run whose cache barely worked', () => {
     expect(() => assertSourceMix(resultWith({ llm: 90, cache: 10, fallback: 0 }), cohort)).toThrow(
-      /cache/,
+      /below/,
     );
   });
 
@@ -139,7 +139,13 @@ describe('refusing a mislabelled arm', () => {
 
     expect(() =>
       assertSourceMix(resultWith({ llm: 10, cache: 90, fallback: 0 }), perShopper),
-    ).toThrow(/cache/);
+    ).toThrow(/above/);
+  });
+
+  it('refuses a run that measured nothing', () => {
+    expect(() =>
+      assertSourceMix(resultWith({ llm: 0, cache: 0, fallback: 0 }), { fallback: 'all' }),
+    ).toThrow(/no views/);
   });
 
   it('accepts a deterministic run with nothing but fallbacks', () => {

@@ -93,6 +93,10 @@ export interface SourceRule {
 // A run whose sources do not match its arm is a different arm under the wrong
 // name. Throwing is the only way a benchmark can refuse to publish that.
 export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
+  // A run that measured nothing cannot be evidence of anything.
+  if (result.views === 0) {
+    throw new Error(`arm ${result.arm}: no views were measured`);
+  }
   const { fallback } = result.sources;
   if (rule.fallback === 'none' && fallback > 0) {
     throw new Error(
