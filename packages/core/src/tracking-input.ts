@@ -209,8 +209,13 @@ export const bundleSchema = z.strictObject({
     .refine((skus) => new Set(skus).size === skus.length, {
       message: 'a bundle must not list the same product twice',
     }),
-  // The shop's price for the set — not derived from the parts.
+  // The shop's price for the set — not derived from the parts, so the set says
+  // which money it is in rather than borrowing it from a member.
   price: z.number().nonnegative(),
+  currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/, 'expected a three-letter ISO 4217 code')
+    .default('USD'),
   label: z.string().min(1).max(FIELD_LIMITS.shortText).optional(),
 });
 export type Bundle = z.infer<typeof bundleSchema>;

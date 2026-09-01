@@ -73,33 +73,20 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
 }
 
 /**
- * Formats a bundle's price. A bundle has no currency of its own, so this reads
- * it off the first member found in the catalog, and throws only if none of
- * the bundle's SKUs are in the catalog. Pass `formatBundlePrice` to total a
- * mixed-currency set yourself, or to choose which member sets the currency.
+ * Formats a bundle's price, in the currency the shop put on the bundle.
+ *
+ * The price and the currency come from the same object, so a set whose members
+ * are priced in another currency still shows the shop's own price correctly.
  */
-export function defaultFormatBundlePrice(
-  bundle: Bundle,
-  products: ReadonlyMap<string, Product>,
-  locale?: string,
-): string {
-  let currency: string | undefined;
-  for (const sku of bundle.skus) {
-    const product = products.get(sku);
-    if (product) {
-      currency = product.currency;
-      break;
-    }
-  }
-
-  if (currency === undefined) {
-    throw new TypeError(`bundle ${bundle.id} holds no products, so it has no price to show`);
-  }
-
+export function defaultFormatBundlePrice(bundle: Bundle, locale?: string): string {
   try {
-    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(bundle.price);
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: bundle.currency,
+    }).format(bundle.price);
   } catch {
-    // A bad locale should not crash the page.
-    return `${currency} ${bundle.price}`;
+    // A bad locale, or a currency code Intl rejects on a hand-built bundle,
+    // should not crash the page. A price nobody can punctuate is still a price.
+    return `${bundle.currency} ${bundle.price}`;
   }
 }

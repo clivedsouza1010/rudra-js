@@ -21,8 +21,6 @@ const product = (sku: string, overrides: Partial<Product> = {}): Product => ({
 
 const CATALOG = [product('TR-101'), product('TR-102')];
 
-const catalogOf = (...products: Product[]) => new Map(products.map((entry) => [entry.sku, entry]));
-
 const reference = (sku: string, overrides = {}) => ({
   sku,
   basis: 'popular' as const,
@@ -467,47 +465,22 @@ describe('formatting a price', () => {
   });
 });
 
-/** Exported, so this is called with catalogs `RudraComponent` would never build. */
+/** Exported, so this is called with bundles `RudraComponent` would never build. */
 describe('formatting a bundle price', () => {
-  const bundle = { id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300 };
+  const bundle = { id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300, currency: 'USD' };
 
-  it('prices the set in the currency its members are priced in', () => {
-    const catalog = catalogOf(
-      product('TR-101', { currency: 'EUR' }),
-      product('TR-102', { currency: 'EUR' }),
-    );
-
+  it('prices the set in the currency the shop put on the set', () => {
     // Intl puts a non-breaking space between the number and the symbol.
-    expect(defaultFormatBundlePrice(bundle, catalog, 'de-DE')).toBe('300,00 €');
+    expect(defaultFormatBundlePrice({ ...bundle, currency: 'EUR' }, 'de-DE')).toBe('300,00 €');
   });
 
-  it('reads the currency off the first member present, when members disagree', () => {
-    // Core allows members with different currencies — this is real data, not a made-up edge case.
-    const catalog = catalogOf(
-      product('TR-101', { currency: 'USD' }),
-      product('TR-102', { currency: 'EUR' }),
-    );
-
-    expect(defaultFormatBundlePrice(bundle, catalog, 'en-US')).toBe('$300.00');
-  });
-
-  it('skips a member the catalog does not have, and prices from the one that is there', () => {
-    const catalog = catalogOf(product('TR-101', { currency: 'EUR' }));
-
-    expect(defaultFormatBundlePrice(bundle, catalog, 'de-DE')).toBe('300,00 €');
-  });
-
-  it('refuses a set with nothing in it', () => {
-    // Exported, so a hand-built bundle can skip the two-product contract and arrive empty.
-    expect(() => defaultFormatBundlePrice({ ...bundle, skus: [] }, catalogOf(), 'en-US')).toThrow(
-      TypeError,
-    );
+  it('prices a set in a currency that has no decimals', () => {
+    // Yen has none, so a forced two places would invent a fraction that does not exist.
+    expect(defaultFormatBundlePrice({ ...bundle, currency: 'JPY' }, 'en-US')).toBe('¥300');
   });
 
   it('still shows a price when the host passes a locale Intl rejects', () => {
-    const catalog = catalogOf(product('TR-101'), product('TR-102'));
-
-    expect(defaultFormatBundlePrice(bundle, catalog, 'not a locale')).toBe('USD 300');
+    expect(defaultFormatBundlePrice(bundle, 'not a locale')).toBe('USD 300');
   });
 });
 
@@ -736,7 +709,7 @@ describe('a bundle', () => {
       },
     ]);
 
-  const BUNDLES = [{ id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300 }];
+  const BUNDLES = [{ id: 'BUN-1', skus: ['TR-101', 'TR-102'], price: 300, currency: 'USD' }];
 
   it('shows the price the shop set, not the sum of the parts', () => {
     // TR-101 and TR-102 are 174 each. The saving is the whole point.
@@ -753,15 +726,16 @@ describe('a bundle', () => {
     expect(markup).toContain('Product TR-102');
   });
 
-  it('renders instead of crashing when the set mixes currencies', () => {
-    // Mixed currencies are valid data, not a host mistake.
+  it('prices the set in the currency the shop gave the set, not a member currency', () => {
+    // A member may be priced in another currency. The set says what its own
+    // price is in, so nothing has to read that off a part.
     const markup = render(bundleSpec(), {
       bundles: BUNDLES,
-      products: [product('TR-101', { currency: 'USD' }), product('TR-102', { currency: 'EUR' })],
+      products: [product('TR-101', { currency: 'EUR' }), product('TR-102', { currency: 'EUR' })],
     });
 
-    expect(markup).not.toBe('');
     expect(markup).toContain('$300.00');
+    expect(markup).not.toContain('€300.00');
   });
 
   it('renders nothing when the host passed no such bundle', () => {

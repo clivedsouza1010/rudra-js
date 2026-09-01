@@ -23,9 +23,14 @@ describe('the generated bundles', () => {
         id: 'BUN-Trail-Running',
         skus: ['TR-2', 'TR-3'],
         price: 108,
+        currency: 'USD',
         label: 'Trail Running starter set',
       },
     ]);
+  });
+
+  it('prices a set in the money the catalog prices its products in', () => {
+    for (const bundle of generateBundles(catalog)) expect(bundle.currency).toBe('USD');
   });
 
   it('pairs products from the same category', () => {

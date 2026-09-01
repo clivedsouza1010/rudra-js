@@ -136,6 +136,122 @@ function verifyBasis(basis: RecommendationBasis, product: Product, digest: Signa
 }
 
 /**
+ * Free text that states something the renderer cannot check.
+ *
+ * The prompt bans prices, discounts, delivery dates, stock levels and ratings
+ * because every one of them moves after the words are written, and a cohort
+ * component is cached and served again later. `verifyBasis` checks the basis a
+ * pick claims; nothing checks the sentences around it, so every string the
+ * model writes is checked here — a heading is not a safer place for a claim
+ * than the small print under it.
+ *
+ * A claim is about money, a customer score, when it arrives, or how many are
+ * left. A specification is not a claim, even when it has a number or a
+ * percentage in it: "100% recycled nylon", "a comfort rating of -5C" and
+ * "arrives flat-packed" are all things a shop can say about the product itself,
+ * and they stay. That is why almost every rule below needs a second word beside
+ * the first — "20% off", not "20%"; "rated 4.8", not "rated". A careful
+ * rewording will get past this, and that is the trade we want: missing one
+ * claim is better than deleting honest copy on every page.
+ *
+ * One rule per line, because each line is a separate judgement about where the
+ * boundary sits and each one wants its own reason written next to it.
+ */
+const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
+  {
+    // Customers scoring the product. "rated for winter use", "rated to -10C"
+    // and "an IPX7 water rating" are about what the product can take.
+    kind: 'rating',
+    patterns: [
+      /\breviews?\b|\breviewed\b/,
+      /\b(?:\d+(?:\.\d+)?|three|four|five)[\s-]?stars?\b/,
+      /\bstars?[\s-]?ratings?\b/,
+      // A rating somebody gave it, rather than one it was built to.
+      /\b(?:customer|shopper|buyer|user|average|overall)[\s-]ratings?\b/,
+      // A score out of five is written as a decimal. A spec is "-5C" or "20,000mm".
+      /\bratings?\s+of\s+[0-5]\.\d\b/,
+      /\b(?:highly|top|best|well|poorly|five|four)[\s-]rated\b/,
+      // "rated 4.8" is a score. "rated 3 season" is what the tent is built for.
+      /\brated\s+(?:[0-5]\.\d|(?:[0-5]|three|four|five)\s+(?:stars?|out of))\b/,
+      // How many other people bought or liked it is a customer claim too.
+      /\bbest[\s-]?sell(?:er|ers|ing)\b/,
+      /\bloved by (?:thousands|hundreds|millions|\d)/,
+    ],
+  },
+  {
+    kind: 'price',
+    patterns: [
+      /[$£€¥]\s?\d/,
+      /\b\d+(?:\.\d+)?\s?(?:usd|eur|gbp|dollars?|pounds?|euros?)\b/,
+      /\bpric(?:e|es|ed|ing)\b/,
+      // A before-and-after is a price claim even with no currency on it.
+      /\bwas\s+[$£€¥]?\s?\d[\d,.]*\s*[,;–—-]?\s*now\s+[$£€¥]?\s?\d/,
+      // "does not feel cheap" is about quality. Only the comparison is money.
+      /\bcheap(?:er|est)\b/,
+      /\baffordable\b|\bbargain\b/,
+      // "at no cost to comfort" is not money. "costs less" is.
+      /\bcosts?\s+(?:less|more|only|just|about|around|[$£€¥]?\d)/,
+      /\blow(?:er)?[\s-]cost\b/,
+      // "saves weight" and "saves on weight" are both about grams.
+      /\bsaves?\s+(?:you\s+)?(?:money|cash|[$£€¥]\s?\d)/,
+    ],
+  },
+  {
+    // A percentage in outdoor copy is a specification far more often than it is
+    // money off, so it only counts beside a money word: "20% off", not
+    // "100% recycled".
+    kind: 'discount',
+    patterns: [
+      /\d+(?:\.\d+)?\s?(?:%|percent)\s*(?:off\b|discount|reduction|less\b)/,
+      /\b(?:save|saving|savings|off|discount|extra|up to)\s+(?:up to\s+)?\d+(?:\.\d+)?\s?(?:%|percent)/,
+      /\bdiscount(?:s|ed)?\b/,
+      /\bsale\b|\bmarked down\b|\bdeal of\b/,
+      /\bhalf[\s-]?(?:price|off)\b/,
+      // "extra clearance for thick socks" is room inside the shoe.
+      /\bclearance\s+(?:sale|price|event|deal)\b|\bon clearance\b/,
+      // "reduced weight" and "reduced to 900g" are specifications. Only a
+      // reduced price, or a reduction with a date on it, is money off.
+      /\bprice reduced\b|\breduced price\b|\breduced by \d+\s?(?:%|percent)|\breduced\s+(?:this|next|last)\s+week\b/,
+    ],
+  },
+  {
+    // When it turns up, not what turns up. "ships in a recycled box" and
+    // "arrives flat-packed" describe the thing, so the verb alone is not enough
+    // — it needs a day or a date beside it.
+    kind: 'delivery',
+    patterns: [
+      /\bdelivery\b|\bshipping\b/,
+      /\bnext[\s-]day\b|\bsame[\s-]day\b|\bovernight\b/,
+      /\b(?:ships?|arrives?|arriving|delivered|by|before|in time for)\s+(?:on\s+)?(?:today|tomorrow|tonight|this week|next week|the weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+      /\b(?:ships?|arrives?|arriving)\s+(?:in|within)\s+\d/,
+      /\bin time for\b/,
+    ],
+  },
+  {
+    kind: 'stock',
+    patterns: [
+      /\b(?:in|out of|low on) stock\b/,
+      /\brestocked?\b|\bsold out\b/,
+      // "the last few miles" is a distance, so a count needs "left" after it.
+      /\b(?:only\s+)?(?:\d+|a few|a handful|a couple|one|few)\s+(?:left|remaining)\b/,
+      /\blast (?:one|few)\s+(?:left|remaining|in stock)\b/,
+      /\bselling fast\b|\b(?:almost|nearly) gone\b|\bwhile stocks last\b/,
+    ],
+  },
+];
+
+/** Names the first forbidden claim the text makes, or null when it makes none. */
+function claimIn(text: string): string | null {
+  const lower = text.toLowerCase();
+  for (const claim of CLAIM_PATTERNS) {
+    for (const pattern of claim.patterns) {
+      if (pattern.test(lower)) return claim.kind;
+    }
+  }
+  return null;
+}
+
+/**
  * The running state of one reconciliation pass: what has been placed, how much
  * of the item budget is left, and what was changed along the way.
  *
@@ -165,6 +281,37 @@ function createPlacementTracker(maxItems: number) {
 }
 
 type PlacementTracker = ReturnType<typeof createPlacementTracker>;
+
+/**
+ * Drops text that makes a claim we cannot check, and names what it claimed.
+ *
+ * Runs after clamping, so what is screened is exactly what would have rendered.
+ * Dropping means what it means everywhere else here: this field becomes null
+ * and the rest of the block carries on.
+ */
+function screenClaim(
+  value: string | null,
+  field: string,
+  tracker: PlacementTracker,
+): string | null {
+  if (value === null) return null;
+
+  const kind = claimIn(value);
+  if (kind === null) return value;
+
+  tracker.record(`unverifiable-claim:${kind}:${field}`);
+  return null;
+}
+
+/**
+ * The same screen for a field that cannot be null. Emptying it hands the field
+ * to the rule that already drops a block, or a whole generation, whose text
+ * clamps to nothing — so a banner reading "20% off" disappears rather than
+ * rendering blank.
+ */
+function screenRequired(value: string, field: string, tracker: PlacementTracker): string {
+  return screenClaim(value, field, tracker) ?? '';
+}
 
 /**
  * Decides whether one SKU may be placed, and names the reason when it may not.
@@ -215,7 +362,9 @@ function reconcileItems(
       basis: hasSupportedBasis ? item.basis : 'popular',
       // The prose exists to state the basis. If the basis did not hold, the
       // prose is a claim we just decided is untrue.
-      reason: hasSupportedBasis ? clampNullable(item.reason, CLAMP.reason) : null,
+      reason: hasSupportedBasis
+        ? screenClaim(clampNullable(item.reason, CLAMP.reason), `reason:${item.sku}`, tracker)
+        : null,
       badge: clampNullable(item.badge, CLAMP.badge),
       emphasis: item.emphasis,
     });
@@ -313,7 +462,11 @@ function reconcileBlock(
       // Every other block kind disappears when its content clamps to nothing.
       // A hero with no headline and no product is the same empty region, and
       // it would otherwise render above real content.
-      const headline = clamp(block.headline, CLAMP.headline);
+      const headline = screenRequired(
+        clamp(block.headline, CLAMP.headline),
+        'hero-headline',
+        tracker,
+      );
       if (headline.length === 0 && sku === null) {
         tracker.record('empty-block:hero');
         return null;
@@ -321,9 +474,9 @@ function reconcileBlock(
       return {
         kind: 'hero',
         headline,
-        body: clampNullable(block.body, CLAMP.subheadline),
+        body: screenClaim(clampNullable(block.body, CLAMP.subheadline), 'hero-body', tracker),
         sku,
-        ctaLabel: clampNullable(block.ctaLabel, CLAMP.ctaLabel),
+        ctaLabel: screenClaim(clampNullable(block.ctaLabel, CLAMP.ctaLabel), 'hero-cta', tracker),
       };
     }
 
@@ -335,7 +488,7 @@ function reconcileBlock(
       }
       return {
         kind: 'grid',
-        title: clampNullable(block.title, CLAMP.blockTitle),
+        title: screenClaim(clampNullable(block.title, CLAMP.blockTitle), 'grid-title', tracker),
         // Never leave a grid wider than it has items to fill.
         columns: Math.min(block.columns, Math.max(2, items.length)) as 2 | 3 | 4,
         items,
@@ -350,13 +503,13 @@ function reconcileBlock(
       }
       return {
         kind: 'carousel',
-        title: clampNullable(block.title, CLAMP.blockTitle),
+        title: screenClaim(clampNullable(block.title, CLAMP.blockTitle), 'carousel-title', tracker),
         items,
       };
     }
 
     case 'banner': {
-      const text = clamp(block.text, CLAMP.bannerText);
+      const text = screenRequired(clamp(block.text, CLAMP.bannerText), 'banner-text', tracker);
       if (text.length === 0) {
         tracker.record('empty-block:banner');
         return null;
@@ -365,19 +518,19 @@ function reconcileBlock(
         kind: 'banner',
         tone: block.tone,
         text,
-        ctaLabel: clampNullable(block.ctaLabel, CLAMP.ctaLabel),
+        ctaLabel: screenClaim(clampNullable(block.ctaLabel, CLAMP.ctaLabel), 'banner-cta', tracker),
       };
     }
 
     case 'copy': {
-      const body = clamp(block.body, CLAMP.copyBody);
+      const body = screenRequired(clamp(block.body, CLAMP.copyBody), 'copy-body', tracker);
       if (body.length === 0) {
         tracker.record('empty-block:copy');
         return null;
       }
       return {
         kind: 'copy',
-        title: clampNullable(block.title, CLAMP.blockTitle),
+        title: screenClaim(clampNullable(block.title, CLAMP.blockTitle), 'copy-title', tracker),
         body,
       };
     }
@@ -393,9 +546,9 @@ function reconcileBlock(
 
       return {
         kind: 'bundle',
-        title: clampNullable(block.title, CLAMP.blockTitle),
-        body: clampNullable(block.body, CLAMP.subheadline),
-        ctaLabel: clampNullable(block.ctaLabel, CLAMP.ctaLabel),
+        title: screenClaim(clampNullable(block.title, CLAMP.blockTitle), 'bundle-title', tracker),
+        body: screenClaim(clampNullable(block.body, CLAMP.subheadline), 'bundle-body', tracker),
+        ctaLabel: screenClaim(clampNullable(block.ctaLabel, CLAMP.ctaLabel), 'bundle-cta', tracker),
         // The model's bundleId is ignored on purpose.
         bundleId: chosen.id,
       };
@@ -443,8 +596,12 @@ export function reconcileSpec(
 
   const spec: GeneratedSpec = {
     tone: generated.tone,
-    headline: clamp(generated.headline, CLAMP.headline),
-    subheadline: clampNullable(generated.subheadline, CLAMP.subheadline),
+    headline: screenRequired(clamp(generated.headline, CLAMP.headline), 'headline', tracker),
+    subheadline: screenClaim(
+      clampNullable(generated.subheadline, CLAMP.subheadline),
+      'subheadline',
+      tracker,
+    ),
     blocks,
     rationale: clamp(generated.rationale, CLAMP.rationale),
   };

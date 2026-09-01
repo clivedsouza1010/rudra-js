@@ -104,11 +104,13 @@ proportionate when the primary model can act. This one cannot.
 
 - **Wording.** Roughly a kilobyte of model-written prose reaches the page per
   render. It is length-clamped and cannot contain markup, because the schema has
-  no field that carries markup. It **can** contain anything else the model
-  writes: a price, a discount, a stock claim, or a competitor's product name.
-  The prompt instructs against all of those, and instruction is not enforcement
-  — this is the one place the design relies on persuading the model rather than
-  constraining it. There is no classifier reading the output.
+  no field that carries markup. Every model-written field is now read for the
+  claims the prompt bans — a customer rating, a price, a discount, a delivery
+  date, a stock level — and any field that makes one is dropped. The check is a
+  set of patterns, not a classifier, so it is not complete: a reworded claim can
+  get through, and anything outside those five kinds — a competitor's product
+  name, for example — is not looked for at all. Host text is never screened; it
+  is the shop's own words.
 - **Instruction disclosure.** A determined injection could get fragments of the
   instruction half echoed back inside a text field. Those instructions are open
   source and in this repository, so the loss is small, but it is not zero.

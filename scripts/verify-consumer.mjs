@@ -178,13 +178,23 @@ const [firstBundle] = bundles;
 if (!firstBundle) {
   throw new Error('bundleSchema.parse returned nothing');
 }
-const bundlePrice = defaultFormatBundlePrice(
-  firstBundle,
-  new Map(products.map((entry) => [entry.sku, entry])),
-  'en-US',
-);
+// Takes the set and an optional locale — no catalog. The price and the currency
+// both come off the bundle itself.
+const bundlePrice = defaultFormatBundlePrice(firstBundle, 'en-US');
 if (bundlePrice !== '$180.00') {
   throw new Error(\`defaultFormatBundlePrice returned \${bundlePrice}\`);
+}
+
+// The set says which money it is in, so a euro set in a dollar catalog is still
+// priced in euros.
+const euroPrice = defaultFormatBundlePrice({ ...firstBundle, currency: 'EUR' }, 'en-US');
+if (euroPrice !== '€180.00') {
+  throw new Error(\`defaultFormatBundlePrice ignored the bundle currency: \${euroPrice}\`);
+}
+
+// The locale is optional, and leaving it out must still produce a price.
+if (defaultFormatBundlePrice(firstBundle).length === 0) {
+  throw new Error('defaultFormatBundlePrice returned nothing without a locale');
 }
 
 // Proves the package's entry point and types resolve for a real consumer under

@@ -341,7 +341,34 @@ describe('bundles', () => {
   it('accepts a set the shop sells together', () => {
     const parsed = parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }]));
 
-    expect(parsed.bundles).toEqual([{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }]);
+    expect(parsed.bundles).toEqual([{ id: 'BUN-1', skus: ['A', 'B'], price: 25, currency: 'USD' }]);
+  });
+
+  it('carries the shop own currency for the set', () => {
+    // The set is priced by the shop, so it says which money that price is in.
+    const parsed = parseTrackingInput(
+      withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: 25, currency: 'EUR' }]),
+    );
+
+    expect(parsed.bundles[0]?.currency).toBe('EUR');
+  });
+
+  it('defaults a set to dollars, the same as a product', () => {
+    const parsed = parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }]));
+
+    expect(parsed.bundles[0]?.currency).toBe('USD');
+  });
+
+  it.each([
+    ['an ISO 4217 code', 'EUR', true],
+    ['a lowercase code', 'usd', false],
+    ['a currency name', 'DOLLARS', false],
+  ])('bundle currency: %s', (_label, currency, accepted) => {
+    const result = safeParseTrackingInput(
+      withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: 25, currency }]),
+    );
+
+    expect(result.success).toBe(accepted);
   });
 
   it('defaults to none, so a host that has no bundles sends nothing', () => {

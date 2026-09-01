@@ -34,6 +34,8 @@ export function generateBundles(catalog: readonly Product[]): Bundle[] {
       id: `BUN-${category.replaceAll(' ', '-')}`,
       skus: twoCheapest.map((product) => product.sku),
       price: Math.round(sum * 0.9 * 100) / 100,
+      // This shop prices everything in dollars, same as the catalog.
+      currency: 'USD',
       label: `${category} starter set`,
     });
   }

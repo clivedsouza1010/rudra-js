@@ -182,8 +182,7 @@ export function RudraComponent({
     bundles: bundlesById,
     hrefForSku,
     formatPrice: formatPrice ?? ((product) => defaultFormatPrice(product, locale)),
-    formatBundlePrice:
-      formatBundlePrice ?? ((bundle) => defaultFormatBundlePrice(bundle, productMap, locale)),
+    formatBundlePrice: formatBundlePrice ?? ((bundle) => defaultFormatBundlePrice(bundle, locale)),
   };
 
   // An empty recommendation area is worse than none: it takes up space and

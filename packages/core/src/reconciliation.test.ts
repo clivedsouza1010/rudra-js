@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   RECOMMENDATION_BASES,
+  type Block,
+  type BundleBlock,
   type GeneratedSpec,
   type ProductReference,
 } from './component-spec.js';
@@ -50,6 +52,9 @@ const specWith = (blocks: GeneratedSpec['blocks']): GeneratedSpec => ({
 
 const grid = (items: ProductReference[]) =>
   specWith([{ kind: 'grid', title: 'For you', columns: 3, items }]);
+
+/** One surviving product, so a spec stays usable while its words are tested. */
+const PRODUCT_GRID: Block = { kind: 'grid', title: null, columns: 2, items: [ref('TR-101')] };
 
 /** Runs a spec through reconciliation against a given payload. */
 function reconcile(spec: GeneratedSpec, overrides: Partial<TrackingInputDraft> = {}) {
@@ -635,4 +640,435 @@ describe('an empty hero', () => {
     expect(block.sku).toBe('TR-101');
     expect(result.isUsable).toBe(true);
   });
+});
+
+describe('claims the renderer cannot check', () => {
+  /** The reason that survived on the one product of a one-grid spec. */
+  const reasonFor = (text: string): string | null | undefined =>
+    basisOf(reconcile(grid([ref('TR-101', { reason: text })])))?.reason;
+
+  // Typed as the block, not inferred: `body: null` would otherwise infer the
+  // literal type `null` and refuse a string override.
+  const bundleBlock: BundleBlock = {
+    kind: 'bundle',
+    title: 'Get set up',
+    body: null,
+    ctaLabel: 'Add both',
+    bundleId: null,
+  };
+
+  const withBundle = (overrides: Partial<BundleBlock>) =>
+    reconcile(specWith([{ ...bundleBlock, ...overrides }]), {
+      candidates: [product('A'), product('B')],
+      bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+    });
+
+  // Straight out of the committed transcript. The prompt told the model not to
+  // state a rating, and it wrote all three of these anyway.
+  const FROM_THE_TRANSCRIPT = [
+    'one of the best-reviewed picks in Backpacks',
+    'another highly rated backpack in this category',
+    "well reviewed in the category you're browsing",
+  ];
+
+  for (const claim of FROM_THE_TRANSCRIPT) {
+    it(`drops a rating the model really wrote: "${claim}"`, () => {
+      expect(reasonFor(claim)).toBeNull();
+    });
+  }
+
+  it('drops a price claim', () => {
+    expect(reasonFor('the same pack for $40 less')).toBeNull();
+  });
+
+  it('drops a percentage claim', () => {
+    expect(reasonFor('20% off for the rest of the week')).toBeNull();
+  });
+
+  it('drops a delivery promise', () => {
+    expect(reasonFor('arrives before the weekend')).toBeNull();
+  });
+
+  it('drops a stock-level claim', () => {
+    expect(reasonFor('only 2 left in stock')).toBeNull();
+  });
+
+  // The screen is worse than the hole it fills if it eats honest copy. These
+  // talk about weight, warmth and materials, and none of them state a price,
+  // a rating, a delivery date or a stock level.
+  const ORDINARY = [
+    'a waterproof option from the same category',
+    'saves weight on long hikes',
+    'rated for winter use',
+    'goes with the pack in your cart',
+    'made from recycled fabric',
+    'the roomiest pack in the range',
+    'a simple daypack for short walks',
+    'the shape you kept coming back to',
+  ];
+
+  for (const reason of ORDINARY) {
+    it(`keeps ordinary copy: "${reason}"`, () => {
+      expect(reasonFor(reason)).toBe(reason);
+    });
+  }
+
+  // A specification is not a claim, even with a number or a percentage in it.
+  // Every line here is copy a real shop writes, and every one of them used to
+  // be deleted. They are the regression that stops this screen becoming worse
+  // than the hole it fills.
+  const SPECIFICATIONS = [
+    'made from 100% recycled nylon',
+    '100% merino wool against the skin',
+    '100% waterproof in a downpour',
+    '30% lighter than the pack it replaces',
+    'a comfort rating of -5C',
+    'an IPX7 water rating',
+    'rated 3 season for shoulder-season trips',
+    'reduced to 900g without losing warmth',
+    'a waterproof rating of 20,000mm',
+    'rated to -10C for winter nights',
+    'arrives flat-packed',
+    'arrives ready to ride',
+    'ships flat and folds away',
+    'ships in a recycled box',
+    'comfortable for the last few miles',
+    'does not feel cheap',
+    'cuts weight at no cost to comfort',
+    'extra clearance for thick socks',
+    // The twin of "saves weight on long hikes" above. Which side of "on" the
+    // noun falls on is not something an author could predict.
+    'saves on weight over the Alpine',
+  ];
+
+  for (const reason of SPECIFICATIONS) {
+    it(`keeps a specification: "${reason}"`, () => {
+      expect(reasonFor(reason)).toBe(reason);
+    });
+  }
+
+  // Money, a customer score, when it arrives, how many are left.
+  const REAL_CLAIMS: { reason: string; kind: string }[] = [
+    { reason: 'half off this week', kind: 'discount' },
+    { reason: 'was 120, now 80', kind: 'price' },
+    { reason: 'reduced this week', kind: 'discount' },
+    { reason: 'only a handful left', kind: 'stock' },
+    { reason: 'get it by Friday', kind: 'delivery' },
+    { reason: 'best seller in Backpacks', kind: 'rating' },
+    { reason: 'loved by thousands of buyers', kind: 'rating' },
+  ];
+
+  for (const claim of REAL_CLAIMS) {
+    it(`drops a ${claim.kind} claim: "${claim.reason}"`, () => {
+      const result = reconcile(grid([ref('TR-101', { reason: claim.reason })]));
+
+      expect(result.violations).toContain(`unverifiable-claim:${claim.kind}:reason:TR-101`);
+    });
+  }
+
+  it('records the claim it dropped', () => {
+    const result = reconcile(grid([ref('TR-101', { reason: 'rated 4.8 stars by shoppers' })]));
+
+    expect(result.violations).toContain('unverifiable-claim:rating:reason:TR-101');
+  });
+
+  it('records nothing for ordinary copy', () => {
+    const result = reconcile(grid([ref('TR-101', { reason: 'saves weight on long hikes' })]));
+
+    expect(result.violations).toEqual([]);
+  });
+
+  it('keeps the product when its reason is dropped', () => {
+    const result = reconcile(grid([ref('TR-101', { reason: '30% off today' })]));
+
+    expect(placedSkus(result.spec.blocks)).toEqual(['TR-101']);
+    expect(result.isUsable).toBe(true);
+  });
+
+  it('screens a bundle title, body and CTA the same way', () => {
+    const result = withBundle({
+      title: 'Half price when you buy the set',
+      body: 'rated 4.8 stars by shoppers',
+      ctaLabel: 'Get it for $59',
+    });
+
+    expect(result.spec.blocks[0]).toMatchObject({
+      kind: 'bundle',
+      title: null,
+      body: null,
+      ctaLabel: null,
+    });
+    expect(result.violations).toContain('unverifiable-claim:price:bundle-title');
+    expect(result.violations).toContain('unverifiable-claim:rating:bundle-body');
+    expect(result.violations).toContain('unverifiable-claim:price:bundle-cta');
+  });
+
+  it('still shows the set when the words around it are dropped', () => {
+    const result = withBundle({ title: 'Save 20% on the set', ctaLabel: 'Only 3 left' });
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'bundle', bundleId: 'BUN-1' });
+    expect(result.isUsable).toBe(true);
+  });
+
+  it('leaves ordinary bundle copy alone', () => {
+    const result = withBundle({ body: 'Everything you need for one trip' });
+
+    expect(result.spec.blocks[0]).toMatchObject({
+      title: 'Get set up',
+      body: 'Everything you need for one trip',
+      ctaLabel: 'Add both',
+    });
+  });
+});
+
+/**
+ * The screen once ran on four fields, so the same claim could be deleted from a
+ * product's small print and kept in the heading right above it. Every string the
+ * model writes is read now. Host text is not: a product title, a category and a
+ * bundle label are the shop's own words.
+ */
+describe('claims in every field the model writes', () => {
+  it('drops a claim in the spec headline', () => {
+    const result = reconcile({ ...specWith([PRODUCT_GRID]), headline: 'Half price this week' });
+
+    expect(result.spec.headline).toBe('');
+    expect(result.violations).toContain('unverifiable-claim:price:headline');
+  });
+
+  it('drops a claim in the spec subheadline', () => {
+    const result = reconcile({ ...specWith([PRODUCT_GRID]), subheadline: 'Only 2 left in stock' });
+
+    expect(result.spec.subheadline).toBeNull();
+    expect(result.violations).toContain('unverifiable-claim:stock:subheadline');
+  });
+
+  it('drops a claim in a hero headline', () => {
+    const result = reconcile(
+      specWith([
+        {
+          kind: 'hero',
+          headline: 'Rated 4.8 stars by shoppers',
+          body: null,
+          sku: 'TR-101',
+          ctaLabel: null,
+        },
+      ]),
+    );
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'hero', headline: '', sku: 'TR-101' });
+    expect(result.violations).toContain('unverifiable-claim:rating:hero-headline');
+  });
+
+  it('drops a claim in a hero body', () => {
+    const result = reconcile(
+      specWith([
+        {
+          kind: 'hero',
+          headline: 'Pick of the season',
+          body: 'arrives before the weekend',
+          sku: 'TR-101',
+          ctaLabel: null,
+        },
+      ]),
+    );
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'hero', body: null });
+    expect(result.violations).toContain('unverifiable-claim:delivery:hero-body');
+  });
+
+  it('drops a claim in a hero CTA', () => {
+    const result = reconcile(
+      specWith([
+        {
+          kind: 'hero',
+          headline: 'Pick of the season',
+          body: null,
+          sku: 'TR-101',
+          ctaLabel: 'Get it for $59',
+        },
+      ]),
+    );
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'hero', ctaLabel: null });
+    expect(result.violations).toContain('unverifiable-claim:price:hero-cta');
+  });
+
+  it('drops a claim in a grid title', () => {
+    const result = reconcile(
+      specWith([{ kind: 'grid', title: '20% off everything', columns: 2, items: [ref('TR-101')] }]),
+    );
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'grid', title: null });
+    expect(result.violations).toContain('unverifiable-claim:discount:grid-title');
+  });
+
+  it('drops a claim in a carousel title', () => {
+    const result = reconcile(
+      specWith([{ kind: 'carousel', title: 'Best sellers in Backpacks', items: [ref('TR-101')] }]),
+    );
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'carousel', title: null });
+    expect(result.violations).toContain('unverifiable-claim:rating:carousel-title');
+  });
+
+  it('drops a claim in banner text', () => {
+    const result = reconcile(
+      specWith([
+        { kind: 'banner', tone: 'info', text: '20% off for the rest of the week', ctaLabel: null },
+        PRODUCT_GRID,
+      ]),
+    );
+
+    expect(result.violations).toContain('unverifiable-claim:discount:banner-text');
+  });
+
+  it('drops a claim in a banner CTA', () => {
+    const result = reconcile(
+      specWith([
+        { kind: 'banner', tone: 'info', text: 'Built for wet rock', ctaLabel: 'Only 3 left' },
+        PRODUCT_GRID,
+      ]),
+    );
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'banner', ctaLabel: null });
+    expect(result.violations).toContain('unverifiable-claim:stock:banner-cta');
+  });
+
+  it('drops a claim in a copy title', () => {
+    const result = reconcile(
+      specWith([
+        { kind: 'copy', title: 'Half off this week', body: 'Built for wet rock.' },
+        PRODUCT_GRID,
+      ]),
+    );
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'copy', title: null });
+    expect(result.violations).toContain('unverifiable-claim:discount:copy-title');
+  });
+
+  it('drops a claim in a copy body', () => {
+    const result = reconcile(
+      specWith([
+        { kind: 'copy', title: null, body: 'Free next-day delivery on every order.' },
+        PRODUCT_GRID,
+      ]),
+    );
+
+    expect(result.violations).toContain('unverifiable-claim:delivery:copy-body');
+  });
+});
+
+/**
+ * Four of those fields cannot be null. Emptying one hands the block to the rule
+ * that already drops a block whose text clamps to nothing, so a banner reading
+ * "20% off" disappears rather than rendering blank.
+ */
+describe('a claim in a field that cannot be empty', () => {
+  it('drops a banner whose text makes a claim', () => {
+    const result = reconcile(
+      specWith([
+        { kind: 'banner', tone: 'info', text: '20% off for the rest of the week', ctaLabel: null },
+        PRODUCT_GRID,
+      ]),
+    );
+
+    expect(result.spec.blocks.map((block) => block.kind)).toEqual(['grid']);
+    expect(result.violations).toContain('empty-block:banner');
+  });
+
+  it('drops a copy block whose body makes a claim', () => {
+    const result = reconcile(
+      specWith([
+        { kind: 'copy', title: null, body: 'Free next-day delivery on every order.' },
+        PRODUCT_GRID,
+      ]),
+    );
+
+    expect(result.spec.blocks.map((block) => block.kind)).toEqual(['grid']);
+    expect(result.violations).toContain('empty-block:copy');
+  });
+
+  it('drops a hero whose headline makes a claim and has no product', () => {
+    const result = reconcile(
+      specWith([
+        {
+          kind: 'hero',
+          headline: 'Half price this week',
+          body: null,
+          sku: null,
+          ctaLabel: null,
+        },
+        PRODUCT_GRID,
+      ]),
+    );
+
+    expect(result.spec.blocks.map((block) => block.kind)).toEqual(['grid']);
+    expect(result.violations).toContain('empty-block:hero');
+  });
+
+  it('makes the whole generation unusable when the spec headline makes a claim', () => {
+    const result = reconcile({ ...specWith([PRODUCT_GRID]), headline: 'Half price this week' });
+
+    expect(result.isUsable).toBe(false);
+    expect(result.violations).toContain('unusable:no-headline');
+  });
+});
+
+/**
+ * Both strings below are from the committed transcript, from the generation
+ * whose product reasons were already dropped for saying the same thing. They are
+ * the regression that stops a page contradicting itself.
+ */
+describe('the words the model really wrote', () => {
+  it('drops the subheadline it wrote', () => {
+    const result = reconcile({
+      ...specWith([PRODUCT_GRID]),
+      subheadline: "A short, well-rated selection from the category you're browsing",
+    });
+
+    expect(result.spec.subheadline).toBeNull();
+    expect(result.violations).toContain('unverifiable-claim:rating:subheadline');
+  });
+
+  it('drops the grid title it wrote', () => {
+    const result = reconcile(
+      specWith([
+        { kind: 'grid', title: 'Top-rated in Backpacks', columns: 2, items: [ref('TR-101')] },
+      ]),
+    );
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'grid', title: null });
+    expect(result.violations).toContain('unverifiable-claim:rating:grid-title');
+  });
+});
+
+/**
+ * The same specifications the screen already leaves alone in a product reason. A
+ * heading is not a different kind of sentence, and a screen that eats honest
+ * copy on every page is worse than the hole it fills.
+ */
+describe('ordinary copy in the fields now screened', () => {
+  const SPECIFICATIONS = [
+    'made from 100% recycled nylon',
+    'a comfort rating of -5C',
+    'arrives flat-packed',
+  ];
+
+  for (const text of SPECIFICATIONS) {
+    it(`keeps it in a headline: "${text}"`, () => {
+      const result = reconcile({ ...specWith([PRODUCT_GRID]), headline: text });
+
+      expect(result.spec.headline).toBe(text);
+      expect(result.violations).toEqual([]);
+    });
+
+    it(`keeps it in a banner: "${text}"`, () => {
+      const result = reconcile(
+        specWith([{ kind: 'banner', tone: 'info', text, ctaLabel: null }, PRODUCT_GRID]),
+      );
+
+      expect(result.spec.blocks[0]).toMatchObject({ kind: 'banner', text });
+      expect(result.violations).toEqual([]);
+    });
+  }
 });

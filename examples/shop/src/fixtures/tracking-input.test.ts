@@ -75,7 +75,7 @@ describe('the tracking payload the shop builds', () => {
     ];
 
     it('keeps a bundle whose members are all candidates', () => {
-      const bundle = { id: 'BUN-1', skus: ['A', 'B'], price: 25 };
+      const bundle = { id: 'BUN-1', skus: ['A', 'B'], price: 25, currency: 'USD' };
 
       const input = buildTrackingInput(shoppers[0]!, 'current', smallCatalog, [bundle]);
 
@@ -83,7 +83,7 @@ describe('the tracking payload the shop builds', () => {
     });
 
     it('drops a bundle that names a product outside the candidates', () => {
-      const bundle = { id: 'BUN-2', skus: ['A', 'not-a-candidate'], price: 5 };
+      const bundle = { id: 'BUN-2', skus: ['A', 'not-a-candidate'], price: 5, currency: 'USD' };
 
       const input = buildTrackingInput(shoppers[0]!, 'current', smallCatalog, [bundle]);
 
