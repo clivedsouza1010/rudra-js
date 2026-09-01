@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   SPEC_VERSION,
   generatedSpecSchema,
+  type Block,
   type ComponentSpec,
   type DegradedReason,
   type GeneratedSpec,
@@ -10,8 +11,13 @@ import {
 import { buildFallbackSpec } from './fallback-component.js';
 import { buildPrompt } from './model-prompt.js';
 import type { ComponentProvider, TokenUsage } from './provider.js';
-import { reconcileSpec } from './reconciliation.js';
-import { selectProducts } from './product-selection.js';
+import {
+  MAX_BLOCKS,
+  bundleForShopper,
+  placeableHeroSkus,
+  reconcileSpec,
+} from './reconciliation.js';
+import { selectProducts, type ProductPick } from './product-selection.js';
 import { fitToShopper } from './fit-to-shopper.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import {
@@ -206,6 +212,61 @@ interface ModelCall {
 /** A model call whose answer can be reconciled and served. */
 interface ModelAnswer extends ModelCall {
   spec: GeneratedSpec;
+}
+
+/**
+ * Fills a cohort spec with this shopper's products, keeping room for a set.
+ *
+ * The grid used to take the whole item budget, so a bundle block later in the
+ * spec found nothing left and was dropped. The set is chosen first, its
+ * products are held back from the grid, and the grid's limit drops by what the
+ * set and the heroes have already spoken for.
+ *
+ * The arithmetic has to hold whatever order the model put the blocks in, so it
+ * is written as one sum over the whole spec rather than as a running budget:
+ * the grid gets `maxItems` minus every distinct product the set and the heroes
+ * will place. Nothing is then dropped for want of budget, and reconciliation
+ * reaches the same set this did — it can only ever have more placed than the
+ * pre-choice assumed, and never one of the set's own products.
+ */
+function fitCohortSpec(
+  spec: GeneratedSpec,
+  input: TrackingInput,
+  digest: SignalDigest,
+): GeneratedSpec {
+  const picks = selectProducts(input, digest);
+  // Blocks past the cap never render, so a set is not worth reserving for one.
+  const blocks = spec.blocks.slice(0, MAX_BLOCKS);
+
+  let hasBundleBlock = false;
+  const aboveBundle: Block[] = [];
+  for (const block of blocks) {
+    if (block.kind === 'bundle') {
+      hasBundleBlock = true;
+      break;
+    }
+    aboveBundle.push(block);
+  }
+  if (!hasBundleBlock) return fitToShopper(spec, picks, digest.maxItems);
+
+  // Only the heroes above the bundle block are placed when it is reached, so
+  // they are all the choice may account for.
+  const chosen = bundleForShopper(input, digest, placeableHeroSkus(aboveBundle, input, digest));
+  if (!chosen) return fitToShopper(spec, picks, digest.maxItems);
+
+  const spokenFor = new Set<string>(chosen.skus);
+  for (const sku of placeableHeroSkus(blocks, input, digest)) spokenFor.add(sku);
+
+  const roomLeft = digest.maxItems - spokenFor.size;
+  // A set is worth showing, but not at the cost of an empty grid.
+  if (roomLeft <= 0) return fitToShopper(spec, picks, digest.maxItems);
+
+  const forGrid: ProductPick[] = [];
+  for (const pick of picks) {
+    if (!spokenFor.has(pick.product.sku)) forGrid.push(pick);
+  }
+
+  return fitToShopper(spec, forGrid, roomLeft);
 }
 
 /** Attaches the provenance the server owns. The model never supplies any of it. */
@@ -425,9 +486,7 @@ export function createComponentGenerator(
       // from, and always against the facts of the shopper asking now.
       // A cohort spec names products chosen for whoever asked first.
       const served =
-        generation === 'cohort'
-          ? fitToShopper(answer.spec, selectProducts(input, digest), digest.maxItems)
-          : answer.spec;
+        generation === 'cohort' ? fitCohortSpec(answer.spec, input, digest) : answer.spec;
 
       const reconciled = reconcileSpec(served, input, digest);
       if (!reconciled.isUsable) {

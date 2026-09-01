@@ -4,7 +4,7 @@ import {
   type ComponentGeneratorOptions,
   type GenerationEvent,
 } from './component-generator.js';
-import type { GeneratedSpec } from './component-spec.js';
+import type { Block, GeneratedSpec } from './component-spec.js';
 import type { ComponentProvider } from './provider.js';
 import { createMemorySpecCache, createNullSpecCache } from './spec-cache.js';
 import type { TrackingInputDraft } from './tracking-input.js';
@@ -113,6 +113,52 @@ const bundleIdOf = (spec: { blocks: GeneratedSpec['blocks'] }): string | null =>
   }
   return null;
 };
+
+/** The product the hero kept, if it kept one. */
+const heroSkuOf = (spec: { blocks: GeneratedSpec['blocks'] }): string | null => {
+  for (const block of spec.blocks) {
+    if (block.kind === 'hero') return block.sku;
+  }
+  return null;
+};
+
+const heroBlock = (sku: string | null): Block => ({
+  kind: 'hero',
+  headline: 'Made for long days',
+  body: null,
+  sku,
+  ctaLabel: null,
+});
+
+// Only the number of slots matters in cohort mode: the products are replaced.
+const gridBlock = (skus: string[]): Block => ({
+  kind: 'grid',
+  title: null,
+  columns: 2,
+  items: skus.map((sku) => ({
+    sku,
+    basis: 'popular' as const,
+    reason: null,
+    badge: null,
+    emphasis: 'normal' as const,
+  })),
+});
+
+const bundleBlock: Block = {
+  kind: 'bundle',
+  title: 'Get set up',
+  body: null,
+  ctaLabel: null,
+  bundleId: null,
+};
+
+const specOf = (blocks: Block[]): GeneratedSpec => ({
+  tone: 'neutral',
+  headline: 'Picked for you',
+  subheadline: null,
+  blocks,
+  rationale: 'Test fixture.',
+});
 
 const generatorWith = (options: ComponentGeneratorOptions = {}) =>
   createComponentGenerator({ cache: createNullSpecCache(), ...options });
@@ -804,6 +850,239 @@ describe('generation modes', () => {
 
     expect(after.source).toBe('cache');
     expect(placedSkus(after)).toEqual(['TR-102']);
+  });
+});
+
+/**
+ * A cohort spec is refilled with this shopper's products, and the grid used to
+ * take the whole item budget. A bundle block found nothing left, so the set was
+ * dropped and the shop never showed one. The set is chosen first now, and the
+ * grid is handed what is left.
+ *
+ * A hero counts too: its product is never swapped, so it spends a slot before
+ * the grid gets any.
+ */
+describe('keeping room for the set', () => {
+  const CATALOG = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const SETS = [
+    { id: 'BUN-AB', skus: ['A', 'B'], price: 10 },
+    { id: 'BUN-CD', skus: ['C', 'D'], price: 20 },
+  ];
+
+  // C is in the cart, so BUN-CD is the better-fitting set and C is never
+  // recommended on its own. The products are alike otherwise, so the picks come
+  // back in SKU order: A, B, D, E, F.
+  const shopper = (overrides: Partial<TrackingInputDraft> = {}): TrackingInputDraft => ({
+    user: { id: 'S-0001', segment: 'loyalty' },
+    context: { surface: 'pdp' },
+    candidates: CATALOG.map((sku) => product(sku)),
+    bundles: SETS,
+    signals: { cart: [{ sku: 'C', at: 1_700_000_000_000 }] },
+    ...overrides,
+  });
+
+  const generatorFor = (spec: GeneratedSpec, options: ComponentGeneratorOptions = {}) =>
+    generatorWith({ provider: countingProvider(spec).provider, ...options });
+
+  /** Every product the page shows, the set's own members included. */
+  const shownProducts = (spec: { blocks: GeneratedSpec['blocks'] }): string[] => {
+    const shown: string[] = [];
+    for (const block of spec.blocks) {
+      if (block.kind === 'grid' || block.kind === 'carousel') {
+        for (const item of block.items) shown.push(item.sku);
+      }
+      if (block.kind === 'hero' && block.sku !== null) shown.push(block.sku);
+      if (block.kind === 'bundle' && block.bundleId !== null) {
+        const chosen = SETS.find((candidate) => candidate.id === block.bundleId);
+        if (chosen) for (const sku of chosen.skus) shown.push(sku);
+      }
+    }
+    return shown;
+  };
+
+  it('renders the grid and the set together', async () => {
+    const rendered = await generatorFor(
+      specOf([gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
+    ).generate(shopper());
+
+    expect(placedSkus(rendered)).toEqual(['A', 'B']);
+    expect(bundleIdOf(rendered)).toBe('BUN-CD');
+  });
+
+  it('fits a hero, a grid and a set inside the item budget', async () => {
+    const rendered = await generatorFor(
+      specOf([heroBlock('E'), gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
+    ).generate(shopper());
+
+    expect(heroSkuOf(rendered)).toBe('E');
+    expect(placedSkus(rendered)).toEqual(['A']);
+    expect(bundleIdOf(rendered)).toBe('BUN-CD');
+    // The hero, one grid item and both members of the set: four, the maximum.
+    expect(shownProducts(rendered)).toHaveLength(4);
+  });
+
+  it('renders the set the hero has left free, not the one it took a product from', async () => {
+    // D is the hero's, so BUN-CD is out of reach and BUN-AB is what is chosen.
+    const rendered = await generatorFor(
+      specOf([heroBlock('D'), gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
+    ).generate(shopper());
+
+    expect(heroSkuOf(rendered)).toBe('D');
+    expect(bundleIdOf(rendered)).toBe('BUN-AB');
+    expect(placedSkus(rendered)).toEqual(['E']);
+    expect(shownProducts(rendered)).toHaveLength(4);
+  });
+
+  it('renders the set it chose whichever side of it the hero sits', async () => {
+    // Nothing is placed when a bundle block comes first, so the set is picked
+    // without the hero, and the hero gives its product up as a repeat.
+    const rendered = await generatorFor(
+      specOf([bundleBlock, heroBlock('D'), gridBlock(['A', 'B', 'C', 'D'])]),
+    ).generate(shopper());
+
+    expect(bundleIdOf(rendered)).toBe('BUN-CD');
+    expect(heroSkuOf(rendered)).toBeNull();
+    expect(placedSkus(rendered)).toEqual(['A', 'B']);
+    expect(shownProducts(rendered)).toHaveLength(4);
+  });
+
+  it('gives the grid back the slot of a hero product this shopper cannot see', async () => {
+    const rendered = await generatorFor(
+      specOf([heroBlock('F'), gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
+    ).generate(
+      shopper({
+        candidates: CATALOG.map((sku) => product(sku, { isInStock: sku !== 'F' })),
+      }),
+    );
+
+    expect(heroSkuOf(rendered)).toBeNull();
+    expect(placedSkus(rendered)).toEqual(['A', 'B']);
+    expect(bundleIdOf(rendered)).toBe('BUN-CD');
+  });
+
+  it('gives the grid back the slot of a hero naming a product in the cart', async () => {
+    // C is the sibling's job, not the hero's: it is already in the cart, so the
+    // hero gives it up the same way it would give up an out-of-stock product.
+    const rendered = await generatorFor(
+      specOf([heroBlock('C'), gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
+    ).generate(shopper());
+
+    expect(heroSkuOf(rendered)).toBeNull();
+    expect(placedSkus(rendered)).toEqual(['A', 'B']);
+    expect(bundleIdOf(rendered)).toBe('BUN-CD');
+  });
+
+  it('counts a hero below the bundle block toward the room it reserves', async () => {
+    // E is the hero's and sits after the bundle block. The reservation has to
+    // count it too, or the carousel and grid ahead of it spend the slot first
+    // and the hero loses its product for want of budget.
+    const carousel: Block = {
+      kind: 'carousel',
+      title: null,
+      items: [{ sku: 'A', basis: 'popular', reason: null, badge: null, emphasis: 'normal' }],
+    };
+
+    const rendered = await generatorFor(
+      specOf([carousel, gridBlock(['A', 'B', 'C', 'D']), bundleBlock, heroBlock('E')]),
+    ).generate(shopper());
+
+    expect(heroSkuOf(rendered)).toBe('E');
+    expect(bundleIdOf(rendered)).toBe('BUN-CD');
+  });
+
+  it('keeps every product in the set out of the grid', async () => {
+    // A is in the cart, so BUN-AB is the set and B is the best pick left. The
+    // grid would have shown B if the set had not spoken for it first.
+    const rendered = await generatorFor(
+      specOf([gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
+    ).generate(shopper({ signals: { cart: [{ sku: 'A', at: 1_700_000_000_000 }] } }));
+
+    expect(bundleIdOf(rendered)).toBe('BUN-AB');
+    expect(placedSkus(rendered)).toEqual(['C', 'D']);
+    expect(shownProducts(rendered)).toHaveLength(4);
+  });
+
+  it('fills the whole grid when the spec has no bundle block', async () => {
+    const rendered = await generatorFor(specOf([gridBlock(['A', 'B', 'C', 'D'])])).generate(
+      shopper(),
+    );
+
+    expect(placedSkus(rendered)).toEqual(['A', 'B', 'D', 'E']);
+  });
+
+  it('fills the whole grid when the shop offers no sets', async () => {
+    const rendered = await generatorFor(
+      specOf([gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
+    ).generate(shopper({ bundles: [] }));
+
+    expect(placedSkus(rendered)).toEqual(['A', 'B', 'D', 'E']);
+    expect(bundleIdOf(rendered)).toBeNull();
+  });
+
+  it('keeps no room at all when the set would leave the grid empty', async () => {
+    // Three items, a hero and a set of two: reserving would leave the grid
+    // nothing. A set that does not render is better than a grid that does not.
+    const tight = shopper({ context: { surface: 'pdp', maxItems: 3 } });
+
+    const rendered = await generatorFor(
+      specOf([heroBlock('E'), gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
+    ).generate(tight);
+    const withoutSet = await generatorFor(
+      specOf([heroBlock('E'), gridBlock(['A', 'B', 'C', 'D'])]),
+    ).generate(tight);
+
+    expect(bundleIdOf(rendered)).toBeNull();
+    expect(placedSkus(rendered)).toEqual(placedSkus(withoutSet));
+    expect(heroSkuOf(rendered)).toBe('E');
+  });
+
+  it('keeps no room for a bundle block that is past the block cap', async () => {
+    const copy: Block = { kind: 'copy', title: null, body: 'Built for long days out.' };
+    const banner: Block = {
+      kind: 'banner',
+      tone: 'info',
+      text: 'Trail season is here.',
+      ctaLabel: null,
+    };
+
+    const rendered = await generatorFor(
+      specOf([gridBlock(['A', 'B', 'C', 'D']), copy, banner, copy, bundleBlock]),
+    ).generate(shopper());
+
+    expect(bundleIdOf(rendered)).toBeNull();
+    expect(placedSkus(rendered)).toEqual(['A', 'B', 'D', 'E']);
+  });
+
+  it('keeps a second bundle block from going over the item budget', async () => {
+    // Room is reserved for one set. The second bundle block finds nothing left
+    // once the first one has spent it, so it drops rather than going over.
+    const events: GenerationEvent[] = [];
+    const rendered = await generatorFor(
+      specOf([gridBlock(['A', 'B', 'C', 'D']), bundleBlock, bundleBlock]),
+      {
+        onEvent: (event) => events.push(event),
+      },
+    ).generate(shopper());
+
+    const bundleBlocks = rendered.blocks.filter((block) => block.kind === 'bundle');
+    expect(bundleBlocks).toHaveLength(1);
+    expect(bundleIdOf(rendered)).toBe('BUN-CD');
+    expect(shownProducts(rendered).length).toBeLessThanOrEqual(4);
+    expect(events[0]?.violations).toContain('no-bundle');
+  });
+
+  it('leaves per-shopper generation alone', async () => {
+    const spec = specOf([gridBlock(['A', 'B', 'D', 'E']), bundleBlock]);
+
+    const perShopper = await generatorFor(spec, { generation: 'per-shopper' }).generate(shopper());
+    const cohort = await generatorFor(spec).generate(shopper());
+
+    // Per-shopper keeps the model's own four products and the set is dropped.
+    expect(placedSkus(perShopper)).toEqual(['A', 'B', 'D', 'E']);
+    expect(bundleIdOf(perShopper)).toBeNull();
+
+    expect(placedSkus(cohort)).toEqual(['A', 'B']);
+    expect(bundleIdOf(cohort)).toBe('BUN-CD');
   });
 });
 
