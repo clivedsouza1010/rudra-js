@@ -30,7 +30,11 @@ describe('summarising a run', () => {
   });
 
   it('reads the cache hit rate off every view, not just the model ones', () => {
-    const result = summarise('c', [event({ source: 'cache' }), event()], PRICES);
+    const result = summarise(
+      'c',
+      [event({ source: 'cache' }), event({ calledModel: false })],
+      PRICES,
+    );
 
     expect(result.cacheHitRate).toBe(0.5);
   });
@@ -54,13 +58,13 @@ describe('summarising a run', () => {
 
   it('reports the middle and the tail of the timings', () => {
     const events: GenerationEvent[] = [];
-    for (let ms = 1; ms <= 100; ms += 1) events.push(event({ elapsedMs: ms }));
+    for (let ms = 1; ms <= 33; ms += 1) events.push(event({ elapsedMs: ms }));
 
     const result = summarise('c', events, PRICES);
 
-    expect(result.elapsedMs.median).toBe(50);
-    expect(result.elapsedMs.p95).toBe(95);
-    expect(result.elapsedMs.p99).toBe(99);
+    expect(result.elapsedMs.median).toBe(17);
+    expect(result.elapsedMs.p95).toBe(32);
+    expect(result.elapsedMs.p99).toBe(33);
   });
 
   it('groups violations by their kind', () => {
