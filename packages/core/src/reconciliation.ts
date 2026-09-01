@@ -42,8 +42,13 @@ const CLAMP = {
   rationale: 300,
 } as const;
 
-/** More than this and the component stops being a component. */
-const MAX_BLOCKS = 4;
+/**
+ * More than this and the component stops being a component.
+ *
+ * Exported because the fill pass has to read the same blocks this module will:
+ * one past the cap never renders, so nothing is worth reserving for it.
+ */
+export const MAX_BLOCKS = 4;
 
 export interface ReconcileResult {
   spec: GeneratedSpec;
@@ -436,6 +441,59 @@ function chooseBundle(
   }
 
   return best;
+}
+
+/**
+ * The set this shopper should get, decided before anything is placed.
+ *
+ * The generator needs the answer early, so it can keep the set's products out
+ * of the grid and keep room for them. `chooseBundle` stays private: this hands
+ * out the choice, not the machinery behind it.
+ *
+ * `spokenFor` is what the blocks above the bundle block will have placed by the
+ * time it is reached. Placing it here first is what makes the two choices agree:
+ * a set is only pre-chosen if reconciliation could still reach for it.
+ */
+export function bundleForShopper(
+  input: TrackingInput,
+  digest: SignalDigest,
+  spokenFor: readonly string[],
+): Bundle | undefined {
+  const allowlist = buildAllowlist(input, digest);
+  const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
+  const tracker = createPlacementTracker(digest.maxItems);
+
+  for (const sku of spokenFor) tracker.place(sku);
+
+  return chooseBundle(input.bundles, allowlist, digest, candidatesBySku, tracker);
+}
+
+/**
+ * The hero products these blocks will really place.
+ *
+ * A hero keeps the product the model named — its headline was written about
+ * that product — so it spends a slot of the item budget the grid cannot have.
+ * One this shopper cannot see is dropped below and spends nothing, so it is not
+ * counted here either.
+ */
+export function placeableHeroSkus(
+  blocks: readonly Block[],
+  input: TrackingInput,
+  digest: SignalDigest,
+): string[] {
+  const allowlist = buildAllowlist(input, digest);
+
+  const skus: string[] = [];
+  for (const block of blocks) {
+    if (block.kind !== 'hero') continue;
+    if (block.sku === null) continue;
+    if (!allowlist.allowed.has(block.sku) || allowlist.blocked.has(block.sku)) continue;
+    // Two heroes naming the same product: only the first one gets to place it.
+    if (skus.includes(block.sku)) continue;
+    skus.push(block.sku);
+  }
+
+  return skus;
 }
 
 function reconcileBlock(
