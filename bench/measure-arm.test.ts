@@ -14,7 +14,13 @@ import {
 import { generateCatalog } from '../examples/shop/src/fixtures/catalog.js';
 import { generateShoppers } from '../examples/shop/src/fixtures/shoppers.js';
 
-const PRICES: TokenPrices = { inputPerMillion: 15, outputPerMillion: 75 };
+// Four different numbers, so a cost test cannot pass with two of them swapped.
+const PRICES: TokenPrices = {
+  inputPerMillion: 5,
+  outputPerMillion: 25,
+  cacheWritePerMillion: 6.25,
+  cacheReadPerMillion: 0.5,
+};
 
 const event = (overrides: Partial<GenerationEvent> = {}): GenerationEvent => ({
   key: 'k',
@@ -82,7 +88,35 @@ describe('summarising a run', () => {
     const result = summarise('c', [event({ usage }), event({ calledModel: false, usage })], PRICES);
 
     expect(result.inputTokens).toBe(1_000_000);
-    expect(result.costPerThousandViews).toBe(7500);
+    // One million input tokens over two views: $5 spread over 2 views is
+    // $2,500 per thousand.
+    expect(result.costPerThousandViews).toBe(2500);
+  });
+
+  it('bills the cached prefix as well as the plain input', () => {
+    // A real call marks the system prompt as a cached prefix, so it reports
+    // four token counts and only two of them used to be billed.
+    // A different count for each field, so the four prices cannot be swapped
+    // around and still add up.
+    const usage = {
+      inputTokens: 1_000_000,
+      outputTokens: 2_000_000,
+      cacheWriteTokens: 4_000_000,
+      cacheReadTokens: 8_000_000,
+    };
+    const result = summarise('c', [event({ usage })], PRICES);
+
+    expect(result.cacheWriteTokens).toBe(4_000_000);
+    expect(result.cacheReadTokens).toBe(8_000_000);
+    // 1x5 + 2x25 + 4x6.25 + 8x0.5 is $84, over a single view.
+    expect(result.costPerThousandViews).toBe(84_000);
+  });
+
+  it('leaves the cache token counts at zero when the call reports none', () => {
+    const result = summarise('c', [event({ usage: { inputTokens: 10, outputTokens: 2 } })], PRICES);
+
+    expect(result.cacheWriteTokens).toBe(0);
+    expect(result.cacheReadTokens).toBe(0);
   });
 
   it('reports the middle and the tail of the timings', () => {
@@ -129,6 +163,8 @@ const resultWith = (sources: ArmResult['sources']): ArmResult => {
     modelCallsPerThousand: 0,
     inputTokens: 0,
     outputTokens: 0,
+    cacheWriteTokens: 0,
+    cacheReadTokens: 0,
     costPerThousandViews: 0,
     elapsedMs: { median: 0, p95: 0, p99: 0 },
     violations: {},

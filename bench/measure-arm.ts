@@ -14,6 +14,9 @@ import type { Shopper } from '../examples/shop/src/fixtures/shoppers.js';
 export interface TokenPrices {
   inputPerMillion: number;
   outputPerMillion: number;
+  /** A cached prefix is written once at a premium and read back cheaply. */
+  cacheWritePerMillion: number;
+  cacheReadPerMillion: number;
 }
 
 export interface ArmResult {
@@ -25,6 +28,10 @@ export interface ArmResult {
   modelCallsPerThousand: number;
   inputTokens: number;
   outputTokens: number;
+  // Kept apart from the input tokens rather than folded in, so a reader can
+  // re-price the cached prefix at read rates instead of write rates.
+  cacheWriteTokens: number;
+  cacheReadTokens: number;
   costPerThousandViews: number;
   elapsedMs: { median: number; p95: number; p99: number };
   violations: Record<string, number>;
@@ -49,6 +56,8 @@ export function summarise(
   let modelCalls = 0;
   let inputTokens = 0;
   let outputTokens = 0;
+  let cacheWriteTokens = 0;
+  let cacheReadTokens = 0;
 
   for (const event of events) {
     sources[event.source] += 1;
@@ -60,6 +69,8 @@ export function summarise(
       modelCalls += 1;
       inputTokens += event.usage?.inputTokens ?? 0;
       outputTokens += event.usage?.outputTokens ?? 0;
+      cacheWriteTokens += event.usage?.cacheWriteTokens ?? 0;
+      cacheReadTokens += event.usage?.cacheReadTokens ?? 0;
     }
 
     for (const violation of event.violations ?? []) {
@@ -72,7 +83,9 @@ export function summarise(
   const views = events.length;
   const cost =
     (inputTokens / 1_000_000) * prices.inputPerMillion +
-    (outputTokens / 1_000_000) * prices.outputPerMillion;
+    (outputTokens / 1_000_000) * prices.outputPerMillion +
+    (cacheWriteTokens / 1_000_000) * prices.cacheWritePerMillion +
+    (cacheReadTokens / 1_000_000) * prices.cacheReadPerMillion;
   timings.sort((left, right) => left - right);
 
   return {
@@ -84,6 +97,8 @@ export function summarise(
     modelCallsPerThousand: views === 0 ? 0 : (modelCalls / views) * 1000,
     inputTokens,
     outputTokens,
+    cacheWriteTokens,
+    cacheReadTokens,
     costPerThousandViews: views === 0 ? 0 : (cost / views) * 1000,
     elapsedMs: {
       median: percentile(timings, 0.5),

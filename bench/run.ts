@@ -10,11 +10,26 @@ import {
   type TokenPrices,
 } from './measure-arm.js';
 
-// Claude Opus list price, and the only place a price appears.
-const PRICES: TokenPrices = { inputPerMillion: 15, outputPerMillion: 75 };
+// claude-opus-5 list price, checked 2026-09-01. The only place a price
+// appears, and it goes into the result file so a stale one is visible there
+// and not only here. A cached prefix is written at 1.25x input and read back
+// at 0.1x.
+const PRICES: TokenPrices = {
+  inputPerMillion: 5,
+  outputPerMillion: 25,
+  cacheWritePerMillion: 6.25,
+  cacheReadPerMillion: 0.5,
+};
 
-// Copied from a real recorded call, so the stub bills like the model does.
-const RECORDED_USAGE = { inputTokens: 1539, outputTokens: 542 };
+// Copied whole from a real recorded claude-opus-5 call, so the stub bills like
+// the model does. That call is a cold one: it wrote the cached prefix and read
+// nothing back, and replaying it makes every call here a cold one too.
+const RECORDED_USAGE = {
+  inputTokens: 1539,
+  outputTokens: 542,
+  cacheWriteTokens: 3223,
+  cacheReadTokens: 0,
+};
 
 // The default cache TTL is 60 seconds, tuned for a live page render. A real
 // run with hundreds of model calls can take longer than that, and an entry
