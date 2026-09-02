@@ -1,4 +1,15 @@
-import type { GenerationEvent } from '@rudra-js/core';
+import {
+  createComponentGenerator,
+  type ComponentGeneratorOptions,
+  type ComponentProvider,
+  type GeneratedSpec,
+  type GenerationEvent,
+  type Product,
+  type ProductReference,
+  type TokenUsage,
+} from '@rudra-js/core';
+import { buildTrackingInput } from '../examples/shop/src/fixtures/tracking-input.js';
+import type { Shopper } from '../examples/shop/src/fixtures/shoppers.js';
 
 export interface TokenPrices {
   inputPerMillion: number;
@@ -118,4 +129,102 @@ export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
       `arm ${result.arm}: cache hit rate ${result.cacheHitRate.toFixed(3)} is above ${rule.maxCacheHitRate}`,
     );
   }
+}
+
+// Up to four, because one product that the shopper already has in their cart
+// is dropped by reconciliation and a single-item grid would empty.
+function candidateSkus(userPrompt: string, limit: number): string[] {
+  // Only the candidates section — the shopper section also has "- " lines.
+  const candidates = userPrompt.slice(userPrompt.indexOf('## Candidates'));
+  const skus: string[] = [];
+  for (const line of candidates.split('\n')) {
+    const match = line.match(/^- "([^"]+)"/);
+    if (match) skus.push(match[1]!);
+    if (skus.length === limit) break;
+  }
+  if (skus.length === 0) throw new Error('the stub found no candidate in the prompt');
+  return skus;
+}
+
+// The stub answers like a model does, with products from the list it was
+// shown. A SKU the shopper was never offered is dropped by reconciliation,
+// and the arm would fall back.
+export function createStubProvider(usage: TokenUsage): ComponentProvider {
+  return {
+    name: 'stub',
+    model: 'stub',
+    async generate(request) {
+      return { spec: buildStubSpec(candidateSkus(request.user, 4)), usage };
+    },
+  };
+}
+
+export interface ArmSpec {
+  name: string;
+  options: ComponentGeneratorOptions;
+  rule: SourceRule;
+}
+
+// Real traffic puts many shoppers on the same page, and the cohort key
+// includes the page's category — a unique product per shopper would mean a
+// unique cohort per shopper, and nothing would ever be shared.
+function skuFor(index: number, shopperCount: number, catalog: readonly Product[]): string {
+  const pages = Math.max(1, Math.floor(shopperCount / 10));
+  const inStock: Product[] = [];
+  for (const product of catalog) {
+    if (product.isInStock) inStock.push(product);
+  }
+  if (inStock.length === 0) throw new Error('the catalog has nothing in stock');
+  return inStock[(index % pages) % inStock.length]!.sku;
+}
+
+// The stub always answers with this, one grid item per SKU it picked from the
+// prompt.
+export function buildStubSpec(skus: readonly string[]): GeneratedSpec {
+  const items: ProductReference[] = [];
+  for (const sku of skus) {
+    items.push({ sku, basis: 'popular', reason: null, badge: null, emphasis: 'normal' });
+  }
+
+  return {
+    tone: 'neutral',
+    headline: 'More to see',
+    subheadline: null,
+    blocks: [
+      {
+        kind: 'grid',
+        title: 'Picked for you',
+        columns: 3,
+        items,
+      },
+    ],
+    rationale: 'A fixed spec, so the numbers measure the framework and not the model.',
+  };
+}
+
+export async function measureArm(
+  arm: ArmSpec,
+  shoppers: readonly Shopper[],
+  catalog: readonly Product[],
+  prices: TokenPrices,
+): Promise<ArmResult> {
+  const events: GenerationEvent[] = [];
+  const generator = createComponentGenerator({
+    ...arm.options,
+    onEvent: (event) => {
+      events.push(event);
+    },
+  });
+
+  // In population order on a cold cache: the first shopper of a cohort misses
+  // and the rest hit, which is what really happens.
+  for (let index = 0; index < shoppers.length; index += 1) {
+    const shopper = shoppers[index]!;
+    const sku = skuFor(index, shoppers.length, catalog);
+    await generator.generate(buildTrackingInput(shopper, sku, catalog, []));
+  }
+
+  const result = summarise(arm.name, events, prices);
+  assertSourceMix(result, arm.rule);
+  return result;
 }

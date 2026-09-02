@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { GenerationEvent } from '@rudra-js/core';
+import { generatedSpecSchema, type GenerationEvent, type ProviderRequest } from '@rudra-js/core';
 import {
   assertSourceMix,
+  createStubProvider,
+  measureArm,
   summarise,
   type ArmResult,
+  type ArmSpec,
   type SourceRule,
   type TokenPrices,
 } from './measure-arm.js';
+import { generateCatalog } from '../examples/shop/src/fixtures/catalog.js';
+import { generateShoppers } from '../examples/shop/src/fixtures/shoppers.js';
 
 const PRICES: TokenPrices = { inputPerMillion: 15, outputPerMillion: 75 };
 
@@ -158,5 +163,100 @@ describe('refusing a mislabelled arm', () => {
     expect(() =>
       assertSourceMix(resultWith({ llm: 1, cache: 0, fallback: 99 }), { fallback: 'all' }),
     ).toThrow(/reached a model/);
+  });
+});
+
+const catalog = generateCatalog(7, 40);
+const shoppers = generateShoppers(11, catalog).slice(0, 5);
+// The stub reads its SKU from the prompt, so it always answers with a
+// product the shopper was actually offered.
+const stub = () => createStubProvider({ inputTokens: 1000, outputTokens: 200 });
+
+describe('measuring one arm', () => {
+  it('reports a view for every shopper', async () => {
+    const arm: ArmSpec = { name: 'b', options: { provider: null }, rule: { fallback: 'all' } };
+    const result = await measureArm(arm, shoppers, catalog, PRICES);
+
+    expect(result.views).toBe(5);
+  });
+
+  it('calls no model on the deterministic arm', async () => {
+    const arm: ArmSpec = { name: 'b', options: { provider: null }, rule: { fallback: 'all' } };
+    const result = await measureArm(arm, shoppers, catalog, PRICES);
+
+    expect(result.modelCalls).toBe(0);
+    expect(result.sources.fallback).toBe(5);
+  });
+
+  it('serves later shoppers in a cohort from the cache', async () => {
+    // A bigger slice than the other tests: sharing a page is necessary for a
+    // cohort to form, but not enough on its own — segment and cold-start
+    // status still split shoppers into different cohorts, so a handful of
+    // shoppers is too small a sample to reliably land two of them in the
+    // same one. Twenty is also the point where a page holds more than one
+    // page's worth of shoppers, which is what tells this test apart from a
+    // run that puts everyone on a single page regardless of population size.
+    const cohortShoppers = generateShoppers(11, catalog).slice(0, 20);
+    const arm: ArmSpec = {
+      name: 'c',
+      options: { provider: stub(), generation: 'cohort' },
+      rule: { fallback: 'none' },
+    };
+    const result = await measureArm(arm, cohortShoppers, catalog, PRICES);
+
+    expect(result.sources.fallback).toBe(0);
+    expect(result.modelCalls).toBeLessThan(result.views);
+    // The exact count, not just "fewer than everyone": a run that collapsed
+    // every shopper onto one page would still show fewer calls than views,
+    // so that relation alone cannot tell a spread-out population from a
+    // squashed one. Nine is the number of distinct cohorts this seeded
+    // population of twenty actually forms.
+    expect(result.modelCalls).toBe(9);
+  });
+
+  it('calls the model for every shopper in per-shopper mode', async () => {
+    const arm: ArmSpec = {
+      name: 'd',
+      options: { provider: stub(), generation: 'per-shopper' },
+      rule: { fallback: 'none' },
+    };
+    const result = await measureArm(arm, shoppers, catalog, PRICES);
+
+    expect(result.modelCalls).toBe(5);
+    expect(result.sources.cache).toBe(0);
+    expect(result.inputTokens).toBeGreaterThan(0);
+  });
+
+  it('throws rather than report a cohort run that never reached a model', async () => {
+    // The mislabelling case, end to end: arm (b)'s options under arm (c)'s rule.
+    const arm: ArmSpec = { name: 'c', options: { provider: null }, rule: { fallback: 'none' } };
+
+    await expect(measureArm(arm, shoppers, catalog, PRICES)).rejects.toThrow(/fell back/);
+  });
+
+  it('gives the same numbers twice', async () => {
+    const build = (): ArmSpec => ({
+      name: 'c',
+      options: { provider: stub(), generation: 'cohort' },
+      rule: { fallback: 'none' },
+    });
+
+    const first = await measureArm(build(), shoppers, catalog, PRICES);
+    const second = await measureArm(build(), shoppers, catalog, PRICES);
+
+    expect(second.sources).toEqual(first.sources);
+    expect(second.modelCalls).toBe(first.modelCalls);
+  });
+
+  it('throws when the prompt has no candidates section', async () => {
+    const provider = createStubProvider({ inputTokens: 0, outputTokens: 0 });
+    const request: ProviderRequest = {
+      system: '',
+      user: '## Shopper\n\nSegment: "loyalty"',
+      schema: generatedSpecSchema,
+      signal: new AbortController().signal,
+    };
+
+    await expect(provider.generate(request)).rejects.toThrow(/no candidate/);
   });
 });

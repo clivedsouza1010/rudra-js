@@ -1,5 +1,5 @@
 import type { Product } from '@rudra-js/core';
-import { createSeededRandom } from './seeded-random';
+import { createSeededRandom } from './seeded-random.js';
 
 export interface Shopper {
   id: string;

@@ -1,5 +1,5 @@
 import { productSchema, type Product } from '@rudra-js/core';
-import { createSeededRandom } from './seeded-random';
+import { createSeededRandom } from './seeded-random.js';
 
 const CATEGORIES = [
   'Trail Running',
