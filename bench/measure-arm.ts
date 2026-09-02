@@ -19,8 +19,30 @@ export interface TokenPrices {
   cacheReadPerMillion: number;
 }
 
+/**
+ * Where an arm's numbers came from.
+ *
+ * 'stub' is a fixed answer with a recorded call's token counts. 'replay' is a
+ * recording of real answers. 'live' is a real model, on the network, billing.
+ * The numbers read the same in all three, which is why the run has to say
+ * which one it was.
+ */
+export type ArmMode = 'stub' | 'replay' | 'live';
+
+/** What an arm claims about itself, next to what actually answered it. */
+export interface ArmIdentity {
+  name: string;
+  mode: ArmMode;
+  /** Null when the arm runs without a provider at all. */
+  providerName: string | null;
+  providerModel: string | null;
+}
+
 export interface ArmResult {
   arm: string;
+  mode: ArmMode;
+  providerName: string | null;
+  providerModel: string | null;
   views: number;
   sources: { llm: number; cache: number; fallback: number };
   cacheHitRate: number;
@@ -46,7 +68,7 @@ function percentile(sorted: readonly number[], fraction: number): number {
 }
 
 export function summarise(
-  arm: string,
+  identity: ArmIdentity,
   events: readonly GenerationEvent[],
   prices: TokenPrices,
 ): ArmResult {
@@ -89,7 +111,10 @@ export function summarise(
   timings.sort((left, right) => left - right);
 
   return {
-    arm,
+    arm: identity.name,
+    mode: identity.mode,
+    providerName: identity.providerName,
+    providerModel: identity.providerModel,
     views,
     sources,
     cacheHitRate: views === 0 ? 0 : sources.cache / views,
@@ -129,6 +154,22 @@ export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
   // A run that measured nothing cannot be evidence of anything.
   if (result.views === 0) {
     throw new Error(`arm ${result.arm}: no views were measured`);
+  }
+
+  // The mode is typed into the arm by hand; the provider name comes off
+  // whatever object answered the calls. Two different sources, so they can
+  // disagree — and a run labelled live that a stub answered is the exact
+  // mistake this benchmark was written after.
+  const stubbed = result.providerName === null || result.providerName === 'stub';
+  if (result.mode !== 'stub' && stubbed) {
+    throw new Error(
+      `arm ${result.arm}: this arm says '${result.mode}', but nothing but a stub answered it`,
+    );
+  }
+  if (result.mode === 'stub' && !stubbed) {
+    throw new Error(
+      `arm ${result.arm}: this arm says 'stub', but the provider ${result.providerName} answered it, which is a real one and bills`,
+    );
   }
   const { fallback } = result.sources;
   if (rule.fallback === 'none' && fallback > 0) {
@@ -191,6 +232,8 @@ export function createStubProvider(usage: TokenUsage): ComponentProvider {
 
 export interface ArmSpec {
   name: string;
+  /** Checked against the provider that answers, so a wrong one throws. */
+  mode: ArmMode;
   options: ComponentGeneratorOptions;
   rule: SourceRule;
 }
@@ -279,7 +322,17 @@ export async function measureArm(
     await generator.generate(buildTrackingInput(shopper, sku, catalog, []));
   }
 
-  const result = summarise(arm.name, events, prices);
+  const provider = arm.options.provider ?? null;
+  const result = summarise(
+    {
+      name: arm.name,
+      mode: arm.mode,
+      providerName: provider === null ? null : provider.name,
+      providerModel: provider === null ? null : provider.model,
+    },
+    events,
+    prices,
+  );
   assertSourceMix(result, arm.rule);
   return result;
 }

@@ -6,6 +6,7 @@ import {
   measureArm,
   skuFor,
   summarise,
+  type ArmIdentity,
   type ArmResult,
   type ArmSpec,
   type SourceRule,
@@ -30,10 +31,18 @@ const event = (overrides: Partial<GenerationEvent> = {}): GenerationEvent => ({
   ...overrides,
 });
 
+const identity = (name: string, overrides: Partial<ArmIdentity> = {}): ArmIdentity => ({
+  name,
+  mode: 'stub',
+  providerName: 'stub',
+  providerModel: 'stub',
+  ...overrides,
+});
+
 describe('summarising a run', () => {
   it('counts each source', () => {
     const result = summarise(
-      'c',
+      identity('c'),
       [
         event(),
         event({ source: 'cache' }),
@@ -49,7 +58,7 @@ describe('summarising a run', () => {
 
   it('reads the cache hit rate off every view, not just the model ones', () => {
     const result = summarise(
-      'c',
+      identity('c'),
       [event({ source: 'cache' }), event({ calledModel: false })],
       PRICES,
     );
@@ -59,7 +68,7 @@ describe('summarising a run', () => {
 
   it('counts only the requests that were sent', () => {
     // A request that joined an in-flight generation did not call the model.
-    const result = summarise('c', [event(), event({ calledModel: false })], PRICES);
+    const result = summarise(identity('c'), [event(), event({ calledModel: false })], PRICES);
 
     expect(result.modelCalls).toBe(1);
   });
@@ -68,7 +77,7 @@ describe('summarising a run', () => {
     // One call in four views is 250 calls per thousand. This number is written
     // into the result file, so it needs an assertion of its own.
     const result = summarise(
-      'c',
+      identity('c'),
       [
         event(),
         event({ calledModel: false }),
@@ -85,7 +94,11 @@ describe('summarising a run', () => {
     // Both events carry the same usage, because the second joined the first.
     // Summing both would double the bill.
     const usage = { inputTokens: 1_000_000, outputTokens: 0 };
-    const result = summarise('c', [event({ usage }), event({ calledModel: false, usage })], PRICES);
+    const result = summarise(
+      identity('c'),
+      [event({ usage }), event({ calledModel: false, usage })],
+      PRICES,
+    );
 
     expect(result.inputTokens).toBe(1_000_000);
     // One million input tokens over two views: $5 spread over 2 views is
@@ -104,7 +117,7 @@ describe('summarising a run', () => {
       cacheWriteTokens: 4_000_000,
       cacheReadTokens: 8_000_000,
     };
-    const result = summarise('c', [event({ usage })], PRICES);
+    const result = summarise(identity('c'), [event({ usage })], PRICES);
 
     expect(result.cacheWriteTokens).toBe(4_000_000);
     expect(result.cacheReadTokens).toBe(8_000_000);
@@ -113,7 +126,11 @@ describe('summarising a run', () => {
   });
 
   it('leaves the cache token counts at zero when the call reports none', () => {
-    const result = summarise('c', [event({ usage: { inputTokens: 10, outputTokens: 2 } })], PRICES);
+    const result = summarise(
+      identity('c'),
+      [event({ usage: { inputTokens: 10, outputTokens: 2 } })],
+      PRICES,
+    );
 
     expect(result.cacheWriteTokens).toBe(0);
     expect(result.cacheReadTokens).toBe(0);
@@ -123,7 +140,7 @@ describe('summarising a run', () => {
     const events: GenerationEvent[] = [];
     for (let ms = 1; ms <= 33; ms += 1) events.push(event({ elapsedMs: ms }));
 
-    const result = summarise('c', events, PRICES);
+    const result = summarise(identity('c'), events, PRICES);
 
     expect(result.elapsedMs.median).toBe(17);
     expect(result.elapsedMs.p95).toBe(32);
@@ -132,7 +149,7 @@ describe('summarising a run', () => {
 
   it('groups violations by their kind', () => {
     const result = summarise(
-      'c',
+      identity('c'),
       [
         event({ violations: ['unknown-sku:A', 'unknown-sku:B', 'empty-block:grid'] }),
         event({ violations: ['no-bundle'] }),
@@ -144,7 +161,11 @@ describe('summarising a run', () => {
   });
 
   it('reports zeroes for a run that called no model', () => {
-    const result = summarise('b', [event({ source: 'fallback', calledModel: false })], PRICES);
+    const result = summarise(
+      identity('b'),
+      [event({ source: 'fallback', calledModel: false })],
+      PRICES,
+    );
 
     expect(result.modelCalls).toBe(0);
     expect(result.costPerThousandViews).toBe(0);
@@ -152,10 +173,16 @@ describe('summarising a run', () => {
   });
 });
 
-const resultWith = (sources: ArmResult['sources']): ArmResult => {
+const resultWith = (
+  sources: ArmResult['sources'],
+  overrides: Partial<ArmResult> = {},
+): ArmResult => {
   const views = sources.llm + sources.cache + sources.fallback;
   return {
     arm: 'test',
+    mode: 'stub',
+    providerName: 'stub',
+    providerModel: 'stub',
     views,
     sources,
     cacheHitRate: views === 0 ? 0 : sources.cache / views,
@@ -168,6 +195,7 @@ const resultWith = (sources: ArmResult['sources']): ArmResult => {
     costPerThousandViews: 0,
     elapsedMs: { median: 0, p95: 0, p99: 0 },
     violations: {},
+    ...overrides,
   };
 };
 
@@ -217,6 +245,48 @@ describe('refusing a mislabelled arm', () => {
     expect(() =>
       assertSourceMix(resultWith({ llm: 1, cache: 0, fallback: 99 }), { fallback: 'all' }),
     ).toThrow(/reached a model/);
+  });
+
+  it('refuses a run labelled live that the stub answered', () => {
+    // The failure this whole benchmark exists to catch: numbers measured with
+    // the model switched off, published under a heading saying it was on. The
+    // label is written by hand in the arm; the name comes off whatever object
+    // actually answered, so the two can disagree.
+    const result = resultWith(
+      { llm: 10, cache: 90, fallback: 0 },
+      { mode: 'live', providerName: 'stub', providerModel: 'stub' },
+    );
+
+    expect(() => assertSourceMix(result, { fallback: 'none' })).toThrow(/nothing but a stub/);
+  });
+
+  it('refuses a run labelled live that had no provider at all', () => {
+    const result = resultWith(
+      { llm: 0, cache: 0, fallback: 100 },
+      { mode: 'replay', providerName: null, providerModel: null },
+    );
+
+    expect(() => assertSourceMix(result, { fallback: 'all' })).toThrow(/nothing but a stub/);
+  });
+
+  it('refuses a run labelled stub that a real provider answered', () => {
+    // The other direction, which bills money: whoever runs this expects a
+    // stub and gets an invoice.
+    const result = resultWith(
+      { llm: 100, cache: 0, fallback: 0 },
+      { mode: 'stub', providerName: 'anthropic', providerModel: 'claude-opus-5' },
+    );
+
+    expect(() => assertSourceMix(result, { fallback: 'none' })).toThrow(/provider anthropic/);
+  });
+
+  it('accepts the no-model arm as a stub run', () => {
+    const result = resultWith(
+      { llm: 0, cache: 0, fallback: 100 },
+      { mode: 'stub', providerName: null, providerModel: null },
+    );
+
+    expect(() => assertSourceMix(result, { fallback: 'all' })).not.toThrow();
   });
 
   it('refuses a run where every view fell back but the model was still called', () => {
@@ -298,14 +368,24 @@ describe('choosing which page a shopper looks at', () => {
 
 describe('measuring one arm', () => {
   it('reports a view for every shopper', async () => {
-    const arm: ArmSpec = { name: 'b', options: { provider: null }, rule: { fallback: 'all' } };
+    const arm: ArmSpec = {
+      name: 'b',
+      mode: 'stub',
+      options: { provider: null },
+      rule: { fallback: 'all' },
+    };
     const result = await measureArm(arm, shoppers, catalog, PRICES);
 
     expect(result.views).toBe(5);
   });
 
   it('calls no model on the deterministic arm', async () => {
-    const arm: ArmSpec = { name: 'b', options: { provider: null }, rule: { fallback: 'all' } };
+    const arm: ArmSpec = {
+      name: 'b',
+      mode: 'stub',
+      options: { provider: null },
+      rule: { fallback: 'all' },
+    };
     const result = await measureArm(arm, shoppers, catalog, PRICES);
 
     expect(result.modelCalls).toBe(0);
@@ -323,6 +403,7 @@ describe('measuring one arm', () => {
     const cohortShoppers = generateShoppers(11, catalog).slice(0, 20);
     const arm: ArmSpec = {
       name: 'c',
+      mode: 'stub',
       options: { provider: stub(), generation: 'cohort' },
       rule: { fallback: 'none' },
     };
@@ -337,6 +418,33 @@ describe('measuring one arm', () => {
     expect(result.modelCalls).toBe(9);
   });
 
+  it('records the mode and the provider that answered', async () => {
+    const arm: ArmSpec = {
+      name: 'd',
+      mode: 'stub',
+      options: { provider: stub(), generation: 'per-shopper' },
+      rule: { fallback: 'none' },
+    };
+    const result = await measureArm(arm, shoppers, catalog, PRICES);
+
+    expect(result.mode).toBe('stub');
+    expect(result.providerName).toBe('stub');
+    expect(result.providerModel).toBe('stub');
+  });
+
+  it('records no provider for the arm that runs without one', async () => {
+    const arm: ArmSpec = {
+      name: 'b',
+      mode: 'stub',
+      options: { provider: null },
+      rule: { fallback: 'all' },
+    };
+    const result = await measureArm(arm, shoppers, catalog, PRICES);
+
+    expect(result.providerName).toBe(null);
+    expect(result.providerModel).toBe(null);
+  });
+
   it('hands the shoppers-per-page down to the run', async () => {
     // The same twenty shoppers as the cohort test above, five to a page
     // instead of ten: four pages instead of two, so more cohorts form and the
@@ -345,6 +453,7 @@ describe('measuring one arm', () => {
     const cohortShoppers = generateShoppers(11, catalog).slice(0, 20);
     const arm: ArmSpec = {
       name: 'c',
+      mode: 'stub',
       options: { provider: stub(), generation: 'cohort' },
       rule: { fallback: 'none' },
     };
@@ -356,6 +465,7 @@ describe('measuring one arm', () => {
   it('calls the model for every shopper in per-shopper mode', async () => {
     const arm: ArmSpec = {
       name: 'd',
+      mode: 'stub',
       options: { provider: stub(), generation: 'per-shopper' },
       rule: { fallback: 'none' },
     };
@@ -368,7 +478,12 @@ describe('measuring one arm', () => {
 
   it('throws rather than report a cohort run that never reached a model', async () => {
     // The mislabelling case, end to end: arm (b)'s options under arm (c)'s rule.
-    const arm: ArmSpec = { name: 'c', options: { provider: null }, rule: { fallback: 'none' } };
+    const arm: ArmSpec = {
+      name: 'c',
+      mode: 'stub',
+      options: { provider: null },
+      rule: { fallback: 'none' },
+    };
 
     await expect(measureArm(arm, shoppers, catalog, PRICES)).rejects.toThrow(/fell back/);
   });
@@ -376,6 +491,7 @@ describe('measuring one arm', () => {
   it('gives the same numbers twice', async () => {
     const build = (): ArmSpec => ({
       name: 'c',
+      mode: 'stub',
       options: { provider: stub(), generation: 'cohort' },
       rule: { fallback: 'none' },
     });

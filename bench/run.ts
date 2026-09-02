@@ -5,10 +5,12 @@ import { generateShoppers } from '../examples/shop/src/fixtures/shoppers.js';
 import {
   createStubProvider,
   measureArm,
+  SHOPPERS_PER_PAGE,
   type ArmResult,
   type ArmSpec,
   type TokenPrices,
 } from './measure-arm.js';
+import { buildReport, formatTable } from './report.js';
 
 // claude-opus-5 list price, checked 2026-09-01. The only place a price
 // appears, and it goes into the result file so a stale one is visible there
@@ -37,24 +39,6 @@ const RECORDED_USAGE = {
 // cohorting. Long enough that the measurement never depends on the clock.
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
-function table(results: readonly ArmResult[]): string {
-  const lines: string[] = [];
-  lines.push(
-    '| Arm | Views | Model calls | LLM/Cache/Fallback | Cache hits | Cost / 1k views | Median ms | p95 | p99 |',
-  );
-  lines.push('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |');
-  for (const result of results) {
-    const hits = `${(result.cacheHitRate * 100).toFixed(1)}%`;
-    const cost = `$${result.costPerThousandViews.toFixed(2)}`;
-    const mix = `${result.sources.llm}/${result.sources.cache}/${result.sources.fallback}`;
-    lines.push(
-      `| ${result.arm} | ${result.views} | ${result.modelCalls} | ${mix} | ${hits} | ${cost} | ` +
-        `${result.elapsedMs.median} | ${result.elapsedMs.p95} | ${result.elapsedMs.p99} |`,
-    );
-  }
-  return lines.join('\n');
-}
-
 async function main(): Promise<void> {
   const catalog = generateCatalog(1);
   const shoppers = generateShoppers(2, catalog);
@@ -62,17 +46,19 @@ async function main(): Promise<void> {
   const arms: ArmSpec[] = [
     {
       name: 'b deterministic',
+      mode: 'stub',
       options: { provider: null },
       rule: { fallback: 'all', modelCalls: 'none' },
     },
     {
       name: 'c cohort',
+      mode: 'stub',
       options: {
         provider: createStubProvider(RECORDED_USAGE),
         generation: 'cohort',
         cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
       },
-      // Both a floor and a ceiling: this fixture (ten shoppers per page,
+      // Both a floor and a ceiling: this fixture (ten shoppers to a page,
       // four shopper segments) lands cohort caching around 54%. A run that
       // collapsed back to one page per cohort would print ~98% and pass a
       // floor alone — a ceiling is what would have caught that.
@@ -80,6 +66,7 @@ async function main(): Promise<void> {
     },
     {
       name: 'd per-shopper',
+      mode: 'stub',
       options: {
         provider: createStubProvider(RECORDED_USAGE),
         generation: 'per-shopper',
@@ -95,19 +82,24 @@ async function main(): Promise<void> {
     results.push(await measureArm(arm, shoppers, catalog, PRICES));
   }
 
-  mkdirSync('bench/results', { recursive: true });
-  const stamp = new Date().toISOString().replaceAll(':', '-');
-  writeFileSync(`bench/results/${stamp}.json`, `${JSON.stringify(results, null, 2)}\n`);
+  const generatedAt = new Date().toISOString();
+  const report = buildReport({
+    arms: results,
+    prices: PRICES,
+    population: shoppers.length,
+    shoppersPerPage: SHOPPERS_PER_PAGE,
+    generatedAt,
+  });
 
-  console.log(table(results));
+  mkdirSync('bench/results', { recursive: true });
+  const stamp = generatedAt.replaceAll(':', '-');
+  writeFileSync(`bench/results/${stamp}.json`, `${JSON.stringify(report, null, 2)}\n`);
+
+  console.log(formatTable(report.arms));
   console.log();
-  console.log('Median ms, p95 and p99 come from the stub, not from a real model call.');
-  console.log(
-    'Input/output tokens and cost are one real recorded call, replayed for every model call — not what the model actually said each time.',
-  );
-  console.log(
-    'Cache hit rate is set by this fixture: ten shoppers per page and four shopper segments. A different population or segment count moves it.',
-  );
+  for (const caveat of report.caveats) {
+    console.log(caveat);
+  }
   for (const result of results) {
     console.log(`\n${result.arm} violations:`, result.violations);
   }
