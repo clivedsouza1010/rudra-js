@@ -195,10 +195,27 @@ export interface ArmSpec {
   rule: SourceRule;
 }
 
+/**
+ * How many shoppers look at the same page.
+ *
+ * This one number sets the headline cache hit rate: it decides how many
+ * shoppers can share a cohort, and nothing else in the run moves it as much.
+ * Ten is an assumption about traffic, not a measurement — an earlier
+ * ten-per-cohort figure was withdrawn because it counted a different page
+ * assignment. It is a parameter and it goes into the result file so whoever
+ * writes the numbers up can say what was assumed, or sweep it.
+ */
+export const SHOPPERS_PER_PAGE = 10;
+
 // Real traffic puts many shoppers on the same page, and the cohort key
 // includes the page's category — a unique product per shopper would mean a
 // unique cohort per shopper, and nothing would ever be shared.
-export function skuFor(index: number, shopperCount: number, catalog: readonly Product[]): string {
+export function skuFor(
+  index: number,
+  shopperCount: number,
+  catalog: readonly Product[],
+  shoppersPerPage: number = SHOPPERS_PER_PAGE,
+): string {
   const inStock: Product[] = [];
   for (const product of catalog) {
     if (product.isInStock) inStock.push(product);
@@ -211,7 +228,7 @@ export function skuFor(index: number, shopperCount: number, catalog: readonly Pr
   // hit rate — the exact distortion this whole benchmark exists to measure
   // honestly. Once there are more pages than products, one page per product
   // is the most pages there can honestly be.
-  const pages = Math.min(Math.max(1, Math.floor(shopperCount / 10)), inStock.length);
+  const pages = Math.min(Math.max(1, Math.floor(shopperCount / shoppersPerPage)), inStock.length);
   return inStock[index % pages]!.sku;
 }
 
@@ -244,6 +261,7 @@ export async function measureArm(
   shoppers: readonly Shopper[],
   catalog: readonly Product[],
   prices: TokenPrices,
+  shoppersPerPage: number = SHOPPERS_PER_PAGE,
 ): Promise<ArmResult> {
   const events: GenerationEvent[] = [];
   const generator = createComponentGenerator({
@@ -257,7 +275,7 @@ export async function measureArm(
   // and the rest hit, which is what really happens.
   for (let index = 0; index < shoppers.length; index += 1) {
     const shopper = shoppers[index]!;
-    const sku = skuFor(index, shoppers.length, catalog);
+    const sku = skuFor(index, shoppers.length, catalog, shoppersPerPage);
     await generator.generate(buildTrackingInput(shopper, sku, catalog, []));
   }
 

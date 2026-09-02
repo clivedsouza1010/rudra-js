@@ -238,6 +238,36 @@ const shoppers = generateShoppers(11, catalog).slice(0, 5);
 const stub = () => createStubProvider({ inputTokens: 1000, outputTokens: 200 });
 
 describe('choosing which page a shopper looks at', () => {
+  it('opens more pages when fewer shoppers share one', () => {
+    // Shoppers per page is the whole cache hit rate, so it has to be a knob
+    // and not a number buried in the middle of the function.
+    const shopperCount = 20;
+
+    const skusAtFive = new Set<string>();
+    for (let index = 0; index < shopperCount; index += 1) {
+      skusAtFive.add(skuFor(index, shopperCount, catalog, 5));
+    }
+
+    const skusAtTwenty = new Set<string>();
+    for (let index = 0; index < shopperCount; index += 1) {
+      skusAtTwenty.add(skuFor(index, shopperCount, catalog, 20));
+    }
+
+    expect(skusAtFive.size).toBe(4);
+    expect(skusAtTwenty.size).toBe(1);
+  });
+
+  it('puts ten shoppers on a page when nobody says otherwise', () => {
+    const shopperCount = 20;
+
+    const skus = new Set<string>();
+    for (let index = 0; index < shopperCount; index += 1) {
+      skus.add(skuFor(index, shopperCount, catalog));
+    }
+
+    expect(skus.size).toBe(2);
+  });
+
   it('spreads a population bigger than the catalog evenly, one page per product', () => {
     const inStockSkus: string[] = [];
     for (const product of catalog) {
@@ -305,6 +335,22 @@ describe('measuring one arm', () => {
     // squashed one. Nine is the number of distinct cohorts this seeded
     // population of twenty actually forms.
     expect(result.modelCalls).toBe(9);
+  });
+
+  it('hands the shoppers-per-page down to the run', async () => {
+    // The same twenty shoppers as the cohort test above, five to a page
+    // instead of ten: four pages instead of two, so more cohorts form and the
+    // model is called more often. Fourteen is what this seeded population
+    // forms at five to a page.
+    const cohortShoppers = generateShoppers(11, catalog).slice(0, 20);
+    const arm: ArmSpec = {
+      name: 'c',
+      options: { provider: stub(), generation: 'cohort' },
+      rule: { fallback: 'none' },
+    };
+    const result = await measureArm(arm, cohortShoppers, catalog, PRICES, 5);
+
+    expect(result.modelCalls).toBe(14);
   });
 
   it('calls the model for every shopper in per-shopper mode', async () => {
