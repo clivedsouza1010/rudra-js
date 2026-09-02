@@ -99,6 +99,13 @@ export interface SourceRule {
   fallback: 'none' | 'all';
   minCacheHitRate?: number;
   maxCacheHitRate?: number;
+  /**
+   * 'none' means the arm must not have called a model at all. This is a
+   * different check than `fallback: 'all'`: a call that timed out or errored
+   * still counts as `calledModel`, and still bills, even though its source
+   * comes back as fallback. `fallback: 'all'` alone would not catch that.
+   */
+  modelCalls?: 'none';
 }
 
 // A run whose sources do not match its arm is a different arm under the wrong
@@ -117,6 +124,11 @@ export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
   if (rule.fallback === 'all' && fallback !== result.views) {
     throw new Error(
       `arm ${result.arm}: ${result.views - fallback} of ${result.views} views reached a model, but this arm runs without one`,
+    );
+  }
+  if (rule.modelCalls === 'none' && result.modelCalls > 0) {
+    throw new Error(
+      `arm ${result.arm}: ${result.modelCalls} of ${result.views} views called a model, but this arm must not call one at all`,
     );
   }
   if (rule.minCacheHitRate !== undefined && result.cacheHitRate < rule.minCacheHitRate) {

@@ -31,8 +31,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      # No dependency of this workspace needs an install script to be usable
-      # (the only one in the tree is fsevents, which is darwin-only), so do not
+      # Some dependencies in the tree do carry an install script (esbuild's
+      # postinstall sets up its binary, and it is not darwin-only), but none
+      # of them need to run for this workspace to build and test, so do not
       # run arbitrary code from the dependency graph on every CI run.
       - run: npm ci --ignore-scripts
 

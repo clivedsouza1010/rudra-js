@@ -165,6 +165,17 @@ describe('refusing a mislabelled arm', () => {
       assertSourceMix(resultWith({ llm: 1, cache: 0, fallback: 99 }), { fallback: 'all' }),
     ).toThrow(/reached a model/);
   });
+
+  it('refuses a run where every view fell back but the model was still called', () => {
+    // A provider that times out or errors still calls the model and still
+    // bills for it, even though its source comes back as fallback.
+    // `fallback: 'all'` alone does not see this; `modelCalls: 'none'` does.
+    const result: ArmResult = { ...resultWith({ llm: 0, cache: 0, fallback: 100 }), modelCalls: 5 };
+
+    expect(() => assertSourceMix(result, { fallback: 'all', modelCalls: 'none' })).toThrow(
+      /called a model/,
+    );
+  });
 });
 
 const catalog = generateCatalog(7, 40);
