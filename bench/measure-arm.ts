@@ -55,7 +55,9 @@ export interface ArmResult {
   cacheWriteTokens: number;
   cacheReadTokens: number;
   costPerThousandViews: number;
-  elapsedMs: { median: number; p95: number; p99: number };
+  // Absent for a stub run. The stub answers far below the millisecond that
+  // Date.now() can see, so its median is a 0 dressed up as a measurement.
+  elapsedMs?: { median: number; p95: number; p99: number };
   violations: Record<string, number>;
 }
 
@@ -125,11 +127,15 @@ export function summarise(
     cacheWriteTokens,
     cacheReadTokens,
     costPerThousandViews: views === 0 ? 0 : (cost / views) * 1000,
-    elapsedMs: {
-      median: percentile(timings, 0.5),
-      p95: percentile(timings, 0.95),
-      p99: percentile(timings, 0.99),
-    },
+    ...(identity.mode === 'stub'
+      ? {}
+      : {
+          elapsedMs: {
+            median: percentile(timings, 0.5),
+            p95: percentile(timings, 0.95),
+            p99: percentile(timings, 0.99),
+          },
+        }),
     violations,
   };
 }

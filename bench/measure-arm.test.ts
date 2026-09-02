@@ -140,11 +140,27 @@ describe('summarising a run', () => {
     const events: GenerationEvent[] = [];
     for (let ms = 1; ms <= 33; ms += 1) events.push(event({ elapsedMs: ms }));
 
+    const result = summarise(
+      identity('c', { mode: 'replay', providerName: 'recording', providerModel: 'claude-opus-5' }),
+      events,
+      PRICES,
+    );
+
+    expect(result.elapsedMs?.median).toBe(17);
+    expect(result.elapsedMs?.p95).toBe(32);
+    expect(result.elapsedMs?.p99).toBe(33);
+  });
+
+  it('reports no timings at all for a stub run', () => {
+    // The stub answers far below a millisecond, so Date.now() reads 0 or 1 for
+    // every view. Writing that down as a median is writing down a result the
+    // run did not measure.
+    const events: GenerationEvent[] = [];
+    for (let ms = 0; ms <= 5; ms += 1) events.push(event({ elapsedMs: ms }));
+
     const result = summarise(identity('c'), events, PRICES);
 
-    expect(result.elapsedMs.median).toBe(17);
-    expect(result.elapsedMs.p95).toBe(32);
-    expect(result.elapsedMs.p99).toBe(33);
+    expect(result.elapsedMs).toBe(undefined);
   });
 
   it('groups violations by their kind', () => {

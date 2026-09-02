@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildReport, formatTable } from './report.js';
+import { buildCaveats, buildReport, formatTable } from './report.js';
 import type { ArmResult, TokenPrices } from './measure-arm.js';
 
 const PRICES: TokenPrices = {
@@ -24,7 +24,6 @@ const armResult = (overrides: Partial<ArmResult> = {}): ArmResult => ({
   cacheWriteTokens: 741_290,
   cacheReadTokens: 0,
   costPerThousandViews: 19.04,
-  elapsedMs: { median: 0, p95: 1, p99: 1 },
   violations: {},
   ...overrides,
 });
@@ -69,11 +68,53 @@ describe('the result file', () => {
   });
 });
 
+describe('the caveats a stub run needs', () => {
+  const caveatsFor = (mode: ArmResult['mode']): readonly string[] =>
+    buildCaveats([armResult({ mode })], 10);
+
+  it('says the violation counts cannot be anything but zero', () => {
+    // Every arm prints an empty violations object, and under the stub that is
+    // not a measurement: nothing it answers can break a rule.
+    expect(hasLine(caveatsFor('stub'), 'no violation the stub can produce')).toBe(true);
+  });
+
+  it('says there are no timings and why', () => {
+    expect(hasLine(caveatsFor('stub'), 'No timings are reported')).toBe(true);
+  });
+
+  it('drops the stub caveats when a real model answered', () => {
+    expect(hasLine(caveatsFor('live'), 'no violation the stub can produce')).toBe(false);
+    expect(hasLine(caveatsFor('live'), 'No timings are reported')).toBe(false);
+    expect(hasLine(caveatsFor('live'), 'one real recorded call')).toBe(false);
+  });
+
+  it('says the hit rate is one cold pass and not a steady state', () => {
+    // 54% can be quoted as a ceiling or as a floor by anyone who does not
+    // know the run was a single cold pass at ten views per page.
+    expect(hasLine(caveatsFor('stub'), 'one cold pass')).toBe(true);
+    expect(hasLine(caveatsFor('live'), 'one cold pass')).toBe(true);
+  });
+});
+
 describe('the printed table', () => {
   it('prints the mode right after the arm', () => {
     const table = formatTable([armResult({ arm: 'c cohort', mode: 'stub' })]);
 
     expect(table).toContain('| c cohort | stub |');
+  });
+
+  it('prints n/a where a stub run has no timings', () => {
+    const table = formatTable([armResult({ mode: 'stub' })]);
+
+    expect(table).toContain('| n/a | n/a | n/a |');
+  });
+
+  it('prints the timings a timed run does have', () => {
+    const table = formatTable([
+      armResult({ mode: 'live', elapsedMs: { median: 820, p95: 1400, p99: 1490 } }),
+    ]);
+
+    expect(table).toContain('| 820 | 1400 | 1490 |');
   });
 
   it('prints the mode a live run would carry', () => {
