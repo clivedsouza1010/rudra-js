@@ -134,8 +134,11 @@ export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
 // Up to four, because one product that the shopper already has in their cart
 // is dropped by reconciliation and a single-item grid would empty.
 function candidateSkus(userPrompt: string, limit: number): string[] {
-  // Only the candidates section — the shopper section also has "- " lines.
-  const candidates = userPrompt.slice(userPrompt.indexOf('## Candidates'));
+  // Only read the candidates section, so nothing else in the prompt can be
+  // mistaken for one.
+  const start = userPrompt.indexOf('## Candidates');
+  if (start < 0) throw new Error('the stub found no candidates section in the prompt');
+  const candidates = userPrompt.slice(start);
   const skus: string[] = [];
   for (const line of candidates.split('\n')) {
     const match = line.match(/^- "([^"]+)"/);
@@ -168,14 +171,21 @@ export interface ArmSpec {
 // Real traffic puts many shoppers on the same page, and the cohort key
 // includes the page's category — a unique product per shopper would mean a
 // unique cohort per shopper, and nothing would ever be shared.
-function skuFor(index: number, shopperCount: number, catalog: readonly Product[]): string {
-  const pages = Math.max(1, Math.floor(shopperCount / 10));
+export function skuFor(index: number, shopperCount: number, catalog: readonly Product[]): string {
   const inStock: Product[] = [];
   for (const product of catalog) {
     if (product.isInStock) inStock.push(product);
   }
   if (inStock.length === 0) throw new Error('the catalog has nothing in stock');
-  return inStock[(index % pages) % inStock.length]!.sku;
+
+  // Clamped rather than folded: folding a page count bigger than the catalog
+  // back onto it (with a second modulo) hands the wrapped-around pages a
+  // second helping of shoppers, which merges cohorts and inflates the cache
+  // hit rate — the exact distortion this whole benchmark exists to measure
+  // honestly. Once there are more pages than products, one page per product
+  // is the most pages there can honestly be.
+  const pages = Math.min(Math.max(1, Math.floor(shopperCount / 10)), inStock.length);
+  return inStock[index % pages]!.sku;
 }
 
 // The stub always answers with this, one grid item per SKU it picked from the

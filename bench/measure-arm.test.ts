@@ -4,6 +4,7 @@ import {
   assertSourceMix,
   createStubProvider,
   measureArm,
+  skuFor,
   summarise,
   type ArmResult,
   type ArmSpec,
@@ -172,6 +173,35 @@ const shoppers = generateShoppers(11, catalog).slice(0, 5);
 // product the shopper was actually offered.
 const stub = () => createStubProvider({ inputTokens: 1000, outputTokens: 200 });
 
+describe('choosing which page a shopper looks at', () => {
+  it('spreads a population bigger than the catalog evenly, one page per product', () => {
+    const inStockSkus: string[] = [];
+    for (const product of catalog) {
+      if (product.isInStock) inStockSkus.push(product.sku);
+    }
+    // Comfortably past the point where shopperCount / 10 exceeds the number
+    // of in-stock products, which is where folding the page count back onto
+    // the catalog used to double up on some of them.
+    const shopperCount = inStockSkus.length * 10 + 30;
+
+    const shopperCountPerSku = new Map<string, number>();
+    for (let index = 0; index < shopperCount; index += 1) {
+      const sku = skuFor(index, shopperCount, catalog);
+      shopperCountPerSku.set(sku, (shopperCountPerSku.get(sku) ?? 0) + 1);
+    }
+
+    expect(shopperCountPerSku.size).toBe(inStockSkus.length);
+
+    let fewest = Infinity;
+    let most = -Infinity;
+    for (const count of shopperCountPerSku.values()) {
+      if (count < fewest) fewest = count;
+      if (count > most) most = count;
+    }
+    expect(most - fewest).toBeLessThanOrEqual(1);
+  });
+});
+
 describe('measuring one arm', () => {
   it('reports a view for every shopper', async () => {
     const arm: ArmSpec = { name: 'b', options: { provider: null }, rule: { fallback: 'all' } };
@@ -205,7 +235,6 @@ describe('measuring one arm', () => {
     const result = await measureArm(arm, cohortShoppers, catalog, PRICES);
 
     expect(result.sources.fallback).toBe(0);
-    expect(result.modelCalls).toBeLessThan(result.views);
     // The exact count, not just "fewer than everyone": a run that collapsed
     // every shopper onto one page would still show fewer calls than views,
     // so that relation alone cannot tell a spread-out population from a
