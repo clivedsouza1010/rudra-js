@@ -88,6 +88,13 @@ describe('the caveats a stub run needs', () => {
     expect(hasLine(caveatsFor('live'), 'one real recorded call')).toBe(false);
   });
 
+  it('says the cost is a ceiling and how far off a real run it is', () => {
+    // A reader who quotes the cost column is out by about half unless the
+    // caveat says so — every call here pays a fresh cache write.
+    expect(hasLine(caveatsFor('stub'), 'close to twice a steady-state run')).toBe(true);
+    expect(hasLine(caveatsFor('stub'), 'ceiling')).toBe(true);
+  });
+
   it('says the hit rate is one cold pass and not a steady state', () => {
     // 54% can be quoted as a ceiling or as a floor by anyone who does not
     // know the run was a single cold pass at ten views per page.
@@ -97,6 +104,11 @@ describe('the caveats a stub run needs', () => {
 });
 
 describe('the printed table', () => {
+  it('calls the cost column a ceiling', () => {
+    // The number is a cold-cache worst case, so the heading has to say so.
+    expect(formatTable([armResult()])).toContain('Cost / 1k views (ceiling)');
+  });
+
   it('prints the mode right after the arm', () => {
     const table = formatTable([armResult({ arm: 'c cohort', mode: 'stub' })]);
 
