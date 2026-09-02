@@ -58,6 +58,23 @@ describe('summarising a run', () => {
     expect(result.modelCalls).toBe(1);
   });
 
+  it('scales the model calls to a thousand views', () => {
+    // One call in four views is 250 calls per thousand. This number is written
+    // into the result file, so it needs an assertion of its own.
+    const result = summarise(
+      'c',
+      [
+        event(),
+        event({ calledModel: false }),
+        event({ calledModel: false }),
+        event({ calledModel: false }),
+      ],
+      PRICES,
+    );
+
+    expect(result.modelCallsPerThousand).toBe(250);
+  });
+
   it('bills a shared answer once', () => {
     // Both events carry the same usage, because the second joined the first.
     // Summing both would double the bill.
@@ -297,6 +314,20 @@ describe('measuring one arm', () => {
       signal: new AbortController().signal,
     };
 
-    await expect(provider.generate(request)).rejects.toThrow(/no candidate/);
+    // The whole message, not just "no candidate": the two guards below each
+    // other read almost the same, and a loose matcher passes for either one.
+    await expect(provider.generate(request)).rejects.toThrow(/no candidates section/);
+  });
+
+  it('throws when the candidates section is there but holds no candidate', async () => {
+    const provider = createStubProvider({ inputTokens: 0, outputTokens: 0 });
+    const request: ProviderRequest = {
+      system: '',
+      user: '## Candidates\n\nNothing in stock for this shopper.',
+      schema: generatedSpecSchema,
+      signal: new AbortController().signal,
+    };
+
+    await expect(provider.generate(request)).rejects.toThrow(/no candidate in the prompt/);
   });
 });
