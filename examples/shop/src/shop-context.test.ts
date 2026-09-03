@@ -48,7 +48,7 @@ describe('the replay-only switch', () => {
         schema: generatedSpecSchema,
         signal: AbortSignal.timeout(1000),
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/no recording/i);
     expect(warn).not.toHaveBeenCalled();
 
     warn.mockRestore();

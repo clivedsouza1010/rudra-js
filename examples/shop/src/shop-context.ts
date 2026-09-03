@@ -77,14 +77,17 @@ export function chooseProvider() {
   if (process.env['RUDRA_REPLAY_ONLY']) {
     if (apiKey) {
       throw new Error(
-        'RUDRA_REPLAY_ONLY is set and so is ANTHROPIC_API_KEY: refusing to start, because replay only means no model calls',
+        'RUDRA_REPLAY_ONLY is set and so is ANTHROPIC_API_KEY: refusing to start, because replay only means no model calls ' +
+          '(the key may be coming from examples/shop/.env.local)',
       );
     }
-    return createReplayProvider({
-      directory: RECORDINGS_DIRECTORY,
-      model: MODEL_ID,
-      onMiss: 'throw',
-    });
+    return withVisibleFailures(
+      createReplayProvider({
+        directory: RECORDINGS_DIRECTORY,
+        model: MODEL_ID,
+        onMiss: 'throw',
+      }),
+    );
   }
 
   // With a key, call the model and keep the transcript. Without one, replay —
