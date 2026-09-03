@@ -25,10 +25,11 @@ describe('checking a page a crawler will read', () => {
   it('catches every way a deferred page is wrong', () => {
     const problems = checkCrawlable(DEFERRED, DEFERRED);
 
-    expect(problems).toHaveLength(3);
-    expect(problems.join(' ')).toContain('after </main>');
-    expect(problems.join(' ')).toContain('hidden');
-    expect(problems.join(' ')).toContain('script');
+    expect(problems).toEqual([
+      'the slot is after </main>, so it is not in position',
+      'the page holds content in a hidden div for a script to move',
+      'the page uses a script to move content into place',
+    ]);
   });
 
   it('catches a slot that arrives after the main content on its own', () => {
