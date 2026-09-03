@@ -1,5 +1,5 @@
 import type { Bundle, Product, TrackingInputDraft } from '@rudra-js/core';
-import type { Shopper } from './shoppers.js';
+import type { Shopper } from './shoppers';
 
 /**
  * Fixed so a page is reproducible.
