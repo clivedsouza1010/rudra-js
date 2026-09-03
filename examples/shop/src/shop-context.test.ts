@@ -4,9 +4,16 @@ import { generatedSpecSchema } from '@rudra-js/core';
 const KEY = 'ANTHROPIC_API_KEY';
 const REPLAY_ONLY = 'RUDRA_REPLAY_ONLY';
 
+// So afterEach can put this back instead of erasing it - a pool sharing one process across files needs that.
+const AMBIENT_REPLAY_ONLY = process.env[REPLAY_ONLY];
+
 afterEach(() => {
   delete process.env[KEY];
-  delete process.env[REPLAY_ONLY];
+  if (AMBIENT_REPLAY_ONLY === undefined) {
+    delete process.env[REPLAY_ONLY];
+  } else {
+    process.env[REPLAY_ONLY] = AMBIENT_REPLAY_ONLY;
+  }
   // The module reads the environment once, so each case needs a fresh copy.
   vi.resetModules();
 });
@@ -41,6 +48,11 @@ describe('the replay-only switch', () => {
 
     // Building a provider sends nothing, so a fake key is safe here.
     await expect(import('./shop-context')).resolves.toBeDefined();
+  });
+
+  it('puts the switch back after a test that had to turn it off, not just deletes it', () => {
+    // If cleanup only deleted this, the previous test's own delete would leak into the next file.
+    expect(process.env[REPLAY_ONLY]).toBe('1');
   });
 
   it('treats a missing recording as an error, not something to paper over', async () => {
