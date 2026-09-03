@@ -1,10 +1,11 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { checkCrawlable } from './check-crawlable.js';
+import { exitedBeforeServing, reportFailure } from './verify-messages.js';
 
 // The page the committed transcript covers. Any other page is a replay miss,
 // which fails for a reason that has nothing to do with crawling.
-const PATH = '/product/RJ-00001?shopper=S-0001';
+const PAGE_PATH = '/product/RJ-00001?shopper=S-0001';
 
 // Ask the operating system for a free port, then hand that number to next.
 // PORT=0 is not something `next start` is documented to accept, so pick the
@@ -42,33 +43,30 @@ function startShop(port: number): ChildProcess {
   );
 }
 
-// Wait for next to say it is listening. Sleeping a fixed time is how flaky
-// checks get written. We match the printed address rather than a bare word
-// like "Ready" — that word can show up in an unrelated line before the
-// server actually binds, and matching the address also proves next bound
-// the port we asked for, not some other one.
-function waitUntilReady(shop: ChildProcess, port: number): Promise<void> {
+// Sleeping a fixed time is how flaky checks get written, so wait for next to
+// print the address instead: a bare word like "Ready" can show up before the
+// server actually binds, and the address also proves next bound the port we
+// asked for, not some other one.
+function waitUntilReady(shop: ChildProcess, port: number, getSeen: () => string): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error('the shop did not start within 60 seconds')),
       60_000,
     );
-    let seen = '';
     const boundAddress = `http://localhost:${port}`;
 
-    const read = (chunk: Buffer): void => {
-      seen += chunk.toString();
-      if (seen.includes(boundAddress)) {
+    const checkReady = (): void => {
+      if (getSeen().includes(boundAddress)) {
         clearTimeout(timer);
         resolve();
       }
     };
 
-    shop.stdout?.on('data', read);
-    shop.stderr?.on('data', read);
+    shop.stdout?.on('data', checkReady);
+    shop.stderr?.on('data', checkReady);
     shop.on('exit', (code) => {
       clearTimeout(timer);
-      reject(new Error(`the shop exited with ${code} before serving anything:\n${seen}`));
+      reject(new Error(exitedBeforeServing(code)));
     });
   });
 }
@@ -97,16 +95,23 @@ async function main(): Promise<void> {
   const port = await freePort();
   const shop = startShop(port);
 
+  // Kept for the whole run, not just until the shop says it is ready, so any
+  // failure after that point can still show what the shop said about it.
+  let seen = '';
+  const remember = (chunk: Buffer): void => {
+    seen += chunk.toString();
+  };
+  shop.stdout?.on('data', remember);
+  shop.stderr?.on('data', remember);
+
   try {
-    await waitUntilReady(shop, port);
+    await waitUntilReady(shop, port, () => seen);
     // A stalled connection would otherwise hang the script forever. One
-    // deadline for the whole exchange: if it fires after fetch resolves,
-    // aborting the signal also errors the body stream, so the reads below
-    // are bounded by the same timeout without needing one of their own.
-    const response = await fetch(`http://localhost:${port}${PATH}`, {
-      // Ask for the bytes uncompressed. Node's fetch otherwise sends
-      // "accept-encoding: gzip, deflate" and next start compresses, so the
-      // chunk boundaries we would see are zlib's, not the server's.
+    // deadline for the whole exchange: aborting also errors the body stream,
+    // so the reads below are bounded by it too, without needing one of their own.
+    const response = await fetch(`http://localhost:${port}${PAGE_PATH}`, {
+      // Uncompressed: next start compresses by default, and the chunk
+      // boundaries we would see with gzip on are zlib's, not the server's.
       headers: { 'Accept-Encoding': 'identity' },
       signal: AbortSignal.timeout(30_000),
     });
@@ -114,11 +119,9 @@ async function main(): Promise<void> {
     if (!response.body) throw new Error('the shop sent no body');
 
     // The first read is what a crawler taking one read would see — but one
-    // read is not one server flush: small writes can arrive coalesced into
-    // a single read, and a large flush (seen splitting around 64KB while
-    // testing this) can arrive split across several. So this sub-check only
-    // bites on a page big enough to span reads; it proves nothing about a
-    // page, like this one, that fits in a single read regardless.
+    // read is not one server flush, so this sub-check only bites on a page
+    // big enough to span reads. It proves nothing about a page, like this
+    // one, that fits in a single read regardless.
     const reader = response.body.getReader();
     const first = await reader.read();
     const decoder = new TextDecoder();
@@ -141,15 +144,21 @@ async function main(): Promise<void> {
     if (problems.length > 0) {
       console.error('the page is not what a crawler needs:');
       for (const problem of problems) console.error(`  - ${problem}`);
+      // The usual cause, in plain terms rather than React's own vocabulary.
+      console.error(
+        'this usually means a loading.tsx got added, or the recommendations got wrapped in <Suspense>',
+      );
       process.exitCode = 1;
       return;
     }
 
     // Only claims what checkCrawlable actually established above: the slot
     // is present, it is before </main>, and nothing hides it behind a
-    // script. Not a claim about which read it arrived in — see the comment
-    // by the first read for why that would overclaim on a page this size.
+    // script — not a claim about which read it arrived in.
     console.log('crawlable: the slot is in the page, before </main>, and nothing hides it');
+  } catch (error) {
+    reportFailure(error, seen);
+    process.exitCode = 1;
   } finally {
     // Always, including when the check failed or the fetch threw.
     await stopShop(shop);

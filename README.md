@@ -36,7 +36,13 @@ npm test
 npm run verify:consumer   # packs both packages and uses them from outside the repo
 ```
 
-CI runs all six of these on every pull request, and builds the example shop in a second job.
+CI runs all six of these on every pull request, and a second job builds the example shop and
+checks that its page still reads as one to a crawler:
+
+```sh
+ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/example-shop
+npm run verify:crawlable
+```
 
 ## Example
 
