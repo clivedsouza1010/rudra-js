@@ -28,8 +28,9 @@ function freePort(): Promise<number> {
 
 function startShop(port: number): ChildProcess {
   const environment: NodeJS.ProcessEnv = { ...process.env, RUDRA_REPLAY_ONLY: '1' };
-  // Whatever is in the shell, this run must not reach the model.
-  delete environment['ANTHROPIC_API_KEY'];
+  // Present but empty. Next only fills a key in from .env.local when it is
+  // missing, and the shop reads an empty one as no key at all.
+  environment['ANTHROPIC_API_KEY'] = '';
 
   return spawn(
     'npm',
