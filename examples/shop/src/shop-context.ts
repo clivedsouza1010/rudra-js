@@ -68,8 +68,24 @@ function withVisibleFailures(provider: ComponentProvider): ComponentProvider {
   };
 }
 
-function chooseProvider() {
+export function chooseProvider() {
   const apiKey = process.env['ANTHROPIC_API_KEY'];
+
+  // Set by anything that must not spend money — the crawlability check starts
+  // this shop for real. Throwing beats ignoring the key: a run that quietly
+  // used it would bill, and nobody would find out until the invoice.
+  if (process.env['RUDRA_REPLAY_ONLY']) {
+    if (apiKey) {
+      throw new Error(
+        'RUDRA_REPLAY_ONLY is set and so is ANTHROPIC_API_KEY: refusing to start, because replay only means no model calls',
+      );
+    }
+    return createReplayProvider({
+      directory: RECORDINGS_DIRECTORY,
+      model: MODEL_ID,
+      onMiss: 'throw',
+    });
+  }
 
   // With a key, call the model and keep the transcript. Without one, replay —
   // and in CI a miss is an error, because a run that quietly falls back is a
