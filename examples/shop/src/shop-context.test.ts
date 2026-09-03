@@ -12,6 +12,14 @@ afterEach(() => {
 });
 
 describe('the replay-only switch', () => {
+  it('is already on by default, so a key alone in the shell cannot bill during npm test', async () => {
+    // vitest.config.ts turns this on for every test file. Not setting it here
+    // on purpose - this proves the config protects a run, not this test.
+    process.env[KEY] = 'sk-ant-not-a-real-key';
+
+    await expect(import('./shop-context')).rejects.toThrow(/replay only/i);
+  });
+
   it('refuses to load when a key is present as well', async () => {
     process.env[REPLAY_ONLY] = '1';
     process.env[KEY] = 'sk-ant-not-a-real-key';
@@ -26,6 +34,9 @@ describe('the replay-only switch', () => {
   });
 
   it('leaves the normal path alone when the switch is off', async () => {
+    // vitest.config.ts turns the switch on for every test by default, so this
+    // case has to turn it back off itself to reach the path it names.
+    delete process.env[REPLAY_ONLY];
     process.env[KEY] = 'sk-ant-not-a-real-key';
 
     // Building a provider sends nothing, so a fake key is safe here.

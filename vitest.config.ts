@@ -23,6 +23,9 @@ export default defineConfig({
       // shop is — otherwise every replay is a miss and the guard that watches
       // for a silent fallback never arms.
       RUDRA_SHOP_RECORDINGS: fileURLToPath(new URL('examples/shop/recordings/', import.meta.url)),
+      // A key sitting in a developer's shell must not turn npm test into a
+      // billed call. This makes the shop refuse to load rather than call out.
+      RUDRA_REPLAY_ONLY: '1',
     },
   },
 });
