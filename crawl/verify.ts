@@ -43,18 +43,22 @@ function startShop(port: number): ChildProcess {
 }
 
 // Wait for next to say it is listening. Sleeping a fixed time is how flaky
-// checks get written.
-function waitUntilReady(shop: ChildProcess): Promise<void> {
+// checks get written. We match the printed address rather than a bare word
+// like "Ready" — that word can show up in an unrelated line before the
+// server actually binds, and matching the address also proves next bound
+// the port we asked for, not some other one.
+function waitUntilReady(shop: ChildProcess, port: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error('the shop did not start within 60 seconds')),
       60_000,
     );
     let seen = '';
+    const boundAddress = `http://localhost:${port}`;
 
     const read = (chunk: Buffer): void => {
       seen += chunk.toString();
-      if (seen.includes('Ready') || seen.includes('started server')) {
+      if (seen.includes(boundAddress)) {
         clearTimeout(timer);
         resolve();
       }
@@ -69,17 +73,52 @@ function waitUntilReady(shop: ChildProcess): Promise<void> {
   });
 }
 
+// SIGTERM asks nicely; a shop that ignores it (or is stuck) would otherwise
+// hang the parent forever, since the piped stdio keeps the event loop alive.
+// Escalate to SIGKILL after a short grace so cleanup always finishes.
+function stopShop(shop: ChildProcess): Promise<void> {
+  return new Promise((resolve) => {
+    if (shop.exitCode !== null || shop.signalCode !== null) {
+      resolve();
+      return;
+    }
+    const escalate = setTimeout(() => {
+      shop.kill('SIGKILL');
+    }, 5_000);
+    shop.once('exit', () => {
+      clearTimeout(escalate);
+      resolve();
+    });
+    shop.kill('SIGTERM');
+  });
+}
+
 async function main(): Promise<void> {
   const port = await freePort();
   const shop = startShop(port);
 
   try {
-    await waitUntilReady(shop);
-    const response = await fetch(`http://localhost:${port}${PATH}`);
+    await waitUntilReady(shop, port);
+    // A stalled connection would otherwise hang the script forever. One
+    // deadline for the whole exchange: if it fires after fetch resolves,
+    // aborting the signal also errors the body stream, so the reads below
+    // are bounded by the same timeout without needing one of their own.
+    const response = await fetch(`http://localhost:${port}${PATH}`, {
+      // Ask for the bytes uncompressed. Node's fetch otherwise sends
+      // "accept-encoding: gzip, deflate" and next start compresses, so the
+      // chunk boundaries we would see are zlib's, not the server's.
+      headers: { 'Accept-Encoding': 'identity' },
+      signal: AbortSignal.timeout(30_000),
+    });
     if (!response.ok) throw new Error(`the shop answered ${response.status}`);
     if (!response.body) throw new Error('the shop sent no body');
 
-    // The first read is what a crawler taking one read would see.
+    // The first read is what a crawler taking one read would see — but one
+    // read is not one server flush: small writes can arrive coalesced into
+    // a single read, and a large flush (seen splitting around 64KB while
+    // testing this) can arrive split across several. So this sub-check only
+    // bites on a page big enough to span reads; it proves nothing about a
+    // page, like this one, that fits in a single read regardless.
     const reader = response.body.getReader();
     const first = await reader.read();
     const decoder = new TextDecoder();
@@ -106,10 +145,14 @@ async function main(): Promise<void> {
       return;
     }
 
-    console.log('crawlable: the slot is in the first chunk, in position, and nothing hides it');
+    // Only claims what checkCrawlable actually established above: the slot
+    // is present, it is before </main>, and nothing hides it behind a
+    // script. Not a claim about which read it arrived in — see the comment
+    // by the first read for why that would overclaim on a page this size.
+    console.log('crawlable: the slot is in the page, before </main>, and nothing hides it');
   } finally {
     // Always, including when the check failed or the fetch threw.
-    shop.kill('SIGTERM');
+    await stopShop(shop);
   }
 }
 
