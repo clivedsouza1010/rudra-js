@@ -12,6 +12,7 @@ export default defineConfig({
       'tests/**/*.test.ts',
       'tests/**/*.test.tsx',
       'bench/**/*.test.ts',
+      'crawl/**/*.test.ts',
       'examples/*/src/**/*.test.ts',
       'examples/*/src/**/*.test.tsx',
     ],

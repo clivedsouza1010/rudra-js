@@ -12,5 +12,5 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "include": ["bench/**/*"]
+  "include": ["bench/**/*", "crawl/**/*"]
 }
