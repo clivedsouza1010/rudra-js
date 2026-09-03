@@ -325,6 +325,10 @@ export async function measureArm(
   for (let index = 0; index < shoppers.length; index += 1) {
     const shopper = shoppers[index]!;
     const sku = skuFor(index, shoppers.length, catalog, shoppersPerPage);
+    // One at a time is the measurement: running these together would let
+    // shoppers of one cohort race the first request, and the cache hit rate is
+    // what we came for.
+    // oxlint-disable-next-line no-await-in-loop
     await generator.generate(buildTrackingInput(shopper, sku, catalog, []));
   }
 

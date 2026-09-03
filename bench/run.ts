@@ -79,6 +79,8 @@ async function main(): Promise<void> {
   const results: ArmResult[] = [];
   for (const arm of arms) {
     // A failed assertion stops the run. A wrong number is worse than none.
+    // Arms run one after another so each gets its own cold cache.
+    // oxlint-disable-next-line no-await-in-loop
     results.push(await measureArm(arm, shoppers, catalog, PRICES));
   }
 
