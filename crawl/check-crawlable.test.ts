@@ -53,4 +53,15 @@ describe('checking a page a crawler will read', () => {
 
     expect(checkCrawlable(empty, empty)).toEqual(['the page has no recommendation slot at all']);
   });
+
+  it('says so when the page has no </main> at all, so position cannot be judged', () => {
+    const noMain = `<!DOCTYPE html><html><body>
+<h1>Trail Shoe</h1>
+<section class="rudra" data-rudra-slot="recommendations"><h2>Picked for you</h2></section>
+</body></html>`;
+
+    expect(checkCrawlable(noMain, noMain)).toEqual([
+      'the page has no </main>, so the slot position cannot be checked',
+    ]);
+  });
 });

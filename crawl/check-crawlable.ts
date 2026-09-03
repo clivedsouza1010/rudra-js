@@ -16,7 +16,11 @@ export function checkCrawlable(html: string, firstChunk: string): string[] {
   }
 
   const mainEndsAt = html.indexOf('</main>');
-  if (mainEndsAt !== -1 && slotAt > mainEndsAt) {
+  if (mainEndsAt === -1) {
+    // No </main> means the position check below has nothing to compare
+    // against, so a missing one is itself a problem, not a pass.
+    problems.push('the page has no </main>, so the slot position cannot be checked');
+  } else if (slotAt > mainEndsAt) {
     problems.push('the slot is after </main>, so it is not in position');
   }
 
