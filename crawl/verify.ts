@@ -43,32 +43,44 @@ function startShop(port: number): ChildProcess {
   );
 }
 
+type ReadinessWatcher = { ready: Promise<void>; onData: () => void };
+
+// A Promise executor runs synchronously, so this is always overwritten right below - TS just can't see that.
+function noop(): void {}
+
 // Sleeping a fixed time is how flaky checks get written, so wait for next to
 // print the address instead: a bare word like "Ready" can show up before the
 // server actually binds, and the address also proves next bound the port we
 // asked for, not some other one.
-function waitUntilReady(shop: ChildProcess, port: number, getSeen: () => string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error('the shop did not start within 60 seconds')),
-      60_000,
-    );
-    const boundAddress = `http://localhost:${port}`;
-
-    const checkReady = (): void => {
-      if (getSeen().includes(boundAddress)) {
-        clearTimeout(timer);
-        resolve();
-      }
-    };
-
-    shop.stdout?.on('data', checkReady);
-    shop.stderr?.on('data', checkReady);
-    shop.on('exit', (code) => {
-      clearTimeout(timer);
-      reject(new Error(exitedBeforeServing(code)));
-    });
+//
+// Hands back onData instead of attaching its own listener, so main's single listener always appends first.
+function waitUntilReady(shop: ChildProcess, port: number, getSeen: () => string): ReadinessWatcher {
+  let resolveReady: () => void = noop;
+  let rejectReady: (error: Error) => void = noop;
+  const ready = new Promise<void>((resolve, reject) => {
+    resolveReady = resolve;
+    rejectReady = reject;
   });
+
+  const timer = setTimeout(
+    () => rejectReady(new Error('the shop did not start within 60 seconds')),
+    60_000,
+  );
+  const boundAddress = `http://localhost:${port}`;
+
+  const onData = (): void => {
+    if (getSeen().includes(boundAddress)) {
+      clearTimeout(timer);
+      resolveReady();
+    }
+  };
+
+  shop.on('exit', (code) => {
+    clearTimeout(timer);
+    rejectReady(new Error(exitedBeforeServing(code)));
+  });
+
+  return { ready, onData };
 }
 
 // SIGTERM asks nicely; a shop that ignores it (or is stuck) would otherwise
@@ -98,14 +110,17 @@ async function main(): Promise<void> {
   // Kept for the whole run, not just until the shop says it is ready, so any
   // failure after that point can still show what the shop said about it.
   let seen = '';
+  const { ready, onData } = waitUntilReady(shop, port, () => seen);
+  // One listener, so appending always happens before the ready check sees it.
   const remember = (chunk: Buffer): void => {
     seen += chunk.toString();
+    onData();
   };
   shop.stdout?.on('data', remember);
   shop.stderr?.on('data', remember);
 
   try {
-    await waitUntilReady(shop, port, () => seen);
+    await ready;
     // A stalled connection would otherwise hang the script forever. One
     // deadline for the whole exchange: aborting also errors the body stream,
     // so the reads below are bounded by it too, without needing one of their own.
