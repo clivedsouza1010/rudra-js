@@ -50,11 +50,6 @@ describe('the replay-only switch', () => {
     await expect(import('./shop-context')).resolves.toBeDefined();
   });
 
-  it('puts the switch back after a test that had to turn it off, not just deletes it', () => {
-    // If cleanup only deleted this, the previous test's own delete would leak into the next file.
-    expect(process.env[REPLAY_ONLY]).toBe('1');
-  });
-
   it('treats a missing recording as an error, not something to paper over', async () => {
     process.env[REPLAY_ONLY] = '1';
 

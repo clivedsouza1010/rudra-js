@@ -68,12 +68,12 @@ function withVisibleFailures(provider: ComponentProvider): ComponentProvider {
   };
 }
 
-export function chooseProvider() {
+export function chooseProvider(): ComponentProvider {
   const apiKey = process.env['ANTHROPIC_API_KEY'];
 
-  // Set by anything that must not spend money — the crawlability check starts
-  // this shop for real. Throwing beats ignoring the key: a run that quietly
-  // used it would bill, and nobody would find out until the invoice.
+  // Set by anything that must not spend money. Throwing beats ignoring the
+  // key: a run that quietly used it would bill, and nobody would find out
+  // until the invoice.
   if (process.env['RUDRA_REPLAY_ONLY']) {
     if (apiKey) {
       throw new Error(
