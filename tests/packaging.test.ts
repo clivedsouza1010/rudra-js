@@ -263,3 +263,17 @@ describe('the release workflow', () => {
     }
   });
 });
+
+describe('the README', () => {
+  it('lists every package that gets published', () => {
+    // The anthropic package sat in packages/ for a week without a row here,
+    // and it is the one that makes the billed call.
+    const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
+
+    for (const name of PACKAGES) {
+      expect(readme, `@rudra-js/${name} is published but not in the README table`).toContain(
+        `[\`@rudra-js/${name}\`](packages/${name})`,
+      );
+    }
+  });
+});

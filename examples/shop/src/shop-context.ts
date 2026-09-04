@@ -117,9 +117,15 @@ export function chooseProvider(): ComponentProvider {
   });
 }
 
+// Core's default is 60 seconds. That is far too short here: the shop would go
+// back to the model about once a minute per cohort, which costs money on a dev
+// server someone left running, and the repeat call rewrites the same recording
+// file rather than adding one, so the usual tell never shows up.
+export const CACHE_TTL_MS = 60 * 60 * 1000;
+
 const generator = createComponentGenerator({
   provider: chooseProvider(),
-  cache: createMemorySpecCache(),
+  cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
   // Without this a failed model call is invisible: the generator degrades to
   // the deterministic component by design and says nothing, so the page looks
   // right and the terminal stays silent.

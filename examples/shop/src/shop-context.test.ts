@@ -71,4 +71,13 @@ describe('the replay-only switch', () => {
 
     warn.mockRestore();
   });
+
+  it('caches a page for longer than anyone will sit on the demo', async () => {
+    // Core defaults to 60 seconds, which sends the shop back to the model
+    // about once a minute per cohort. That bills, and the repeat call rewrites
+    // the same recording file, so no new file shows up to give it away.
+    const { CACHE_TTL_MS } = await import('./shop-context');
+
+    expect(CACHE_TTL_MS).toBeGreaterThanOrEqual(60 * 60 * 1000);
+  });
 });
