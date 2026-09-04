@@ -607,6 +607,16 @@ describe('the styling contract', () => {
     }
   });
 
+  it('puts a class on every element it emits', () => {
+    // The test above only sees elements that already have a class, so an
+    // element with none is invisible to it. This is the other half.
+    const bare = [...everything().matchAll(/<([a-z]+)(\s[^>]*)?>/g)].filter(
+      (match) => !(match[2] ?? '').includes('class='),
+    );
+
+    expect(bare.map((match) => match[0])).toEqual([]);
+  });
+
   it('documents every attribute it emits', () => {
     const emitted = new Set([...everything().matchAll(/(data-rudra-[a-z-]+)=/g)].map((m) => m[1]!));
     const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');

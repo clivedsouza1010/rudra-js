@@ -328,6 +328,29 @@ function cohortDigest(shopper: Shopper = {}): SignalDigest {
 
 const CANDIDATES = ['TR-101', 'TR-102'];
 
+// The fixture above gives both shoppers one category, so their affinity
+// lists match whatever the cohort step does. This one differs underneath the
+// top category, which is where the leak was.
+function deeperInput(shopper: { id: string; second: string; views: number }): TrackingInput {
+  return parseTrackingInput({
+    user: { id: shopper.id, segment: 'loyalty' },
+    context: { surface: 'pdp', currentCategory: 'Trail Running' },
+    candidates: [
+      { sku: 'TR-101', title: 'Shoe', category: 'Trail Running', price: 100 },
+      { sku: 'TN-200', title: 'Tent', category: 'Tents', price: 400 },
+      { sku: 'BP-300', title: 'Pack', category: 'Backpacks', price: 200 },
+    ],
+    signals: {
+      lastPurchased: [{ sku: 'TR-101', at: 1_700_000_000_000 }],
+      mostViewed: [
+        // Different view counts, so the top category's own score differs too.
+        { sku: 'TR-101', at: 1_700_000_000_000, views: shopper.views },
+        { sku: shopper.second, at: 1_700_000_000_000, views: shopper.views },
+      ],
+    },
+  });
+}
+
 // the two candidates every cohortDigest() shopper is offered
 const cohortKeyFor = (digest: SignalDigest, provider = 'p:m') =>
   cohortCacheKey(digest, ['TR-101', 'TR-999'], provider);
@@ -382,29 +405,6 @@ describe('a cohort key', () => {
       buildPrompt(second, toCohortDigest(buildDigest(second))).user,
     );
   });
-
-  // The fixture above gives both shoppers one category, so their affinity
-  // lists match whatever the cohort step does. This one differs underneath the
-  // top category, which is where the leak was.
-  function deeperInput(shopper: { id: string; second: string; views: number }): TrackingInput {
-    return parseTrackingInput({
-      user: { id: shopper.id, segment: 'loyalty' },
-      context: { surface: 'pdp', currentCategory: 'Trail Running' },
-      candidates: [
-        { sku: 'TR-101', title: 'Shoe', category: 'Trail Running', price: 100 },
-        { sku: 'TN-200', title: 'Tent', category: 'Tents', price: 400 },
-        { sku: 'BP-300', title: 'Pack', category: 'Backpacks', price: 200 },
-      ],
-      signals: {
-        lastPurchased: [{ sku: 'TR-101', at: 1_700_000_000_000 }],
-        mostViewed: [
-          // Different view counts, so the top category's own score differs too.
-          { sku: 'TR-101', at: 1_700_000_000_000, views: shopper.views },
-          { sku: shopper.second, at: 1_700_000_000_000, views: shopper.views },
-        ],
-      },
-    });
-  }
 
   it('sends the same prompt when history differs below the top category', () => {
     // Two shoppers who both top out in Trail Running, one shopping for tents
