@@ -27,13 +27,21 @@ function freePort(): Promise<number> {
   });
 }
 
-function startShop(port: number): ChildProcess {
+type RunningShop = {
+  shop: ChildProcess;
+  ready: Promise<void>;
+  // Everything the shop has said so far, kept for the whole run rather than
+  // until it is ready, so a failure after that can still show what it said.
+  seen: () => string;
+};
+
+function startShop(port: number): RunningShop {
   const environment: NodeJS.ProcessEnv = { ...process.env, RUDRA_REPLAY_ONLY: '1' };
   // Present but empty. Next only fills a key in from .env.local when it is
   // missing, and the shop reads an empty one as no key at all.
   environment['ANTHROPIC_API_KEY'] = '';
 
-  return spawn(
+  const shop = spawn(
     'npm',
     ['run', 'start', '--workspace', '@rudra-js/example-shop', '--', '-p', String(port)],
     {
@@ -43,22 +51,9 @@ function startShop(port: number): ChildProcess {
       detached: true,
     },
   );
-}
 
-type ReadinessWatcher = { ready: Promise<void>; onData: () => void };
-
-// A Promise executor runs synchronously, so this is always overwritten right below - TS just can't see that.
-function noop(): void {}
-
-// Sleeping a fixed time is how flaky checks get written, so wait for next to
-// print the address instead: a bare word like "Ready" can show up before the
-// server actually binds, and the address also proves next bound the port we
-// asked for, not some other one.
-//
-// Hands back onData instead of attaching its own listener, so main's single listener always appends first.
-function waitUntilReady(shop: ChildProcess, port: number, getSeen: () => string): ReadinessWatcher {
-  let resolveReady: () => void = noop;
-  let rejectReady: (error: Error) => void = noop;
+  let resolveReady!: () => void;
+  let rejectReady!: (error: Error) => void;
   const ready = new Promise<void>((resolve, reject) => {
     resolveReady = resolve;
     rejectReady = reject;
@@ -70,24 +65,29 @@ function waitUntilReady(shop: ChildProcess, port: number, getSeen: () => string)
   );
   const boundAddress = `http://localhost:${port}`;
 
-  const onData = (): void => {
-    if (getSeen().includes(boundAddress)) {
+  // Sleeping a fixed time is how flaky checks get written, so wait for the one
+  // line that names the address next actually bound.
+  let seen = '';
+  const remember = (chunk: Buffer): void => {
+    seen += chunk.toString();
+    if (seen.includes(boundAddress)) {
       clearTimeout(timer);
       resolveReady();
     }
   };
+  shop.stdout?.on('data', remember);
+  shop.stderr?.on('data', remember);
 
   shop.on('exit', (code, signal) => {
     clearTimeout(timer);
     rejectReady(new Error(exitedBeforeServing(code, signal)));
   });
 
-  return { ready, onData };
+  return { shop, ready, seen: () => seen };
 }
 
 // Signals the whole group, not just npm, so an npm that does not forward the
-// signal cannot orphan next. The group can already be gone by the time we
-// signal it, and that is fine - there is nothing left to stop.
+// signal cannot orphan next.
 function signalGroup(pid: number, signal: NodeJS.Signals): void {
   try {
     process.kill(-pid, signal);
@@ -98,7 +98,6 @@ function signalGroup(pid: number, signal: NodeJS.Signals): void {
 
 // SIGTERM asks nicely; a shop that ignores it (or is stuck) would otherwise
 // hang the parent forever, since the piped stdio keeps the event loop alive.
-// Escalate to SIGKILL after a short grace so cleanup always finishes.
 function stopShop(shop: ChildProcess): Promise<void> {
   return new Promise((resolve) => {
     if (shop.exitCode !== null || shop.signalCode !== null) {
@@ -123,19 +122,7 @@ function stopShop(shop: ChildProcess): Promise<void> {
 
 async function main(): Promise<void> {
   const port = await freePort();
-  const shop = startShop(port);
-
-  // Kept for the whole run, not just until the shop says it is ready, so any
-  // failure after that point can still show what the shop said about it.
-  let seen = '';
-  const { ready, onData } = waitUntilReady(shop, port, () => seen);
-  // One listener, so appending always happens before the ready check sees it.
-  const remember = (chunk: Buffer): void => {
-    seen += chunk.toString();
-    onData();
-  };
-  shop.stdout?.on('data', remember);
-  shop.stderr?.on('data', remember);
+  const { shop, ready, seen } = startShop(port);
 
   try {
     await ready;
@@ -169,7 +156,7 @@ async function main(): Promise<void> {
 
     console.log('crawlable: the slot is in the page, before </main>, and nothing hides it');
   } catch (error) {
-    reportFailure(error, seen);
+    reportFailure(error, seen());
     process.exitCode = 1;
   } finally {
     // Always, including when the check failed or the fetch threw.
