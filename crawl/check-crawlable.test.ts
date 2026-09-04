@@ -17,6 +17,15 @@ const DEFERRED = `<!DOCTYPE html><html><body><main>
 <script>$RC("B:0","S:0")</script>
 </body></html>`;
 
+// The same deferral one level up, which is what a route-level loading.tsx
+// does: the whole <main> goes into the hidden div, so the slot arrives before
+// its own </main> and the position check passes. Trimmed from what react-dom
+// 19.2.8 actually streams; only the markers give this page away.
+const DEFERRED_ABOVE_MAIN = `<!DOCTYPE html><html><head></head><body><!--$?--><template id="B:0"></template><div>Loading…</div><!--/$-->
+<div hidden id="S:0"><main><h1>Trail Shoe</h1><section class="rudra" data-rudra-slot="recommendations"><h2>Picked for you</h2></section></main></div>
+<script>$RC("B:0","S:0")</script>
+</body></html>`;
+
 describe('checking a page a crawler will read', () => {
   it('passes a page that writes the slot in place', () => {
     expect(checkCrawlable(GOOD)).toEqual([]);
@@ -27,6 +36,15 @@ describe('checking a page a crawler will read', () => {
 
     expect(problems).toEqual([
       'the slot is after </main>, so it is not in position',
+      'the page holds content in a hidden div for a script to move',
+      'the page uses a script to move content into place',
+    ]);
+  });
+
+  it('catches a page that defers the whole <main>, where the slot is still before </main>', () => {
+    const problems = checkCrawlable(DEFERRED_ABOVE_MAIN);
+
+    expect(problems).toEqual([
       'the page holds content in a hidden div for a script to move',
       'the page uses a script to move content into place',
     ]);

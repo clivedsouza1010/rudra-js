@@ -13,11 +13,11 @@ export function exitedBeforeServing(code: number | null, signal: NodeJS.Signals 
 }
 
 // Called once, in main's catch-all, so no failure loses what the shop said —
-// not just the one that happens to exit before serving. Next can bind the
-// port and log "Ready" with no production build in place at all, then fail
-// on the first real request and print its own "next build" advice — which
-// reads .env.local and bills. So the safe line is named on every failure,
-// not only one that looks like a missing build.
+// not just the one that happens to exit before serving. A missing production
+// build is not only ever a shop that never started: next can log its own
+// address and then exit by itself once it finds no build. And the advice it
+// prints is a bare `next build`, which reads .env.local and bills. So the safe
+// line is named on every failure, not only one that looks like a missing build.
 export function reportFailure(error: unknown, seen: string): void {
   console.error(error instanceof Error ? error.message : String(error));
 

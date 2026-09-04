@@ -2,7 +2,9 @@
 const SLOT = 'data-rudra-slot';
 
 // React parks content it could not send in place inside one of these, then
-// moves it with a script. A crawler runs neither.
+// moves it with a script. A crawler runs neither. Checked against react-dom
+// 19.2.8: a host that sets React's identifierPrefix moves the S: prefix, and
+// then both of these stop matching without saying so.
 const HIDDEN_HOLDER = '<div hidden id="S:';
 const SWAP_SCRIPT = '$RC(';
 
@@ -17,8 +19,6 @@ export function checkCrawlable(html: string): string[] {
 
   const mainEndsAt = html.indexOf('</main>');
   if (mainEndsAt === -1) {
-    // No </main> means the position check below has nothing to compare
-    // against, so a missing one is itself a problem, not a pass.
     problems.push('the page has no </main>, so the slot position cannot be checked');
   } else if (slotAt > mainEndsAt) {
     problems.push('the slot is after </main>, so it is not in position');
