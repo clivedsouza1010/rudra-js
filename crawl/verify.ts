@@ -39,6 +39,8 @@ function startShop(port: number): ChildProcess {
     {
       env: environment,
       stdio: ['ignore', 'pipe', 'pipe'],
+      // Its own group, so stopping it reaches next and not only npm.
+      detached: true,
     },
   );
 }
@@ -83,6 +85,17 @@ function waitUntilReady(shop: ChildProcess, port: number, getSeen: () => string)
   return { ready, onData };
 }
 
+// Signals the whole group, not just npm, so an npm that does not forward the
+// signal cannot orphan next. The group can already be gone by the time we
+// signal it, and that is fine - there is nothing left to stop.
+function signalGroup(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, signal);
+  } catch {
+    // Already gone.
+  }
+}
+
 // SIGTERM asks nicely; a shop that ignores it (or is stuck) would otherwise
 // hang the parent forever, since the piped stdio keeps the event loop alive.
 // Escalate to SIGKILL after a short grace so cleanup always finishes.
@@ -92,14 +105,19 @@ function stopShop(shop: ChildProcess): Promise<void> {
       resolve();
       return;
     }
+    if (shop.pid === undefined) {
+      resolve();
+      return;
+    }
+    const pid = shop.pid;
     const escalate = setTimeout(() => {
-      shop.kill('SIGKILL');
+      signalGroup(pid, 'SIGKILL');
     }, 5_000);
     shop.once('exit', () => {
       clearTimeout(escalate);
       resolve();
     });
-    shop.kill('SIGTERM');
+    signalGroup(pid, 'SIGTERM');
   });
 }
 
@@ -177,6 +195,11 @@ async function main(): Promise<void> {
   } finally {
     // Always, including when the check failed or the fetch threw.
     await stopShop(shop);
+    // A grandchild that outlived the kill still holds the other end. Dropping
+    // our end is what lets the process exit rather than waiting on it.
+    shop.stdout?.destroy();
+    shop.stderr?.destroy();
+    shop.unref();
   }
 }
 
