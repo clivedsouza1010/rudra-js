@@ -140,25 +140,14 @@ async function main(): Promise<void> {
   try {
     await ready;
     // A stalled connection would otherwise hang the script forever. One
-    // deadline for the whole exchange: aborting also errors the body stream,
-    // so the reads below are bounded by it too, without needing one of their own.
+    // deadline for the whole exchange: aborting errors the body stream too, so
+    // reading it below is bounded by the same signal.
     const response = await fetch(`http://localhost:${port}${PAGE_PATH}`, {
-      // Uncompressed: next start compresses by default, and the chunk
-      // boundaries we would see with gzip on are zlib's, not the server's.
-      headers: { 'Accept-Encoding': 'identity' },
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error(`the shop answered ${response.status}`);
-    if (!response.body) throw new Error('the shop sent no body');
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let html = '';
-    for (;;) {
-      const next = await reader.read();
-      if (next.done) break;
-      html += decoder.decode(next.value, { stream: true });
-    }
+    const html = await response.text();
 
     // A fallback page is still server-rendered, so every crawlability check
     // would pass while the page is not the one we meant to measure.
