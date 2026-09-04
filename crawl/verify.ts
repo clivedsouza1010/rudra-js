@@ -77,9 +77,9 @@ function waitUntilReady(shop: ChildProcess, port: number, getSeen: () => string)
     }
   };
 
-  shop.on('exit', (code) => {
+  shop.on('exit', (code, signal) => {
     clearTimeout(timer);
-    rejectReady(new Error(exitedBeforeServing(code)));
+    rejectReady(new Error(exitedBeforeServing(code, signal)));
   });
 
   return { ready, onData };

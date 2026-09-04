@@ -5,7 +5,10 @@
 const SAFE_BUILD_LINE =
   'ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/example-shop';
 
-export function exitedBeforeServing(code: number | null): string {
+export function exitedBeforeServing(code: number | null, signal: NodeJS.Signals | null): string {
+  // A null code means a signal killed it, and then the signal name is the only
+  // thing that says anything: an out-of-memory kill in CI reads as SIGKILL.
+  if (code === null) return `the shop was killed by ${signal} before serving anything`;
   return `the shop exited with ${code} before serving anything`;
 }
 
