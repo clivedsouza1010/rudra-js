@@ -383,6 +383,45 @@ describe('a cohort key', () => {
     );
   });
 
+  // The fixture above gives both shoppers one category, so their affinity
+  // lists match whatever the cohort step does. This one differs underneath the
+  // top category, which is where the leak was.
+  function deeperInput(shopper: { id: string; second: string; views: number }): TrackingInput {
+    return parseTrackingInput({
+      user: { id: shopper.id, segment: 'loyalty' },
+      context: { surface: 'pdp', currentCategory: 'Trail Running' },
+      candidates: [
+        { sku: 'TR-101', title: 'Shoe', category: 'Trail Running', price: 100 },
+        { sku: 'TN-200', title: 'Tent', category: 'Tents', price: 400 },
+        { sku: 'BP-300', title: 'Pack', category: 'Backpacks', price: 200 },
+      ],
+      signals: {
+        lastPurchased: [{ sku: 'TR-101', at: 1_700_000_000_000 }],
+        mostViewed: [
+          // Different view counts, so the top category's own score differs too.
+          { sku: 'TR-101', at: 1_700_000_000_000, views: shopper.views },
+          { sku: shopper.second, at: 1_700_000_000_000, views: shopper.views },
+        ],
+      },
+    });
+  }
+
+  it('sends the same prompt when history differs below the top category', () => {
+    // Two shoppers who both top out in Trail Running, one shopping for tents
+    // and one not. The key keeps only the top category name, so nothing below
+    // it may reach the prompt.
+    const first = deeperInput({ id: 'S-0001', second: 'TN-200', views: 40 });
+    const second = deeperInput({ id: 'S-0002', second: 'BP-300', views: 2 });
+    const candidates = ['TR-101', 'TN-200', 'BP-300'];
+
+    expect(cohortCacheKey(buildDigest(first), candidates, 'p:m')).toBe(
+      cohortCacheKey(buildDigest(second), candidates, 'p:m'),
+    );
+    expect(buildPrompt(first, toCohortDigest(buildDigest(first))).user).toBe(
+      buildPrompt(second, toCohortDigest(buildDigest(second))).user,
+    );
+  });
+
   it('would send different prompts without that step', () => {
     // Proves the test above is not passing for free.
     const first = cohortInput({ id: 'S-0001', search: 'maternity leggings', sku: 'TR-101' });

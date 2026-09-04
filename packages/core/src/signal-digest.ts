@@ -306,6 +306,18 @@ export function buildDigest(input: TrackingInput): SignalDigest {
 // Everything the cohort key leaves out has to leave the prompt too, or the
 // first shopper's searches and history end up shaping copy that is cached and
 // served to everyone else in their cohort.
+// The cohort key keeps the top category's name and nothing else, so that is
+// all the prompt may carry. The scores and the categories under them are built
+// from what one shopper bought, viewed and disliked.
+function topCategoryOnly(affinity: CategoryAffinity[]): CategoryAffinity[] {
+  const top = affinity[0];
+  if (top === undefined) return [];
+  // The score stays on the object but never reaches the prompt: two shoppers
+  // can both top out in Trail Running and score it 9 and 40, and that gap is
+  // one of them shopping much harder. See describeShopper.
+  return [{ category: top.category, score: top.score }];
+}
+
 export function toCohortDigest(digest: SignalDigest): SignalDigest {
   // Listed rather than spread, so what survives is the thing you read.
   const cohort: SignalDigest = {
@@ -321,7 +333,7 @@ export function toCohortDigest(digest: SignalDigest): SignalDigest {
     cartSkus: [],
     topViewed: [],
     recentSearches: [],
-    categoryAffinity: digest.categoryAffinity,
+    categoryAffinity: topCategoryOnly(digest.categoryAffinity),
     interactionCounts: [],
     isColdStart: digest.isColdStart,
   };
