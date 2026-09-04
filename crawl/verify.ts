@@ -151,16 +151,9 @@ async function main(): Promise<void> {
     if (!response.ok) throw new Error(`the shop answered ${response.status}`);
     if (!response.body) throw new Error('the shop sent no body');
 
-    // The first read is what a crawler taking one read would see — but one
-    // read is not one server flush, so this sub-check only bites on a page
-    // big enough to span reads. It proves nothing about a page, like this
-    // one, that fits in a single read regardless.
     const reader = response.body.getReader();
-    const first = await reader.read();
     const decoder = new TextDecoder();
-    const firstChunk = first.value ? decoder.decode(first.value, { stream: true }) : '';
-
-    let html = firstChunk;
+    let html = '';
     for (;;) {
       const next = await reader.read();
       if (next.done) break;
@@ -173,7 +166,7 @@ async function main(): Promise<void> {
       throw new Error('the shop served the deterministic fallback, so this checked the wrong page');
     }
 
-    const problems = checkCrawlable(html, firstChunk);
+    const problems = checkCrawlable(html);
     if (problems.length > 0) {
       console.error('the page is not what a crawler needs:');
       for (const problem of problems) console.error(`  - ${problem}`);
@@ -185,9 +178,6 @@ async function main(): Promise<void> {
       return;
     }
 
-    // Only claims what checkCrawlable actually established above: the slot
-    // is present, it is before </main>, and nothing hides it behind a
-    // script — not a claim about which read it arrived in.
     console.log('crawlable: the slot is in the page, before </main>, and nothing hides it');
   } catch (error) {
     reportFailure(error, seen);

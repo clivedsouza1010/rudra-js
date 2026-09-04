@@ -19,11 +19,11 @@ const DEFERRED = `<!DOCTYPE html><html><body><main>
 
 describe('checking a page a crawler will read', () => {
   it('passes a page that writes the slot in place', () => {
-    expect(checkCrawlable(GOOD, GOOD)).toEqual([]);
+    expect(checkCrawlable(GOOD)).toEqual([]);
   });
 
   it('catches every way a deferred page is wrong', () => {
-    const problems = checkCrawlable(DEFERRED, DEFERRED);
+    const problems = checkCrawlable(DEFERRED);
 
     expect(problems).toEqual([
       'the slot is after </main>, so it is not in position',
@@ -36,23 +36,13 @@ describe('checking a page a crawler will read', () => {
     const late = `<!DOCTYPE html><html><body><main><h1>Trail Shoe</h1></main>
 <section class="rudra" data-rudra-slot="recommendations"></section></body></html>`;
 
-    expect(checkCrawlable(late, late)).toEqual([
-      'the slot is after </main>, so it is not in position',
-    ]);
-  });
-
-  it('catches a slot missing from the first chunk', () => {
-    const firstChunk = '<!DOCTYPE html><html><body><main><h1>Trail Shoe</h1>';
-
-    expect(checkCrawlable(GOOD, firstChunk)).toEqual([
-      'the slot is not in the first chunk, so a crawler reading one read misses it',
-    ]);
+    expect(checkCrawlable(late)).toEqual(['the slot is after </main>, so it is not in position']);
   });
 
   it('says so when the slot is missing altogether', () => {
     const empty = '<!DOCTYPE html><html><body><main></main></body></html>';
 
-    expect(checkCrawlable(empty, empty)).toEqual(['the page has no recommendation slot at all']);
+    expect(checkCrawlable(empty)).toEqual(['the page has no recommendation slot at all']);
   });
 
   it('says so when the page has no </main> at all, so position cannot be judged', () => {
@@ -61,7 +51,7 @@ describe('checking a page a crawler will read', () => {
 <section class="rudra" data-rudra-slot="recommendations"><h2>Picked for you</h2></section>
 </body></html>`;
 
-    expect(checkCrawlable(noMain, noMain)).toEqual([
+    expect(checkCrawlable(noMain)).toEqual([
       'the page has no </main>, so the slot position cannot be checked',
     ]);
   });

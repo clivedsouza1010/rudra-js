@@ -6,7 +6,7 @@ const SLOT = 'data-rudra-slot';
 const HIDDEN_HOLDER = '<div hidden id="S:';
 const SWAP_SCRIPT = '$RC(';
 
-export function checkCrawlable(html: string, firstChunk: string): string[] {
+export function checkCrawlable(html: string): string[] {
   const problems: string[] = [];
 
   const slotAt = html.indexOf(SLOT);
@@ -30,10 +30,6 @@ export function checkCrawlable(html: string, firstChunk: string): string[] {
 
   if (html.includes(SWAP_SCRIPT)) {
     problems.push('the page uses a script to move content into place');
-  }
-
-  if (!firstChunk.includes(SLOT)) {
-    problems.push('the slot is not in the first chunk, so a crawler reading one read misses it');
   }
 
   return problems;
