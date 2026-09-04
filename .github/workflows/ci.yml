@@ -76,5 +76,6 @@ jobs:
       # No ANTHROPIC_API_KEY here: the shop replays, and a replay miss is an
       # error in CI rather than a quiet fallback.
       - run: npm run build --workspace @rudra-js/example-shop
-      - run: npm run verify:crawlable
+      # Seconds, and it runs before the step that starts a server.
       - run: npm run typecheck --workspace @rudra-js/example-shop
+      - run: npm run verify:crawlable
