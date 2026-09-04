@@ -474,6 +474,14 @@ describe('formatting a bundle price', () => {
     expect(defaultFormatBundlePrice({ ...bundle, currency: 'EUR' }, 'de-DE')).toBe('300,00 €');
   });
 
+  it('throws on a price that is not a finite number', () => {
+    // Intl turns null into 0, so without this a set of paid products renders
+    // as free. The same rule the product price already follows.
+    for (const price of [null, undefined, Number.NaN, Infinity]) {
+      expect(() => defaultFormatBundlePrice({ ...bundle, price } as never)).toThrow(TypeError);
+    }
+  });
+
   it('prices a set in a currency that has no decimals', () => {
     // Yen has none, so a forced two places would invent a fraction that does not exist.
     expect(defaultFormatBundlePrice({ ...bundle, currency: 'JPY' }, 'en-US')).toBe('¥300');
