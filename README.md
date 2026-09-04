@@ -36,7 +36,23 @@ npm test
 npm run verify:consumer   # packs both packages and uses them from outside the repo
 ```
 
-CI runs all six of these on every pull request, and builds the example shop in a second job.
+If you have a key in your shell, run the tests as `ANTHROPIC_API_KEY= npm test`: the example
+shop's tests refuse to load with a key set, so that a test run can never bill.
+
+CI runs all six of these on every pull request, and a second job builds the example shop and
+checks that its page still reads as one to a crawler. CI has no key, so it runs the build plainly:
+
+```sh
+npm run build --workspace @rudra-js/example-shop
+npm run verify:crawlable
+```
+
+Locally, empty the key on the build line — the shop reads `examples/shop/.env.local`, and a build
+with a key calls the model for real:
+
+```sh
+ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/example-shop
+```
 
 ## Example
 

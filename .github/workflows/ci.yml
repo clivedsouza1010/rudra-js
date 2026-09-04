@@ -59,6 +59,8 @@ jobs:
   # slower than everything else in `verify` put together.
   shop:
     runs-on: ubuntu-latest
+    # Without this, a hung shop falls back to GitHub's six-hour default.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,4 +76,6 @@ jobs:
       # No ANTHROPIC_API_KEY here: the shop replays, and a replay miss is an
       # error in CI rather than a quiet fallback.
       - run: npm run build --workspace @rudra-js/example-shop
+      # Seconds, and it runs before the step that starts a server.
       - run: npm run typecheck --workspace @rudra-js/example-shop
+      - run: npm run verify:crawlable
