@@ -123,9 +123,13 @@ export function chooseProvider(): ComponentProvider {
 // file rather than adding one, so the usual tell never shows up.
 export const CACHE_TTL_MS = 60 * 60 * 1000;
 
+// Exported so a test can drive the very cache the generator uses. Asserting
+// the constant alone would pass with this wiring taken back out.
+export const specCache = createMemorySpecCache({ ttlMs: CACHE_TTL_MS });
+
 const generator = createComponentGenerator({
   provider: chooseProvider(),
-  cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
+  cache: specCache,
   // Without this a failed model call is invisible: the generator degrades to
   // the deterministic component by design and says nothing, so the page looks
   // right and the terminal stays silent.

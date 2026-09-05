@@ -72,12 +72,23 @@ describe('the replay-only switch', () => {
     warn.mockRestore();
   });
 
-  it('caches a page for longer than anyone will sit on the demo', async () => {
+  it('still has the page an hour later, on the cache the generator uses', async () => {
     // Core defaults to 60 seconds, which sends the shop back to the model
     // about once a minute per cohort. That bills, and the repeat call rewrites
     // the same recording file, so no new file shows up to give it away.
-    const { CACHE_TTL_MS } = await import('./shop-context');
+    // Driving the real cache, because asserting the constant on its own passes
+    // even with the wiring taken back out.
+    vi.useFakeTimers();
+    try {
+      const { specCache } = await import('./shop-context');
+      const cached = { spec: { blocks: [] } as never, generatedAt: Date.now() };
 
-    expect(CACHE_TTL_MS).toBeGreaterThanOrEqual(60 * 60 * 1000);
+      await specCache.set('k', cached);
+      vi.advanceTimersByTime(59 * 60 * 1000);
+
+      expect(await specCache.get('k')).toStrictEqual(cached);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

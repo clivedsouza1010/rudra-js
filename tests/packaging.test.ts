@@ -269,9 +269,17 @@ describe('the README', () => {
     // The anthropic package sat in packages/ for a week without a row here,
     // and it is the one that makes the billed call.
     const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
+    // The table rows only. A link in the prose around it is not a listing, and
+    // searching the whole file would let a deleted row pass.
+    const table = readme
+      .slice(readme.indexOf('## Packages'))
+      .split('\n## ')[0]!
+      .split('\n')
+      .filter((line) => line.startsWith('|'))
+      .join('\n');
 
     for (const name of PACKAGES) {
-      expect(readme, `@rudra-js/${name} is published but not in the README table`).toContain(
+      expect(table, `@rudra-js/${name} is published but not in the README table`).toContain(
         `[\`@rudra-js/${name}\`](packages/${name})`,
       );
     }
