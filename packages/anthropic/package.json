@@ -48,10 +48,10 @@
   },
   "peerDependencies": {
     "@rudra-js/core": "^0.1.0",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@rudra-js/core": "0.1.0",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   }
 }
