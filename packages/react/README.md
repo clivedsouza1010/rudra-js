@@ -12,7 +12,7 @@ crawler that does not run JavaScript.
 ## Install
 
 ```sh
-npm install @rudra-js/react @rudra-js/core react
+npm install @rudra-js/react @rudra-js/core react zod@^4
 ```
 
 Both `@rudra-js/core` and `react` are peer dependencies: the specification you pass
@@ -54,8 +54,15 @@ number throws rather than rendering the product as free.
 ## Styling
 
 The package ships no CSS, on purpose — a stylesheet would fight whatever your
-site already has. Every element it emits carries a class, and this is all of
-them:
+site already has. Unstyled, the block renders as a run-on line: every card
+element is inline, so titles and prices sit together with no separation. That is
+the starting point, not a fault.
+
+`examples/shop/public/demo-styles.css` is a working stylesheet written against
+nothing but the table below — copy it as a starting point. The example shop
+serves it behind `?styles=on` so you can see both states.
+
+Every element it emits carries a class, and this is all of them:
 
 | Where          | Classes                                                                                                                                                                                                    |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
