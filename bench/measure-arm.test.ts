@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { generatedSpecSchema, type GenerationEvent, type ProviderRequest } from '@rudra-js/core';
+import {
+  createComponentGenerator,
+  generatedSpecSchema,
+  type ComponentProvider,
+  type GenerationEvent,
+  type ProviderRequest,
+} from '@rudra-js/core';
 import {
   assertSourceMix,
   createStubProvider,
@@ -12,6 +18,7 @@ import {
   type SourceRule,
   type TokenPrices,
 } from './measure-arm.js';
+import { buildTrackingInput } from '../examples/shop/src/fixtures/tracking-input.js';
 import { generateCatalog } from '../examples/shop/src/fixtures/catalog.js';
 import { generateShoppers } from '../examples/shop/src/fixtures/shoppers.js';
 
@@ -543,5 +550,52 @@ describe('measuring one arm', () => {
     };
 
     await expect(provider.generate(request)).rejects.toThrow(/no candidate in the prompt/);
+  });
+});
+
+function countingProvider(usage: { inputTokens: number; outputTokens: number }): {
+  provider: ComponentProvider;
+  calls: () => number;
+} {
+  const inner = createStubProvider(usage);
+  let calls = 0;
+
+  return {
+    provider: {
+      name: 'stub',
+      model: 'stub',
+      async generate(request: ProviderRequest) {
+        calls += 1;
+        return inner.generate(request);
+      },
+    },
+    calls: () => calls,
+  };
+}
+
+describe('two requests for one key, in flight together', () => {
+  it('sends one request and bills it once', async () => {
+    const usage = { inputTokens: 1_000_000, outputTokens: 0 };
+    const { provider, calls } = countingProvider(usage);
+    const smallCatalog = generateCatalog(1, 20);
+    const [shopper] = generateShoppers(2, smallCatalog, 1);
+    const events: GenerationEvent[] = [];
+    const generator = createComponentGenerator({
+      provider,
+      generation: 'cohort',
+      onEvent: (generationEvent) => events.push(generationEvent),
+    });
+
+    // Both start before either resolves, so the second reaches the key while
+    // the first is still running. No cache entry exists yet for it to hit.
+    const input = buildTrackingInput(shopper!, smallCatalog[0]!.sku, smallCatalog, []);
+    await Promise.all([generator.generate(input), generator.generate(input)]);
+
+    expect(calls()).toBe(1);
+    expect(events.filter((one) => one.calledModel)).toHaveLength(1);
+    // The joiner has to get the answer, not a fallback. That is what sharing
+    // one generation means, and billing once is worthless without it.
+    expect(events.map((one) => one.source)).toEqual(['llm', 'llm']);
+    expect(summarise(identity('c'), events, PRICES).inputTokens).toBe(1_000_000);
   });
 });

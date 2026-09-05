@@ -37,11 +37,18 @@ export interface ReportInput {
  */
 export function buildCaveats(arms: readonly ArmResult[], shoppersPerPage: number): string[] {
   let anyStub = false;
+  let anyCpu = false;
   for (const arm of arms) {
     if (arm.mode === 'stub') anyStub = true;
+    if (arm.cpuUserMs !== undefined && arm.cpuSystemMs !== undefined) anyCpu = true;
   }
 
   const caveats: string[] = [];
+  if (anyCpu) {
+    caveats.push(
+      `CPU is one process per arm, and it is the framework doing parse, digest, select, reconcile and render. No model call is in it${anyStub ? ', and under the stub no network wait is either' : ''}.`,
+    );
+  }
   if (anyStub) {
     caveats.push(
       'No timings are reported for a stub run. The stub answers far below the millisecond Date.now() can see, so a median would be a 0 or a 1 written down as a result.',
@@ -78,9 +85,9 @@ export function buildReport(input: ReportInput): BenchReport {
 export function formatTable(results: readonly ArmResult[]): string {
   const lines: string[] = [];
   lines.push(
-    '| Arm | Mode | Views | Model calls | LLM/Cache/Fallback | Cache hits | Cost / 1k views (ceiling) | Median ms | p95 | p99 |',
+    '| Arm | Mode | Views | Model calls | LLM/Cache/Fallback | Cache hits | Cost / 1k views (ceiling) | CPU ms (user+sys) | Median ms | p95 | p99 |',
   );
-  lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |');
+  lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |');
   for (const result of results) {
     const hits = `${(result.cacheHitRate * 100).toFixed(1)}%`;
     const cost = `$${result.costPerThousandViews.toFixed(2)}`;
@@ -90,9 +97,13 @@ export function formatTable(results: readonly ArmResult[]): string {
     const median = timings === undefined ? 'n/a' : String(timings.median);
     const p95 = timings === undefined ? 'n/a' : String(timings.p95);
     const p99 = timings === undefined ? 'n/a' : String(timings.p99);
+    const cpu =
+      result.cpuUserMs === undefined || result.cpuSystemMs === undefined
+        ? 'n/a'
+        : `${result.cpuUserMs}+${result.cpuSystemMs}`;
     lines.push(
       `| ${result.arm} | ${result.mode} | ${result.views} | ${result.modelCalls} | ${mix} | ${hits} | ${cost} | ` +
-        `${median} | ${p95} | ${p99} |`,
+        `${cpu} | ${median} | ${p95} | ${p99} |`,
     );
   }
   return lines.join('\n');
