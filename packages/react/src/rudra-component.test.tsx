@@ -610,10 +610,14 @@ describe('the styling contract', () => {
   it('puts a class on every element it emits', () => {
     // The test above only sees elements that already have a class, so an
     // element with none is invisible to it. This is the other half.
-    const bare = [...everything().matchAll(/<([a-z]+)(\s[^>]*)?>/g)].filter(
-      (match) => !(match[2] ?? '').includes('class='),
-    );
+    // [a-z][a-z0-9]* rather than [a-z]+, or every heading is skipped: on
+    // <h2 class="..."> the name stops at "h" and the match never completes.
+    const elements = [...everything().matchAll(/<([a-z][a-z0-9]*)([^>]*)>/g)];
+    const bare = elements.filter((match) => !match[2]!.includes('class='));
 
+    // Without a floor this passes on empty markup, which RudraComponent
+    // returns when nothing is visible.
+    expect(elements.length).toBeGreaterThan(20);
     expect(bare.map((match) => match[0])).toEqual([]);
   });
 

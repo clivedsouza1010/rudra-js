@@ -406,6 +406,44 @@ describe('a cohort key', () => {
     );
   });
 
+  // The cohort key hashes these, so the cohort prompt is allowed to vary with
+  // them. categoryAffinity is only partly in the key - the top category's name
+  // and nothing else - which is what the test below this one pins.
+  const IN_THE_COHORT_KEY = [
+    'segment',
+    'surface',
+    'slot',
+    'locale',
+    'maxItems',
+    'isColdStart',
+    'currentCategory',
+    'categoryAffinity',
+  ] as const;
+
+  const SCRUBBED = EVERY_DIGEST_FIELD.filter(
+    (field) => !IN_THE_COHORT_KEY.includes(field as (typeof IN_THE_COHORT_KEY)[number]),
+  );
+
+  it('has every digest field either in the key or scrubbed', () => {
+    // Fails when SignalDigest gains a field, so the choice has to be made
+    // rather than defaulted into a leak.
+    expect([...IN_THE_COHORT_KEY, ...SCRUBBED].toSorted()).toEqual(
+      [...EVERY_DIGEST_FIELD].toSorted(),
+    );
+  });
+
+  it.each(SCRUBBED)('changing %s leaves the cohort prompt alone', (field) => {
+    // The fixture-based test below can only catch leaks through the fields it
+    // happens to vary. This one covers every field the key leaves out.
+    const input = deeperInput({ id: 'S-0001', second: 'TN-200', views: 3 });
+    const original = buildDigest(input);
+    const changed = { ...original, [field]: somethingElse(original[field]) } as SignalDigest;
+
+    expect(buildPrompt(input, toCohortDigest(changed)).user).toBe(
+      buildPrompt(input, toCohortDigest(original)).user,
+    );
+  });
+
   it('sends the same prompt when history differs below the top category', () => {
     // Two shoppers who both top out in Trail Running, one shopping for tents
     // and one not. The key keeps only the top category name, so nothing below

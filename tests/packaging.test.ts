@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   dirname as posixDirname,
@@ -25,7 +25,14 @@ import { describe, expect, it } from 'vitest';
  */
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
-const PACKAGES = ['core', 'react', 'anthropic'] as const;
+// Read from disk rather than listed. A package added to packages/ used to get
+// no tarball check, no provenance check and no README row, and nothing failed
+// until someone noticed - which is how @rudra-js/anthropic went a week without
+// a row in the table below.
+const PACKAGES = readdirSync(join(REPO_ROOT, 'packages'), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .toSorted();
 
 /** Everything a tarball may contain. Anything else is a packaging mistake. */
 const ALLOWED = /^(LICENSE|README\.md|package\.json|dist\/.+|src\/.+\.tsx?)$/;
@@ -72,16 +79,11 @@ function listPackedFiles(packageName: string): string[] {
   return packed.files.map((file) => file.path);
 }
 
-// Packed once per package rather than once per test: `npm pack` is a subprocess.
-const PACKED = Object.fromEntries(PACKAGES.map((name) => [name, listPackedFiles(name)])) as Record<
-  (typeof PACKAGES)[number],
-  string[]
->;
-
 const LICENCE_TEXT = readFileSync(join(REPO_ROOT, 'LICENSE'), 'utf8');
 
 describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
-  const files = PACKED[packageName];
+  // Once per package rather than once per test: `npm pack` is a subprocess.
+  const files = listPackedFiles(packageName);
 
   it('carries the licence text, not just the licence field', () => {
     // "license": "MIT" in a manifest is metadata. The MIT licence itself asks
@@ -271,12 +273,12 @@ describe('the README', () => {
     const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
     // The table rows only. A link in the prose around it is not a listing, and
     // searching the whole file would let a deleted row pass.
-    const table = readme
-      .slice(readme.indexOf('## Packages'))
-      .split('\n## ')[0]!
-      .split('\n')
-      .filter((line) => line.startsWith('|'))
-      .join('\n');
+    const heading = readme.indexOf('## Packages');
+    expect(heading, 'the README has no ## Packages heading').toBeGreaterThan(-1);
+
+    const section = readme.slice(heading).split('\n## ')[0]!;
+    const tableRows = section.split('\n').filter((line) => line.startsWith('|'));
+    const table = tableRows.join('\n');
 
     for (const name of PACKAGES) {
       expect(table, `@rudra-js/${name} is published but not in the README table`).toContain(

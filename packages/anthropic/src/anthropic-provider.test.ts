@@ -215,18 +215,32 @@ describe('the Anthropic adapter', () => {
     await expect(provider.generate(request())).rejects.toThrow(/does not fit the schema/i);
   });
 
-  it('says what the model actually sent when the tool input does not fit', async () => {
-    // A rejected generation costs a real call. Zod alone says which fields are
-    // wrong but not what arrived, so the next step is another paid call to
-    // find out. The message carries the input instead.
+  it('names the shape the model sent, not what was in it', async () => {
+    // A rejected generation costs a real call, and Zod's field list does not
+    // say whether the model sent nothing, prose, or a wrapper. The shape
+    // answers that. The values do not go in: this file keeps the vendor's
+    // message out of the error for the same reason, and a spec is written
+    // from a prompt carrying the shopper's searches.
     const provider = createAnthropicProvider({
       apiKey: 'k',
-      fetch: answer({
-        content: [{ type: 'tool_use', name: 'emit_component_spec', input: { tone: 'chatty' } }],
-      }),
+      fetch: answer(toolAnswer({ body: { headline: 'a shopper searched for this' } })),
     });
 
-    await expect(provider.generate(request())).rejects.toThrow(/chatty/);
+    const failure = provider.generate(request());
+
+    await expect(failure).rejects.toThrow(/keys body/);
+    await expect(failure).rejects.not.toThrow(/shopper searched/);
+  });
+
+  it('names the vendor when the tool use carries no input at all', async () => {
+    // JSON.stringify(undefined) is undefined, so reading .length off it threw
+    // a TypeError from inside the adapter instead of naming anthropic.
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer({ content: [{ type: 'tool_use', name: 'emit_component_spec' }] }),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/does not fit the schema/i);
   });
 
   it('rejects distinctly when the model refuses', async () => {

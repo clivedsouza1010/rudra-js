@@ -121,10 +121,9 @@ export function chooseProvider(): ComponentProvider {
 // back to the model about once a minute per cohort, which costs money on a dev
 // server someone left running, and the repeat call rewrites the same recording
 // file rather than adding one, so the usual tell never shows up.
-export const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_TTL_MS = 60 * 60 * 1000;
 
-// Exported so a test can drive the very cache the generator uses. Asserting
-// the constant alone would pass with this wiring taken back out.
+// Exported so a test can drive the very cache the generator is given.
 export const specCache = createMemorySpecCache({ ttlMs: CACHE_TTL_MS });
 
 const generator = createComponentGenerator({

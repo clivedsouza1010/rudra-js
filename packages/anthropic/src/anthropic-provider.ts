@@ -38,6 +38,17 @@ interface ToolUseBlock {
   input: unknown;
 }
 
+// Enough to tell nothing from prose from a wrapper, without quoting anything
+// the model wrote.
+function describeShape(input: unknown): string {
+  if (input === null) return 'null';
+  if (Array.isArray(input)) return `an array of ${input.length}`;
+  if (typeof input !== 'object') return String(typeof input);
+
+  const keys = Object.keys(input);
+  return keys.length === 0 ? 'an empty object' : `an object with keys ${keys.join(', ')}`;
+}
+
 // The one value of a single-key object, or undefined for anything else. Two
 // keys means no obvious payload, so the caller does not guess.
 function onlyValue(input: unknown): unknown {
@@ -170,25 +181,21 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       // Parsed against the caller's own schema. generatedSpecSchema has no
       // refinements, so this catches type and enum violations — a block kind
       // outside the closed set, a non-string headline — not refinement logic.
-      const asSent = request.schema.safeParse(block.input);
       // Seen for real: the model returned a correct spec one level down, under
-      // a key of its own invention. The same repair the reconciler makes for
-      // the spec's contents - take the answer when it is right, rather than
-      // throwing it away over its envelope. Only when there is one candidate,
-      // and only when it satisfies the schema by itself.
-      const nested = asSent.success ? null : request.schema.safeParse(onlyValue(block.input));
-      const usable = asSent.success ? asSent : nested;
+      // a key of its own invention. Same idea as reconciliation - take a good
+      // answer rather than reject it over one fixable defect.
+      const asSent = request.schema.safeParse(block.input);
+      const usable = asSent.success ? asSent : request.schema.safeParse(onlyValue(block.input));
 
-      if (!usable?.success) {
-        // Carrying the input into the message: a rejected generation has
-        // already cost a real call, and the field list on its own does not say
-        // whether the model sent nothing, sent prose, or sent a shape from an
-        // older vocabulary. Trimmed, because a spec can be long.
-        const sent = JSON.stringify(block.input);
-        const shown = sent.length > 500 ? `${sent.slice(0, 500)}...` : sent;
+      if (!usable.success) {
+        // The shape, never the values. A rejected generation has already cost
+        // a real call, and the field list alone does not say whether the model
+        // sent nothing, prose, or a wrapper - but the values would carry the
+        // shopper's own searches into an adopter's logs, which is what the
+        // HTTP branch above refuses to do.
         throw new Error(
           `anthropic returned a ${TOOL_NAME} tool use that does not fit the schema. ` +
-            `It sent: ${shown}`,
+            `It sent ${describeShape(block.input)}.`,
           { cause: asSent.error },
         );
       }
