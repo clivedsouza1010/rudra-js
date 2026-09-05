@@ -46,6 +46,16 @@ export function buildCaveats(arms: readonly ArmResult[], shoppersPerPage: number
     caveats.push(
       'No timings are reported for a stub run. The stub answers far below the millisecond Date.now() can see, so a median would be a 0 or a 1 written down as a result.',
     );
+
+    let anyCpu = false;
+    for (const arm of arms) {
+      if (arm.cpuUserMs !== undefined) anyCpu = true;
+    }
+    if (anyCpu) {
+      caveats.push(
+        'CPU is one process per arm, and it is the framework doing parse, digest, select, reconcile and render. No model call is in it, and under the stub no network wait is either.',
+      );
+    }
     caveats.push(
       'Input/output tokens and cost are one real recorded call, replayed for every model call — not what the model actually said each time. That call was a cold one, so every call here is billed for writing the cached prefix. A real run writes the prefix once and reads it back at a tenth of the price, which makes this cost close to twice a steady-state run rather than a small overstatement. Read the column as a ceiling, not as what the model would cost.',
     );
@@ -78,9 +88,9 @@ export function buildReport(input: ReportInput): BenchReport {
 export function formatTable(results: readonly ArmResult[]): string {
   const lines: string[] = [];
   lines.push(
-    '| Arm | Mode | Views | Model calls | LLM/Cache/Fallback | Cache hits | Cost / 1k views (ceiling) | Median ms | p95 | p99 |',
+    '| Arm | Mode | Views | Model calls | LLM/Cache/Fallback | Cache hits | Cost / 1k views (ceiling) | CPU ms (user+sys) | Median ms | p95 | p99 |',
   );
-  lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |');
+  lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |');
   for (const result of results) {
     const hits = `${(result.cacheHitRate * 100).toFixed(1)}%`;
     const cost = `$${result.costPerThousandViews.toFixed(2)}`;
@@ -90,9 +100,13 @@ export function formatTable(results: readonly ArmResult[]): string {
     const median = timings === undefined ? 'n/a' : String(timings.median);
     const p95 = timings === undefined ? 'n/a' : String(timings.p95);
     const p99 = timings === undefined ? 'n/a' : String(timings.p99);
+    const cpu =
+      result.cpuUserMs === undefined || result.cpuSystemMs === undefined
+        ? 'n/a'
+        : `${result.cpuUserMs}+${result.cpuSystemMs}`;
     lines.push(
       `| ${result.arm} | ${result.mode} | ${result.views} | ${result.modelCalls} | ${mix} | ${hits} | ${cost} | ` +
-        `${median} | ${p95} | ${p99} |`,
+        `${cpu} | ${median} | ${p95} | ${p99} |`,
     );
   }
   return lines.join('\n');

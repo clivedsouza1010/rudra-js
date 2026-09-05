@@ -12,6 +12,8 @@ import {
   type SourceRule,
   type TokenPrices,
 } from './measure-arm.js';
+import { createComponentGenerator, type ComponentProvider } from '@rudra-js/core';
+import { buildTrackingInput } from '../examples/shop/src/fixtures/tracking-input.js';
 import { generateCatalog } from '../examples/shop/src/fixtures/catalog.js';
 import { generateShoppers } from '../examples/shop/src/fixtures/shoppers.js';
 
@@ -543,5 +545,83 @@ describe('measuring one arm', () => {
     };
 
     await expect(provider.generate(request)).rejects.toThrow(/no candidate in the prompt/);
+  });
+});
+
+function slowProvider(usage: { inputTokens: number; outputTokens: number }): {
+  provider: ComponentProvider;
+  calls: () => number;
+  release: () => void;
+} {
+  let calls = 0;
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  return {
+    provider: {
+      name: 'stub',
+      model: 'stub',
+      async generate(request: ProviderRequest) {
+        calls += 1;
+        await held;
+        const skus = /"(RJ-\d+)"/g;
+        const found = [...request.user.matchAll(skus)].map((match) => match[1]!).slice(0, 4);
+        return {
+          spec: generatedSpecSchema.parse({
+            tone: 'neutral',
+            headline: 'Picked for you',
+            subheadline: null,
+            blocks: [
+              {
+                kind: 'grid',
+                title: null,
+                columns: 2,
+                items: found.map((sku) => ({
+                  sku,
+                  basis: 'popular',
+                  reason: null,
+                  badge: null,
+                  emphasis: 'normal',
+                })),
+              },
+            ],
+            rationale: 'stub',
+          }),
+          usage,
+        };
+      },
+    },
+    calls: () => calls,
+    release,
+  };
+}
+
+describe('two requests that arrive together', () => {
+  it('sends one request and bills it once', async () => {
+    const usage = { inputTokens: 1_000_000, outputTokens: 0 };
+    const { provider, calls, release } = slowProvider(usage);
+    const smallCatalog = generateCatalog(1, 20);
+    const pair = generateShoppers(2, smallCatalog, 2);
+    const events: GenerationEvent[] = [];
+    const generator = createComponentGenerator({
+      provider,
+      generation: 'cohort',
+      onEvent: (generationEvent) => events.push(generationEvent),
+    });
+
+    const input = (shopper: (typeof pair)[number]) =>
+      buildTrackingInput(shopper, smallCatalog[0]!.sku, smallCatalog, []);
+    const both = Promise.all([
+      generator.generate(input(pair[0]!)),
+      generator.generate(input(pair[0]!)),
+    ]);
+    release();
+    await both;
+
+    expect(calls()).toBe(1);
+    expect(events.filter((one) => one.calledModel)).toHaveLength(1);
+    expect(summarise(identity('c'), events, PRICES).inputTokens).toBe(1_000_000);
   });
 });

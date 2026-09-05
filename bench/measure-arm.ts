@@ -55,6 +55,10 @@ export interface ArmResult {
   cacheWriteTokens: number;
   cacheReadTokens: number;
   costPerThousandViews: number;
+  // Filled in by run-arm, which measures a whole process. measureArm itself
+  // shares a process with whatever else the caller is doing.
+  cpuUserMs?: number;
+  cpuSystemMs?: number;
   // Absent for a stub run. The stub answers far below the millisecond that
   // Date.now() can see, so its median is a 0 dressed up as a measurement.
   elapsedMs?: { median: number; p95: number; p99: number };

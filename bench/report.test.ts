@@ -134,4 +134,14 @@ describe('the printed table', () => {
 
     expect(table).toContain('| c cohort | live |');
   });
+
+  it('says what the cpu figure leaves out when there is one', () => {
+    const withCpu = [{ ...armResult(), cpuUserMs: 134, cpuSystemMs: 2 }];
+
+    expect(buildCaveats(withCpu, 10).join(' ')).toMatch(/no model call is in it/i);
+  });
+
+  it('says nothing about cpu when no arm measured it', () => {
+    expect(buildCaveats([armResult()], 10).join(' ')).not.toMatch(/cpu/i);
+  });
 });
