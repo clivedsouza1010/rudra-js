@@ -3,3 +3,7 @@ package-lock.json
 
 # Scratch for plan execution: git-ignored, and not the formatter's business.
 .superpowers
+
+# Written by JSON.stringify and compared byte for byte, so the formatter
+# must not touch it.
+tests/golden

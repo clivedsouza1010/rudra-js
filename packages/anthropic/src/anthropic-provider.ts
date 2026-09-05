@@ -115,10 +115,10 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
               name: TOOL_NAME,
               description: 'Return the component specification.',
               // "input" — a tool's input_schema describes what the model must
-              // produce as the tool call's argument, not core's own output.
-              // Identical to the default today because nothing in
-              // generatedSpecSchema uses `.default()` or `.transform()`; the
-              // day one does, "output" would silently send the wrong shape.
+              // produce as the tool call's argument, not core's own output. The
+              // two are not the same: "output" carries additionalProperties:
+              // false on every block and "input" does not. Pinned in
+              // tests/tool-schema.test.ts.
               input_schema: z.toJSONSchema(request.schema, { io: 'input' }),
             },
           ],

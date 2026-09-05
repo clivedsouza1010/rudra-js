@@ -165,7 +165,9 @@ describe('what the model cannot say', () => {
  * to a comment.
  */
 describe('provider structured-output compatibility', () => {
-  const jsonSchema = z.toJSONSchema(generatedSpecSchema, { io: 'output' });
+  // 'input' is the shape the provider sends. Checking 'output' would verify
+  // an object nobody transmits.
+  const jsonSchema = z.toJSONSchema(generatedSpecSchema, { io: 'input' });
   const serialised = JSON.stringify(jsonSchema);
 
   it('converts to JSON Schema at all', () => {
@@ -181,7 +183,7 @@ describe('provider structured-output compatibility', () => {
 
   it('declares every property of a product reference as required', () => {
     const parsed = JSON.parse(serialised) as Record<string, unknown>;
-    const refSchema = z.toJSONSchema(productReferenceSchema, { io: 'output' }) as {
+    const refSchema = z.toJSONSchema(productReferenceSchema, { io: 'input' }) as {
       properties: Record<string, unknown>;
       required?: string[];
     };
