@@ -15,10 +15,16 @@ async function main(): Promise<void> {
     await collect(origin);
 
     const responses = await collect(origin);
+    const again = await collect(origin);
     const classes = classify(responses);
+    // Both passes, because a proxy that compressed only the second one would
+    // still decode to the same text and slip past the stability check.
     const reasons = [
-      ...unstable(responses, await collect(origin)),
-      ...refusals(responses, classes),
+      ...new Set([
+        ...unstable(responses, again),
+        ...refusals(responses, classes),
+        ...refusals(again, classify(again)),
+      ]),
     ];
 
     if (reasons.length > 0) {

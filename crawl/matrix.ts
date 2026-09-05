@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { checkCrawlable } from './check-crawlable.js';
+import { DEFERRAL_PROBLEMS, PLACEMENT_PROBLEMS, checkCrawlable } from './check-crawlable.js';
 
 export interface AgentResponse {
   agent: string;
@@ -31,10 +31,12 @@ export function classify(responses: AgentResponse[]): ResponseClass[] {
     const marker = response.body.indexOf(HYDRATION_MARKER);
     byDigest.set(digest, {
       agents: [response.agent],
-      bytes: response.body.length,
+      bytes: Buffer.byteLength(response.body),
       digest,
       problems: checkCrawlable(response.body),
-      visibleBytes: marker === -1 ? response.body.length : marker,
+      visibleBytes: Buffer.byteLength(
+        marker === -1 ? response.body : response.body.slice(0, marker),
+      ),
     });
   }
 
@@ -118,14 +120,12 @@ export function renderTable(classes: ResponseClass[]): string {
     '| --- | --- | --- | --- | --- | --- | --- |',
   ];
   for (const row of classes) {
-    const positioned = row.problems.some((problem) => problem.includes('not in position'));
-    const hidden = row.problems.some(
-      (problem) => problem.includes('hidden') || problem.includes('script'),
-    );
+    const misplaced = row.problems.some((problem) => PLACEMENT_PROBLEMS.includes(problem));
+    const deferred = row.problems.some((problem) => DEFERRAL_PROBLEMS.includes(problem));
     const share = Math.round((1 - row.visibleBytes / row.bytes) * 100);
     lines.push(
       `| ${row.agents.join(', ')} | ${row.bytes} | \`${row.digest.slice(0, 12)}\` | ` +
-        `${positioned ? 'no' : 'yes'} | ${hidden ? 'no' : 'yes'} | ${row.visibleBytes} bytes | ${share}% |`,
+        `${misplaced ? 'no' : 'yes'} | ${deferred ? 'no' : 'yes'} | ${row.visibleBytes} bytes | ${share}% |`,
     );
   }
   return lines.join('\n');

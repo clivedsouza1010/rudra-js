@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classify, refusals, unstable, type AgentResponse } from './matrix.js';
+import { classify, refusals, renderTable, unstable, type AgentResponse } from './matrix.js';
 
 const GOOD = `<!DOCTYPE html><html><head></head><body><main><h1>Shoe</h1><section data-rudra-slot="recommendations"><h2>Picked for you</h2></section></main><script>self.__next_f.push([1,"x"])</script></body></html>`;
 
@@ -122,5 +122,80 @@ describe('checking the run repeated itself', () => {
     expect(unstable(first, [response('googlebot')])).toEqual([
       'bingbot answered differently on a second pass, so this run is not reproducible',
     ]);
+  });
+});
+
+describe('a second pass that arrives compressed', () => {
+  it('is caught by refusing on that pass as well', () => {
+    // The stability check cannot see this: response.text() decodes, so a
+    // compressed reply gives back the same string.
+    const first = [response('googlebot'), response('bingbot', { body: OTHER })];
+    const second = [
+      response('googlebot', { contentEncoding: 'gzip' }),
+      response('bingbot', { body: OTHER }),
+    ];
+
+    expect(unstable(first, second)).toEqual([]);
+    expect(refusals(first, classify(first))).toEqual([]);
+    expect(refusals(second, classify(second))).toEqual([
+      'googlebot came back gzip-encoded, so every byte count is the compressor’s',
+    ]);
+  });
+});
+
+describe('counting bytes rather than characters', () => {
+  it('measures the body in utf-8 bytes', () => {
+    const accented = `<main>caf\u00e9</main><script>self.__next_f.push([])</script>`;
+    const classes = classify([response('curl', { body: accented })]);
+
+    expect(classes[0]!.bytes).toBe(Buffer.byteLength(accented));
+    expect(classes[0]!.bytes).toBeGreaterThan(accented.length);
+  });
+
+  it('measures the visible document in utf-8 bytes too', () => {
+    const accented = `<main data-rudra-slot="x">caf\u00e9</main><script>self.__next_f.push([])</script>`;
+    const classes = classify([response('curl', { body: accented })]);
+    const prefix = accented.slice(0, accented.indexOf('self.__next_f'));
+
+    expect(classes[0]!.visibleBytes).toBe(Buffer.byteLength(prefix));
+    expect(classes[0]!.visibleBytes).toBeGreaterThan(prefix.length);
+  });
+});
+
+describe('reporting placement in the table', () => {
+  it('does not call a page with no slot at all well placed', () => {
+    const classes = classify([
+      response('googlebot', { body: '<main>nothing here</main>' }),
+      response('bingbot', { body: OTHER }),
+    ]);
+
+    expect(renderTable(classes).split('\n')[2]).toContain('| no |');
+  });
+
+  it('does not call a page with no closing main well placed', () => {
+    const classes = classify([
+      response('googlebot', { body: '<section data-rudra-slot="x"></section>' }),
+      response('bingbot', { body: OTHER }),
+    ]);
+
+    expect(renderTable(classes).split('\n')[2]).toContain('| no |');
+  });
+
+  it('does not call a page that hides its slot behind a script clean', () => {
+    // In position and still invisible: react parked the whole main in a hidden
+    // div, so the slot is before its own </main>.
+    const deferred = `<div hidden id="S:0"><main><section data-rudra-slot="x"></section></main></div><script>$RC("B:0","S:0")</script>`;
+    const classes = classify([
+      response('googlebot', { body: deferred }),
+      response('bingbot', { body: OTHER }),
+    ]);
+
+    expect(renderTable(classes).split('\n')[2]).toContain('| yes | no |');
+  });
+
+  it('calls a good page well placed', () => {
+    expect(renderTable(classify([response('googlebot')])).split('\n')[2]).toContain(
+      '| yes | yes |',
+    );
   });
 });
