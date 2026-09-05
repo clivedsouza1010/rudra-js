@@ -71,4 +71,34 @@ describe('the replay-only switch', () => {
 
     warn.mockRestore();
   });
+
+  it('holds a page for an hour and lets it go after that', async () => {
+    vi.useFakeTimers();
+    try {
+      const { specCache } = await import('./shop-context');
+      const cached = { spec: { blocks: [] } as never, generatedAt: Date.now() };
+
+      await specCache.set('k', cached);
+      vi.advanceTimersByTime(59 * 60 * 1000);
+      expect(await specCache.get('k')).toStrictEqual(cached);
+
+      vi.advanceTimersByTime(2 * 60 * 1000);
+      expect(await specCache.get('k')).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives the generator that cache, not a copy of it', async () => {
+    const { getShopContext, specCache } = await import('./shop-context');
+    const { buildTrackingInput } = await import('./fixtures/tracking-input');
+    const { catalog, bundles, findShopper, generator } = getShopContext();
+    const get = vi.spyOn(specCache, 'get');
+
+    await generator.generate(
+      buildTrackingInput(findShopper('S-0001'), catalog[0]!.sku, catalog, bundles),
+    );
+
+    expect(get).toHaveBeenCalled();
+  });
 });

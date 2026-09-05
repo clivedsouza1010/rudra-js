@@ -474,6 +474,12 @@ describe('formatting a bundle price', () => {
     expect(defaultFormatBundlePrice({ ...bundle, currency: 'EUR' }, 'de-DE')).toBe('300,00 €');
   });
 
+  it('throws on a price that is not a finite number', () => {
+    for (const price of [null, undefined, Number.NaN, Infinity]) {
+      expect(() => defaultFormatBundlePrice({ ...bundle, price } as never)).toThrow(TypeError);
+    }
+  });
+
   it('prices a set in a currency that has no decimals', () => {
     // Yen has none, so a forced two places would invent a fraction that does not exist.
     expect(defaultFormatBundlePrice({ ...bundle, currency: 'JPY' }, 'en-US')).toBe('¥300');
@@ -597,6 +603,14 @@ describe('the styling contract', () => {
     for (const className of emitted) {
       expect(readme, `.${className} is emitted but not documented`).toContain(`\`.${className}\``);
     }
+  });
+
+  it('puts a class on every element it emits', () => {
+    const elements = [...everything().matchAll(/<([a-z][a-z0-9]*)([^>]*)>/g)];
+    const bare = elements.filter((match) => !match[2]!.includes('class='));
+
+    expect(elements.length).toBeGreaterThan(20);
+    expect(bare.map((match) => match[0])).toEqual([]);
   });
 
   it('documents every attribute it emits', () => {

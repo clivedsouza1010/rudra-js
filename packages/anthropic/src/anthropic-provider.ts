@@ -38,6 +38,21 @@ interface ToolUseBlock {
   input: unknown;
 }
 
+function describeShape(input: unknown): string {
+  if (input === null) return 'null';
+  if (Array.isArray(input)) return `an array of ${input.length}`;
+  if (typeof input !== 'object') return String(typeof input);
+
+  const keys = Object.keys(input);
+  return keys.length === 0 ? 'an empty object' : `an object with keys ${keys.join(', ')}`;
+}
+
+function onlyValue(input: unknown): unknown {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
+  const values = Object.values(input);
+  return values.length === 1 ? values[0] : undefined;
+}
+
 function isToolUseBlock(candidate: unknown): candidate is ToolUseBlock {
   return (
     typeof candidate === 'object' &&
@@ -162,7 +177,18 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       // Parsed against the caller's own schema. generatedSpecSchema has no
       // refinements, so this catches type and enum violations — a block kind
       // outside the closed set, a non-string headline — not refinement logic.
-      const spec = request.schema.parse(block.input);
+      const asSent = request.schema.safeParse(block.input);
+      const usable = asSent.success ? asSent : request.schema.safeParse(onlyValue(block.input));
+
+      if (!usable.success) {
+        throw new Error(
+          `anthropic returned a ${TOOL_NAME} tool use that does not fit the schema. ` +
+            `It sent ${describeShape(block.input)}.`,
+          { cause: asSent.error },
+        );
+      }
+
+      const spec = usable.data;
       const usage = toUsage(body.usage);
 
       return { spec, ...(usage ? { usage } : {}) };

@@ -307,6 +307,8 @@ export function buildDigest(input: TrackingInput): SignalDigest {
 // first shopper's searches and history end up shaping copy that is cached and
 // served to everyone else in their cohort.
 export function toCohortDigest(digest: SignalDigest): SignalDigest {
+  const top = digest.categoryAffinity[0];
+
   // Listed rather than spread, so what survives is the thing you read.
   const cohort: SignalDigest = {
     userId: 'cohort',
@@ -321,7 +323,7 @@ export function toCohortDigest(digest: SignalDigest): SignalDigest {
     cartSkus: [],
     topViewed: [],
     recentSearches: [],
-    categoryAffinity: digest.categoryAffinity,
+    categoryAffinity: top ? [{ category: top.category, score: 0 }] : [],
     interactionCounts: [],
     isColdStart: digest.isColdStart,
   };

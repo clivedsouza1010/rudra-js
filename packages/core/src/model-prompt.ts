@@ -175,9 +175,7 @@ function section(heading: string, body: string | undefined): string | null {
 
 function describeShopper(digest: SignalDigest): string {
   const viewed = digest.topViewed.map((view) => `${quote(view.sku)} viewed ${view.views}x`);
-  const affinity = digest.categoryAffinity.map(
-    (entry) => `${quote(entry.category)} ${entry.score}`,
-  );
+  const affinity = digest.categoryAffinity.map((entry) => quote(entry.category));
   const interactions = digest.interactionCounts.map(
     (entry) => `${quote(entry.type)} x${entry.count}`,
   );

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   dirname as posixDirname,
@@ -25,7 +25,10 @@ import { describe, expect, it } from 'vitest';
  */
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
-const PACKAGES = ['core', 'react', 'anthropic'] as const;
+const PACKAGES = readdirSync(join(REPO_ROOT, 'packages'), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .toSorted();
 
 /** Everything a tarball may contain. Anything else is a packaging mistake. */
 const ALLOWED = /^(LICENSE|README\.md|package\.json|dist\/.+|src\/.+\.tsx?)$/;
@@ -72,16 +75,10 @@ function listPackedFiles(packageName: string): string[] {
   return packed.files.map((file) => file.path);
 }
 
-// Packed once per package rather than once per test: `npm pack` is a subprocess.
-const PACKED = Object.fromEntries(PACKAGES.map((name) => [name, listPackedFiles(name)])) as Record<
-  (typeof PACKAGES)[number],
-  string[]
->;
-
 const LICENCE_TEXT = readFileSync(join(REPO_ROOT, 'LICENSE'), 'utf8');
 
 describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
-  const files = PACKED[packageName];
+  const files = listPackedFiles(packageName);
 
   it('carries the licence text, not just the licence field', () => {
     // "license": "MIT" in a manifest is metadata. The MIT licence itself asks
@@ -260,6 +257,24 @@ describe('the release workflow', () => {
     // A check that runs after the publish protects nothing.
     for (const step of jobStepsOf(ciWorkflow, 'verify')) {
       expect(steps.indexOf(step), `\`${step}\` runs after publishing`).toBeLessThan(firstPublish);
+    }
+  });
+});
+
+describe('the README', () => {
+  it('lists every package that gets published', () => {
+    const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
+    const heading = readme.indexOf('## Packages');
+    expect(heading, 'the README has no ## Packages heading').toBeGreaterThan(-1);
+
+    const section = readme.slice(heading).split('\n## ')[0]!;
+    const tableRows = section.split('\n').filter((line) => line.startsWith('|'));
+    const table = tableRows.join('\n');
+
+    for (const name of PACKAGES) {
+      expect(table, `@rudra-js/${name} is published but not in the README table`).toContain(
+        `[\`@rudra-js/${name}\`](packages/${name})`,
+      );
     }
   });
 });

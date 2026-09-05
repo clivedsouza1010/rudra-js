@@ -50,7 +50,7 @@ jobs:
       - run: npm test
 
       # Asserts what a tarball contains; this asserts that the tarball works —
-      # it packs both packages, resolves them from outside the repository, and
+      # it packs all three packages, resolves them from outside the repository, and
       # renders. Nothing else here would notice a package that installs but
       # cannot be imported.
       - run: npm run verify:consumer

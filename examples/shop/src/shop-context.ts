@@ -117,9 +117,13 @@ export function chooseProvider(): ComponentProvider {
   });
 }
 
+const CACHE_TTL_MS = 60 * 60 * 1000;
+
+export const specCache = createMemorySpecCache({ ttlMs: CACHE_TTL_MS });
+
 const generator = createComponentGenerator({
   provider: chooseProvider(),
-  cache: createMemorySpecCache(),
+  cache: specCache,
   // Without this a failed model call is invisible: the generator degrades to
   // the deterministic component by design and says nothing, so the page looks
   // right and the terminal stays silent.

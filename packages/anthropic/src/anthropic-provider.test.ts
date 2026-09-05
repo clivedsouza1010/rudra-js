@@ -183,6 +183,54 @@ describe('the Anthropic adapter', () => {
     await expect(provider.generate(request())).rejects.toThrow(/max_tokens/i);
   });
 
+  it('takes the spec when the model wraps it in a single key', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer(toolAnswer({ body: spec })),
+    });
+
+    await expect(provider.generate(request())).resolves.toMatchObject({ spec });
+  });
+
+  it('does not guess when the wrapper holds something that is not a spec', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer(toolAnswer({ body: { tone: 'chatty' } })),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/does not fit the schema/i);
+  });
+
+  it('does not guess when there is more than one key to choose from', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer(toolAnswer({ body: spec, other: spec })),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/does not fit the schema/i);
+  });
+
+  it('names the shape the model sent, not what was in it', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer(toolAnswer({ body: { headline: 'a shopper searched for this' } })),
+    });
+
+    const failure = provider.generate(request());
+
+    await expect(failure).rejects.toThrow(/keys body/);
+    await expect(failure).rejects.not.toThrow(/shopper searched/);
+  });
+
+  it('names the vendor when the tool use carries no input at all', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer({ content: [{ type: 'tool_use', name: 'emit_component_spec' }] }),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/does not fit the schema/i);
+  });
+
   it('rejects distinctly when the model refuses', async () => {
     const provider = createAnthropicProvider({
       apiKey: 'k',

@@ -8,15 +8,16 @@ HTML response. The model never returns markup: it returns a specification drawn 
 vocabulary, which a registry of components renders. That is what makes generated output safe to put
 in a page.
 
-> **Status: early, and not published.** Both packages are being built one module at a time and
+> **Status: early, and not published.** All three packages are being built one module at a time and
 > their contracts are still moving. Please do not depend on them yet.
 
 ## Packages
 
-| Package                             | What it does                                                                                       |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------- |
-| [`@rudra-js/core`](packages/core)   | The contracts and logic that turn one tracking payload into one renderable component specification |
-| [`@rudra-js/react`](packages/react) | Renders that specification as React Server Components, with no client JavaScript                   |
+| Package                                     | What it does                                                                                       |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| [`@rudra-js/core`](packages/core)           | The contracts and logic that turn one tracking payload into one renderable component specification |
+| [`@rudra-js/react`](packages/react)         | Renders that specification as React Server Components, with no client JavaScript                   |
+| [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API, and is the only package that makes a billed call                       |
 
 ## Development
 
@@ -33,7 +34,7 @@ npm run typecheck    # includes test files, which the build does not
 npm run lint
 npm run format:check
 npm test
-npm run verify:consumer   # packs both packages and uses them from outside the repo
+npm run verify:consumer   # packs all three packages and uses them from outside the repo
 ```
 
 If you have a key in your shell, run the tests as `ANTHROPIC_API_KEY= npm test`: the example

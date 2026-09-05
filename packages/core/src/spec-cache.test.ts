@@ -328,6 +328,25 @@ function cohortDigest(shopper: Shopper = {}): SignalDigest {
 
 const CANDIDATES = ['TR-101', 'TR-102'];
 
+function deeperInput(shopper: { id: string; second: string; views: number }): TrackingInput {
+  return parseTrackingInput({
+    user: { id: shopper.id, segment: 'loyalty' },
+    context: { surface: 'pdp', currentCategory: 'Trail Running' },
+    candidates: [
+      { sku: 'TR-101', title: 'Shoe', category: 'Trail Running', price: 100 },
+      { sku: 'TN-200', title: 'Tent', category: 'Tents', price: 400 },
+      { sku: 'BP-300', title: 'Pack', category: 'Backpacks', price: 200 },
+    ],
+    signals: {
+      lastPurchased: [{ sku: 'TR-101', at: 1_700_000_000_000 }],
+      mostViewed: [
+        { sku: 'TR-101', at: 1_700_000_000_000, views: shopper.views },
+        { sku: shopper.second, at: 1_700_000_000_000, views: shopper.views },
+      ],
+    },
+  });
+}
+
 // the two candidates every cohortDigest() shopper is offered
 const cohortKeyFor = (digest: SignalDigest, provider = 'p:m') =>
   cohortCacheKey(digest, ['TR-101', 'TR-999'], provider);
@@ -377,6 +396,50 @@ describe('a cohort key', () => {
 
     expect(cohortCacheKey(buildDigest(first), CANDIDATES, 'p:m')).toBe(
       cohortCacheKey(buildDigest(second), CANDIDATES, 'p:m'),
+    );
+    expect(buildPrompt(first, toCohortDigest(buildDigest(first))).user).toBe(
+      buildPrompt(second, toCohortDigest(buildDigest(second))).user,
+    );
+  });
+
+  const IN_THE_COHORT_KEY = [
+    'segment',
+    'surface',
+    'slot',
+    'locale',
+    'maxItems',
+    'isColdStart',
+    'currentCategory',
+    'categoryAffinity',
+  ] as const;
+
+  const SCRUBBED = EVERY_DIGEST_FIELD.filter(
+    (field) => !IN_THE_COHORT_KEY.includes(field as (typeof IN_THE_COHORT_KEY)[number]),
+  );
+
+  it('has every digest field either in the key or scrubbed', () => {
+    expect([...IN_THE_COHORT_KEY, ...SCRUBBED].toSorted()).toEqual(
+      [...EVERY_DIGEST_FIELD].toSorted(),
+    );
+  });
+
+  it.each(SCRUBBED)('changing %s leaves the cohort prompt alone', (field) => {
+    const input = deeperInput({ id: 'S-0001', second: 'TN-200', views: 3 });
+    const original = buildDigest(input);
+    const changed = { ...original, [field]: somethingElse(original[field]) } as SignalDigest;
+
+    expect(buildPrompt(input, toCohortDigest(changed)).user).toBe(
+      buildPrompt(input, toCohortDigest(original)).user,
+    );
+  });
+
+  it('sends the same prompt when history differs below the top category', () => {
+    const first = deeperInput({ id: 'S-0001', second: 'TN-200', views: 40 });
+    const second = deeperInput({ id: 'S-0002', second: 'BP-300', views: 2 });
+    const candidates = ['TR-101', 'TN-200', 'BP-300'];
+
+    expect(cohortCacheKey(buildDigest(first), candidates, 'p:m')).toBe(
+      cohortCacheKey(buildDigest(second), candidates, 'p:m'),
     );
     expect(buildPrompt(first, toCohortDigest(buildDigest(first))).user).toBe(
       buildPrompt(second, toCohortDigest(buildDigest(second))).user,

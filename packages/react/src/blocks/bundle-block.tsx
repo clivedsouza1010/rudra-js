@@ -29,7 +29,9 @@ export function BundleRenderer({
       <ul className="rudra-bundle__items">
         {products.map((product) => (
           <li key={product.sku} className="rudra-bundle__item" data-rudra-sku={product.sku}>
-            <a href={context.hrefForSku(product.sku)}>{product.title}</a>
+            <a className="rudra-bundle__link" href={context.hrefForSku(product.sku)}>
+              {product.title}
+            </a>
           </li>
         ))}
       </ul>
