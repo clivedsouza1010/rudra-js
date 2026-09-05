@@ -79,8 +79,6 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
  * are priced in another currency still shows the shop's own price correctly.
  */
 export function defaultFormatBundlePrice(bundle: Bundle, locale?: string): string {
-  // Same rule as the product price: null renders as a free set, undefined as
-  // NaN. A set of paid products showing as free is an incident.
   if (!Number.isFinite(bundle.price)) {
     throw new TypeError(
       `price for bundle ${bundle.id} is ${String(bundle.price)}, not a finite number — ` +

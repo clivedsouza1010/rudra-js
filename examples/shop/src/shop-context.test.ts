@@ -73,14 +73,8 @@ describe('the replay-only switch', () => {
   });
 
   it('holds a page for an hour and lets it go after that', async () => {
-    // Core defaults to 60 seconds, which sends the shop back to the model
-    // about once a minute per cohort. That bills, and the repeat call rewrites
-    // the same recording file, so no new file shows up to give it away.
-    // Both ends are checked: too short bills, too long serves a stale page.
     vi.useFakeTimers();
     try {
-      // Imported after the fake clock is installed, or createMemorySpecCache
-      // captures the real Date.now and advancing moves nothing.
       const { specCache } = await import('./shop-context');
       const cached = { spec: { blocks: [] } as never, generatedAt: Date.now() };
 
@@ -96,8 +90,6 @@ describe('the replay-only switch', () => {
   });
 
   it('gives the generator that cache, not a copy of it', async () => {
-    // The test above drives specCache directly, so it stays green if the
-    // generator is handed a fresh default cache instead. This is the wiring.
     const { getShopContext, specCache } = await import('./shop-context');
     const { buildTrackingInput } = await import('./fixtures/tracking-input');
     const { catalog, bundles, findShopper, generator } = getShopContext();

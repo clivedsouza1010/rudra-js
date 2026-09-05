@@ -328,9 +328,6 @@ function cohortDigest(shopper: Shopper = {}): SignalDigest {
 
 const CANDIDATES = ['TR-101', 'TR-102'];
 
-// The fixture above gives both shoppers one category, so their affinity
-// lists match whatever the cohort step does. This one differs underneath the
-// top category, which is where the leak was.
 function deeperInput(shopper: { id: string; second: string; views: number }): TrackingInput {
   return parseTrackingInput({
     user: { id: shopper.id, segment: 'loyalty' },
@@ -343,7 +340,6 @@ function deeperInput(shopper: { id: string; second: string; views: number }): Tr
     signals: {
       lastPurchased: [{ sku: 'TR-101', at: 1_700_000_000_000 }],
       mostViewed: [
-        // Different view counts, so the top category's own score differs too.
         { sku: 'TR-101', at: 1_700_000_000_000, views: shopper.views },
         { sku: shopper.second, at: 1_700_000_000_000, views: shopper.views },
       ],
@@ -406,9 +402,6 @@ describe('a cohort key', () => {
     );
   });
 
-  // The cohort key hashes these, so the cohort prompt is allowed to vary with
-  // them. categoryAffinity is only partly in the key - the top category's name
-  // and nothing else - which is what the test below this one pins.
   const IN_THE_COHORT_KEY = [
     'segment',
     'surface',
@@ -425,16 +418,12 @@ describe('a cohort key', () => {
   );
 
   it('has every digest field either in the key or scrubbed', () => {
-    // Fails when SignalDigest gains a field, so the choice has to be made
-    // rather than defaulted into a leak.
     expect([...IN_THE_COHORT_KEY, ...SCRUBBED].toSorted()).toEqual(
       [...EVERY_DIGEST_FIELD].toSorted(),
     );
   });
 
   it.each(SCRUBBED)('changing %s leaves the cohort prompt alone', (field) => {
-    // The fixture-based test below can only catch leaks through the fields it
-    // happens to vary. This one covers every field the key leaves out.
     const input = deeperInput({ id: 'S-0001', second: 'TN-200', views: 3 });
     const original = buildDigest(input);
     const changed = { ...original, [field]: somethingElse(original[field]) } as SignalDigest;
@@ -445,9 +434,6 @@ describe('a cohort key', () => {
   });
 
   it('sends the same prompt when history differs below the top category', () => {
-    // Two shoppers who both top out in Trail Running, one shopping for tents
-    // and one not. The key keeps only the top category name, so nothing below
-    // it may reach the prompt.
     const first = deeperInput({ id: 'S-0001', second: 'TN-200', views: 40 });
     const second = deeperInput({ id: 'S-0002', second: 'BP-300', views: 2 });
     const candidates = ['TR-101', 'TN-200', 'BP-300'];

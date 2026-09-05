@@ -184,10 +184,6 @@ describe('the Anthropic adapter', () => {
   });
 
   it('takes the spec when the model wraps it in a single key', async () => {
-    // Seen for real: the model returned the whole spec under "body". The spec
-    // itself was right - correct tone, real SKUs, valid basis values - just one
-    // level too deep. Rejecting a good answer over its envelope costs a paid
-    // call and gives the shopper the fallback.
     const provider = createAnthropicProvider({
       apiKey: 'k',
       fetch: answer(toolAnswer({ body: spec })),
@@ -206,7 +202,6 @@ describe('the Anthropic adapter', () => {
   });
 
   it('does not guess when there is more than one key to choose from', async () => {
-    // Two candidates means no single obvious payload, so this stays an error.
     const provider = createAnthropicProvider({
       apiKey: 'k',
       fetch: answer(toolAnswer({ body: spec, other: spec })),
@@ -216,11 +211,6 @@ describe('the Anthropic adapter', () => {
   });
 
   it('names the shape the model sent, not what was in it', async () => {
-    // A rejected generation costs a real call, and Zod's field list does not
-    // say whether the model sent nothing, prose, or a wrapper. The shape
-    // answers that. The values do not go in: this file keeps the vendor's
-    // message out of the error for the same reason, and a spec is written
-    // from a prompt carrying the shopper's searches.
     const provider = createAnthropicProvider({
       apiKey: 'k',
       fetch: answer(toolAnswer({ body: { headline: 'a shopper searched for this' } })),
@@ -233,8 +223,6 @@ describe('the Anthropic adapter', () => {
   });
 
   it('names the vendor when the tool use carries no input at all', async () => {
-    // JSON.stringify(undefined) is undefined, so reading .length off it threw
-    // a TypeError from inside the adapter instead of naming anthropic.
     const provider = createAnthropicProvider({
       apiKey: 'k',
       fetch: answer({ content: [{ type: 'tool_use', name: 'emit_component_spec' }] }),

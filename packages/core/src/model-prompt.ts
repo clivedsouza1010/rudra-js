@@ -175,8 +175,6 @@ function section(heading: string, body: string | undefined): string | null {
 
 function describeShopper(digest: SignalDigest): string {
   const viewed = digest.topViewed.map((view) => `${quote(view.sku)} viewed ${view.views}x`);
-  // Names only, strongest first. The score is unnormalised and personal, and
-  // the ordering already says everything the model needs.
   const affinity = digest.categoryAffinity.map((entry) => quote(entry.category));
   const interactions = digest.interactionCounts.map(
     (entry) => `${quote(entry.type)} x${entry.count}`,

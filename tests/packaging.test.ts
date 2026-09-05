@@ -25,10 +25,6 @@ import { describe, expect, it } from 'vitest';
  */
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
-// Read from disk rather than listed. A package added to packages/ used to get
-// no tarball check, no provenance check and no README row, and nothing failed
-// until someone noticed - which is how @rudra-js/anthropic went a week without
-// a row in the table below.
 const PACKAGES = readdirSync(join(REPO_ROOT, 'packages'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
@@ -82,7 +78,6 @@ function listPackedFiles(packageName: string): string[] {
 const LICENCE_TEXT = readFileSync(join(REPO_ROOT, 'LICENSE'), 'utf8');
 
 describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
-  // Once per package rather than once per test: `npm pack` is a subprocess.
   const files = listPackedFiles(packageName);
 
   it('carries the licence text, not just the licence field', () => {
@@ -268,11 +263,7 @@ describe('the release workflow', () => {
 
 describe('the README', () => {
   it('lists every package that gets published', () => {
-    // The anthropic package sat in packages/ for a week without a row here,
-    // and it is the one that makes the billed call.
     const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
-    // The table rows only. A link in the prose around it is not a listing, and
-    // searching the whole file would let a deleted row pass.
     const heading = readme.indexOf('## Packages');
     expect(heading, 'the README has no ## Packages heading').toBeGreaterThan(-1);
 

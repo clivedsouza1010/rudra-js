@@ -307,11 +307,6 @@ export function buildDigest(input: TrackingInput): SignalDigest {
 // first shopper's searches and history end up shaping copy that is cached and
 // served to everyone else in their cohort.
 export function toCohortDigest(digest: SignalDigest): SignalDigest {
-  // The key hashes the top category's name, so that is all that may survive
-  // here. Everything under it - the score, and the categories below the first
-  // - is scored from what this one shopper bought, liked, carted, viewed and
-  // disliked. The score is zeroed rather than carried, so a cohort is safe
-  // whatever the prompt later chooses to print.
   const top = digest.categoryAffinity[0];
 
   // Listed rather than spread, so what survives is the thing you read.

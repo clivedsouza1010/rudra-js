@@ -475,8 +475,6 @@ describe('formatting a bundle price', () => {
   });
 
   it('throws on a price that is not a finite number', () => {
-    // Intl turns null into 0, so without this a set of paid products renders
-    // as free. The same rule the product price already follows.
     for (const price of [null, undefined, Number.NaN, Infinity]) {
       expect(() => defaultFormatBundlePrice({ ...bundle, price } as never)).toThrow(TypeError);
     }
@@ -608,15 +606,9 @@ describe('the styling contract', () => {
   });
 
   it('puts a class on every element it emits', () => {
-    // The test above only sees elements that already have a class, so an
-    // element with none is invisible to it. This is the other half.
-    // [a-z][a-z0-9]* rather than [a-z]+, or every heading is skipped: on
-    // <h2 class="..."> the name stops at "h" and the match never completes.
     const elements = [...everything().matchAll(/<([a-z][a-z0-9]*)([^>]*)>/g)];
     const bare = elements.filter((match) => !match[2]!.includes('class='));
 
-    // Without a floor this passes on empty markup, which RudraComponent
-    // returns when nothing is visible.
     expect(elements.length).toBeGreaterThan(20);
     expect(bare.map((match) => match[0])).toEqual([]);
   });

@@ -38,8 +38,6 @@ interface ToolUseBlock {
   input: unknown;
 }
 
-// Enough to tell nothing from prose from a wrapper, without quoting anything
-// the model wrote.
 function describeShape(input: unknown): string {
   if (input === null) return 'null';
   if (Array.isArray(input)) return `an array of ${input.length}`;
@@ -49,8 +47,6 @@ function describeShape(input: unknown): string {
   return keys.length === 0 ? 'an empty object' : `an object with keys ${keys.join(', ')}`;
 }
 
-// The one value of a single-key object, or undefined for anything else. Two
-// keys means no obvious payload, so the caller does not guess.
 function onlyValue(input: unknown): unknown {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
   const values = Object.values(input);
@@ -181,18 +177,10 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       // Parsed against the caller's own schema. generatedSpecSchema has no
       // refinements, so this catches type and enum violations — a block kind
       // outside the closed set, a non-string headline — not refinement logic.
-      // Seen for real: the model returned a correct spec one level down, under
-      // a key of its own invention. Same idea as reconciliation - take a good
-      // answer rather than reject it over one fixable defect.
       const asSent = request.schema.safeParse(block.input);
       const usable = asSent.success ? asSent : request.schema.safeParse(onlyValue(block.input));
 
       if (!usable.success) {
-        // The shape, never the values. A rejected generation has already cost
-        // a real call, and the field list alone does not say whether the model
-        // sent nothing, prose, or a wrapper - but the values would carry the
-        // shopper's own searches into an adopter's logs, which is what the
-        // HTTP branch above refuses to do.
         throw new Error(
           `anthropic returned a ${TOOL_NAME} tool use that does not fit the schema. ` +
             `It sent ${describeShape(block.input)}.`,

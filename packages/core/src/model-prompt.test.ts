@@ -142,9 +142,6 @@ describe('the vocabulary the model is shown', () => {
  */
 describe('the shopper half', () => {
   it('names the categories in order and shows no scores', () => {
-    // The score is unnormalised and personal - two shoppers can share a top
-    // category and score it 9 and 40. CategoryAffinity's own doc says only the
-    // ordering means anything, so only the order is sent.
     const { user } = promptFor({
       candidates: [
         product('TR-101', { category: 'Trail Running' }),
