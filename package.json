@@ -26,6 +26,7 @@
     "bench": "tsx bench/run.ts",
     "verify:consumer": "node scripts/verify-consumer.mjs",
     "verify:crawlable": "tsx crawl/verify.ts",
+    "matrix:crawler": "tsx crawl/run-matrix.ts",
     "test:watch": "vitest",
     "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo"
   },
