@@ -183,6 +183,20 @@ describe('the Anthropic adapter', () => {
     await expect(provider.generate(request())).rejects.toThrow(/max_tokens/i);
   });
 
+  it('says what the model actually sent when the tool input does not fit', async () => {
+    // A rejected generation costs a real call. Zod alone says which fields are
+    // wrong but not what arrived, so the next step is another paid call to
+    // find out. The message carries the input instead.
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer({
+        content: [{ type: 'tool_use', name: 'emit_component_spec', input: { tone: 'chatty' } }],
+      }),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/chatty/);
+  });
+
   it('rejects distinctly when the model refuses', async () => {
     const provider = createAnthropicProvider({
       apiKey: 'k',

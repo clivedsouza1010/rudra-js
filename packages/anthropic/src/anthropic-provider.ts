@@ -162,7 +162,21 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       // Parsed against the caller's own schema. generatedSpecSchema has no
       // refinements, so this catches type and enum violations — a block kind
       // outside the closed set, a non-string headline — not refinement logic.
-      const spec = request.schema.parse(block.input);
+      // Carrying the input into the message: a rejected generation has already
+      // cost a real call, and the field list on its own does not say whether
+      // the model sent nothing, sent prose, or sent a shape from an older
+      // vocabulary. Trimmed, because a spec can be long.
+      const parsed_spec = request.schema.safeParse(block.input);
+      if (!parsed_spec.success) {
+        const sent = JSON.stringify(block.input);
+        const shown = sent.length > 500 ? `${sent.slice(0, 500)}...` : sent;
+        throw new Error(
+          `anthropic returned a ${TOOL_NAME} tool use that does not fit the schema. ` +
+            `It sent: ${shown}`,
+          { cause: parsed_spec.error },
+        );
+      }
+      const spec = parsed_spec.data;
       const usage = toUsage(body.usage);
 
       return { spec, ...(usage ? { usage } : {}) };
