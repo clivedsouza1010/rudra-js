@@ -10,7 +10,7 @@ export const PRICES: TokenPrices = {
 };
 
 // Copied from the committed transcript, so the stub bills what a real call did.
-export const RECORDED_USAGE = {
+const RECORDED_USAGE = {
   inputTokens: 1539,
   outputTokens: 542,
   cacheReadTokens: 0,
@@ -33,39 +33,42 @@ export function isArmName(value: string): value is ArmName {
 // Built fresh each call: a provider and a cache are live objects, and an arm
 // that reused another's cache would not be measuring a cold one.
 export function buildArm(name: ArmName): ArmSpec {
-  if (name === 'b deterministic') {
-    return {
-      name,
-      mode: 'stub',
-      options: { provider: null },
-      rule: { fallback: 'all', modelCalls: 'none' },
-    };
+  // A switch with no default: adding a name to ARM_NAMES without a case here
+  // stops compiling. The old shape returned per-shopper for anything it did
+  // not recognise, which is a mislabelled arm - the thing this harness exists
+  // to prevent.
+  switch (name) {
+    case 'b deterministic':
+      return {
+        name,
+        mode: 'stub',
+        options: { provider: null },
+        rule: { fallback: 'all', modelCalls: 'none' },
+      };
+    case 'c cohort':
+      return {
+        name,
+        mode: 'stub',
+        options: {
+          provider: createStubProvider(RECORDED_USAGE),
+          generation: 'cohort',
+          cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
+        },
+        // Both a floor and a ceiling: this fixture (ten shoppers to a page, four
+        // shopper segments) lands cohort caching around 54%. A run that collapsed
+        // back to one page per cohort would print ~98% and pass a floor alone.
+        rule: { fallback: 'none', minCacheHitRate: 0.45, maxCacheHitRate: 0.65 },
+      };
+    case 'd per-shopper':
+      return {
+        name,
+        mode: 'stub',
+        options: {
+          provider: createStubProvider(RECORDED_USAGE),
+          generation: 'per-shopper',
+          cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
+        },
+        rule: { fallback: 'none', maxCacheHitRate: 0.1 },
+      };
   }
-
-  if (name === 'c cohort') {
-    return {
-      name,
-      mode: 'stub',
-      options: {
-        provider: createStubProvider(RECORDED_USAGE),
-        generation: 'cohort',
-        cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
-      },
-      // Both a floor and a ceiling: this fixture (ten shoppers to a page, four
-      // shopper segments) lands cohort caching around 54%. A run that collapsed
-      // back to one page per cohort would print ~98% and pass a floor alone.
-      rule: { fallback: 'none', minCacheHitRate: 0.45, maxCacheHitRate: 0.65 },
-    };
-  }
-
-  return {
-    name,
-    mode: 'stub',
-    options: {
-      provider: createStubProvider(RECORDED_USAGE),
-      generation: 'per-shopper',
-      cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
-    },
-    rule: { fallback: 'none', maxCacheHitRate: 0.1 },
-  };
 }

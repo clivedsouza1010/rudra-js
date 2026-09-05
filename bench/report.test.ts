@@ -118,7 +118,7 @@ describe('the printed table', () => {
   it('prints n/a where a stub run has no timings', () => {
     const table = formatTable([armResult({ mode: 'stub' })]);
 
-    expect(table).toContain('| n/a | n/a | n/a |');
+    expect(table).toContain('| n/a | n/a | n/a | n/a |');
   });
 
   it('prints the timings a timed run does have', () => {
@@ -136,12 +136,30 @@ describe('the printed table', () => {
   });
 
   it('says what the cpu figure leaves out when there is one', () => {
-    const withCpu = [{ ...armResult(), cpuUserMs: 134, cpuSystemMs: 2 }];
+    const withCpu = [armResult({ cpuUserMs: 134, cpuSystemMs: 2 })];
 
     expect(buildCaveats(withCpu, 10).join(' ')).toMatch(/no model call is in it/i);
   });
 
   it('says nothing about cpu when no arm measured it', () => {
     expect(buildCaveats([armResult()], 10).join(' ')).not.toMatch(/cpu/i);
+  });
+
+  it('does not promise a live run has no network wait in it', () => {
+    const live = [armResult({ mode: 'live', cpuUserMs: 134, cpuSystemMs: 2 })];
+    const caveat = buildCaveats(live, 10).join(' ');
+
+    expect(caveat).toMatch(/no model call is in it/i);
+    expect(caveat).not.toMatch(/network wait/i);
+  });
+
+  it('says nothing about cpu when only half of it arrived', () => {
+    expect(buildCaveats([armResult({ cpuUserMs: 134 })], 10).join(' ')).not.toMatch(/cpu/i);
+  });
+
+  it('prints the cpu an arm spent', () => {
+    const table = formatTable([armResult({ cpuUserMs: 134, cpuSystemMs: 2 })]);
+
+    expect(table).toContain('| 134+2 |');
   });
 });

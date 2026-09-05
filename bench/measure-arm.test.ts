@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { generatedSpecSchema, type GenerationEvent, type ProviderRequest } from '@rudra-js/core';
+import {
+  createComponentGenerator,
+  generatedSpecSchema,
+  type ComponentProvider,
+  type GenerationEvent,
+  type ProviderRequest,
+} from '@rudra-js/core';
 import {
   assertSourceMix,
   createStubProvider,
@@ -12,7 +18,6 @@ import {
   type SourceRule,
   type TokenPrices,
 } from './measure-arm.js';
-import { createComponentGenerator, type ComponentProvider } from '@rudra-js/core';
 import { buildTrackingInput } from '../examples/shop/src/fixtures/tracking-input.js';
 import { generateCatalog } from '../examples/shop/src/fixtures/catalog.js';
 import { generateShoppers } from '../examples/shop/src/fixtures/shoppers.js';
@@ -548,16 +553,12 @@ describe('measuring one arm', () => {
   });
 });
 
-function slowProvider(usage: { inputTokens: number; outputTokens: number }): {
+function countingProvider(usage: { inputTokens: number; outputTokens: number }): {
   provider: ComponentProvider;
   calls: () => number;
-  release: () => void;
 } {
+  const inner = createStubProvider(usage);
   let calls = 0;
-  let release!: () => void;
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
 
   return {
     provider: {
@@ -565,45 +566,19 @@ function slowProvider(usage: { inputTokens: number; outputTokens: number }): {
       model: 'stub',
       async generate(request: ProviderRequest) {
         calls += 1;
-        await held;
-        const skus = /"(RJ-\d+)"/g;
-        const found = [...request.user.matchAll(skus)].map((match) => match[1]!).slice(0, 4);
-        return {
-          spec: generatedSpecSchema.parse({
-            tone: 'neutral',
-            headline: 'Picked for you',
-            subheadline: null,
-            blocks: [
-              {
-                kind: 'grid',
-                title: null,
-                columns: 2,
-                items: found.map((sku) => ({
-                  sku,
-                  basis: 'popular',
-                  reason: null,
-                  badge: null,
-                  emphasis: 'normal',
-                })),
-              },
-            ],
-            rationale: 'stub',
-          }),
-          usage,
-        };
+        return inner.generate(request);
       },
     },
     calls: () => calls,
-    release,
   };
 }
 
-describe('two requests that arrive together', () => {
+describe('two requests for one key, in flight together', () => {
   it('sends one request and bills it once', async () => {
     const usage = { inputTokens: 1_000_000, outputTokens: 0 };
-    const { provider, calls, release } = slowProvider(usage);
+    const { provider, calls } = countingProvider(usage);
     const smallCatalog = generateCatalog(1, 20);
-    const pair = generateShoppers(2, smallCatalog, 2);
+    const [shopper] = generateShoppers(2, smallCatalog, 1);
     const events: GenerationEvent[] = [];
     const generator = createComponentGenerator({
       provider,
@@ -611,17 +586,16 @@ describe('two requests that arrive together', () => {
       onEvent: (generationEvent) => events.push(generationEvent),
     });
 
-    const input = (shopper: (typeof pair)[number]) =>
-      buildTrackingInput(shopper, smallCatalog[0]!.sku, smallCatalog, []);
-    const both = Promise.all([
-      generator.generate(input(pair[0]!)),
-      generator.generate(input(pair[0]!)),
-    ]);
-    release();
-    await both;
+    // Both start before either resolves, so the second reaches the key while
+    // the first is still running. No cache entry exists yet for it to hit.
+    const input = buildTrackingInput(shopper!, smallCatalog[0]!.sku, smallCatalog, []);
+    await Promise.all([generator.generate(input), generator.generate(input)]);
 
     expect(calls()).toBe(1);
     expect(events.filter((one) => one.calledModel)).toHaveLength(1);
+    // The joiner has to get the answer, not a fallback. That is what sharing
+    // one generation means, and billing once is worthless without it.
+    expect(events.map((one) => one.source)).toEqual(['llm', 'llm']);
     expect(summarise(identity('c'), events, PRICES).inputTokens).toBe(1_000_000);
   });
 });
