@@ -183,6 +183,38 @@ describe('the Anthropic adapter', () => {
     await expect(provider.generate(request())).rejects.toThrow(/max_tokens/i);
   });
 
+  it('takes the spec when the model wraps it in a single key', async () => {
+    // Seen for real: the model returned the whole spec under "body". The spec
+    // itself was right - correct tone, real SKUs, valid basis values - just one
+    // level too deep. Rejecting a good answer over its envelope costs a paid
+    // call and gives the shopper the fallback.
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer(toolAnswer({ body: spec })),
+    });
+
+    await expect(provider.generate(request())).resolves.toMatchObject({ spec });
+  });
+
+  it('does not guess when the wrapper holds something that is not a spec', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer(toolAnswer({ body: { tone: 'chatty' } })),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/does not fit the schema/i);
+  });
+
+  it('does not guess when there is more than one key to choose from', async () => {
+    // Two candidates means no single obvious payload, so this stays an error.
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer(toolAnswer({ body: spec, other: spec })),
+    });
+
+    await expect(provider.generate(request())).rejects.toThrow(/does not fit the schema/i);
+  });
+
   it('says what the model actually sent when the tool input does not fit', async () => {
     // A rejected generation costs a real call. Zod alone says which fields are
     // wrong but not what arrived, so the next step is another paid call to

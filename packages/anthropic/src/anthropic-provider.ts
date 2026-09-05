@@ -38,6 +38,14 @@ interface ToolUseBlock {
   input: unknown;
 }
 
+// The one value of a single-key object, or undefined for anything else. Two
+// keys means no obvious payload, so the caller does not guess.
+function onlyValue(input: unknown): unknown {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
+  const values = Object.values(input);
+  return values.length === 1 ? values[0] : undefined;
+}
+
 function isToolUseBlock(candidate: unknown): candidate is ToolUseBlock {
   return (
     typeof candidate === 'object' &&
@@ -162,21 +170,30 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       // Parsed against the caller's own schema. generatedSpecSchema has no
       // refinements, so this catches type and enum violations — a block kind
       // outside the closed set, a non-string headline — not refinement logic.
-      // Carrying the input into the message: a rejected generation has already
-      // cost a real call, and the field list on its own does not say whether
-      // the model sent nothing, sent prose, or sent a shape from an older
-      // vocabulary. Trimmed, because a spec can be long.
-      const parsed_spec = request.schema.safeParse(block.input);
-      if (!parsed_spec.success) {
+      const asSent = request.schema.safeParse(block.input);
+      // Seen for real: the model returned a correct spec one level down, under
+      // a key of its own invention. The same repair the reconciler makes for
+      // the spec's contents - take the answer when it is right, rather than
+      // throwing it away over its envelope. Only when there is one candidate,
+      // and only when it satisfies the schema by itself.
+      const nested = asSent.success ? null : request.schema.safeParse(onlyValue(block.input));
+      const usable = asSent.success ? asSent : nested;
+
+      if (!usable?.success) {
+        // Carrying the input into the message: a rejected generation has
+        // already cost a real call, and the field list on its own does not say
+        // whether the model sent nothing, sent prose, or sent a shape from an
+        // older vocabulary. Trimmed, because a spec can be long.
         const sent = JSON.stringify(block.input);
         const shown = sent.length > 500 ? `${sent.slice(0, 500)}...` : sent;
         throw new Error(
           `anthropic returned a ${TOOL_NAME} tool use that does not fit the schema. ` +
             `It sent: ${shown}`,
-          { cause: parsed_spec.error },
+          { cause: asSent.error },
         );
       }
-      const spec = parsed_spec.data;
+
+      const spec = usable.data;
       const usage = toUsage(body.usage);
 
       return { spec, ...(usage ? { usage } : {}) };
