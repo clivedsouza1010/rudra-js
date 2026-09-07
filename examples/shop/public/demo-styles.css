@@ -1,0 +1,221 @@
+/*
+ * The example's own stylesheet. @rudra-js/react ships no CSS — this is written
+ * against the class table in its README and nothing else, to show that the
+ * table is enough. Copy it as a starting point, not as a supported API.
+ */
+
+.rudra {
+  --demo-ink: #1b1b1f;
+  --demo-quiet: #6b6b76;
+  --demo-line: #e3e3e8;
+  --demo-accent: #1f5f4b;
+
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  color: var(--demo-ink);
+  max-width: 68rem;
+  margin: 2.5rem auto;
+  padding: 0 1.25rem;
+}
+
+.rudra__header {
+  border-bottom: 1px solid var(--demo-line);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.rudra__headline {
+  font-size: 1.375rem;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.rudra__subheadline {
+  color: var(--demo-quiet);
+  margin: 0.35rem 0 0;
+}
+
+.rudra__rationale {
+  font-size: 0.8125rem;
+  color: var(--demo-quiet);
+  background: #f7f7f9;
+  border-left: 3px solid var(--demo-line);
+  padding: 0.5rem 0.75rem;
+  margin: 1.5rem 0 0;
+}
+
+.rudra-grid__title,
+.rudra-carousel__title,
+.rudra-copy__title,
+.rudra-bundle__title {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.rudra-grid__items,
+.rudra-carousel__track {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 1.25rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Nothing here scrolls it with JavaScript, so the track has to scroll itself. */
+.rudra-carousel__track {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(13rem, 1fr);
+  overflow-x: auto;
+}
+
+.rudra-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid var(--demo-line);
+  border-radius: 0.5rem;
+  padding: 0.875rem;
+  background: #fff;
+}
+
+/* Applied alongside .rudra-card, so this comes after the base rule. */
+.rudra-card--featured {
+  border-color: var(--demo-accent);
+  box-shadow: 0 1px 0 var(--demo-accent);
+}
+
+.rudra-card__image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 0.375rem;
+  margin-bottom: 0.625rem;
+}
+
+.rudra-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.rudra-card__title {
+  font-weight: 600;
+  color: var(--demo-ink);
+  line-height: 1.3;
+}
+
+.rudra-card__price {
+  color: var(--demo-ink);
+}
+
+.rudra-card__reason,
+.rudra-card__badge {
+  font-size: 0.8125rem;
+  color: var(--demo-quiet);
+}
+
+.rudra-card__badge {
+  align-self: start;
+  border: 1px solid var(--demo-line);
+  border-radius: 999px;
+  padding: 0.0625rem 0.5rem;
+}
+
+.rudra-hero {
+  border: 1px solid var(--demo-line);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.rudra-hero__headline {
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem;
+}
+
+.rudra-hero__body {
+  color: var(--demo-quiet);
+  margin: 0 0 0.75rem;
+}
+
+.rudra-hero__link {
+  color: var(--demo-accent);
+}
+
+.rudra-hero__price {
+  font-weight: 600;
+}
+
+.rudra-hero__cta,
+.rudra-bundle__cta,
+.rudra-banner__cta {
+  display: inline-block;
+  margin-top: 0.75rem;
+  border: 1px solid var(--demo-accent);
+  border-radius: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  color: var(--demo-accent);
+  font-size: 0.875rem;
+}
+
+.rudra-banner {
+  border: 1px solid var(--demo-line);
+  border-radius: 0.5rem;
+  padding: 0.875rem 1rem;
+  margin-bottom: 1.5rem;
+  background: #f7f7f9;
+}
+
+.rudra-banner__text {
+  margin: 0;
+}
+
+.rudra-copy {
+  margin: 1.5rem 0;
+  max-width: 44rem;
+}
+
+.rudra-copy__body {
+  color: var(--demo-quiet);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.rudra-bundle {
+  border: 1px solid var(--demo-line);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.rudra-bundle__label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--demo-quiet);
+  margin: 0 0 0.35rem;
+}
+
+.rudra-bundle__body {
+  color: var(--demo-quiet);
+  margin: 0 0 0.75rem;
+}
+
+.rudra-bundle__items {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.rudra-bundle__link {
+  color: var(--demo-accent);
+}
+
+.rudra-bundle__price {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
