@@ -10,8 +10,10 @@ break them.
 
 ## [Unreleased]
 
-Nothing released yet. Both packages are being built module by module and
-neither has been published.
+## [0.1.0] - 2026-09-07
+
+The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
+`@rudra-js/anthropic`.
 
 ### Added
 
@@ -29,8 +31,10 @@ neither has been published.
 - The deterministic selector and fallback component, which render when no model
   does and act as the control arm for evaluation.
 - The language-model port, keeping the package free of any vendor SDK.
-- The spec cache: a store port plus an in-memory implementation, keyed on the
-  whole signal digest so no field can drift out of the key.
+- The spec cache: a store port plus an in-memory implementation. Per-shopper
+  generation keys on the whole signal digest. Cohort generation, the default,
+  keys on a listed set of fields, and a test over every digest field fails if
+  one the key leaves out reaches the prompt.
 - The model prompt: a cacheable instruction half and a per-shopper half, with
   every host-supplied value quoted and escaped so it cannot introduce prompt
   structure.
@@ -54,8 +58,8 @@ neither has been published.
 ### Changed
 
 - The block vocabulary now has six kinds rather than five, and the render
-  context has two more fields. Both packages are `0.1.0` and unpublished, so
-  this is a breaking change taken on purpose rather than worked around: the
+  context has two more fields. Nothing had been published, so this is a
+  breaking change taken on purpose rather than worked around: the
   block union is closed so that a spec cannot say anything the renderer has not
   agreed to, and a new kind is therefore always a breaking change. Three things
   stop compiling for a host, and each has a one-line fix.
@@ -65,3 +69,5 @@ neither has been published.
     with `extendRegistry`, which keeps the defaults for whatever you leave out.
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
+
+[0.1.0]: https://github.com/clivedsouza1010/rudra-js/releases/tag/v0.1.0

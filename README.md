@@ -8,8 +8,9 @@ HTML response. The model never returns markup: it returns a specification drawn 
 vocabulary, which a registry of components renders. That is what makes generated output safe to put
 in a page.
 
-> **Status: early, and not published.** All three packages are being built one module at a time and
-> their contracts are still moving. Please do not depend on them yet.
+> **Status: `0.1.0`, early.** Installable and usable — the Getting started below runs as a test on
+> every commit. The public contracts may still change between minor versions before `1.0`, and the
+> changelog says when they do.
 
 ## Getting started
 
