@@ -6,11 +6,39 @@ component specification.
 ## Install
 
 ```sh
-npm install @rudra-js/core zod
+npm install @rudra-js/core zod@^4
 ```
 
 `zod` is a peer dependency: the package's public API _is_ zod schemas, so your
-application and this package must resolve the same zod instance.
+application and this package must resolve the same zod instance. **zod 4 is
+required** — the schemas use zod 4 APIs, and installing into a zod 3 app fails
+with `ERESOLVE` rather than anything more helpful.
+
+## Running without a model
+
+`createComponentGenerator` takes a `provider`. Leave it out, or pass `null`, and
+nothing calls a model and nothing is billed:
+
+```ts
+const generator = createComponentGenerator({ provider: null });
+const spec = await generator.generate(input);
+```
+
+That is a supported configuration rather than a stub. It is the control arm of
+the benchmark, and the right setting for anyone who has not yet decided on a
+provider. `generate` returns a promise either way, so the shape of your code
+does not change when you add one.
+
+The deterministic component emits exactly one **grid** block — or nothing, when
+no candidate is in stock — with a headline from a fixed set of four. Every other
+block kind in the vocabulary (hero, carousel, banner, copy, bundle) only ever
+comes from a model. If you are wiring bundles and none appear, that is why, and
+not your catalog.
+
+To render a spec you wrote yourself, without a model, pass
+`createFixedSpecProvider(spec)` as the provider. It answers every request with
+that spec, which is how the tests exercise blocks the deterministic component
+never emits.
 
 ## `tracking-input`
 

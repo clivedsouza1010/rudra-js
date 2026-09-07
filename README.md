@@ -11,6 +11,60 @@ in a page.
 > **Status: early, and not published.** All three packages are being built one module at a time and
 > their contracts are still moving. Please do not depend on them yet.
 
+## Getting started
+
+Nothing here needs an API key. Leave the provider out and you get the deterministic
+component — a supported setting, not a stub, and the right one until you have decided
+on a model.
+
+```sh
+npm install @rudra-js/core @rudra-js/react zod@^4
+```
+
+zod 4 is required. The public API of `@rudra-js/core` _is_ zod schemas, so your app and
+the package have to resolve the same zod, and a zod 3 app will fail to install.
+
+```tsx
+import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
+import { RudraComponent } from '@rudra-js/react';
+
+const catalog = [
+  { sku: 'A-1', title: 'Cast iron skillet', category: 'Cookware', price: 39, currency: 'USD' },
+  { sku: 'A-2', title: 'Enamel dutch oven', category: 'Cookware', price: 89, currency: 'USD' },
+  { sku: 'A-3', title: 'Chef knife', category: 'Knives', price: 55, currency: 'USD' },
+];
+
+async function recommendations() {
+  // No provider means no API key and no spend. It is a supported setting, not
+  // a stub: you get the deterministic component.
+  const generator = createComponentGenerator({ provider: null });
+
+  // Parsing fills in what you left out and rejects what does not belong. Pass
+  // the parsed candidates to the renderer, not your raw objects.
+  const input = parseTrackingInput({
+    user: { id: 'shopper-1' },
+    context: { surface: 'pdp', currentSku: 'A-1', currentCategory: 'Cookware' },
+    candidates: catalog,
+    signals: { cart: [{ sku: 'A-2', at: Date.now() }] },
+  });
+
+  const spec = await generator.generate(input);
+
+  return <RudraComponent spec={spec} products={input.candidates} />;
+}
+```
+
+A shopper looking at the skillet with the dutch oven already in their cart is shown the
+knife, under the heading "Goes with your cart". The page they are on and the thing they
+have already chosen are both left out. No model was asked, and nothing was billed.
+
+To bring a model in, add [`@rudra-js/anthropic`](packages/anthropic) and pass it as the
+`provider`. Everything above stays the same — the model changes the wording and the
+layout, not which products are chosen. See [`@rudra-js/core`](packages/core) for the full
+payload, and [`@rudra-js/react`](packages/react) for the class names to style.
+
+This example is run as a test on every commit, so it cannot rot.
+
 ## Packages
 
 | Package                                     | What it does                                                                                       |
