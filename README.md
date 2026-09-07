@@ -54,8 +54,9 @@ async function recommendations() {
 }
 ```
 
-A shopper looking at the skillet with the dutch oven already in their cart is shown the
-knife, under the heading "Goes with your cart". The page they are on and the thing they
+In Next.js, `export default recommendations` at the end makes this a page. A shopper
+looking at the skillet with the dutch oven already in their cart is shown the knife,
+under the heading "Goes with your cart". The page they are on and the thing they
 have already chosen are both left out. No model was asked, and nothing was billed.
 
 To bring a model in, add [`@rudra-js/anthropic`](packages/anthropic) and pass it as the
