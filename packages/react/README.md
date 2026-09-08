@@ -63,7 +63,7 @@ the starting point, not a fault.
 
 `examples/shop/public/demo-styles.css` is a working stylesheet written against
 nothing but the table below — copy it as a starting point. The example shop
-serves it behind `?styles=on` so you can see both states.
+applies it by default; `?styles=off` shows the raw markup.
 
 Every element it emits carries a class, and this is all of them:
 

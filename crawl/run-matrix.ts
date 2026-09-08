@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { classify, collect, refusals, renderTable, unstable } from './matrix.js';
 import { freePort, startShop, stopShop } from './shop-server.js';
@@ -38,7 +39,10 @@ async function main(): Promise<void> {
     console.log();
     // The split is Next's bot list, which moves between releases.
     const next = createRequire(import.meta.url)('next/package.json') as { version: string };
-    console.log(`next@${next.version}, one page, Accept-Encoding: identity`);
+    const commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      encoding: 'utf8',
+    }).trim();
+    console.log(`next@${next.version}, commit ${commit}, one page, Accept-Encoding: identity`);
   } catch (error) {
     reportFailure(error, seen());
     process.exitCode = 1;

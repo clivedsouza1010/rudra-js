@@ -27,10 +27,10 @@ export default async function ProductPage({
   // show a different product and track it as though the shopper asked for it.
   if (content === null) notFound();
 
-  const styled = styles === 'on';
+  const styled = styles !== 'off';
   const query = new URLSearchParams();
   if (shopper !== undefined) query.set('shopper', shopper);
-  if (!styled) query.set('styles', 'on');
+  if (styled) query.set('styles', 'off');
   const toggleHref = query.size === 0 ? '?' : `?${query.toString()}`;
 
   return (
