@@ -10,7 +10,7 @@ An Anthropic adapter for
 ## Install
 
 ```sh
-npm install @rudra-js/anthropic @rudra-js/core zod
+npm install @rudra-js/anthropic @rudra-js/core zod@^4
 ```
 
 ```ts

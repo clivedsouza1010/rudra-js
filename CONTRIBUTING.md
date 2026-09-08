@@ -165,10 +165,13 @@ It builds, runs the same six checks a pull request runs, and then publishes
 `@rudra-js/core`, `@rudra-js/react` and `@rudra-js/anthropic` in that order with
 `npm publish --provenance`. Core goes first because react declares it as a peer.
 
-Two things the job leaves to you: that the tag sits on `main`, and that it
-matches the `version` in `packages/core/package.json`. Check both before you
-push. npm rejects a republish of a version that already exists, so a wrong tag
-is fixed by tagging a new patch version, not by retrying the old one.
+Before it publishes, the job checks two things and stops if either fails: the
+tagged commit is on `main`, and the tag equals the `version` in
+`packages/core/package.json`. Tags matching `v*` cannot be moved or deleted
+once pushed, so a tag that fails a check is left behind and the fix is to bump
+the version and tag again. The same goes for a version that did publish: npm
+rejects a republish, so a mistake is fixed by tagging a new patch version, not
+by retrying the old one.
 
 ## Reporting a security issue
 
