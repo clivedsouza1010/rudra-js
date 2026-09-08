@@ -773,6 +773,7 @@ describe('claims the renderer cannot check', () => {
     { reason: '4.8 out of 5 from other hikers', kind: 'rating' },
     { reason: 'limited stock on this colour', kind: 'stock' },
     { reason: 'only 3 remain', kind: 'stock' },
+    { reason: 'only one remains', kind: 'stock' },
     { reason: 'save 20 off the pair', kind: 'discount' },
   ];
 
