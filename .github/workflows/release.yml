@@ -10,6 +10,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: npm
     permissions:
       contents: read
       # Mints the OIDC token npm uses to attest that this build produced this
@@ -19,6 +20,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -52,6 +54,13 @@ jobs:
       # version that exists, so the job would fail on core before reaching
       # react. Recover by publishing react by hand, or by tagging a new patch
       # version.
+      # A tag on any branch would otherwise publish with valid provenance. It has
+      # to sit on main and name the version in package.json.
+      - run: git fetch --no-tags origin main && git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - run: test "v$(node -p "require('./packages/core/package.json').version")" = "$GITHUB_REF_NAME"
+
+      # NODE_AUTH_TOKEN goes once trusted publishing is set up on npmjs.com.
+      # Provenance already works without it.
       - run: npm publish --provenance --access public
         working-directory: packages/core
         env:
