@@ -956,6 +956,26 @@ describe('claims in every field the model writes', () => {
 
     expect(result.violations).toContain('unverifiable-claim:delivery:copy-body');
   });
+
+  // The rationale is read by engineers, not shoppers, but it is still the
+  // model's own words and a log that repeats an untrue claim is a log that
+  // hides one.
+  it('drops a claim in the spec rationale', () => {
+    const result = reconcile({
+      ...specWith([PRODUCT_GRID]),
+      rationale: 'Half price today, only 2 left in stock',
+    });
+
+    expect(result.spec.rationale).toBe('');
+    expect(result.violations).toContain('unverifiable-claim:price:rationale');
+  });
+
+  it('leaves an ordinary rationale alone', () => {
+    const result = reconcile(specWith([PRODUCT_GRID]));
+
+    expect(result.spec.rationale).toBe('Leaned on the category affinity.');
+    expect(result.violations).toEqual([]);
+  });
 });
 
 /**

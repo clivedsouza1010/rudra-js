@@ -661,7 +661,7 @@ export function reconcileSpec(
       tracker,
     ),
     blocks,
-    rationale: clamp(generated.rationale, CLAMP.rationale),
+    rationale: screenRequired(clamp(generated.rationale, CLAMP.rationale), 'rationale', tracker),
   };
 
   // A component that recommends nothing is worse than no component at all.
