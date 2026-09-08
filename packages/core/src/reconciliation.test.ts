@@ -766,6 +766,14 @@ describe('claims the renderer cannot check', () => {
     { reason: 'get it by Friday', kind: 'delivery' },
     { reason: 'best seller in Backpacks', kind: 'rating' },
     { reason: 'loved by thousands of buyers', kind: 'rating' },
+    { reason: 'yours for USD 20', kind: 'price' },
+    { reason: 'EUR 5.99 for a spare pair', kind: 'price' },
+    { reason: '₹1,499 for the pair', kind: 'price' },
+    { reason: '249 kr for the pair', kind: 'price' },
+    { reason: '4.8 out of 5 from other hikers', kind: 'rating' },
+    { reason: 'limited stock on this colour', kind: 'stock' },
+    { reason: 'only 3 remain', kind: 'stock' },
+    { reason: 'save 20 off the pair', kind: 'discount' },
   ];
 
   for (const claim of REAL_CLAIMS) {

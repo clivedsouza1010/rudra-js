@@ -177,6 +177,8 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
       /\b(?:customer|shopper|buyer|user|average|overall)[\s-]ratings?\b/,
       // A score out of five is written as a decimal. A spec is "-5C" or "20,000mm".
       /\bratings?\s+of\s+[0-5]\.\d\b/,
+      // The same score with the word "rating" nowhere near it: "4.8 out of 5".
+      /\b[0-5](?:\.\d)?\s+out of\s+(?:5|five)\b/,
       /\b(?:highly|top|best|well|poorly|five|four)[\s-]rated\b/,
       // "rated 4.8" is a score. "rated 3 season" is what the tent is built for.
       /\brated\s+(?:[0-5]\.\d|(?:[0-5]|three|four|five)\s+(?:stars?|out of))\b/,
@@ -188,8 +190,12 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
   {
     kind: 'price',
     patterns: [
-      /[$£€¥]\s?\d/,
+      /[$£€¥₹]\s?\d/,
       /\b\d+(?:\.\d+)?\s?(?:usd|eur|gbp|dollars?|pounds?|euros?)\b/,
+      // The same codes on the other side of the number: "USD 20", "EUR 5.99".
+      /\b(?:usd|eur|gbp)\s?\d/,
+      // The krona is spelled out rather than drawn, so it needs a number beside it.
+      /\bkr\s?\d|\d\s?kr\b/,
       /\bpric(?:e|es|ed|ing)\b/,
       // A before-and-after is a price claim even with no currency on it.
       /\bwas\s+[$£€¥]?\s?\d[\d,.]*\s*[,;–—-]?\s*now\s+[$£€¥]?\s?\d/,
@@ -214,6 +220,8 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
       /\bdiscount(?:s|ed)?\b/,
       /\bsale\b|\bmarked down\b|\bdeal of\b/,
       /\bhalf[\s-]?(?:price|off)\b/,
+      // Money off with no percent sign anywhere on it: "save 20 off".
+      /\bsaves?\s+\d[\d.,]*\s+off\b/,
       // "extra clearance for thick socks" is room inside the shoe.
       /\bclearance\s+(?:sale|price|event|deal)\b|\bon clearance\b/,
       // "reduced weight" and "reduced to 900g" are specifications. Only a
@@ -238,9 +246,10 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
     kind: 'stock',
     patterns: [
       /\b(?:in|out of|low on) stock\b/,
+      /\blimited stock\b/,
       /\brestocked?\b|\bsold out\b/,
       // "the last few miles" is a distance, so a count needs "left" after it.
-      /\b(?:only\s+)?(?:\d+|a few|a handful|a couple|one|few)\s+(?:left|remaining)\b/,
+      /\b(?:only\s+)?(?:\d+|a few|a handful|a couple|one|few)\s+(?:left|remain(?:ing)?)\b/,
       /\blast (?:one|few)\s+(?:left|remaining|in stock)\b/,
       /\bselling fast\b|\b(?:almost|nearly) gone\b|\bwhile stocks last\b/,
     ],
