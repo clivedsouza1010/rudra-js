@@ -304,6 +304,23 @@ describe('host-supplied values that are not merely bounded', () => {
     expect(withProduct({ currency }).success).toBe(accepted);
   });
 
+  // The locale is part of the cohort cache key, so a value that is really a
+  // list buys one shopper a cohort of their own and a bill to match.
+  it.each([
+    ['a language on its own', 'en', true],
+    ['a language and a region', 'en-US', true],
+    ['a script subtag', 'zh-Hant-TW', true],
+    ['a numeric region', 'es-419', true],
+    ['an Accept-Language header', 'en-US,en;q=0.9', false],
+    ['a space', 'en US', false],
+    ['an underscore', 'en_US', false],
+    ['an empty string', '', false],
+  ])('locale: %s', (_label, locale, accepted) => {
+    const result = safeParseTrackingInput(minimalPayload({ context: { surface: 'pdp', locale } }));
+
+    expect(result.success).toBe(accepted);
+  });
+
   it.each([
     ['a real timestamp', Date.UTC(2026, 0, 1), true],
     ['zero', 0, true],

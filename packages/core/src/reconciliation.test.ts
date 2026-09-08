@@ -141,6 +141,16 @@ describe('product truth', () => {
     expect(result.violations).toContain('duplicate-sku:TR-101');
   });
 
+  // The spec schema cannot bound a string, so the SKU here is whatever the
+  // model wrote. It goes straight into a violation string an evaluation logs.
+  it('keeps a very long SKU short in the violation it records', () => {
+    const result = reconcile(grid([ref('X'.repeat(500))]));
+
+    const violation = result.violations[0] ?? '';
+    expect(violation.startsWith('unknown-sku:')).toBe(true);
+    expect(violation.length).toBeLessThan(50);
+  });
+
   it('de-duplicates across separate blocks, not just within one', () => {
     const result = reconcile(
       specWith([
@@ -756,6 +766,15 @@ describe('claims the renderer cannot check', () => {
     { reason: 'get it by Friday', kind: 'delivery' },
     { reason: 'best seller in Backpacks', kind: 'rating' },
     { reason: 'loved by thousands of buyers', kind: 'rating' },
+    { reason: 'yours for USD 20', kind: 'price' },
+    { reason: 'EUR 5.99 for a spare pair', kind: 'price' },
+    { reason: '₹1,499 for the pair', kind: 'price' },
+    { reason: '249 kr for the pair', kind: 'price' },
+    { reason: '4.8 out of 5 from other hikers', kind: 'rating' },
+    { reason: 'limited stock on this colour', kind: 'stock' },
+    { reason: 'only 3 remain', kind: 'stock' },
+    { reason: 'only one remains', kind: 'stock' },
+    { reason: 'save 20 off the pair', kind: 'discount' },
   ];
 
   for (const claim of REAL_CLAIMS) {
@@ -955,6 +974,26 @@ describe('claims in every field the model writes', () => {
     );
 
     expect(result.violations).toContain('unverifiable-claim:delivery:copy-body');
+  });
+
+  // The rationale is read by engineers, not shoppers, but it is still the
+  // model's own words and a log that repeats an untrue claim is a log that
+  // hides one.
+  it('drops a claim in the spec rationale', () => {
+    const result = reconcile({
+      ...specWith([PRODUCT_GRID]),
+      rationale: 'Half price today, only 2 left in stock',
+    });
+
+    expect(result.spec.rationale).toBe('');
+    expect(result.violations).toContain('unverifiable-claim:price:rationale');
+  });
+
+  it('leaves an ordinary rationale alone', () => {
+    const result = reconcile(specWith([PRODUCT_GRID]));
+
+    expect(result.spec.rationale).toBe('Leaned on the category affinity.');
+    expect(result.violations).toEqual([]);
   });
 });
 
