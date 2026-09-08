@@ -40,6 +40,8 @@ const CLAMP = {
   bannerText: 160,
   copyBody: 420,
   rationale: 300,
+  // Not rendered anywhere — this is the SKU as it reads back in a violation.
+  violationSku: 32,
 } as const;
 
 /**
@@ -329,11 +331,14 @@ function screenRequired(value: string, field: string, tracker: PlacementTracker)
  * so each one has to name the fault that actually fired.
  */
 function rejectionFor(sku: string, allowlist: Allowlist, tracker: PlacementTracker): string | null {
+  // A rejected SKU is whatever the model wrote, and the schema cannot bound it.
+  const named = clamp(sku, CLAMP.violationSku);
+
   // Either hallucinated or out of stock. Either way it cannot render.
-  if (!allowlist.allowed.has(sku)) return `unknown-sku:${sku}`;
-  if (allowlist.blocked.has(sku)) return `blocked-sku:${sku}`;
-  if (tracker.hasPlaced(sku)) return `duplicate-sku:${sku}`;
-  if (tracker.remaining <= 0) return `budget:dropped:${sku}`;
+  if (!allowlist.allowed.has(sku)) return `unknown-sku:${named}`;
+  if (allowlist.blocked.has(sku)) return `blocked-sku:${named}`;
+  if (tracker.hasPlaced(sku)) return `duplicate-sku:${named}`;
+  if (tracker.remaining <= 0) return `budget:dropped:${named}`;
   return null;
 }
 

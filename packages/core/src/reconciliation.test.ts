@@ -141,6 +141,16 @@ describe('product truth', () => {
     expect(result.violations).toContain('duplicate-sku:TR-101');
   });
 
+  // The spec schema cannot bound a string, so the SKU here is whatever the
+  // model wrote. It goes straight into a violation string an evaluation logs.
+  it('keeps a very long SKU short in the violation it records', () => {
+    const result = reconcile(grid([ref('X'.repeat(500))]));
+
+    const violation = result.violations[0] ?? '';
+    expect(violation.startsWith('unknown-sku:')).toBe(true);
+    expect(violation.length).toBeLessThan(50);
+  });
+
   it('de-duplicates across separate blocks, not just within one', () => {
     const result = reconcile(
       specWith([
