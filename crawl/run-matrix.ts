@@ -42,7 +42,11 @@ async function main(): Promise<void> {
     const commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
       encoding: 'utf8',
     }).trim();
-    console.log(`next@${next.version}, commit ${commit}, one page, Accept-Encoding: identity`);
+    const dirty =
+      execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim() !== '';
+    console.log(
+      `next@${next.version}, commit ${commit}${dirty ? ' (uncommitted changes)' : ''}, one page, Accept-Encoding: identity`,
+    );
   } catch (error) {
     reportFailure(error, seen());
     process.exitCode = 1;
