@@ -31,7 +31,10 @@ your catalog.
 
 ## What comes from where
 
-This split is the reason a generated component is safe to put in a page.
+This split is what a rendered component rests on. The model decides how things
+are arranged and what the words are; every fact about a product is read from
+your catalog when the page is served, and the model's own words are rendered as
+text and escaped by React.
 
 | Decided by the model                       | Decided by your catalog |
 | ------------------------------------------ | ----------------------- |

@@ -80,9 +80,10 @@ request. Every category defaults to `[]`, so the host needs no special case.
 ### What the host must supply
 
 `user.id`, `context.surface`, and at least one entry in `candidates`.
-`candidates` is the merchandising boundary: whatever the host leaves out cannot
-be recommended, which is what makes it impossible to surface a product that
-does not exist or is not merchandised for this shopper. SKUs must be unique.
+`candidates` is the merchandising boundary. Every SKU the model writes is looked
+up in that list, and one that is not on it is dropped by reconciliation before
+anything renders — so a product you left out does not reach the page. SKUs must
+be unique.
 
 `bundles` is optional: the sets the shop sells together, each with the shop's
 own price for the set, the currency that price is in, and, if you want one,
@@ -131,6 +132,9 @@ wrote, not text the model wrote, and it renders ahead of the model's words.
 | `mostViewed[].views`       | `1`                 |
 | `lastPurchased[].quantity` | `1`                 |
 
+`context.locale` has to be a single language tag, such as `en-US`. One tag, not
+a list and not an `Accept-Language` header.
+
 ### Cohorts
 
 By default one generated component is shared between shoppers who look alike,
@@ -152,6 +156,20 @@ the model chooses the products too, and every shopper pays for their own call.
 ```ts
 createComponentGenerator({ provider, generation: 'per-shopper' });
 ```
+
+#### What you put in `segment`
+
+`segment` is sent to the model exactly as you wrote it, in both modes, and the
+contract takes any string up to 128 characters. Use plain merchandising labels —
+`lapsed`, `high-value`, `trial`, `wholesale`. Keep out anything that says
+something protected about a person: health, race, ethnic origin, religion or
+belief, sex life or sexual orientation, politics, union membership, biometric or
+genetic data.
+
+The same applies to `recentSearches`, `context.searchQuery` and
+`interaction.type` in per-shopper mode. Those three are shopper text, and they
+are sent as written. What a shopper types is theirs; what you label them with is
+your choice.
 
 ### Limits
 
@@ -183,6 +201,104 @@ Every fixed-shape object is a `strictObject`. A host that misspells
 `recentSearches` gets an error, not a shopper who silently looks like a
 first-time visitor. `interaction.meta` is the one dynamic shape — an open
 record, minus the keys that would mutate a prototype instead of the object.
+
+## What the model sees
+
+The two generation modes send different things. Cohort is the default.
+
+### Cohort mode
+
+- the surface and the slot
+- the locale
+- the segment, when you set one
+- the category being browsed (`context.currentCategory`)
+- the name of the category the shopper leans towards most — the name only, the
+  score stays behind
+- whether this shopper has no history at all
+- how many products the component may place (`context.maxItems`)
+- the candidate list: one line per product, with its SKU, title, category,
+  rating and tags
+
+### Per-shopper mode
+
+Everything above, and:
+
+- the SKU being looked at right now
+- the current search
+- whether this is a returning shopper
+- liked SKUs, and disliked SKUs
+- purchased SKUs, and what is in the basket
+- the most-viewed SKUs, each with its view count
+- recent searches
+- every category they lean towards, strongest first
+- the other kinds of interaction, each with a count
+
+### Left out of both
+
+- `user.id`
+- every timestamp (`at`) — used to sort signals, then dropped
+- dwell time (`dwellMs`) — added up in the digest, left out of the prompt
+- every price, and every currency
+- `imageUrl`
+- `interaction.value` and `interaction.meta` — the model is told which kinds of
+  interaction happened and how often, and no more
+
+The candidate list is trimmed on the way out: an out-of-stock product is dropped,
+and at most 60 products go, in the order you supplied them.
+
+`spec-cache.test.ts` walks every field of the digest and checks each one is
+either in the cohort key or scrubbed from the cohort prompt. A field the key
+leaves out that still changes the prompt fails that test. Adding a field to the
+digest fails it too, until someone says which side the field is on.
+
+## Any provider
+
+A provider is three things:
+
+```ts
+export interface ComponentProvider {
+  /** Short identifier recorded on every generated spec, e.g. 'anthropic'. */
+  readonly name: string;
+  /** Concrete model identifier, e.g. 'claude-opus-5'. */
+  readonly model: string;
+  generate(request: ProviderRequest): Promise<ProviderResult>;
+}
+```
+
+`createComponentGenerator({ provider })` takes any object of that shape — a
+hosted API, a model you run yourself, a deployment inside your own tenancy, or a
+recorded fixture. `@rudra-js/core` depends on no vendor SDK.
+`@rudra-js/anthropic` is one adapter, not a requirement, and `provider: null` is
+the default that costs nothing.
+
+An adapter takes its API key as an option, so you choose where the key comes
+from. `ANTHROPIC_API_KEY` is the name the example shop uses for its own
+convenience. No package here reads the environment.
+
+## The cache
+
+`cache` defaults to an in-process store. `createMemorySpecCache()` keeps an entry
+for `ttlMs` — 60,000 milliseconds by default, so one minute — and holds up to
+`maxEntries`, 10,000 by default. Once it is full, the entry read longest ago goes
+first.
+
+An entry holds the generated spec and `generatedAt`, the epoch milliseconds when
+the model produced it. That is the whole of it — no payload, no shopper, no
+prompt.
+
+The port is two methods:
+
+```ts
+export interface SpecCache {
+  get(key: string): Promise<CachedSpec | undefined>;
+  set(key: string, cached: CachedSpec): Promise<void>;
+}
+```
+
+Pass your own store — Redis, Memcached, whatever you already run — and it keeps
+entries on its own terms. What that store holds, and for how long, is yours to
+declare to your users, because this package does not set it. Pass
+`createNullSpecCache()` to store nothing at all.
 
 ## Licence
 

@@ -42,6 +42,11 @@ a good time.
 - Explain in the description what you did to convince yourself the tests would
   catch a regression. That is worth more than a coverage number.
 
+Contributions are licensed under the MIT licence in [LICENSE](./LICENSE), the
+same licence the rest of the project uses. By sending a pull request you confirm
+you have the right to submit the work — you wrote it, or whoever holds the rights
+to it has let you contribute it here. There is no separate agreement to sign.
+
 ## Naming
 
 Names in a published package are permanent in a way internal names are not: a
@@ -144,6 +149,26 @@ npm run lint
 npm run format:check
 npm test
 ```
+
+## Releasing
+
+Bump the version on a pull request of its own, and merge it. Then push a signed
+tag `vX.Y.Z` at the merge commit:
+
+```sh
+git tag -s v0.2.0 -m 'v0.2.0'
+git push origin v0.2.0
+```
+
+A `v*` tag starts [`.github/workflows/release.yml`](.github/workflows/release.yml).
+It builds, runs the same six checks a pull request runs, and then publishes
+`@rudra-js/core`, `@rudra-js/react` and `@rudra-js/anthropic` in that order with
+`npm publish --provenance`. Core goes first because react declares it as a peer.
+
+Two things the job leaves to you: that the tag sits on `main`, and that it
+matches the `version` in `packages/core/package.json`. Check both before you
+push. npm rejects a republish of a version that already exists, so a wrong tag
+is fixed by tagging a new patch version, not by retrying the old one.
 
 ## Reporting a security issue
 

@@ -7,7 +7,7 @@ reporting instead: go to the [Security tab][advisories] and choose _Report a
 vulnerability_. It opens a private thread with the maintainers, and the fix can
 be prepared in a private fork before anything is disclosed.
 
-Expect an acknowledgement within 5 working days. If a report is confirmed, we
+We aim to acknowledge within 5 working days. If a report is confirmed, we
 will agree a disclosure date with you, publish a GitHub Security Advisory, and
 credit you unless you would rather stay anonymous.
 
@@ -68,7 +68,11 @@ supply — every SKU is checked against the shop's own list. It can still write 
 product name into prose, which nothing prevents.
 An injection that fully succeeds — one where the model does exactly what the
 attacker's text says — can change the wording and the ordering of a
-recommendation block. It cannot reach anything.
+recommendation block. That is the reach it has: the response is parsed against a
+schema, every SKU is checked against the shop's list, every stated reason is
+checked against the shopper's signals, and what survives is rendered as escaped
+text by React. There is no tool call, no network access and no data access on
+the model's side of the boundary to aim at.
 
 That is the design, rather than a happy accident: the defence is what the model
 is _able_ to emit, not what we can persuade it to avoid.
@@ -153,3 +157,17 @@ Dependencies are updated by Dependabot, GitHub Actions are pinned by commit SHA,
 CI runs with `contents: read` and does not persist its checkout credentials, and
 `npm ci --ignore-scripts` keeps dependency lifecycle scripts from executing
 during a build.
+
+### Checking what you installed
+
+Every package is published with `npm publish --provenance`, so npm holds a signed
+statement of where the tarball was built. Check it yourself:
+
+```sh
+npm audit signatures
+```
+
+The attestation names this repository, the workflow that ran
+(`.github/workflows/release.yml`) and the commit the release tag pointed at. If
+those do not match what you expect, the package did not come from this pipeline,
+and that is worth reporting.

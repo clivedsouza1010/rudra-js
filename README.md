@@ -5,8 +5,9 @@ A framework of server side components built dynamically and rendered in real tim
 rudra-js takes a validated payload describing what a shopper has done, asks a language model to
 design a recommendation component for that shopper, and server-renders the result into the initial
 HTML response. The model never returns markup: it returns a specification drawn from a closed
-vocabulary, which a registry of components renders. That is what makes generated output safe to put
-in a page.
+vocabulary, which a registry of components renders. So the model picks the arrangement and the
+words, the registry writes the markup, and every product fact — title, price, image, link — is read
+from your own catalog when the page is served. What the model wrote is rendered as escaped text.
 
 > **Status: `0.1.0`, early.** Installable and usable — the Getting started below runs as a test on
 > every commit. The public contracts may still change between minor versions before `1.0`, and the
@@ -21,6 +22,10 @@ on a model.
 ```sh
 npm install @rudra-js/core @rudra-js/react zod@^4
 ```
+
+Every package here lives under the `@rudra-js` scope. The unscoped `rudra-js` package on npm
+belongs to someone else and has nothing to do with this project — check the `@` before you
+install.
 
 zod 4 is required. The public API of `@rudra-js/core` _is_ zod schemas, so your app and
 the package have to resolve the same zod, and a zod 3 app will fail to install.
@@ -65,7 +70,10 @@ To bring a model in, add [`@rudra-js/anthropic`](packages/anthropic) and pass it
 layout, not which products are chosen. See [`@rudra-js/core`](packages/core) for the full
 payload, and [`@rudra-js/react`](packages/react) for the class names to style.
 
-This example is run as a test on every commit, so it cannot rot.
+That adapter is one option, not the only one. The three-method interface any model can sit
+behind is in [Any provider](packages/core#any-provider).
+
+The code above is run as a test on every commit, so a change that breaks it fails CI.
 
 ## Packages
 
@@ -93,8 +101,9 @@ npm test
 npm run verify:consumer   # packs all three packages and uses them from outside the repo
 ```
 
-If you have a key in your shell, run the tests as `ANTHROPIC_API_KEY= npm test`: the example
-shop's tests refuse to load with a key set, so that a test run can never bill.
+If you have a key in your shell, run the tests as `ANTHROPIC_API_KEY= npm test`. `vitest.config.ts`
+sets `RUDRA_REPLAY_ONLY=1` for every test run, and the shop throws at start-up when that is set and
+a key is set too — so a run with a key in the shell fails to load instead of calling the model.
 
 CI runs all six of these on every pull request, and a second job builds the example shop and
 checks that its page still reads as one to a crawler. CI has no key, so it runs the build plainly:
@@ -126,9 +135,15 @@ Set `ANTHROPIC_API_KEY` and `ANTHROPIC_WORKSPACE_ID` in the environment and it c
 transcript under `examples/shop/recordings/`. Without a key it replays those committed transcripts
 instead — so a clone with no key still exercises generation, deterministically, for free. A request with no
 recorded transcript degrades the same way any other model failure does: to a deterministic
-fallback component, so the page never breaks. That degradation is worth watching for rather than
+fallback component, so the page still renders. That degradation is worth watching for rather than
 relying on — a test in the example fails once a transcript is committed if the page it belongs to is
 ever served from the fallback instead.
+
+A transcript is the whole prompt. Each file under `examples/shop/recordings/` holds the system half,
+the user half and the model's answer, in plain JSON, and those files are committed to the repository.
+So point the recording provider at demo shoppers and demo catalogs only. Do not run it against real
+traffic, and do not run it in `per-shopper` mode: that mode puts a real person's likes, basket, views
+and searches into the prompt, and recording writes all of it to a file you then commit.
 
 Expect the first render of a page with a key to be slow. The shop gives the model 60 seconds rather
 than core's 1.5-second default, because this model reasons before it answers and a spec does not
