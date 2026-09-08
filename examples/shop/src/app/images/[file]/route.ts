@@ -17,6 +17,6 @@ export async function GET(
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 4 3" role="img" aria-hidden="true"><rect width="4" height="3" fill="${fill}"/></svg>`;
 
   return new Response(svg, {
-    headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=31536000' },
+    headers: { 'content-type': 'image/svg+xml', 'cache-control': 'no-cache' },
   });
 }
