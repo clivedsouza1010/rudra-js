@@ -14,7 +14,7 @@ export async function GET(
   for (const character of sku) hash = (hash * 31 + character.charCodeAt(0)) % 100_000;
   const fill = PALETTE[hash % PALETTE.length];
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3" role="img" aria-hidden="true"><rect width="4" height="3" fill="${fill}"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 4 3" role="img" aria-hidden="true"><rect width="4" height="3" fill="${fill}"/></svg>`;
 
   return new Response(svg, {
     headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=31536000' },
