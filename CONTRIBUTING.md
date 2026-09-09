@@ -41,6 +41,8 @@ a good time.
 - Every check below has to pass. CI runs the same ones.
 - Explain in the description what you did to convince yourself the tests would
   catch a regression. That is worth more than a coverage number.
+- Add a line under `[Unreleased]` in [CHANGELOG.md](./CHANGELOG.md) for anything
+  a host would notice, or say in the description why none is needed.
 
 Contributions are licensed under the MIT licence in [LICENSE](./LICENSE), the
 same licence the rest of the project uses. By sending a pull request you confirm
