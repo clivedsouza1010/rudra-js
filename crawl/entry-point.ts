@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 export function isEntryPoint(moduleUrl: string, entry: string | undefined): boolean {
   if (entry === undefined) return false;
 
-  let resolved = entry;
+  let resolved: string;
   try {
     resolved = realpathSync(entry);
   } catch {
