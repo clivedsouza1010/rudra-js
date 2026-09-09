@@ -277,4 +277,21 @@ describe('the README', () => {
       );
     }
   });
+
+  it('names the model the anthropic adapter actually defaults to', () => {
+    const source = readFileSync(
+      join(REPO_ROOT, 'packages/anthropic/src/anthropic-provider.ts'),
+      'utf8',
+    );
+    const match = /options\.model \?\? '([^']+)'/.exec(source);
+    expect(
+      match,
+      'the default model is no longer written as `options.model ?? ...`',
+    ).not.toBeNull();
+
+    const readme = readFileSync(join(REPO_ROOT, 'packages/anthropic/README.md'), 'utf8');
+    expect(readme, `the README does not name the default model ${match![1]}`).toContain(
+      `\`${match![1]}\``,
+    );
+  });
 });
