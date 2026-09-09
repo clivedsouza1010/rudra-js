@@ -1,5 +1,8 @@
+import { PassThrough } from 'node:stream';
+import { Suspense, createElement, type ReactNode } from 'react';
+import { renderToPipeableStream } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { checkCrawlable } from './check-crawlable.js';
+import { HIDDEN_DIV, SWAP, checkCrawlable } from './check-crawlable.js';
 
 // A page the way the shop serves it today: the slot is written in place.
 const GOOD = `<!DOCTYPE html><html><body><main>
@@ -26,7 +29,62 @@ const DEFERRED_ABOVE_MAIN = `<!DOCTYPE html><html><head></head><body><!--$?--><t
 <script>$RC("B:0","S:0")</script>
 </body></html>`;
 
+function deferredSlot(): () => ReactNode {
+  let ready = false;
+  let arriving: Promise<void> | null = null;
+
+  return function Slot(): ReactNode {
+    if (!ready) {
+      arriving ??= new Promise<void>((resolve) => {
+        setTimeout(() => {
+          ready = true;
+          resolve();
+        }, 0);
+      });
+      throw arriving;
+    }
+
+    return createElement(
+      'section',
+      { className: 'rudra', 'data-rudra-slot': 'recommendations' },
+      createElement('h2', null, 'Picked for you'),
+    );
+  };
+}
+
+function streamToString(node: ReactNode): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const sink = new PassThrough();
+    const chunks: Buffer[] = [];
+    sink.on('data', (chunk: Buffer) => chunks.push(chunk));
+    sink.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    sink.on('error', reject);
+
+    const stream = renderToPipeableStream(node, {
+      onShellReady: () => stream.pipe(sink),
+      onError: reject,
+    });
+  });
+}
+
 describe('checking a page a crawler will read', () => {
+  it('catches what react-dom itself streams for a Suspense boundary', async () => {
+    const html = await streamToString(
+      createElement(
+        'main',
+        null,
+        createElement('h1', null, 'Trail Shoe'),
+        createElement(
+          Suspense,
+          { fallback: createElement('div', null, 'Loading…') },
+          createElement(deferredSlot()),
+        ),
+      ),
+    );
+
+    expect(checkCrawlable(html)).toEqual(expect.arrayContaining([HIDDEN_DIV, SWAP]));
+  });
+
   it('passes a page that writes the slot in place', () => {
     expect(checkCrawlable(GOOD)).toEqual([]);
   });

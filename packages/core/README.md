@@ -190,6 +190,8 @@ numbers rather than discovering them from a rejection.
 | `candidates`         | 200   | `candidates`                                                        |
 | `productsPerBundle`  | 5     | `bundles[].skus`, which also needs at least 2                       |
 | `bundles`            | 20    | `bundles`                                                           |
+| `localeTag`          | 35    | `context.locale`, which also has to be one language tag             |
+| `maxItems`           | 12    | `context.maxItems`, which also needs at least 1                     |
 
 These bound each field individually; they are not an aggregate prompt budget.
 Fitting a payload into a context window is `digest`'s job, and it trims rather

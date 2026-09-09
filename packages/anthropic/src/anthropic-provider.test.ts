@@ -34,7 +34,7 @@ const answer = (body: unknown, status = 200): typeof globalThis.fetch =>
 const answerText = (body: string, status: number): typeof globalThis.fetch =>
   vi.fn(async () => new Response(body, { status })) as unknown as typeof globalThis.fetch;
 
-const toolAnswer = (input: unknown, usage?: Record<string, number>) => ({
+const toolAnswer = (input: unknown, usage?: Record<string, unknown>) => ({
   content: [{ type: 'tool_use', name: 'emit_component_spec', input }],
   usage: usage ?? { input_tokens: 11, output_tokens: 3 },
 });
@@ -74,6 +74,51 @@ describe('the Anthropic adapter', () => {
 
     await expect(provider.generate(request())).resolves.toMatchObject({
       usage: { inputTokens: 11, outputTokens: 3 },
+    });
+  });
+
+  it('maps all four usage fields to the names core reads, each a different number', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer(
+        toolAnswer(spec, {
+          input_tokens: 1537,
+          output_tokens: 577,
+          cache_read_input_tokens: 3223,
+          cache_creation_input_tokens: 1024,
+        }),
+      ),
+    });
+
+    const result = await provider.generate(request());
+
+    expect(result.usage).toEqual({
+      inputTokens: 1537,
+      outputTokens: 577,
+      cacheReadTokens: 3223,
+      cacheWriteTokens: 1024,
+    });
+  });
+
+  it('drops a token count that arrived as a string and keeps the rest', async () => {
+    const provider = createAnthropicProvider({
+      apiKey: 'k',
+      fetch: answer(
+        toolAnswer(spec, {
+          input_tokens: '11',
+          output_tokens: 577,
+          cache_read_input_tokens: 3223,
+          cache_creation_input_tokens: 1024,
+        }),
+      ),
+    });
+
+    const result = await provider.generate(request());
+
+    expect(result.usage).toEqual({
+      outputTokens: 577,
+      cacheReadTokens: 3223,
+      cacheWriteTokens: 1024,
     });
   });
 
