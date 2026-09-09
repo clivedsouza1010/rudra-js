@@ -176,6 +176,17 @@ describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
   });
 });
 
+describe('the published packages', () => {
+  it('all carry one version, because one tag publishes all three', () => {
+    const versions = PACKAGES.map((packageName) => readManifest(packageName).version);
+    const listed = PACKAGES.map(
+      (packageName, index) => `@rudra-js/${packageName} ${versions[index]}`,
+    ).join(', ');
+
+    expect([...new Set(versions)], listed).toHaveLength(1);
+  });
+});
+
 function collectExportTargets(exports: Record<string, unknown>): string[] {
   return Object.values(exports).flatMap((value) =>
     typeof value === 'string'
@@ -184,9 +195,45 @@ function collectExportTargets(exports: Record<string, unknown>): string[] {
   );
 }
 
-/** Only steps that actually run — a commented-out line is not a step. */
-function stepsOf(workflow: string): string[] {
-  return [...workflow.matchAll(/^\s*- run: (.+)$/gm)].map((match) => match[1]!.trim());
+interface WorkflowStep {
+  run?: string;
+  keys: string[];
+}
+
+/** Every step of one job, as its key names plus its `run:` line. */
+function stepsOf(workflow: string, jobName: string): WorkflowStep[] {
+  const lines = workflow.split('\n');
+  const jobAt = lines.indexOf(`  ${jobName}:`);
+  if (jobAt === -1) throw new Error(`no \`${jobName}:\` job found`);
+
+  const steps: WorkflowStep[] = [];
+  let inSteps = false;
+  for (const line of lines.slice(jobAt + 1)) {
+    const text = line.trim();
+    if (text === '' || text.startsWith('#')) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent <= 2) break;
+    if (!inSteps) {
+      inSteps = indent === 4 && text === 'steps:';
+      continue;
+    }
+    if (indent <= 4) break;
+    if (indent === 6) {
+      if (!text.startsWith('- ')) throw new Error(`expected a step, got \`${text}\``);
+      steps.push({ keys: [] });
+    }
+    if (indent > 8) continue;
+
+    const step = steps.at(-1);
+    if (!step) throw new Error(`\`${text}\` sits before the first step`);
+    const field = text.replace(/^- /, '');
+    const key = field.slice(0, field.indexOf(':'));
+    step.keys.push(key);
+    if (key === 'run') step.run = field.slice(key.length + 1).trim();
+  }
+  if (!inSteps) throw new Error(`the \`${jobName}\` job has no steps`);
+
+  return steps;
 }
 
 /**
@@ -200,21 +247,53 @@ function stepsOf(workflow: string): string[] {
  * file.
  */
 function jobStepsOf(workflow: string, jobName: string): string[] {
-  const header = new RegExp(`^  ${jobName}:$`, 'm').exec(workflow);
-  if (!header) throw new Error(`no \`${jobName}:\` job found`);
+  const commands: string[] = [];
+  for (const step of stepsOf(workflow, jobName)) {
+    if (step.run !== undefined) commands.push(step.run);
+  }
+  return commands;
+}
 
-  const afterHeader = workflow.slice(header.index + header[0].length);
-  // The next job header at the same two-space indentation, if there is one —
-  // that is what ends this job's slice rather than the end of the file.
-  const nextJob = /^  \S.*:$/m.exec(afterHeader);
-  const body = nextJob ? afterHeader.slice(0, nextJob.index) : afterHeader;
+function jobKeysOf(workflow: string, jobName: string): string[] {
+  const lines = workflow.split('\n');
+  const jobAt = lines.indexOf(`  ${jobName}:`);
+  if (jobAt === -1) throw new Error(`no \`${jobName}:\` job found`);
 
-  return stepsOf(body);
+  const keys: string[] = [];
+  for (const line of lines.slice(jobAt + 1)) {
+    const text = line.trim();
+    if (text === '' || text.startsWith('#')) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent <= 2) break;
+    if (indent === 4) keys.push(text.slice(0, text.indexOf(':')));
+  }
+  return keys;
 }
 
 describe('the release workflow', () => {
   const releaseWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/release.yml'), 'utf8');
   const ciWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8');
+
+  it('takes its Node from a version trusted publishing accepts', () => {
+    const pinned = readFileSync(join(REPO_ROOT, '.nvmrc'), 'utf8').trim();
+
+    const parts = pinned.split('.');
+    expect(parts.length, `.nvmrc is "${pinned}"; it must name an exact version`).toBe(3);
+
+    const major = Number(parts[0]);
+    const minor = Number(parts[1]);
+    expect(Number.isInteger(major) && Number.isInteger(minor), `.nvmrc is "${pinned}"`).toBe(true);
+
+    const tooOld = major < 22 || (major === 22 && minor < 14);
+    expect(tooOld, `.nvmrc is ${pinned}; trusted publishing needs 22.14 or newer`).toBe(false);
+
+    for (const workflow of ['release.yml', 'rehearsal.yml']) {
+      const text = readFileSync(join(REPO_ROOT, '.github/workflows', workflow), 'utf8');
+      expect(text, `${workflow} does not take its Node from .nvmrc`).toContain(
+        'node-version-file: .nvmrc',
+      );
+    }
+  });
 
   it.each(PACKAGES)('publishes @rudra-js/%s with provenance', (packageName) => {
     // The directory alone is not evidence of publishing: any step can carry it.
@@ -245,12 +324,25 @@ describe('the release workflow', () => {
     ]);
 
     for (const step of jobStepsOf(ciWorkflow, 'verify')) {
-      expect(stepsOf(releaseWorkflow), `release.yml is missing \`${step}\``).toContain(step);
+      expect(
+        jobStepsOf(releaseWorkflow, 'publish'),
+        `release.yml is missing \`${step}\``,
+      ).toContain(step);
     }
   });
 
+  it('is what `npm run check` runs, after the install', () => {
+    const { scripts } = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const checks = jobStepsOf(ciWorkflow, 'verify');
+    const afterInstall = checks.slice(checks.indexOf('npm ci --ignore-scripts') + 1);
+
+    expect(scripts['check']?.split(' && ')).toEqual(afterInstall);
+  });
+
   it('verifies before it publishes', () => {
-    const steps = stepsOf(releaseWorkflow);
+    const steps = jobStepsOf(releaseWorkflow, 'publish');
     const firstPublish = steps.findIndex((step) => step.startsWith('npm publish'));
     expect(firstPublish).toBeGreaterThan(-1);
 
@@ -258,6 +350,27 @@ describe('the release workflow', () => {
     for (const step of jobStepsOf(ciWorkflow, 'verify')) {
       expect(steps.indexOf(step), `\`${step}\` runs after publishing`).toBeLessThan(firstPublish);
     }
+  });
+
+  it('forgives no step, and skips none before the publish', () => {
+    const steps = stepsOf(releaseWorkflow, 'publish');
+    const firstPublish = steps.findIndex((step) => step.run?.startsWith('npm publish'));
+    expect(firstPublish).toBeGreaterThan(-1);
+
+    for (const step of steps.slice(0, firstPublish)) {
+      const name = step.run ?? step.keys.join(' ');
+      expect(step.keys, `\`${name}\` carries an if:`).not.toContain('if');
+    }
+
+    for (const step of steps) {
+      const name = step.run ?? step.keys.join(' ');
+      expect(step.keys, `\`${name}\` carries continue-on-error`).not.toContain('continue-on-error');
+    }
+
+    expect(
+      jobKeysOf(releaseWorkflow, 'publish'),
+      'the publish job carries continue-on-error',
+    ).not.toContain('continue-on-error');
   });
 });
 

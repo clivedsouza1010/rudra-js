@@ -525,6 +525,7 @@ describe('what it reports', () => {
       onEvent: (event) => events.push(event),
       ...options,
     });
+    // eslint-disable-next-line no-await-in-loop -- sequential on purpose, so run two reads what run one cached
     for (let run = 0; run < runs; run += 1) await generator.generate(payload());
     return events;
   };

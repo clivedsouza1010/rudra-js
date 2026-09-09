@@ -41,6 +41,6 @@ body:
     id: runtime
     attributes:
       label: Node version
-      description: Output of `node --version`. The package needs ^20.19 or >=22.12.
+      description: Output of `node --version`. The package needs >=22.12.
     validations:
       required: true

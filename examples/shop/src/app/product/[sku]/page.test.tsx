@@ -88,6 +88,7 @@ describe('a product page', () => {
     // Different digests, different cache keys, different code paths through
     // selection. A page that only works for one is not working.
     for (const shopper of [coldStartShopper, richShopper]) {
+      // eslint-disable-next-line no-await-in-loop -- sequential on purpose, so a failure names the shopper that failed
       expect(await render(SKU, shopper.id)).toContain('data-rudra-slot');
     }
   });

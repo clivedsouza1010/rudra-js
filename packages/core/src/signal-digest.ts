@@ -230,14 +230,17 @@ function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
 
 /** The most-viewed few, as the digest reports them. */
 function mostViewedProducts(views: ViewSignal[]): ViewedProduct[] {
-  return mergeViewsBySku(views)
+  const top = mergeViewsBySku(views)
     .toSorted((left, right) => right.views - left.views)
-    .slice(0, DIGEST_LIMITS.viewed)
-    .map(({ sku, views: viewCount, dwellMs }) => ({
-      sku,
-      views: viewCount,
-      ...(dwellMs !== undefined ? { dwellMs } : {}),
-    }));
+    .slice(0, DIGEST_LIMITS.viewed);
+
+  const products: ViewedProduct[] = [];
+  for (const merged of top) {
+    const product: ViewedProduct = { sku: merged.sku, views: merged.views };
+    if (merged.dwellMs !== undefined) product.dwellMs = merged.dwellMs;
+    products.push(product);
+  }
+  return products;
 }
 
 /** The open-vocabulary long tail, reduced to "which kinds, and how often". */

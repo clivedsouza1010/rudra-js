@@ -14,12 +14,13 @@
     "examples/*"
   ],
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
+    "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && npm test && npm run verify:consumer",
     "build": "tsc -b",
     "typecheck": "tsc -p tsconfig.typecheck.json && tsc -p tsconfig.tools.json && tsc -p examples/shop/tsconfig.json",
-    "lint": "oxlint",
+    "lint": "oxlint --deny-warnings",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",

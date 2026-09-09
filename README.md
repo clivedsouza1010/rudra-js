@@ -20,15 +20,19 @@ component — a supported setting, not a stub, and the right one until you have 
 on a model.
 
 ```sh
-npm install @rudra-js/core @rudra-js/react zod@^4
+npm install @rudra-js/core @rudra-js/react zod@^4.5
 ```
 
 Every package here lives under the `@rudra-js` scope. The unscoped `rudra-js` package on npm
 belongs to someone else and has nothing to do with this project — check the `@` before you
 install.
 
-zod 4 is required. The public API of `@rudra-js/core` _is_ zod schemas, so your app and
-the package have to resolve the same zod, and a zod 3 app will fail to install.
+zod 4.5 or later is required. The public API of `@rudra-js/core` _is_ zod schemas, so your app and
+the package have to resolve the same zod, and a zod 3 app will fail to install. The floor is 4.5
+rather than 4.0 because 4.5 changed how a nullable field is written into the tool schema the model
+is asked to fill in — `tests/tool-schema.test.ts` holds the golden copy of that schema.
+
+Node 22.12 or later is required. Node 20 is end of life, and nothing here is built or tested on it.
 
 ```tsx
 import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
@@ -88,13 +92,17 @@ The code above is run as a test on every commit, so a change that breaks it fail
 
 ## Development
 
-Node `^20.19 || >=22.12` is required — TypeScript 7 and Vitest 4 both need it,
-and both fail confusingly on older versions. `.nvmrc` pins 22, and
-`engine-strict=true` turns a mismatch into a readable install error.
+Node `>=22.12` is required. Node 20 is end of life, and
+`npm run verify:consumer` runs TypeScript through `--experimental-strip-types`,
+which 20.19 does not have. `.nvmrc` names an exact 22, and `engine-strict=true` turns a
+mismatch into a readable install error. CI runs the checks on 22.12.0 as well as
+on the `.nvmrc` version, so the floor is exercised rather than just declared.
 
 ```sh
 nvm use
 npm install
+
+npm run check        # all six of the below, in order
 
 npm run build        # tsc -b across the workspace
 npm run typecheck    # includes test files, which the build does not
@@ -110,9 +118,9 @@ If you have a key in your shell, run the tests as `ANTHROPIC_API_KEY= npm test`.
 sets `RUDRA_REPLAY_ONLY=1` for every test run, and the shop throws at start-up when that is set and
 a key is set too — so a run with a key in the shell fails to load instead of calling the model.
 
-CI runs all six of these on every pull request, and a second job builds the example shop and
-checks that its page still reads as one to a crawler. CI sets no mode, so the shop replays and that
-job runs the build plainly:
+CI runs all six of these on every pull request as separate steps, so a failure names itself, and a
+second job builds the example shop and checks that its page still reads as one to a crawler. CI sets
+no mode, so the shop replays and that job runs the build plainly:
 
 ```sh
 npm run build --workspace @rudra-js/example-shop
