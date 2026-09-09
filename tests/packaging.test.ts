@@ -193,13 +193,7 @@ interface WorkflowStep {
   keys: string[];
 }
 
-/**
- * Every step of one job, as its key names plus its `run:` line.
- *
- * The keys are what makes `continue-on-error: true` under `npm test` visible: a
- * scrape of `- run:` lines reads a neutered step as present and passing.
- * A commented-out line is not a step.
- */
+/** Every step of one job, as its key names plus its `run:` line. */
 function stepsOf(workflow: string, jobName: string): WorkflowStep[] {
   const lines = workflow.split('\n');
   const jobAt = lines.indexOf(`  ${jobName}:`);

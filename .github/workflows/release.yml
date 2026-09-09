@@ -11,7 +11,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     environment: npm
-    timeout-minutes: 3
+    timeout-minutes: 10
     permissions:
       contents: read
       # Mints the OIDC token npm uses to attest that this build produced this
@@ -38,7 +38,7 @@ jobs:
       - run: npm run build
 
       # Publishing an artefact nobody verified is how a broken release ships.
-      # The same five checks CI runs, in the same order — a release must not be
+      # The same checks CI runs, in the same order — a release must not be
       # held to a lower standard than a pull request.
       - run: npm run typecheck
       - run: npm run lint
