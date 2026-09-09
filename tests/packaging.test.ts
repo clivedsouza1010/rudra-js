@@ -274,6 +274,27 @@ describe('the release workflow', () => {
   const releaseWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/release.yml'), 'utf8');
   const ciWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8');
 
+  it('takes its Node from a version trusted publishing accepts', () => {
+    const pinned = readFileSync(join(REPO_ROOT, '.nvmrc'), 'utf8').trim();
+
+    const parts = pinned.split('.');
+    expect(parts.length, `.nvmrc is "${pinned}"; it must name an exact version`).toBe(3);
+
+    const major = Number(parts[0]);
+    const minor = Number(parts[1]);
+    expect(Number.isInteger(major) && Number.isInteger(minor), `.nvmrc is "${pinned}"`).toBe(true);
+
+    const tooOld = major < 22 || (major === 22 && minor < 14);
+    expect(tooOld, `.nvmrc is ${pinned}; trusted publishing needs 22.14 or newer`).toBe(false);
+
+    for (const workflow of ['release.yml', 'rehearsal.yml']) {
+      const text = readFileSync(join(REPO_ROOT, '.github/workflows', workflow), 'utf8');
+      expect(text, `${workflow} does not take its Node from .nvmrc`).toContain(
+        'node-version-file: .nvmrc',
+      );
+    }
+  });
+
   it.each(PACKAGES)('publishes @rudra-js/%s with provenance', (packageName) => {
     // The directory alone is not evidence of publishing: any step can carry it.
     // Asserting the pair is what fails when a publish becomes an `echo`.

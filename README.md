@@ -94,7 +94,7 @@ The code above is run as a test on every commit, so a change that breaks it fail
 
 Node `>=22.12` is required. Node 20 is end of life, and
 `npm run verify:consumer` runs TypeScript through `--experimental-strip-types`,
-which 20.19 does not have. `.nvmrc` pins 22, and `engine-strict=true` turns a
+which 20.19 does not have. `.nvmrc` names an exact 22, and `engine-strict=true` turns a
 mismatch into a readable install error. CI runs the checks on 22.12.0 as well as
 on the `.nvmrc` version, so the floor is exercised rather than just declared.
 

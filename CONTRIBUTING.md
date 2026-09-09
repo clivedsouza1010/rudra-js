@@ -8,7 +8,8 @@ idea fits — see _Scope_ below.
 
 Node `>=22.12` is required. Node 20 is end of life, and
 `scripts/verify-consumer.mjs` needs `--experimental-strip-types`, which 20.19
-does not have. There is an `.nvmrc`.
+does not have. `.nvmrc` names an exact version, which the publishing workflows
+also read — see [The npm pin](#the-npm-pin).
 
 ```sh
 nvm use
@@ -186,7 +187,15 @@ tagging a new patch version, not by retrying the old one.
 
 Both `release.yml` and `rehearsal.yml` install `npm@11.19.1` before they publish.
 Node 22 ships npm 10, which cannot do trusted publishing at all — that needs npm
-11.5 or newer, which reads the OIDC token itself. The version is pinned exactly
+11.5 or newer, which reads the OIDC token itself.
+
+Trusted publishing also needs Node 22.14 or newer, which is higher than the
+`>=22.12` floor the packages declare and higher than npm's own `>=22.9`. Both
+workflows take their Node from `.nvmrc`, so `.nvmrc` names an exact version
+rather than the `22` line: `22` lets the runner pick whatever 22.x it has
+cached, which could be older than 22.14. A test fails if `.nvmrc` drops below
+22.14, because the first sign otherwise is a release that cannot publish, on a
+tag that cannot be reused. The version is pinned exactly
 rather than to a range because npm is the thing doing the publishing, and a
 publisher that changes under you between two releases is not something to find
 out about during one.
