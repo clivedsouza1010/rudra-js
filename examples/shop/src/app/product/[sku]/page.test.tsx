@@ -117,3 +117,39 @@ describe('the route itself', () => {
     await expect(route(SKU)).resolves.toBeTruthy();
   });
 });
+
+const STYLESHEET = '<link rel="stylesheet" href="/demo-styles.css"';
+
+const renderRoute = async (searchParams: { shopper?: string; styles?: string }) =>
+  renderToStaticMarkup(
+    await ProductPage({
+      params: Promise.resolve({ sku: SKU }),
+      searchParams: Promise.resolve(searchParams),
+    }),
+  );
+
+const toggleHref = (markup: string): string => {
+  const match = /<a href="([^"]*)">(?:Show it unstyled|Apply the example’s styles)<\/a>/.exec(
+    markup,
+  );
+  expect(match, 'the page has no styles toggle').not.toBeNull();
+  return match![1]!.replaceAll('&amp;', '&');
+};
+
+describe('the styles toggle', () => {
+  it('links the stylesheet by default and offers to turn it off', async () => {
+    const markup = await renderRoute({ shopper: richShopper.id });
+
+    expect(markup).toContain(STYLESHEET);
+    expect(markup).toContain('Show it unstyled');
+    expect(toggleHref(markup)).toBe(`?shopper=${richShopper.id}&styles=off`);
+  });
+
+  it('drops the stylesheet when styles=off and offers to put it back', async () => {
+    const markup = await renderRoute({ shopper: richShopper.id, styles: 'off' });
+
+    expect(markup).not.toContain(STYLESHEET);
+    expect(markup).toContain('Apply the example’s styles');
+    expect(toggleHref(markup)).toBe(`?shopper=${richShopper.id}`);
+  });
+});

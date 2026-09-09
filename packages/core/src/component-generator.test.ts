@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  TimeoutError,
   createComponentGenerator,
   type ComponentGeneratorOptions,
   type GenerationEvent,
 } from './component-generator.js';
 import type { Block, GeneratedSpec } from './component-spec.js';
 import type { ComponentProvider } from './provider.js';
-import { createMemorySpecCache, createNullSpecCache } from './spec-cache.js';
+import { createMemorySpecCache, createNullSpecCache, type SpecCache } from './spec-cache.js';
 import type { TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
@@ -671,6 +672,66 @@ describe('what it reports', () => {
     // over the events.
     expect(events).toHaveLength(8);
     expect(events.filter((event) => event.calledModel)).toHaveLength(1);
+  });
+
+  it('hands over the error the provider threw', async () => {
+    const failure = new Error('upstream is down');
+    const [event] = await collect({ provider: throwingProvider(failure) });
+
+    expect(event?.degradedReason).toBe('provider-error');
+    expect(event?.error).toBe(failure);
+  });
+
+  it('hands over the deadline itself when the model ran out of time', async () => {
+    const [event] = await collect({ provider: hangingProvider(), modelTimeoutMs: 20 });
+
+    expect(event?.degradedReason).toBe('timeout');
+    expect(event?.error).toBeInstanceOf(TimeoutError);
+  });
+
+  it('reports a store that throws on read as a cache error, and still serves the model', async () => {
+    const brokenCache: SpecCache = {
+      get: async () => {
+        throw new Error('redis is down');
+      },
+      set: async () => {},
+    };
+
+    const [event] = await collect({ provider: countingProvider().provider, cache: brokenCache });
+
+    expect(event).toMatchObject({ source: 'llm', cache: 'error' });
+  });
+
+  it('reports a store that hangs on read as a cache timeout', async () => {
+    const hangingCache: SpecCache = { get: () => new Promise(() => {}), set: async () => {} };
+
+    const [event] = await collect({
+      provider: countingProvider().provider,
+      cache: hangingCache,
+      cacheTimeoutMs: 20,
+    });
+
+    expect(event).toMatchObject({ source: 'llm', cache: 'timeout' });
+  });
+
+  it('reports an entry of the wrong shape as a cache miss', async () => {
+    const staleCache = {
+      get: async () => ({ tone: 'neutral', headline: 'H', blocks: 'not-an-array' }),
+      set: async () => {},
+    };
+
+    const [event] = await collect({
+      provider: countingProvider().provider,
+      cache: staleCache as never,
+    });
+
+    expect(event).toMatchObject({ source: 'llm', cache: 'miss' });
+  });
+
+  it('reports a cache hit when a valid entry was served', async () => {
+    const events = await collect({ provider: countingProvider().provider }, 2);
+
+    expect(events.map((event) => event.cache)).toEqual(['miss', 'hit']);
   });
 
   it('survives a reporting hook that throws', async () => {

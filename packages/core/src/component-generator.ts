@@ -82,6 +82,8 @@ export interface GenerationEvent {
   violations?: string[];
   usage?: TokenUsage;
   degradedReason?: DegradedReason;
+  error?: unknown;
+  cache?: 'hit' | 'miss' | 'error' | 'timeout';
 }
 
 export interface ComponentGeneratorOptions {
@@ -104,9 +106,12 @@ export interface ComponentGeneratorOptions {
    * hold the page open, which is exactly what this module exists to prevent.
    */
   cacheTimeoutMs?: number;
-  // 'cohort' shares one generated component between shoppers who look alike and
-  // fills in each shopper's own products. 'per-shopper' generates for the
-  // individual, which is what the benchmark compares against.
+  /**
+   * 'cohort' shares one generated component between shoppers who look alike and
+   * fills in each shopper's own products. 'per-shopper' generates for the
+   * individual, which is what the benchmark compares against. Defaults to
+   * 'cohort'.
+   */
   generation?: 'cohort' | 'per-shopper';
   /** Observability. Never allowed to break a render. */
   onEvent?: (event: GenerationEvent) => void;
@@ -118,7 +123,7 @@ export interface ComponentGenerator {
   generateDeterministic(input: TrackingInputDraft): ComponentSpec;
 }
 
-class TimeoutError extends Error {
+export class TimeoutError extends Error {
   constructor(label: string, milliseconds: number) {
     super(`${label} exceeded ${milliseconds}ms`);
     this.name = 'TimeoutError';
@@ -196,7 +201,11 @@ const cachedSpecSchema = z.object({
   generatedAt: z.number(),
 });
 
-/** What the model said, plus what it cost. */
+interface CacheRead {
+  outcome: NonNullable<GenerationEvent['cache']>;
+  entry?: CachedSpec;
+}
+
 /**
  * What one call to the model produced.
  *
@@ -308,7 +317,7 @@ export function createComponentGenerator(
      * omitting it here would hide the calls that produce nothing — exactly the
      * ones worth knowing about.
      */
-    modelCall: Pick<GenerationEvent, 'calledModel' | 'usage' | 'violations'> = {
+    modelCall: Pick<GenerationEvent, 'calledModel' | 'usage' | 'violations' | 'cache' | 'error'> = {
       calledModel: false,
     },
   ): ComponentSpec => {
@@ -341,15 +350,15 @@ export function createComponentGenerator(
    * the spec. Generating again is always safe; handing an unvalidated object to
    * reconciliation is not.
    */
-  const readCache = async (key: string): Promise<CachedSpec | undefined> => {
+  const readCache = async (key: string): Promise<CacheRead> => {
     try {
       const stored = await withinBudget('cache read', cacheTimeoutMs, () => cache.get(key));
       const parsed = cachedSpecSchema.safeParse(stored);
-      return parsed.success ? parsed.data : undefined;
-    } catch {
+      return parsed.success ? { outcome: 'hit', entry: parsed.data } : { outcome: 'miss' };
+    } catch (error) {
       // A store that is down or slow degrades to generating, not to an error
       // page. Nothing here is worth failing a render over.
-      return undefined;
+      return { outcome: error instanceof TimeoutError ? 'timeout' : 'error' };
     }
   };
 
@@ -433,7 +442,8 @@ export function createComponentGenerator(
               providerId,
             );
 
-      const cached = await readCache(key);
+      const read = await readCache(key);
+      const cached = read.entry;
       let calledModel = false;
       let answer: ModelAnswer;
       // When the model produced this, not when it was served. A cached
@@ -460,12 +470,17 @@ export function createComponentGenerator(
           // The request went out. Leaving `calledModel` to default here reported
           // every failed call as no call at all, so the calls that cost money
           // and produced nothing were the only ones missing from the count.
-          return buildDeterministic(input, digest, startedAt, key, reason, { calledModel });
+          return buildDeterministic(input, digest, startedAt, key, reason, {
+            calledModel,
+            cache: read.outcome,
+            error,
+          });
         }
 
         if (!call.spec) {
           return buildDeterministic(input, digest, startedAt, key, 'invalid-generation', {
             calledModel,
+            cache: read.outcome,
             ...(call.usage ? { usage: call.usage } : {}),
           });
         }
@@ -492,6 +507,7 @@ export function createComponentGenerator(
       if (!reconciled.isUsable) {
         return buildDeterministic(input, digest, startedAt, key, 'unusable-on-serve', {
           calledModel,
+          cache: read.outcome,
           violations: reconciled.violations,
           ...(answer.usage ? { usage: answer.usage } : {}),
         });
@@ -504,6 +520,7 @@ export function createComponentGenerator(
         source,
         elapsedMs: finishedAt - startedAt,
         calledModel,
+        cache: read.outcome,
         violations: reconciled.violations,
         ...(answer.usage ? { usage: answer.usage } : {}),
       });

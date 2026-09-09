@@ -70,9 +70,12 @@ under the heading "Goes with your cart". The page they are on and the thing they
 have already chosen are both left out. No model was asked, and nothing was billed.
 
 To bring a model in, add [`@rudra-js/anthropic`](packages/anthropic) and pass it as the
-`provider`. Everything above stays the same — the model changes the wording and the
-layout, not which products are chosen. See [`@rudra-js/core`](packages/core) for the full
-payload, and [`@rudra-js/react`](packages/react) for the class names to style.
+`provider`. Everything above stays the same — the model writes the wording, the layout and
+the emphasis, and by default the products in a grid or carousel are still chosen here
+rather than by the model. See [What the model decides, by
+mode](packages/core#what-the-model-decides-by-mode) for the line in each mode,
+[`@rudra-js/core`](packages/core) for the full payload, and
+[`@rudra-js/react`](packages/react) for the class names to style.
 
 That adapter is one option, not the only one. The three-method interface any model can sit
 behind is in [Any provider](packages/core#any-provider).
@@ -109,21 +112,23 @@ npm test
 npm run verify:consumer   # packs all three packages and uses them from outside the repo
 ```
 
+`ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run bench` measures what each generation mode costs under a stub model; [bench/README.md](bench/README.md) says what its columns mean.
+
 If you have a key in your shell, run the tests as `ANTHROPIC_API_KEY= npm test`. `vitest.config.ts`
 sets `RUDRA_REPLAY_ONLY=1` for every test run, and the shop throws at start-up when that is set and
 a key is set too — so a run with a key in the shell fails to load instead of calling the model.
 
 CI runs all six of these on every pull request as separate steps, so a failure names itself, and a
-second job builds the example shop and checks that its page still reads as one to a crawler. CI has
-no key, so it runs the build plainly:
+second job builds the example shop and checks that its page still reads as one to a crawler. CI sets
+no mode, so the shop replays and that job runs the build plainly:
 
 ```sh
 npm run build --workspace @rudra-js/example-shop
 npm run verify:crawlable
 ```
 
-Locally, empty the key on the build line — the shop reads `examples/shop/.env.local`, and a build
-with a key calls the model for real:
+Locally that build is safe on its own — a key alone no longer spends anything, only
+`RUDRA_SHOP_MODE=record` does. The prefix makes it a rule rather than a default:
 
 ```sh
 ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/example-shop
@@ -140,25 +145,20 @@ npm run dev --workspace @rudra-js/example-shop
 # then visit http://localhost:3000/product/RJ-00001?shopper=S-0001
 ```
 
-Set `ANTHROPIC_API_KEY` and `ANTHROPIC_WORKSPACE_ID` in the environment and it calls Claude for real, saving each answer as a
-transcript under `examples/shop/recordings/`. Without a key it replays those committed transcripts
-instead — so a clone with no key still exercises generation, deterministically, for free. A request with no
-recorded transcript degrades the same way any other model failure does: to a deterministic
-fallback component, so the page still renders. That degradation is worth watching for rather than
-relying on — a test in the example fails once a transcript is committed if the page it belongs to is
-ever served from the fallback instead.
+That replays the transcripts committed under `examples/shop/recordings/`, so it bills nothing
+whatever keys are in your environment. `RUDRA_SHOP_MODE` is the switch, and `record` is the one
+value that spends money:
 
-A transcript is the whole prompt. Each file under `examples/shop/recordings/` holds the system half,
-the user half and the model's answer, in plain JSON, and those files are committed to the repository.
-So point the recording provider at demo shoppers and demo catalogs only. Do not run it against real
-traffic, and do not run it in `per-shopper` mode: that mode puts a real person's likes, basket, views
-and searches into the prompt, and recording writes all of it to a file you then commit.
+```sh
+RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop
+```
 
-Expect the first render of a page with a key to be slow. The shop gives the model 60 seconds rather
-than core's 1.5-second default, because this model reasons before it answers and a spec does not
-come back inside a second and a half — and since a transcript is written only once the call returns,
-that default would mean no recording could ever be made. Nothing after that first render waits: the
-same page comes from the in-process cache, and a keyless clone comes from the transcript.
+That calls Claude once for each page with no transcript yet and saves the answer as a new one. Pages
+that already have a transcript are still replayed, so browsing costs nothing after the first time.
+
+[`examples/shop/README.md`](examples/shop/README.md) covers the rest: the environment variables, how
+to re-record a transcript after a prompt change, and why the files under `recordings/` must only
+ever hold demo shoppers and demo catalogs.
 
 ## Getting help
 

@@ -40,6 +40,19 @@ To render a spec you wrote yourself, without a model, pass
 that spec, which is how the tests exercise blocks the deterministic component
 never emits.
 
+## Options
+
+Everything `createComponentGenerator` takes, and what it does without it.
+
+| Option           | What it does                                                                                         | Default                   |
+| ---------------- | ---------------------------------------------------------------------------------------------------- | ------------------------- |
+| `provider`       | The model adapter. `null` runs without a model and bills nothing.                                    | `null`                    |
+| `cache`          | Where generated specs are kept between requests. Pass `createNullSpecCache()` to keep none.          | `createMemorySpecCache()` |
+| `generation`     | `'cohort'` shares one component between shoppers who look alike; `'per-shopper'` generates for each. | `'cohort'`                |
+| `modelTimeoutMs` | How long the model gets. Past this the request is aborted and the deterministic component renders.   | `1500`                    |
+| `cacheTimeoutMs` | How long a cache read gets. Past this the request generates as if the store had nothing.             | `50`                      |
+| `onEvent`        | Called once per `generate` with a `GenerationEvent`. A hook that throws is swallowed.                | none                      |
+
 ## `tracking-input`
 
 The boundary between a host application and rudra-js. rudra-js collects,
@@ -251,6 +264,28 @@ either in the cohort key or scrubbed from the cohort prompt. A field the key
 leaves out that still changes the prompt fails that test. Adding a field to the
 digest fails it too, until someone says which side the field is on.
 
+## What the model decides, by mode
+
+What the model wrote and what is replaced before the page is served. Cohort is
+the default.
+
+| Decision                          | Cohort, the default                     | Per-shopper                            |
+| --------------------------------- | --------------------------------------- | -------------------------------------- |
+| Layout and block order            | The model                               | The model                              |
+| Headline, subheadline, copy       | The model                               | The model                              |
+| Emphasis per item                 | The model                               | The model                              |
+| Badge text                        | Dropped — written for another product   | The model                              |
+| Which products, and in what order | Filled in per request, not by the model | The model, from your candidates        |
+| The reason and basis per product  | Filled in per request, not by the model | The model, checked against the signals |
+
+In cohort mode the grid and carousel items are filled in per request, best pick
+first, so a component written for one shopper still fits the next. The hero is
+the exception: it keeps the product the model named, because its headline and
+body were written about that product and swapping it would leave copy about
+something else. Reconciliation drops the link if this shopper cannot see that
+product — out of stock, not a candidate, disliked, already bought, in the
+basket, or the one being looked at — and the words stay.
+
 ## Any provider
 
 A provider is three things:
@@ -286,12 +321,13 @@ An entry holds the generated spec and `generatedAt`, the epoch milliseconds when
 the model produced it. That is the whole of it — no payload, no shopper, no
 prompt.
 
-The port is two methods:
+The port is two methods, and an optional third:
 
 ```ts
 export interface SpecCache {
   get(key: string): Promise<CachedSpec | undefined>;
   set(key: string, cached: CachedSpec): Promise<void>;
+  delete?(key: string): Promise<void>;
 }
 ```
 
@@ -299,6 +335,32 @@ Pass your own store — Redis, Memcached, whatever you already run — and it ke
 entries on its own terms. What that store holds, and for how long, is yours to
 declare to your users, because this package does not set it. Pass
 `createNullSpecCache()` to store nothing at all.
+
+### When a generation is wrong
+
+Pass `provider: null` and nothing new is generated; every page renders the
+deterministic component. Shorten `ttlMs` and a bad entry ends sooner. A store
+with `delete` can drop one entry by the `key` on its `GenerationEvent`, and the
+next request generates again. Per-shopper entries end only by TTL, because
+nothing maps a shopper to their keys.
+
+## Watching it in production
+
+The generator never fails a render, so a provider that has been down for a
+week only shows as plainer pages. The way to know is `onEvent`: every call to
+`generate` that gets past input validation reports exactly one
+`GenerationEvent`, and these are the numbers to keep from it. A payload that
+fails `parseTrackingInput` throws instead, and reports nothing.
+
+- **Fallback share** — the share of events with `source: 'fallback'`. Alert
+  when it climbs. `degradedReason` says which way the call failed, and `error`
+  carries what was thrown when the reason is `'provider-error'` or `'timeout'`.
+- **Cache hit rate** — `cache: 'hit'` over the events that have a `cache`
+  field. A store that is down now shows as `cache: 'error'`, and a slow one as
+  `cache: 'timeout'`, rather than as a rising bill.
+- **Spend** — sum `usage` over the events where `calledModel` is true.
+  Requests that joined an in-flight generation carry the same `usage`, so
+  summing over every event counts one call many times.
 
 ## Licence
 

@@ -66,8 +66,8 @@ function isToolUseBlock(candidate: unknown): candidate is ToolUseBlock {
  * Adapts the Anthropic Messages API to `ComponentProvider`.
  *
  * The tool schema is derived from the schema core exports rather than restated
- * here: a second copy is a second vocabulary, and the drift shows up as
- * unexplained `invalid-generation` events.
+ * here: a second copy is a second vocabulary, and the drift would throw below
+ * and reach the generator as unexplained `provider-error` events.
  */
 export function createAnthropicProvider(options: AnthropicProviderOptions): ComponentProvider {
   const model = options.model ?? 'claude-opus-5';
