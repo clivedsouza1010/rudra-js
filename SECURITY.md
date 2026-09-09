@@ -92,12 +92,14 @@ is _able_ to emit, not what we can persuade it to avoid.
 
 ### What is deliberately absent
 
-**No keyword denylist.** The cheat sheet suggests scanning for phrases like
-"ignore instructions" or "developer mode". On a shopping site those are also
-things people search for, and a denylist that blocks a legitimate search is a
-visible bug traded for a defence that a rephrasing walks past. The structural
-controls above do not depend on recognising an attack, which is why they hold
-against ones nobody has thought of.
+**No keyword denylist on input.** The cheat sheet suggests scanning for
+phrases like "ignore instructions" or "developer mode". On a shopping site
+those are also things people search for, and a denylist that blocks a
+legitimate search is a visible bug traded for a defence that a rephrasing walks
+past. The structural controls above do not depend on recognising an attack,
+which is why they hold against ones nobody has thought of. The pattern list
+under _Residual risk_ below is a denylist on the model's output, not on what a
+shopper types.
 
 **No guardrail classifier.** A second model screening inputs and outputs is
 proportionate when the primary model can act. This one cannot.
@@ -118,8 +120,11 @@ proportionate when the primary model can act. This one cannot.
 - **Instruction disclosure.** A determined injection could get fragments of the
   instruction half echoed back inside a text field. Those instructions are open
   source and in this repository, so the loss is small, but it is not zero.
-- **Monitoring.** Per-request logging and rate limiting are not here yet, and
-  neither is the generator that would emit the events they need.
+- **Monitoring.** Per-request logging and rate limiting are not here. The
+  generator reports one `GenerationEvent` per call through `onEvent` — where
+  the component came from, how long it took, whether a model was called, what
+  it cost and what reconciliation removed — and wiring that to a log or a rate
+  limiter is the host's job.
 
 - **Invisible characters.** The escaping covers every character category that
   can carry hidden text. A few individual code points that render blank are

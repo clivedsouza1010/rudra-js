@@ -40,7 +40,11 @@ function shopCommand(port: number): ShopCommand {
 }
 
 export function startShop(port: number, command: ShopCommand = shopCommand(port)): RunningShop {
-  const environment: NodeJS.ProcessEnv = { ...process.env, RUDRA_REPLAY_ONLY: '1' };
+  const environment: NodeJS.ProcessEnv = {
+    ...process.env,
+    RUDRA_REPLAY_ONLY: '1',
+    RUDRA_SHOP_MODE: 'replay',
+  };
   // Present but empty. Next only fills a key in from .env.local when it is
   // missing, and the shop reads an empty one as no key at all.
   environment['ANTHROPIC_API_KEY'] = '';

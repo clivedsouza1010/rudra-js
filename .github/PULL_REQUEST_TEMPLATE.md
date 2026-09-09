@@ -21,6 +21,7 @@ the thing on purpose and confirming a test fails. See CONTRIBUTING.md.
 - [ ] `npm run lint`
 - [ ] `npm run format:check`
 - [ ] `npm test`
+- [ ] CHANGELOG.md line, or say why none is needed.
 
 ## Anything reviewers should look at closely
 

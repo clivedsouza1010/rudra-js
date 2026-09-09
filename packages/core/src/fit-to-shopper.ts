@@ -1,7 +1,7 @@
 import type { Block, GeneratedSpec, ProductReference } from './component-spec.js';
 import type { ProductPick } from './product-selection.js';
 
-// The model picks the shape of the component. Selection picks the products and
+// The model picks the shape. Selection picks the grid and carousel products and
 // what may be said about them, so a shared component still fits one shopper.
 export function fitToShopper(
   spec: GeneratedSpec,

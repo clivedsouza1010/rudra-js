@@ -9,8 +9,8 @@ import type { Bundle, Product } from '@rudra-js/core';
  * the model did not invent — both in stock at the time. A bundle member's SKU
  * comes from the set the shop supplied, not from the model. That division
  * is the whole reason a generated component is safe to put in a page — the
- * model decides what to show and how to describe it, and the shop decides what
- * is true about a product.
+ * model decides how the component reads, and the shop decides what is true
+ * about a product.
  */
 export interface BlockRenderContext {
   /** The host's catalog, keyed by SKU. Read-only: it is the caller's own map. */

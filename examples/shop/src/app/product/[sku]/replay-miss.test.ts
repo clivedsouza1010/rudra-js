@@ -27,12 +27,12 @@ const transcript = transcriptPath(
 const hasTranscript = existsSync(transcript);
 
 describe('the replay-miss rule', () => {
-  if (!hasTranscript) {
-    it(`has nothing to enforce yet — no transcript is committed for ${SKU} and ${SHOPPER}`, () => {
-      expect(hasTranscript).toBe(false);
-    });
-    return;
-  }
+  it(`has a transcript committed for ${SKU} and ${SHOPPER}`, () => {
+    expect(
+      hasTranscript,
+      `no transcript at ${transcript} — the prompt changed; delete the old file and re-record, see examples/shop/README.md`,
+    ).toBe(true);
+  });
 
   it('serves the recorded transcript rather than the fallback component', async () => {
     const markup = renderToStaticMarkup(
