@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { SPEC_VERSION, type GeneratedSpec } from './component-spec.js';
+import { SYSTEM_PROMPT } from './model-prompt.js';
 import type { SignalDigest } from './signal-digest.js';
 
 /**
@@ -16,11 +17,6 @@ import type { SignalDigest } from './signal-digest.js';
  */
 
 /**
- * Asynchronous on purpose. A synchronous `get` would look simpler and would
- * make the shared store the docs recommend impossible to write, since no Redis
- * or Memcached client can return a value without awaiting.
- */
-/**
  * A stored generation, with the moment it was produced.
  *
  * The timestamp travels with the spec because it cannot be recovered later: a
@@ -33,9 +29,15 @@ export interface CachedSpec {
   generatedAt: number;
 }
 
+/**
+ * Asynchronous on purpose. A synchronous `get` would look simpler and would
+ * make the shared store the docs recommend impossible to write, since no Redis
+ * or Memcached client can return a value without awaiting.
+ */
 export interface SpecCache {
   get(key: string): Promise<CachedSpec | undefined>;
   set(key: string, cached: CachedSpec): Promise<void>;
+  delete?(key: string): Promise<void>;
 }
 
 export interface MemorySpecCacheOptions {
@@ -115,6 +117,10 @@ export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): Spe
         entries.delete(oldest.value);
       }
     },
+
+    async delete(key) {
+      entries.delete(key);
+    },
   };
 }
 
@@ -147,6 +153,8 @@ function canonicalise(value: unknown): string {
 
   return `{${entries.map(([name, fieldValue]) => `${JSON.stringify(name)}:${canonicalise(fieldValue)}`).join(',')}}`;
 }
+
+const PROMPT_FINGERPRINT = createHash('sha256').update(SYSTEM_PROMPT).digest('hex').slice(0, 16);
 
 /**
  * Derives the cache key.
@@ -182,6 +190,7 @@ export function specCacheKey(
     // The spec's own version, so a shape change cannot read entries written by
     // the previous shape out of a shared store that outlives a deploy.
     specVersion: SPEC_VERSION,
+    prompt: PROMPT_FINGERPRINT,
     provider: providerId,
     digest,
     candidates: candidateSkus.toSorted(),
@@ -201,6 +210,7 @@ export function cohortCacheKey(
 ): string {
   const material = canonicalise({
     specVersion: SPEC_VERSION,
+    prompt: PROMPT_FINGERPRINT,
     provider: providerId,
     segment: digest.segment ?? null,
     surface: digest.surface,

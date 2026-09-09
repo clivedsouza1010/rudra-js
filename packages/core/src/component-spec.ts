@@ -4,13 +4,13 @@ import { z } from 'zod';
  * The component specification — the only thing a language model is ever allowed
  * to return.
  *
- * The model chooses layout, ordering, emphasis, copy, the recommendation
- * strategy behind each pick, and which of the host's candidate products to
- * surface. It never returns markup, code, URLs, prices,
- * product titles, or images. Every field is an enum, a bounded number, a SKU
- * reference resolved against the candidate set, or free text that is clamped
- * and escaped before it renders. That is what makes generated output safe to
- * put in a server-rendered response.
+ * The model chooses layout, ordering, emphasis and copy. Which products to show
+ * and why is its call only in per-shopper mode, apart from the product a hero
+ * names. It never returns markup, code, URLs, prices, product titles, or
+ * images. Every field is an enum, a bounded number, a SKU reference resolved
+ * against the candidate set, or free text that is clamped and escaped before it
+ * renders. That is what makes generated output safe to put in a server-rendered
+ * response.
  *
  * Two constraints shape this file, and both are easy to undo by accident:
  *

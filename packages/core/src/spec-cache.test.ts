@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { GeneratedSpec } from './component-spec.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import {
@@ -209,6 +209,18 @@ describe('the in-memory cache', () => {
     await cache.set('key', { ...SPEC, spec: { ...GENERATED, headline: 'Something else' } });
 
     expect((await cache.get('key'))?.spec.headline).toBe('Something else');
+  });
+
+  it('forgets an entry it was told to delete', async () => {
+    const cache = createMemorySpecCache();
+    await cache.set('key', SPEC);
+    await cache.delete?.('key');
+
+    expect(await cache.get('key')).toBeUndefined();
+  });
+
+  it('deletes a key it never held without complaint', async () => {
+    await expect(createMemorySpecCache().delete?.('missing')).resolves.toBeUndefined();
   });
 });
 
@@ -478,5 +490,37 @@ describe('a cohort key', () => {
 
   it('is 32 hex characters', () => {
     expect(cohortKeyFor(cohortDigest(), 'p:m')).toMatch(/^[0-9a-f]{32}$/);
+  });
+});
+
+async function keysUnderChangedPrompt() {
+  vi.resetModules();
+  vi.doMock('./model-prompt.js', async (importOriginal) => {
+    const original = await importOriginal<typeof import('./model-prompt.js')>();
+    return { ...original, SYSTEM_PROMPT: `${original.SYSTEM_PROMPT}\nOne more rule.` };
+  });
+  try {
+    return await import('./spec-cache.js');
+  } finally {
+    vi.doUnmock('./model-prompt.js');
+    vi.resetModules();
+  }
+}
+
+describe('the prompt is in both keys', () => {
+  it('changes the per-shopper key when the system prompt changes', async () => {
+    const changed = await keysUnderChangedPrompt();
+
+    expect(changed.specCacheKey(richDigest(), SKUS, 'p:m')).not.toBe(
+      keyFor(richDigest(), SKUS, 'p:m'),
+    );
+  });
+
+  it('changes the cohort key when the system prompt changes', async () => {
+    const changed = await keysUnderChangedPrompt();
+
+    expect(changed.cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m')).not.toBe(
+      cohortKeyFor(cohortDigest(), 'p:m'),
+    );
   });
 });

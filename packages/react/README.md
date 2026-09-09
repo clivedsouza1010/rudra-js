@@ -36,11 +36,18 @@ are arranged and what the words are; every fact about a product is read from
 your catalog when the page is served, and the model's own words are rendered as
 text and escaped by React.
 
-| Decided by the model                       | Decided by your catalog |
-| ------------------------------------------ | ----------------------- |
-| Which layout, in what order                | Every product title     |
-| Which products, and how they are described | Every price             |
-| Tone, headline, badge text                 | Every image and link    |
+| Decided by the model                                                | Decided by your catalog |
+| ------------------------------------------------------------------- | ----------------------- |
+| Which layout, in what order                                         | Every product title     |
+| Tone, headline, the words in each block                             | Every price             |
+| Only in per-shopper mode: which products, and how each is described | Every image and link    |
+
+In the default cohort mode the products, their order and the reason under each
+are filled in per request, not by the model, and a badge the model wrote is
+dropped. The model chooses those only under `generation: 'per-shopper'`. The
+one thing it still picks in either mode is the product a hero names, and the
+full split is in
+[What the model decides, by mode](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core#what-the-model-decides-by-mode).
 
 The specification has no field carrying a title, a price, an image or a URL.
 Product facts are resolved at render time from `products`, keyed by a SKU
