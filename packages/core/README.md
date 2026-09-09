@@ -317,8 +317,9 @@ declare to your users, because this package does not set it. Pass
 
 The generator never fails a render, so a provider that has been down for a
 week only shows as plainer pages. The way to know is `onEvent`: every call to
-`generate` reports exactly one `GenerationEvent`, and these are the numbers to
-keep from it.
+`generate` that gets past input validation reports exactly one
+`GenerationEvent`, and these are the numbers to keep from it. A payload that
+fails `parseTrackingInput` throws instead, and reports nothing.
 
 - **Fallback share** — the share of events with `source: 'fallback'`. Alert
   when it climbs. `degradedReason` says which way the call failed, and `error`

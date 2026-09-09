@@ -82,18 +82,7 @@ export interface GenerationEvent {
   violations?: string[];
   usage?: TokenUsage;
   degradedReason?: DegradedReason;
-  /**
-   * What the provider threw, when `degradedReason` is 'provider-error' — or the
-   * `TimeoutError` itself when it is 'timeout'.
-   */
   error?: unknown;
-  /**
-   * How the one cache read on this request went: 'hit' served a valid entry,
-   * 'miss' found nothing or an entry of the wrong shape, 'error' means the
-   * store threw or rejected, 'timeout' that it exceeded `cacheTimeoutMs`.
-   * Absent when nothing was read, which means no key was computed. Writes
-   * happen in the background and are not reported.
-   */
   cache?: 'hit' | 'miss' | 'error' | 'timeout';
 }
 
