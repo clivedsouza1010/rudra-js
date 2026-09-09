@@ -24,7 +24,7 @@ export const MODEL_ID = 'claude-opus-5';
  * it passes the directory in — see `vitest.config.ts`.
  */
 export const RECORDINGS_DIRECTORY =
-  process.env['RUDRA_SHOP_RECORDINGS'] ?? join(process.cwd(), 'recordings');
+  process.env['RUDRA_SHOP_RECORDINGS'] || join(process.cwd(), 'recordings');
 
 /**
  * Core defaults to 1500ms, which a thinking model cannot meet — and since a

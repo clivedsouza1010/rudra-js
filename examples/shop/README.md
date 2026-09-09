@@ -64,7 +64,7 @@ transcript, and names the path it looked for.
 1. Delete the old file: `rm examples/shop/recordings/<hash>.json`.
 2. Run that one page in record mode: `RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop`, then visit it.
 3. Confirm exactly one new file appeared: `git status --short examples/shop/recordings/`.
-4. Run `npm test`. `replay-miss.test.ts` is the check that the page is served from the new file.
+4. Run `npm test` — `replay-miss.test.ts` checks the RJ-00001 / S-0001 page; other pages are not covered.
 5. Commit the file.
 
 A transcript is the whole prompt: the system half, the user half and the model's answer, in plain

@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generatedSpecSchema } from '@rudra-js/core';
 
@@ -11,10 +12,12 @@ const REPLAY_ONLY = 'RUDRA_REPLAY_ONLY';
 const MODE = 'RUDRA_SHOP_MODE';
 const WORKSPACE = 'ANTHROPIC_WORKSPACE_ID';
 const CI = 'CI';
+const RECORDINGS = 'RUDRA_SHOP_RECORDINGS';
 
 // So afterEach can put this back instead of erasing it - a pool sharing one process across files needs that.
 const AMBIENT_REPLAY_ONLY = process.env[REPLAY_ONLY];
 const AMBIENT_CI = process.env[CI];
+const AMBIENT_RECORDINGS = process.env[RECORDINGS];
 
 const restore = (name: string, value: string | undefined) => {
   if (value === undefined) {
@@ -30,6 +33,7 @@ afterEach(() => {
   delete process.env[WORKSPACE];
   restore(REPLAY_ONLY, AMBIENT_REPLAY_ONLY);
   restore(CI, AMBIENT_CI);
+  restore(RECORDINGS, AMBIENT_RECORDINGS);
   vi.clearAllMocks();
   // The module reads the environment once, so each case needs a fresh copy.
   vi.resetModules();
@@ -208,5 +212,23 @@ describe('a replay miss outside replay-only', () => {
     expect(warn).toHaveBeenCalledTimes(1);
 
     warn.mockRestore();
+  });
+});
+
+describe('the recordings directory', () => {
+  it('falls back to the default when the variable is set but empty, as an empty .env.local row leaves it', async () => {
+    process.env[RECORDINGS] = '';
+
+    const { RECORDINGS_DIRECTORY } = await import('./shop-context');
+
+    expect(RECORDINGS_DIRECTORY).toBe(join(process.cwd(), 'recordings'));
+  });
+
+  it('uses the variable when it names a directory', async () => {
+    process.env[RECORDINGS] = '/somewhere/else';
+
+    const { RECORDINGS_DIRECTORY } = await import('./shop-context');
+
+    expect(RECORDINGS_DIRECTORY).toBe('/somewhere/else');
   });
 });
