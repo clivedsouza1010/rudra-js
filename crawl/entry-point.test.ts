@@ -26,4 +26,9 @@ describe('isEntryPoint', () => {
   it('is false when there is no entry', () => {
     expect(isEntryPoint(import.meta.url, undefined)).toBe(false);
   });
+
+  it('is false when the entry names a path that is not there', () => {
+    const missing = join(mkdtempSync(join(tmpdir(), 'entry-point-')), 'gone.ts');
+    expect(isEntryPoint(import.meta.url, missing)).toBe(false);
+  });
 });
