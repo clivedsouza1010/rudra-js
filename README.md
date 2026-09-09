@@ -66,9 +66,12 @@ under the heading "Goes with your cart". The page they are on and the thing they
 have already chosen are both left out. No model was asked, and nothing was billed.
 
 To bring a model in, add [`@rudra-js/anthropic`](packages/anthropic) and pass it as the
-`provider`. Everything above stays the same — the model changes the wording and the
-layout, not which products are chosen. See [`@rudra-js/core`](packages/core) for the full
-payload, and [`@rudra-js/react`](packages/react) for the class names to style.
+`provider`. Everything above stays the same — the model writes the wording, the layout and
+the emphasis, and by default the products in a grid or carousel are still chosen here
+rather than by the model. See [What the model decides, by
+mode](packages/core#what-the-model-decides-by-mode) for the line in each mode,
+[`@rudra-js/core`](packages/core) for the full payload, and
+[`@rudra-js/react`](packages/react) for the class names to style.
 
 That adapter is one option, not the only one. The three-method interface any model can sit
 behind is in [Any provider](packages/core#any-provider).

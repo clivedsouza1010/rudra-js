@@ -264,6 +264,28 @@ either in the cohort key or scrubbed from the cohort prompt. A field the key
 leaves out that still changes the prompt fails that test. Adding a field to the
 digest fails it too, until someone says which side the field is on.
 
+## What the model decides, by mode
+
+What the model wrote and what is replaced before the page is served. Cohort is
+the default.
+
+| Decision                          | Cohort, the default                     | Per-shopper                            |
+| --------------------------------- | --------------------------------------- | -------------------------------------- |
+| Layout and block order            | The model                               | The model                              |
+| Headline, subheadline, copy       | The model                               | The model                              |
+| Emphasis per item                 | The model                               | The model                              |
+| Badge text                        | Dropped — written for another product   | The model                              |
+| Which products, and in what order | Filled in per request, not by the model | The model, from your candidates        |
+| The reason and basis per product  | Filled in per request, not by the model | The model, checked against the signals |
+
+In cohort mode the grid and carousel items are filled in per request, best pick
+first, so a component written for one shopper still fits the next. The hero is
+the exception: it keeps the product the model named, because its headline and
+body were written about that product and swapping it would leave copy about
+something else. Reconciliation drops the link if this shopper cannot see that
+product — out of stock, not a candidate, disliked, already bought, in the
+basket, or the one being looked at — and the words stay.
+
 ## Any provider
 
 A provider is three things:

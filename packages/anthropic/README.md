@@ -21,8 +21,9 @@ const provider = createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY
 const generator = createComponentGenerator({ provider });
 ```
 
-`model` defaults to the current Claude model this package was written against;
-pass it to pin a different one. `maxTokens` and `baseUrl` are also optional.
+`model` defaults to `claude-opus-5`, the Claude model this package was written
+against; pass it to pin a different one. `maxTokens` and `baseUrl` are also
+optional.
 
 ### An identity-linked key needs a workspace
 
