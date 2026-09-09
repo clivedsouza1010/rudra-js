@@ -69,10 +69,8 @@ export {
   type SpecSource,
 } from './component-spec.js';
 
-export { neverRecommend, reconcileSpec, type ReconcileResult } from './reconciliation.js';
+export { reconcileSpec, type ReconcileResult } from './reconciliation.js';
 export { selectProducts, type ProductPick } from './product-selection.js';
-export { fitToShopper } from './fit-to-shopper.js';
-export { buildFallbackSpec } from './fallback-component.js';
 
 export {
   createFixedSpecProvider,
@@ -85,14 +83,12 @@ export {
 export {
   createMemorySpecCache,
   createNullSpecCache,
-  cohortCacheKey,
-  specCacheKey,
   type CachedSpec,
   type MemorySpecCacheOptions,
   type SpecCache,
 } from './spec-cache.js';
 
-export { SYSTEM_PROMPT, buildPrompt, type PromptPair } from './model-prompt.js';
+export { buildPrompt, type PromptPair } from './model-prompt.js';
 
 export {
   createComponentGenerator,

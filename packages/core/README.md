@@ -299,12 +299,13 @@ An entry holds the generated spec and `generatedAt`, the epoch milliseconds when
 the model produced it. That is the whole of it — no payload, no shopper, no
 prompt.
 
-The port is two methods:
+The port is two methods, and an optional third:
 
 ```ts
 export interface SpecCache {
   get(key: string): Promise<CachedSpec | undefined>;
   set(key: string, cached: CachedSpec): Promise<void>;
+  delete?(key: string): Promise<void>;
 }
 ```
 
@@ -312,6 +313,14 @@ Pass your own store — Redis, Memcached, whatever you already run — and it ke
 entries on its own terms. What that store holds, and for how long, is yours to
 declare to your users, because this package does not set it. Pass
 `createNullSpecCache()` to store nothing at all.
+
+### When a generation is wrong
+
+Pass `provider: null` and nothing new is generated; every page renders the
+deterministic component. Shorten `ttlMs` and a bad entry ends sooner. A store
+with `delete` can drop one entry by the `key` on its `GenerationEvent`, and the
+next request generates again. Per-shopper entries end only by TTL, because
+nothing maps a shopper to their keys.
 
 ## Watching it in production
 
