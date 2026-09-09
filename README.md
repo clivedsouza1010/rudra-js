@@ -113,8 +113,8 @@ npm run build --workspace @rudra-js/example-shop
 npm run verify:crawlable
 ```
 
-Locally, empty the key on the build line — the shop reads `examples/shop/.env.local`, and a build
-with a key calls the model for real:
+Locally that build is safe on its own — a key alone no longer spends anything, only
+`RUDRA_SHOP_MODE=record` does. The prefix makes it a rule rather than a default:
 
 ```sh
 ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/example-shop
@@ -131,25 +131,20 @@ npm run dev --workspace @rudra-js/example-shop
 # then visit http://localhost:3000/product/RJ-00001?shopper=S-0001
 ```
 
-Set `ANTHROPIC_API_KEY` and `ANTHROPIC_WORKSPACE_ID` in the environment and it calls Claude for real, saving each answer as a
-transcript under `examples/shop/recordings/`. Without a key it replays those committed transcripts
-instead — so a clone with no key still exercises generation, deterministically, for free. A request with no
-recorded transcript degrades the same way any other model failure does: to a deterministic
-fallback component, so the page still renders. That degradation is worth watching for rather than
-relying on — a test in the example fails once a transcript is committed if the page it belongs to is
-ever served from the fallback instead.
+That replays the transcripts committed under `examples/shop/recordings/`, so it bills nothing
+whatever keys are in your environment. `RUDRA_SHOP_MODE` is the switch, and `record` is the one
+value that spends money:
 
-A transcript is the whole prompt. Each file under `examples/shop/recordings/` holds the system half,
-the user half and the model's answer, in plain JSON, and those files are committed to the repository.
-So point the recording provider at demo shoppers and demo catalogs only. Do not run it against real
-traffic, and do not run it in `per-shopper` mode: that mode puts a real person's likes, basket, views
-and searches into the prompt, and recording writes all of it to a file you then commit.
+```sh
+RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop
+```
 
-Expect the first render of a page with a key to be slow. The shop gives the model 60 seconds rather
-than core's 1.5-second default, because this model reasons before it answers and a spec does not
-come back inside a second and a half — and since a transcript is written only once the call returns,
-that default would mean no recording could ever be made. Nothing after that first render waits: the
-same page comes from the in-process cache, and a keyless clone comes from the transcript.
+That calls Claude once for each page with no transcript yet and saves the answer as a new one. Pages
+that already have a transcript are still replayed, so browsing costs nothing after the first time.
+
+[`examples/shop/README.md`](examples/shop/README.md) covers the rest: the environment variables, how
+to re-record a transcript after a prompt change, and why the files under `recordings/` must only
+ever hold demo shoppers and demo catalogs.
 
 ## Getting help
 

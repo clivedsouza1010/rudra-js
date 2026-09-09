@@ -1,21 +1,48 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generatedSpecSchema } from '@rudra-js/core';
 
+vi.mock('@rudra-js/anthropic', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@rudra-js/anthropic')>();
+  return { ...actual, createAnthropicProvider: vi.fn(actual.createAnthropicProvider) };
+});
+
 const KEY = 'ANTHROPIC_API_KEY';
 const REPLAY_ONLY = 'RUDRA_REPLAY_ONLY';
+const MODE = 'RUDRA_SHOP_MODE';
+const WORKSPACE = 'ANTHROPIC_WORKSPACE_ID';
+const CI = 'CI';
 
 // So afterEach can put this back instead of erasing it - a pool sharing one process across files needs that.
 const AMBIENT_REPLAY_ONLY = process.env[REPLAY_ONLY];
+const AMBIENT_CI = process.env[CI];
+
+const restore = (name: string, value: string | undefined) => {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+};
 
 afterEach(() => {
   delete process.env[KEY];
-  if (AMBIENT_REPLAY_ONLY === undefined) {
-    delete process.env[REPLAY_ONLY];
-  } else {
-    process.env[REPLAY_ONLY] = AMBIENT_REPLAY_ONLY;
-  }
+  delete process.env[MODE];
+  delete process.env[WORKSPACE];
+  restore(REPLAY_ONLY, AMBIENT_REPLAY_ONLY);
+  restore(CI, AMBIENT_CI);
+  vi.clearAllMocks();
   // The module reads the environment once, so each case needs a fresh copy.
   vi.resetModules();
+});
+
+const anthropicFactory = async () =>
+  vi.mocked((await import('@rudra-js/anthropic')).createAnthropicProvider);
+
+const missingRequest = () => ({
+  system: 'no recording exists for this',
+  user: 'no recording exists for this',
+  schema: generatedSpecSchema,
+  signal: AbortSignal.timeout(1000),
 });
 
 describe('the replay-only switch', () => {
@@ -40,14 +67,19 @@ describe('the replay-only switch', () => {
     await expect(import('./shop-context')).resolves.toBeDefined();
   });
 
-  it('leaves the normal path alone when the switch is off', async () => {
-    // vitest.config.ts turns the switch on for every test by default, so this
-    // case has to turn it back off itself to reach the path it names.
-    delete process.env[REPLAY_ONLY];
+  it('refuses record mode even when no key is set', async () => {
+    process.env[REPLAY_ONLY] = '1';
+    process.env[MODE] = 'record';
+
+    await expect(import('./shop-context')).rejects.toThrow(/replay only/i);
+  });
+
+  it('refuses record mode with a key as well', async () => {
+    process.env[REPLAY_ONLY] = '1';
+    process.env[MODE] = 'record';
     process.env[KEY] = 'sk-ant-not-a-real-key';
 
-    // Building a provider sends nothing, so a fake key is safe here.
-    await expect(import('./shop-context')).resolves.toBeDefined();
+    await expect(import('./shop-context')).rejects.toThrow(/replay only/i);
   });
 
   it('treats a missing recording as an error, not something to paper over', async () => {
@@ -100,5 +132,81 @@ describe('the replay-only switch', () => {
     );
 
     expect(get).toHaveBeenCalled();
+  });
+});
+
+describe('the mode switch', () => {
+  it('replays by default even with a key set, and builds no Anthropic provider', async () => {
+    delete process.env[REPLAY_ONLY];
+    process.env[KEY] = 'sk-ant-not-a-real-key';
+
+    const { chooseProvider } = await import('./shop-context');
+    const factory = await anthropicFactory();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(chooseProvider().generate(missingRequest())).rejects.toThrow(/no recording/i);
+    expect(factory).not.toHaveBeenCalled();
+
+    warn.mockRestore();
+  });
+
+  it('refuses record mode without a key', async () => {
+    delete process.env[REPLAY_ONLY];
+    process.env[MODE] = 'record';
+
+    await expect(import('./shop-context')).rejects.toThrow(/ANTHROPIC_API_KEY/);
+  });
+
+  it('refuses a mode it does not know, naming the two it does', async () => {
+    delete process.env[REPLAY_ONLY];
+    process.env[MODE] = 'live';
+
+    await expect(import('./shop-context')).rejects.toThrow(/"replay" or "record"/);
+  });
+
+  it('records with a key, and hands the workspace to the Anthropic provider', async () => {
+    delete process.env[REPLAY_ONLY];
+    process.env[MODE] = 'record';
+    process.env[KEY] = 'sk-ant-not-a-real-key';
+    process.env[WORKSPACE] = 'wrkspc_not_a_real_workspace';
+
+    await expect(import('./shop-context')).resolves.toBeDefined();
+
+    const factory = await anthropicFactory();
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(factory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: 'sk-ant-not-a-real-key',
+        workspaceId: 'wrkspc_not_a_real_workspace',
+      }),
+    );
+  });
+});
+
+describe('a replay miss outside replay-only', () => {
+  it('rejects without a warning in CI', async () => {
+    delete process.env[REPLAY_ONLY];
+    process.env[CI] = '1';
+
+    const { chooseProvider } = await import('./shop-context');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(chooseProvider().generate(missingRequest())).rejects.toThrow(/no recording/i);
+    expect(warn).not.toHaveBeenCalled();
+
+    warn.mockRestore();
+  });
+
+  it('warns, then rejects, outside CI', async () => {
+    delete process.env[REPLAY_ONLY];
+    delete process.env[CI];
+
+    const { chooseProvider } = await import('./shop-context');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(chooseProvider().generate(missingRequest())).rejects.toThrow(/no recording/i);
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    warn.mockRestore();
   });
 });

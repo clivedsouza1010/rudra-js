@@ -40,11 +40,17 @@ export function createRecordingProvider(
   inner: ComponentProvider,
   directory: string,
 ): ComponentProvider {
+  const replay = createReplayProvider({ directory, model: inner.model, onMiss: 'throw' });
+
   return {
     name: inner.name,
     model: inner.model,
 
     async generate(request) {
+      if (existsSync(transcriptPath(directory, inner.model, request))) {
+        return replay.generate(request);
+      }
+
       const result = await inner.generate(request);
 
       // A write that fails must not discard an answer already paid for. The

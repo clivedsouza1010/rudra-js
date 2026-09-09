@@ -1,9 +1,13 @@
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generatedSpecSchema, type ComponentProvider, type GeneratedSpec } from '@rudra-js/core';
-import { createRecordingProvider, createReplayProvider } from './recording-provider';
+import {
+  createRecordingProvider,
+  createReplayProvider,
+  transcriptPath,
+} from './recording-provider';
 
 const spec: GeneratedSpec = {
   tone: 'neutral',
@@ -63,18 +67,40 @@ describe('recording a provider', () => {
     expect(readdirSync(directory)).toHaveLength(2);
   });
 
-  it('writes one transcript when the same request is made twice', async () => {
+  it('writes one transcript and calls the model once when the same request is made twice', async () => {
     // The other half of the naming contract: a nondeterministic name (a
     // timestamp, a counter) would pass the distinct-request test above while
     // silently breaking replay for every clone, since replay recomputes this
     // same name and expects to find exactly one file under it.
     const directory = scratch();
-    const provider = createRecordingProvider(inner(), directory);
+    const recorded = inner();
+    const provider = createRecordingProvider(recorded, directory);
 
     await provider.generate(request());
     await provider.generate(request());
 
     expect(readdirSync(directory)).toHaveLength(1);
+    expect(recorded.calls).toBe(1);
+  });
+
+  it('leaves a transcript that already exists alone and does not call the model', async () => {
+    const directory = scratch();
+    const fromFile = { ...spec, headline: 'From the file' };
+    const path = transcriptPath(directory, 'test-model', request());
+    const before = `${JSON.stringify(
+      { model: 'test-model', system: 'SYSTEM', user: 'USER', result: { spec: fromFile } },
+      null,
+      2,
+    )}\n`;
+    writeFileSync(path, before);
+    const recorded = inner();
+
+    await expect(createRecordingProvider(recorded, directory).generate(request())).resolves.toEqual(
+      { spec: fromFile },
+    );
+
+    expect(recorded.calls).toBe(0);
+    expect(readFileSync(path, 'utf8')).toBe(before);
   });
 });
 
