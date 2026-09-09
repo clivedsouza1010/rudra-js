@@ -31,6 +31,24 @@ function withThrowingIntl(run: () => string): string {
   }
 }
 
+class ThrowingFormatter {
+  format(): string {
+    throw new RangeError('no digits for this currency');
+  }
+}
+
+function withThrowingFormat(run: () => string): string {
+  const constructor = vi.spyOn(Intl, 'NumberFormat').mockImplementation(function () {
+    return new ThrowingFormatter() as unknown as Intl.NumberFormat;
+  });
+
+  try {
+    return run();
+  } finally {
+    constructor.mockRestore();
+  }
+}
+
 describe('formatting a price when Intl will not build a formatter', () => {
   it('falls back to the currency and the number for a product', () => {
     expect(withThrowingIntl(() => defaultFormatPrice(PRODUCT))).toBe('USD 129.5');
@@ -38,6 +56,16 @@ describe('formatting a price when Intl will not build a formatter', () => {
 
   it('falls back to the currency and the number for a bundle', () => {
     expect(withThrowingIntl(() => defaultFormatBundlePrice(BUNDLE))).toBe('USD 250');
+  });
+});
+
+describe('formatting a price when the formatter itself throws', () => {
+  it('lets the throw out for a product', () => {
+    expect(() => withThrowingFormat(() => defaultFormatPrice(PRODUCT))).toThrow(RangeError);
+  });
+
+  it('lets the throw out for a bundle', () => {
+    expect(() => withThrowingFormat(() => defaultFormatBundlePrice(BUNDLE))).toThrow(RangeError);
   });
 });
 

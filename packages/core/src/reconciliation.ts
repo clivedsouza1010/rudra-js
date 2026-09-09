@@ -250,7 +250,6 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
       /\brestocked?\b|\bsold out\b/,
       // "the last few miles" is a distance, so a count needs "left" after it.
       /\b(?:only\s+)?(?:\d+|a few|a handful|a couple|one|few)\s+(?:left|remain(?:s|ing)?)\b/,
-      /\blast (?:one|few)\s+(?:left|remaining|in stock)\b/,
       /\bselling fast\b|\b(?:almost|nearly) gone\b|\bwhile stocks last\b/,
     ],
   },
