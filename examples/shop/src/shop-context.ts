@@ -24,7 +24,7 @@ export const MODEL_ID = 'claude-opus-5';
  * it passes the directory in — see `vitest.config.ts`.
  */
 export const RECORDINGS_DIRECTORY =
-  process.env['RUDRA_SHOP_RECORDINGS'] ?? join(process.cwd(), 'recordings');
+  process.env['RUDRA_SHOP_RECORDINGS'] || join(process.cwd(), 'recordings');
 
 /**
  * Core defaults to 1500ms, which a thinking model cannot meet — and since a
@@ -70,11 +70,21 @@ function withVisibleFailures(provider: ComponentProvider): ComponentProvider {
 
 export function chooseProvider(): ComponentProvider {
   const apiKey = process.env['ANTHROPIC_API_KEY'];
+  const mode = process.env['RUDRA_SHOP_MODE'] || 'replay';
+
+  if (mode !== 'replay' && mode !== 'record') {
+    throw new Error(`RUDRA_SHOP_MODE is "${mode}": it must be "replay" or "record"`);
+  }
 
   // Set by anything that must not spend money. Throwing beats ignoring the
   // key: a run that quietly used it would bill, and nobody would find out
   // until the invoice.
   if (process.env['RUDRA_REPLAY_ONLY']) {
+    if (mode === 'record') {
+      throw new Error(
+        'RUDRA_REPLAY_ONLY is set and RUDRA_SHOP_MODE is record: refusing to start, because replay only means no model calls',
+      );
+    }
     if (apiKey) {
       throw new Error(
         'RUDRA_REPLAY_ONLY is set and so is ANTHROPIC_API_KEY: refusing to start, because replay only means no model calls ' +
@@ -90,12 +100,18 @@ export function chooseProvider(): ComponentProvider {
     );
   }
 
-  // With a key, call the model and keep the transcript. Without one, replay —
+  // In record mode, call the model and keep the transcript. Otherwise replay —
   // and in CI a miss is an error, because a run that quietly falls back is a
   // run measuring something other than what it says.
-  if (apiKey) {
-    return createRecordingProvider(
-      withVisibleFailures(
+  if (mode === 'record') {
+    if (!apiKey) {
+      throw new Error(
+        'RUDRA_SHOP_MODE is record but ANTHROPIC_API_KEY is not set: recording calls the model, so it needs a key ' +
+          '(export one, or put it in examples/shop/.env.local)',
+      );
+    }
+    return withVisibleFailures(
+      createRecordingProvider(
         createAnthropicProvider({
           apiKey,
           model: MODEL_ID,
@@ -105,8 +121,8 @@ export function chooseProvider(): ComponentProvider {
             ? { workspaceId: process.env['ANTHROPIC_WORKSPACE_ID'] }
             : {}),
         }),
+        RECORDINGS_DIRECTORY,
       ),
-      RECORDINGS_DIRECTORY,
     );
   }
 
