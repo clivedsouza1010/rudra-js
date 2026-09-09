@@ -1,10 +1,8 @@
+import { pathToFileURL } from 'node:url';
 import { checkCrawlable } from './check-crawlable.js';
+import { FALLBACK_MARKER, PAGE_PATH } from './page.js';
 import { startShop, stopShop, freePort } from './shop-server.js';
 import { reportFailure } from './verify-messages.js';
-
-// The page the committed transcript covers. Any other page is a replay miss,
-// which fails for a reason that has nothing to do with crawling.
-const PAGE_PATH = '/product/RJ-00001?shopper=S-0001';
 
 async function main(): Promise<void> {
   const port = await freePort();
@@ -24,7 +22,7 @@ async function main(): Promise<void> {
 
     // A fallback page is still server-rendered, so every crawlability check
     // would pass while the page is not the one we meant to measure.
-    if (html.includes('data-rudra-source="fallback"')) {
+    if (html.includes(FALLBACK_MARKER)) {
       throw new Error('the shop served the deterministic fallback, so this checked the wrong page');
     }
 
@@ -47,12 +45,8 @@ async function main(): Promise<void> {
   } finally {
     // Always, including when the check failed or the fetch threw.
     await stopShop(shop);
-    // A grandchild that outlived the kill still holds the other end. Dropping
-    // our end is what lets the process exit rather than waiting on it.
-    shop.stdout?.destroy();
-    shop.stderr?.destroy();
-    shop.unref();
   }
 }
 
-await main();
+const entry = process.argv[1];
+if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) await main();

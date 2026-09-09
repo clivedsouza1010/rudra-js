@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { ARM_NAMES, PRICES } from './arms.js';
 import { SHOPPERS_PER_PAGE, type ArmResult } from './measure-arm.js';
 import { buildReport, formatTable } from './report.js';
@@ -73,4 +74,5 @@ function main(): void {
   }
 }
 
-if (process.env['VITEST'] === undefined) main();
+const entry = process.argv[1];
+if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) main();

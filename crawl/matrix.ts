@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { DEFERRAL_PROBLEMS, PLACEMENT_PROBLEMS, checkCrawlable } from './check-crawlable.js';
+import { FALLBACK_MARKER, PAGE_PATH } from './page.js';
 
 export interface AgentResponse {
   agent: string;
@@ -47,7 +48,7 @@ export function refusals(responses: AgentResponse[], classes: ResponseClass[]): 
   const reasons: string[] = [];
 
   for (const response of responses) {
-    if (response.body.includes('data-rudra-source="fallback"')) {
+    if (response.body.includes(FALLBACK_MARKER)) {
       reasons.push(`the shop served the deterministic fallback for ${response.agent}`);
     }
   }
@@ -80,8 +81,6 @@ export function unstable(first: AgentResponse[], second: AgentResponse[]): strin
   }
   return reasons;
 }
-
-const PAGE_PATH = '/product/RJ-00001?shopper=S-0001';
 
 const AGENTS = [
   'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',

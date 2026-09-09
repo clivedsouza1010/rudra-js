@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { classify, collect, refusals, renderTable, unstable } from './matrix.js';
 import { freePort, startShop, stopShop } from './shop-server.js';
 import { reportFailure } from './verify-messages.js';
@@ -52,10 +53,8 @@ async function main(): Promise<void> {
     process.exitCode = 1;
   } finally {
     await stopShop(shop);
-    shop.stdout?.destroy();
-    shop.stderr?.destroy();
-    shop.unref();
   }
 }
 
-await main();
+const entry = process.argv[1];
+if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) await main();

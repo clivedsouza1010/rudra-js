@@ -30,22 +30,27 @@ export type RunningShop = {
   seen: () => string;
 };
 
-export function startShop(port: number): RunningShop {
+export type ShopCommand = { file: string; args: string[] };
+
+function shopCommand(port: number): ShopCommand {
+  return {
+    file: 'npm',
+    args: ['run', 'start', '--workspace', '@rudra-js/example-shop', '--', '-p', String(port)],
+  };
+}
+
+export function startShop(port: number, command: ShopCommand = shopCommand(port)): RunningShop {
   const environment: NodeJS.ProcessEnv = { ...process.env, RUDRA_REPLAY_ONLY: '1' };
   // Present but empty. Next only fills a key in from .env.local when it is
   // missing, and the shop reads an empty one as no key at all.
   environment['ANTHROPIC_API_KEY'] = '';
 
-  const shop = spawn(
-    'npm',
-    ['run', 'start', '--workspace', '@rudra-js/example-shop', '--', '-p', String(port)],
-    {
-      env: environment,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      // Its own group, so stopping it reaches next and not only npm.
-      detached: true,
-    },
-  );
+  const shop = spawn(command.file, command.args, {
+    env: environment,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    // Its own group, so stopping it reaches next and not only npm.
+    detached: true,
+  });
 
   let resolveReady!: () => void;
   let rejectReady!: (error: Error) => void;
@@ -93,8 +98,8 @@ function signalGroup(pid: number, signal: NodeJS.Signals): void {
 
 // SIGTERM asks nicely; a shop that ignores it (or is stuck) would otherwise
 // hang the parent forever, since the piped stdio keeps the event loop alive.
-export function stopShop(shop: ChildProcess): Promise<void> {
-  return new Promise((resolve) => {
+export async function stopShop(shop: ChildProcess): Promise<void> {
+  await new Promise<void>((resolve) => {
     if (shop.exitCode !== null || shop.signalCode !== null) {
       resolve();
       return;
@@ -113,4 +118,10 @@ export function stopShop(shop: ChildProcess): Promise<void> {
     });
     signalGroup(pid, 'SIGTERM');
   });
+
+  // A grandchild that outlived the kill still holds the other end. Dropping
+  // our end is what lets the process exit rather than waiting on it.
+  shop.stdout?.destroy();
+  shop.stderr?.destroy();
+  shop.unref();
 }
