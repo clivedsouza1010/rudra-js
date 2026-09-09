@@ -101,6 +101,8 @@ npm test
 npm run verify:consumer   # packs all three packages and uses them from outside the repo
 ```
 
+`ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run bench` measures what each generation mode costs under a stub model; [bench/README.md](bench/README.md) says what its columns mean.
+
 If you have a key in your shell, run the tests as `ANTHROPIC_API_KEY= npm test`. `vitest.config.ts`
 sets `RUDRA_REPLAY_ONLY=1` for every test run, and the shop throws at start-up when that is set and
 a key is set too — so a run with a key in the shell fails to load instead of calling the model.

@@ -54,7 +54,7 @@ export function buildCaveats(arms: readonly ArmResult[], shoppersPerPage: number
       'No timings are reported for a stub run. The stub answers far below the millisecond Date.now() can see, so a median would be a 0 or a 1 written down as a result.',
     );
     caveats.push(
-      'Input/output tokens and cost are one real recorded call, replayed for every model call — not what the model actually said each time. That call was a cold one, so every call here is billed for writing the cached prefix. A real run writes the prefix once and reads it back at a tenth of the price, which makes this cost close to twice a steady-state run rather than a small overstatement. Read the column as a ceiling, not as what the model would cost.',
+      'Input/output tokens and cost are one real recorded call, read from the committed transcript and replayed for every model call — not what the model actually said each time. The cached prefix that call read back is billed here as written, so every call pays for a cold cache write. A real run writes the prefix once and reads it back at a tenth of the price, which makes this cost close to twice a steady-state run rather than a small overstatement. Read the column as a ceiling, not as what the model would cost.',
     );
   }
 
