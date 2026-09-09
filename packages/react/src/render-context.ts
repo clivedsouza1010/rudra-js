@@ -86,14 +86,14 @@ export function defaultFormatBundlePrice(bundle: Bundle, locale?: string): strin
     );
   }
 
+  let formatter: Intl.NumberFormat;
   try {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: bundle.currency,
-    }).format(bundle.price);
+    formatter = new Intl.NumberFormat(locale, { style: 'currency', currency: bundle.currency });
   } catch {
     // A bad locale, or a currency code Intl rejects on a hand-built bundle,
     // should not crash the page. A price nobody can punctuate is still a price.
     return `${bundle.currency} ${bundle.price}`;
   }
+
+  return formatter.format(bundle.price);
 }

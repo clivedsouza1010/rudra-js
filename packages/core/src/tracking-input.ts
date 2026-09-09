@@ -42,6 +42,8 @@ export const FIELD_LIMITS = {
   candidates: 200,
   productsPerBundle: 5,
   bundles: 20,
+  localeTag: 35,
+  maxItems: 12,
 } as const;
 
 /** Assigning this as an object key mutates the prototype instead of the object. */
@@ -183,11 +185,11 @@ export const renderContextSchema = z.strictObject({
   // the locale is part of the cohort cache key, so a list makes its own cohort.
   locale: z
     .string()
-    .max(35)
+    .max(FIELD_LIMITS.localeTag)
     .regex(/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/, 'expected one language tag, such as en-US')
     .default('en-US'),
   /** Upper bound on products across the whole generated component. */
-  maxItems: z.number().int().min(1).max(12).default(4),
+  maxItems: z.number().int().min(1).max(FIELD_LIMITS.maxItems).default(4),
 });
 export type RenderContext = z.infer<typeof renderContextSchema>;
 

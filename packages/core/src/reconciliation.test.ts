@@ -5,9 +5,10 @@ import {
   type BundleBlock,
   type GeneratedSpec,
   type ProductReference,
+  type RecommendationBasis,
 } from './component-spec.js';
 import { buildDigest } from './signal-digest.js';
-import { reconcileSpec, type ReconcileResult } from './reconciliation.js';
+import { MAX_BLOCKS, reconcileSpec, type ReconcileResult } from './reconciliation.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
@@ -197,20 +198,19 @@ describe('the item budget', () => {
     expect(placedSkus(result.spec.blocks)).toEqual(['TR-101', 'TR-102']);
   });
 
-  it('caps the number of blocks', () => {
+  it('caps the number of blocks at four, and hands back exactly four when given five', () => {
     const copyBlock = { kind: 'copy', title: null, body: 'Built for wet rock.' } as const;
-    const result = reconcile(
-      specWith([
-        { kind: 'grid', title: null, columns: 2, items: [ref('TR-101')] },
-        copyBlock,
-        copyBlock,
-        copyBlock,
-        copyBlock,
-      ]),
-    );
+    const spec = specWith([
+      { kind: 'grid', title: null, columns: 2, items: [ref('TR-101')] },
+      ...Array.from({ length: MAX_BLOCKS }, () => copyBlock),
+    ]);
 
-    expect(result.spec.blocks.length).toBeLessThanOrEqual(4);
-    expect(result.violations).toContain('too-many-blocks:5');
+    const result = reconcile(spec);
+
+    expect(MAX_BLOCKS).toBe(4);
+    expect(spec.blocks).toHaveLength(MAX_BLOCKS + 1);
+    expect(result.spec.blocks).toHaveLength(MAX_BLOCKS);
+    expect(result.violations).toContain(`too-many-blocks:${MAX_BLOCKS + 1}`);
   });
 });
 
@@ -250,22 +250,6 @@ describe('verifying the stated reason for a pick', () => {
     expect(placedSkus(result.spec.blocks)).toEqual(['TR-101']);
   });
 
-  it.each([
-    ['complements_cart' as const, () => ({ cart: [{ sku: 'NU-201' }] })],
-    ['complements_purchase' as const, () => ({ lastPurchased: [{ sku: 'NU-201' }] })],
-  ])('keeps %s when the signal supports it', (basis, buildSignals) => {
-    const result = reconcile(grid([ref('TR-101', { basis })]), { signals: buildSignals() });
-
-    expect(basisOf(result)?.basis).toBe(basis);
-  });
-
-  it.each(['complements_cart', 'complements_purchase'] as const)(
-    'downgrades %s when there is no such signal',
-    (basis) => {
-      expect(basisOf(reconcile(grid([ref('TR-101', { basis })])))?.basis).toBe('popular');
-    },
-  );
-
   it('keeps similar_to_current only for the category being browsed', () => {
     const browsing = { surface: 'pdp', currentCategory: 'Trail Running' };
     const matching = reconcile(grid([ref('TR-101', { basis: 'similar_to_current' })]), {
@@ -299,14 +283,31 @@ describe('verifying the stated reason for a pick', () => {
     expect(result.violations).toEqual([]);
   });
 
-  it('checks every basis in the vocabulary', () => {
-    // A basis added without a rule here would be waved through unverified.
-    for (const basis of RECOMMENDATION_BASES) {
-      const result = reconcile(grid([ref('TR-101', { basis })]));
-      const kept = basisOf(result)?.basis;
-      expect(kept === basis || kept === 'popular').toBe(true);
-    }
+  const SUPPORTED_BY: Record<RecommendationBasis, Partial<TrackingInputDraft>> = {
+    similar_to_current: { context: { surface: 'pdp', currentCategory: 'Trail Running' } },
+    most_viewed: { signals: { mostViewed: [{ sku: 'TR-101', views: 3 }] } },
+    complements_cart: { signals: { cart: [{ sku: 'NU-201' }] } },
+    complements_purchase: { signals: { lastPurchased: [{ sku: 'NU-201' }] } },
+    liked_category: { signals: { likes: [{ sku: 'TR-102' }] } },
+    popular: {},
+  };
+
+  it.each(RECOMMENDATION_BASES)('keeps %s when the signals support it', (basis) => {
+    const result = reconcile(grid([ref('TR-101', { basis })]), SUPPORTED_BY[basis]);
+
+    expect(basisOf(result)?.basis).toBe(basis);
+    expect(result.violations).toEqual([]);
   });
+
+  it.each(RECOMMENDATION_BASES.filter((basis) => basis !== 'popular'))(
+    'downgrades %s when the signals do not, and popular is left out because it claims nothing',
+    (basis) => {
+      const result = reconcile(grid([ref('TR-101', { basis })]));
+
+      expect(basisOf(result)?.basis).toBe('popular');
+      expect(result.violations).toContain(`unsupported-basis:${basis}:TR-101`);
+    },
+  );
 });
 
 describe('text repair', () => {
@@ -782,6 +783,138 @@ describe('claims the renderer cannot check', () => {
       const result = reconcile(grid([ref('TR-101', { reason: claim.reason })]));
 
       expect(result.violations).toContain(`unverifiable-claim:${claim.kind}:reason:TR-101`);
+    });
+  }
+
+  const ONE_ROW_PER_CLAIM_PATTERN: { kind: string; catches: string; keeps: string }[] = [
+    { kind: 'rating', catches: 'reviewed by other hikers', keeps: 'a revised fit for wider feet' },
+    {
+      kind: 'rating',
+      catches: 'five stars from other hikers',
+      keeps: 'built for three-season use',
+    },
+    {
+      kind: 'rating',
+      catches: 'a star rating other hikers left',
+      keeps: 'a comfort rating for winter nights',
+    },
+    {
+      kind: 'rating',
+      catches: 'the average rating in this category',
+      keeps: 'the average weight of a winter pack',
+    },
+    { kind: 'rating', catches: 'a rating of 4.6 from hikers', keeps: 'a comfort rating of -5C' },
+    {
+      kind: 'rating',
+      catches: '4.8 out of 5 from other hikers',
+      keeps: '3 out of 4 pockets zip shut',
+    },
+    {
+      kind: 'rating',
+      catches: 'highly rated by other hikers',
+      keeps: 'the top pick for winter nights',
+    },
+    {
+      kind: 'rating',
+      catches: 'rated 4.8 by other hikers',
+      keeps: 'rated 3 season for shoulder-season trips',
+    },
+    { kind: 'rating', catches: 'our best-selling pack', keeps: 'the best pack for long days' },
+    {
+      kind: 'rating',
+      catches: 'loved by thousands of hikers',
+      keeps: 'loved by anyone who walks far',
+    },
+
+    { kind: 'price', catches: '£89 for the pair', keeps: 'a mesh pocket for a 1 litre bottle' },
+    {
+      kind: 'price',
+      catches: '40 dollars for a spare pair',
+      keeps: 'a 30 litre pack for long days',
+    },
+    { kind: 'price', catches: 'yours for USD 20', keeps: 'sold in USD and EUR' },
+    { kind: 'price', catches: '249 kr for the pair', keeps: 'weighs 249 g in the stuff sack' },
+    {
+      kind: 'price',
+      catches: 'the same pack at a lower price',
+      keeps: 'priceless on a cold night',
+    },
+    { kind: 'price', catches: 'was 120, now 80', keeps: 'was a niche pack, now a range staple' },
+    { kind: 'price', catches: 'cheaper than the pack it replaces', keeps: 'does not feel cheap' },
+    {
+      kind: 'price',
+      catches: 'an affordable second pair',
+      keeps: 'you can afford the extra layer',
+    },
+    {
+      kind: 'price',
+      catches: 'costs less than the pair it replaces',
+      keeps: 'cuts weight at no cost to comfort',
+    },
+    {
+      kind: 'price',
+      catches: 'a low-cost second pair',
+      keeps: 'a lower-volume pack for short walks',
+    },
+    {
+      kind: 'price',
+      catches: 'saves you money over a season',
+      keeps: 'saves weight on long hikes',
+    },
+
+    { kind: 'discount', catches: '20% off this week', keeps: 'made from 100% recycled nylon' },
+    {
+      kind: 'discount',
+      catches: 'save 25% on the pair',
+      keeps: '30% lighter than the pack it replaces',
+    },
+    { kind: 'discount', catches: 'a discount for members', keeps: 'a members-only colourway' },
+    { kind: 'discount', catches: 'the summer sale ends soon', keeps: 'holds its resale value' },
+    { kind: 'discount', catches: 'half off this week', keeps: 'half the weight of the old model' },
+    { kind: 'discount', catches: 'save 20 off the pair', keeps: 'saves 200 g off the base weight' },
+    {
+      kind: 'discount',
+      catches: 'on clearance until the end of the month',
+      keeps: 'extra clearance for thick socks',
+    },
+    {
+      kind: 'discount',
+      catches: 'reduced this week',
+      keeps: 'reduced to 900g without losing warmth',
+    },
+
+    { kind: 'delivery', catches: 'free delivery on this one', keeps: 'ships flat and folds away' },
+    {
+      kind: 'delivery',
+      catches: 'in your hands overnight',
+      keeps: 'the next size up fits a bear canister',
+    },
+    { kind: 'delivery', catches: 'get it by Friday', keeps: 'arrives ready to ride' },
+    { kind: 'delivery', catches: 'ships within 2 working days', keeps: 'ships in a recycled box' },
+    {
+      kind: 'delivery',
+      catches: 'in time for the first frost',
+      keeps: 'ready for the first frost',
+    },
+
+    { kind: 'stock', catches: 'in stock in your size', keeps: 'a well-stocked hip pocket' },
+    {
+      kind: 'stock',
+      catches: 'limited stock on this colour',
+      keeps: 'a limited run in three colours',
+    },
+    { kind: 'stock', catches: 'restocked this morning', keeps: 'sold in three sizes' },
+    { kind: 'stock', catches: 'only 3 remain', keeps: 'comfortable for the last few miles' },
+    { kind: 'stock', catches: 'selling fast in your size', keeps: 'nearly weightless in the hand' },
+  ];
+
+  for (const row of ONE_ROW_PER_CLAIM_PATTERN) {
+    it(`drops "${row.catches}" and keeps "${row.keeps}"`, () => {
+      const dropped = reconcile(grid([ref('TR-101', { reason: row.catches })]));
+      const kept = reconcile(grid([ref('TR-101', { reason: row.keeps })]));
+
+      expect(dropped.violations).toContain(`unverifiable-claim:${row.kind}:reason:TR-101`);
+      expect(kept.violations).toEqual([]);
     });
   }
 

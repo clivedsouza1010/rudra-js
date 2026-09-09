@@ -101,6 +101,14 @@ const repeat = (size: number) => 'x'.repeat(size);
 const sized = <T>(size: number, build: (index: number) => T) =>
   Array.from({ length: size }, (_unused, index) => build(index));
 
+const languageTagOfLength = (size: number) => {
+  let tag = 'en';
+  while (tag.length < size) {
+    tag += `-${'a'.repeat(Math.min(8, size - tag.length - 1))}`;
+  }
+  return tag;
+};
+
 const capCases: Array<[string, keyof typeof FIELD_LIMITS, (size: number) => TrackingInputDraft]> = [
   [
     'a product title',
@@ -172,6 +180,16 @@ const capCases: Array<[string, keyof typeof FIELD_LIMITS, (size: number) => Trac
         candidates: sized(size, (index) => ({ ...aProduct, sku: `SKU-${index}` })),
         bundles: [{ id: 'BUN-1', skus: sized(size, (index) => `SKU-${index}`), price: 10 }],
       }),
+  ],
+  [
+    'a locale tag',
+    'localeTag',
+    (size) => minimalPayload({ context: { surface: 'pdp', locale: languageTagOfLength(size) } }),
+  ],
+  [
+    'the items asked for',
+    'maxItems',
+    (size) => minimalPayload({ context: { surface: 'pdp', maxItems: size } }),
   ],
   [
     'the bundle set',

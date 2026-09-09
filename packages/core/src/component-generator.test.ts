@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   TimeoutError,
   createComponentGenerator,
@@ -64,6 +64,15 @@ function countingProvider(spec: GeneratedSpec = modelSpec(['TR-101'])) {
     },
   };
 }
+
+const providerAdvancingClock = (milliseconds: number): ComponentProvider => ({
+  name: 'measured',
+  model: 'measured-model',
+  generate: async () => {
+    vi.advanceTimersByTime(milliseconds);
+    return { spec: modelSpec(['TR-101']) };
+  },
+});
 
 /** A provider that never answers and ignores its signal, to exercise the deadline. */
 const hangingProvider = (): ComponentProvider => ({
@@ -765,18 +774,24 @@ describe('when the component was generated', () => {
     expect(cached.generatedAt).toBe(first.generatedAt);
   });
 
-  it('still reports the real time spent serving it', async () => {
-    const generator = createComponentGenerator({
-      provider: countingProvider().provider,
-      cache: createMemorySpecCache(),
-    });
+  it('still reports the real time spent serving it, so a hit is quicker than the miss', async () => {
+    vi.useFakeTimers();
+    try {
+      const generator = createComponentGenerator({
+        provider: providerAdvancingClock(200),
+        cache: createMemorySpecCache(),
+      });
 
-    await generator.generate(payload());
-    const cached = await generator.generate(payload());
+      const miss = await generator.generate(payload());
+      const hit = await generator.generate(payload());
 
-    // generatedAt is about the spec; latencyMs is about this request.
-    expect(cached.latencyMs).toBeGreaterThanOrEqual(0);
-    expect(cached.latencyMs).toBeLessThan(100);
+      expect(miss.source).toBe('llm');
+      expect(hit.source).toBe('cache');
+      expect(miss.latencyMs).toBeGreaterThanOrEqual(200);
+      expect(miss.latencyMs - hit.latencyMs).toBeGreaterThanOrEqual(200);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -806,6 +821,17 @@ const cohortMate = (id: string, likedSku: string): TrackingInputDraft =>
   payload({
     user: { id, segment: 'loyalty' },
     signals: { likes: [{ sku: likedSku, at: 1_700_000_000_000 }] },
+  });
+
+const SHARED_CANDIDATES = ['TR-101', 'TR-102', 'TR-201', 'TR-202'];
+const IN_STOCK_FOR_FIRST = ['TR-101', 'TR-102'];
+const IN_STOCK_FOR_SECOND = ['TR-201', 'TR-202'];
+
+const cohortShopper = (id: string, sellable: string[]): TrackingInputDraft =>
+  payload({
+    user: { id, segment: 'loyalty' },
+    signals: { likes: [{ sku: sellable[0]!, at: 1_700_000_000_000 }] },
+    candidates: SHARED_CANDIDATES.map((sku) => product(sku, { isInStock: sellable.includes(sku) })),
   });
 
 describe('generation modes', () => {
@@ -842,12 +868,16 @@ describe('generation modes', () => {
       cache: createMemorySpecCache(),
     });
 
-    const first = await generator.generate(cohortMate('S-0001', 'TR-101'));
-    const second = await generator.generate(cohortMate('S-0002', 'TR-102'));
+    const first = await generator.generate(cohortShopper('S-0001', IN_STOCK_FOR_FIRST));
+    const second = await generator.generate(cohortShopper('S-0002', IN_STOCK_FOR_SECOND));
 
     expect(first.source).toBe('llm');
     expect(second.source).toBe('cache');
+    expect(placedSkus(first).length).toBeGreaterThan(0);
     expect(placedSkus(second).length).toBeGreaterThan(0);
+    expect(placedSkus(first).every((sku) => IN_STOCK_FOR_FIRST.includes(sku))).toBe(true);
+    expect(placedSkus(second).every((sku) => IN_STOCK_FOR_SECOND.includes(sku))).toBe(true);
+    expect(placedSkus(second).some((sku) => IN_STOCK_FOR_FIRST.includes(sku))).toBe(false);
   });
 
   it('renders even when the model names products that do not exist', async () => {
