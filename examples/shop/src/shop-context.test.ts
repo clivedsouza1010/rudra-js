@@ -1,6 +1,9 @@
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generatedSpecSchema } from '@rudra-js/core';
+import { generatedSpecSchema, type GeneratedSpec } from '@rudra-js/core';
+import { transcriptPath } from './provider/recording-provider';
 
 vi.mock('@rudra-js/anthropic', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@rudra-js/anthropic')>();
@@ -27,7 +30,16 @@ const restore = (name: string, value: string | undefined) => {
   }
 };
 
+const directories: string[] = [];
+const scratch = () => {
+  const directory = mkdtempSync(join(tmpdir(), 'rudra-recordings-'));
+  directories.push(directory);
+  return directory;
+};
+
 afterEach(() => {
+  for (const directory of directories.splice(0))
+    rmSync(directory, { recursive: true, force: true });
   delete process.env[KEY];
   delete process.env[MODE];
   delete process.env[WORKSPACE];
@@ -48,6 +60,14 @@ const missingRequest = () => ({
   schema: generatedSpecSchema,
   signal: AbortSignal.timeout(1000),
 });
+
+const recordedSpec: GeneratedSpec = {
+  tone: 'neutral',
+  headline: 'Picked for you',
+  subheadline: null,
+  blocks: [{ kind: 'copy', title: null, body: 'Built for wet rock.' }],
+  rationale: 'Test fixture.',
+};
 
 describe('the replay-only switch', () => {
   it('is already on by default, so a key alone in the shell cannot bill during npm test', async () => {
@@ -83,7 +103,7 @@ describe('the replay-only switch', () => {
     process.env[MODE] = 'record';
     process.env[KEY] = 'sk-ant-not-a-real-key';
 
-    await expect(import('./shop-context')).rejects.toThrow(/replay only/i);
+    await expect(import('./shop-context')).rejects.toThrow(/RUDRA_SHOP_MODE is record/);
   });
 
   it('treats a missing recording as an error, not something to paper over', async () => {
@@ -154,6 +174,21 @@ describe('the mode switch', () => {
     warn.mockRestore();
   });
 
+  it('replays when the mode is set but empty, the way an empty .env.local row leaves it', async () => {
+    delete process.env[REPLAY_ONLY];
+    process.env[MODE] = '';
+    process.env[KEY] = 'sk-ant-not-a-real-key';
+
+    const { chooseProvider } = await import('./shop-context');
+    const factory = await anthropicFactory();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(chooseProvider().generate(missingRequest())).rejects.toThrow(/no recording/i);
+    expect(factory).not.toHaveBeenCalled();
+
+    warn.mockRestore();
+  });
+
   it('refuses record mode without a key', async () => {
     delete process.env[REPLAY_ONLY];
     process.env[MODE] = 'record';
@@ -184,6 +219,53 @@ describe('the mode switch', () => {
         workspaceId: 'wrkspc_not_a_real_workspace',
       }),
     );
+  });
+
+  it('keeps a transcript of the call record mode paid for', async () => {
+    const directory = scratch();
+    process.env[RECORDINGS] = directory;
+    delete process.env[REPLAY_ONLY];
+    process.env[MODE] = 'record';
+    process.env[KEY] = 'sk-ant-not-a-real-key';
+
+    const { chooseProvider, MODEL_ID } = await import('./shop-context');
+    const factory = await anthropicFactory();
+    factory.mockReturnValue({
+      name: 'anthropic',
+      model: MODEL_ID,
+      generate: async () => ({ spec: recordedSpec }),
+    });
+
+    await expect(chooseProvider().generate(missingRequest())).resolves.toMatchObject({
+      spec: recordedSpec,
+    });
+    expect(readdirSync(directory)).toHaveLength(1);
+  });
+
+  it('says why a replay failed in record mode, as it does for a call', async () => {
+    const directory = scratch();
+    process.env[RECORDINGS] = directory;
+    delete process.env[REPLAY_ONLY];
+    process.env[MODE] = 'record';
+    process.env[KEY] = 'sk-ant-not-a-real-key';
+
+    const { chooseProvider, MODEL_ID } = await import('./shop-context');
+    const factory = await anthropicFactory();
+    factory.mockReturnValue({
+      name: 'anthropic',
+      model: MODEL_ID,
+      generate: async () => {
+        throw new Error('record mode called the model for a page it already had');
+      },
+    });
+    const request = missingRequest();
+    writeFileSync(transcriptPath(directory, MODEL_ID, request), 'not json');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(chooseProvider().generate(request)).rejects.toThrow(/not valid JSON/);
+    expect(error).toHaveBeenCalled();
+
+    error.mockRestore();
   });
 });
 

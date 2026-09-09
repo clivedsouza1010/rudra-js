@@ -61,9 +61,12 @@ prompt orphans every transcript at once — `SYSTEM_PROMPT` in `packages/core/sr
 anything that changes the user half. `replay-miss.test.ts` fails when the page it guards has no
 transcript, and names the path it looked for.
 
-1. Delete the old file: `rm examples/shop/recordings/<hash>.json`.
+1. Find the hash: run `npm test`. `replay-miss.test.ts` fails and names the path it wanted, which is
+   the new hash — the file sitting in `recordings/` under any other name is the orphan. Delete that
+   one: `rm examples/shop/recordings/<old hash>.json`.
 2. Run that one page in record mode: `RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop`, then visit it.
-3. Confirm exactly one new file appeared: `git status --short examples/shop/recordings/`.
+3. Confirm `git status --short examples/shop/recordings/` shows one deletion and one new file, and
+   that the new name is the hash step 1 named.
 4. Run `npm test` — `replay-miss.test.ts` checks the RJ-00001 / S-0001 page; other pages are not covered.
 5. Commit the file.
 

@@ -111,7 +111,8 @@ sets `RUDRA_REPLAY_ONLY=1` for every test run, and the shop throws at start-up w
 a key is set too — so a run with a key in the shell fails to load instead of calling the model.
 
 CI runs all six of these on every pull request, and a second job builds the example shop and
-checks that its page still reads as one to a crawler. CI has no key, so it runs the build plainly:
+checks that its page still reads as one to a crawler. CI sets no mode, so the shop replays and that
+job runs the build plainly:
 
 ```sh
 npm run build --workspace @rudra-js/example-shop

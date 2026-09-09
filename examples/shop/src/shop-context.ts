@@ -80,15 +80,15 @@ export function chooseProvider(): ComponentProvider {
   // key: a run that quietly used it would bill, and nobody would find out
   // until the invoice.
   if (process.env['RUDRA_REPLAY_ONLY']) {
+    if (mode === 'record') {
+      throw new Error(
+        'RUDRA_REPLAY_ONLY is set and RUDRA_SHOP_MODE is record: refusing to start, because replay only means no model calls',
+      );
+    }
     if (apiKey) {
       throw new Error(
         'RUDRA_REPLAY_ONLY is set and so is ANTHROPIC_API_KEY: refusing to start, because replay only means no model calls ' +
           '(the key may be coming from examples/shop/.env.local)',
-      );
-    }
-    if (mode === 'record') {
-      throw new Error(
-        'RUDRA_REPLAY_ONLY is set and RUDRA_SHOP_MODE is record: refusing to start, because replay only means no model calls',
       );
     }
     return withVisibleFailures(
@@ -110,8 +110,8 @@ export function chooseProvider(): ComponentProvider {
           '(export one, or put it in examples/shop/.env.local)',
       );
     }
-    return createRecordingProvider(
-      withVisibleFailures(
+    return withVisibleFailures(
+      createRecordingProvider(
         createAnthropicProvider({
           apiKey,
           model: MODEL_ID,
@@ -121,8 +121,8 @@ export function chooseProvider(): ComponentProvider {
             ? { workspaceId: process.env['ANTHROPIC_WORKSPACE_ID'] }
             : {}),
         }),
+        RECORDINGS_DIRECTORY,
       ),
-      RECORDINGS_DIRECTORY,
     );
   }
 
