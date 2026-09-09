@@ -1,4 +1,4 @@
-import { pathToFileURL } from 'node:url';
+import { isEntryPoint } from '../crawl/entry-point.js';
 import { generateCatalog } from '../examples/shop/src/fixtures/catalog.js';
 import { generateShoppers } from '../examples/shop/src/fixtures/shoppers.js';
 import { PRICES, buildArm, isArmName } from './arms.js';
@@ -30,5 +30,4 @@ async function main(): Promise<void> {
   );
 }
 
-const entry = process.argv[1];
-if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) await main();
+if (isEntryPoint(import.meta.url, process.argv[1])) await main();

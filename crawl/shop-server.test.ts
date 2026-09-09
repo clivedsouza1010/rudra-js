@@ -75,6 +75,7 @@ describe('stopShop', () => {
     try {
       await stopShop(shop);
 
+      expect(gone(grandchild)).toBe(false);
       expect(shop.stdout?.destroyed).toBe(true);
       expect(shop.stderr?.destroyed).toBe(true);
     } finally {

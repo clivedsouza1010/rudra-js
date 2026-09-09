@@ -1,5 +1,5 @@
-import { pathToFileURL } from 'node:url';
 import { checkCrawlable } from './check-crawlable.js';
+import { isEntryPoint } from './entry-point.js';
 import { FALLBACK_MARKER, PAGE_PATH } from './page.js';
 import { startShop, stopShop, freePort } from './shop-server.js';
 import { reportFailure } from './verify-messages.js';
@@ -48,5 +48,4 @@ async function main(): Promise<void> {
   }
 }
 
-const entry = process.argv[1];
-if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) await main();
+if (isEntryPoint(import.meta.url, process.argv[1])) await main();
