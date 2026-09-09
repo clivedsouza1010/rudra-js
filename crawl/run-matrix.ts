@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { isEntryPoint } from './entry-point.js';
 import { classify, collect, refusals, renderTable, unstable } from './matrix.js';
 import { freePort, startShop, stopShop } from './shop-server.js';
 import { reportFailure } from './verify-messages.js';
@@ -52,10 +53,7 @@ async function main(): Promise<void> {
     process.exitCode = 1;
   } finally {
     await stopShop(shop);
-    shop.stdout?.destroy();
-    shop.stderr?.destroy();
-    shop.unref();
   }
 }
 
-await main();
+if (isEntryPoint(import.meta.url, process.argv[1])) await main();

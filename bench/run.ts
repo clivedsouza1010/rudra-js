@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { isEntryPoint } from '../crawl/entry-point.js';
 import { ARM_NAMES, PRICES } from './arms.js';
 import { SHOPPERS_PER_PAGE, type ArmResult } from './measure-arm.js';
 import { buildReport, formatTable } from './report.js';
@@ -73,4 +74,4 @@ function main(): void {
   }
 }
 
-if (process.env['VITEST'] === undefined) main();
+if (isEntryPoint(import.meta.url, process.argv[1])) main();
