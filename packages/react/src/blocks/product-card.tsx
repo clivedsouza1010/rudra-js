@@ -5,9 +5,9 @@ import type { BlockRenderContext } from '../render-context.js';
  * One product.
  *
  * Every fact here — the title, the price, the image, the link — is read from
- * the catalog, not from the specification. The only things the model
- * contributes are `reason`, `badge` and `emphasis`, and React escapes all three
- * on the way into the markup.
+ * the catalog, not from the specification. The specification contributes only
+ * `reason`, `badge` and `emphasis`, and React escapes all three on the way
+ * into the markup.
  */
 export function ProductCard({
   reference,

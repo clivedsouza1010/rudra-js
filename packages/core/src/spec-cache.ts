@@ -16,11 +16,6 @@ import type { SignalDigest } from './signal-digest.js';
  */
 
 /**
- * Asynchronous on purpose. A synchronous `get` would look simpler and would
- * make the shared store the docs recommend impossible to write, since no Redis
- * or Memcached client can return a value without awaiting.
- */
-/**
  * A stored generation, with the moment it was produced.
  *
  * The timestamp travels with the spec because it cannot be recovered later: a
@@ -33,6 +28,11 @@ export interface CachedSpec {
   generatedAt: number;
 }
 
+/**
+ * Asynchronous on purpose. A synchronous `get` would look simpler and would
+ * make the shared store the docs recommend impossible to write, since no Redis
+ * or Memcached client can return a value without awaiting.
+ */
 export interface SpecCache {
   get(key: string): Promise<CachedSpec | undefined>;
   set(key: string, cached: CachedSpec): Promise<void>;

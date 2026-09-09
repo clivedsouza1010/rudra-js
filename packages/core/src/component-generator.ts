@@ -196,7 +196,6 @@ const cachedSpecSchema = z.object({
   generatedAt: z.number(),
 });
 
-/** What the model said, plus what it cost. */
 /**
  * What one call to the model produced.
  *
