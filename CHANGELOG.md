@@ -10,6 +10,88 @@ break them.
 
 ## [Unreleased]
 
+### Added
+
+- `GenerationEvent` carries `error` and `cache`. `error` is what the provider
+  threw when `degradedReason` is `provider-error`, or the timeout itself when it
+  is `timeout`, so rate limiting and schema drift no longer arrive as the same
+  code. `cache` says how the request's one cache read went — `hit`, `miss`,
+  `error` or `timeout` — so a store that is down stops looking exactly like a
+  cold cache.
+- `SpecCache` takes an optional `delete(key)`. The in-memory cache implements
+  it and the generator never calls it; it is how a host drops one bad entry,
+  using the `key` from that generation's event.
+- `FIELD_LIMITS` names two caps that were written into the schema by hand:
+  `localeTag`, 35, and `maxItems`, 12. Both are in the core README's table of
+  limits.
+- The claim screen reads six more ways of writing what it already banned: a
+  currency code before the number, the rupee and the krona, a score as "4.8 out
+  of 5", "limited stock", a count that "remains", and money off with no percent
+  sign on it.
+- The core README gains an options table for `createComponentGenerator` with
+  every default, a "What the model decides, by mode" table, a "Watching it in
+  production" section on what to compute from `onEvent` and what to alert on,
+  and a "When a generation is wrong" section on getting a bad entry off the
+  page.
+- The example shop has a README and an `.env.example`, and `RUDRA_SHOP_MODE`
+  chooses between replaying the committed transcripts and calling the model.
+
+### Changed
+
+- **Breaking.** `context.locale` takes one language tag — `en-US`,
+  `zh-Hant-TW` — rather than any string of 2 to 35 characters. An
+  `Accept-Language` header passed straight through parsed under 0.1.0 and now
+  throws. The locale is part of the cohort cache key, so a list of tags gave
+  every browser its own cohort and its own billed generation.
+- The rationale the model writes goes through the same claim screen as every
+  other field it writes, so a price or a stock claim cannot survive in the
+  generation log while the same words are stripped from the headline above it.
+- Both cache keys carry a fingerprint of the system prompt, so editing the
+  prompt moves every key. An entry written under 0.1.0's prompt is never read
+  back: it misses once and is generated again.
+- All three packages need Node 22.12 or later. The floor was
+  `^20.19.0 || >=22.12.0`; Node 20 is end of life, and the check that installs
+  the packages from outside the repo needs `--experimental-strip-types`, which
+  20.19 does not have.
+- The zod peer range in core and anthropic is `^4.5.0`, widened back from
+  `^4.5.4`. The tool schema depends on a change zod made in 4.5.0 and on
+  nothing later; the narrower range came from a weekly dependency bump
+  rewriting the peer by accident.
+- Releases publish through npm trusted publishing. The workflow mints a
+  short-lived OIDC token at publish time and no npm token is stored anywhere.
+- The example shop is styled by default. The note at the top still says the
+  package ships no CSS, and `?styles=off` shows the raw markup.
+- The example shop replays by default. Only `RUDRA_SHOP_MODE=record` calls the
+  model, a key on its own no longer spends anything, and a transcript that
+  already exists is never overwritten.
+
+### Removed
+
+- Six pipeline internals are no longer exported from `@rudra-js/core`:
+  `fitToShopper`, `neverRecommend`, `buildFallbackSpec`, `specCacheKey`,
+  `cohortCacheKey` and `SYSTEM_PROMPT`. Nothing outside the package imported
+  them, and after 1.0 taking them away would be a breaking change.
+
+### Fixed
+
+- A hallucinated SKU is cut to 32 characters before it goes into a violation
+  string. The spec schema cannot bound a string, so the whole of whatever the
+  model wrote used to land in the list an evaluation reads.
+- The documents that said the model picks the products. It does under
+  `generation: 'per-shopper'`; under `cohort`, the default, every product but
+  the one a hero names is filled in per request. The react README and four
+  source comments are corrected.
+- SECURITY.md said the generator that would emit monitoring events does not
+  exist. It does: one `GenerationEvent` per call through `onEvent`, and wiring
+  that to a log or a rate limiter is the host's job.
+- The anthropic README names its default model, `claude-opus-5`, rather than
+  calling it the current one.
+- `defaultFormatBundlePrice` guards what `defaultFormatPrice` guards — building
+  the formatter, not running it — which is the parity the react README claims.
+- The example's placeholder image carries a width and a height, so an unstyled
+  card no longer fills the viewport, and its route sends `no-cache` rather than
+  pinning a stale image in the browser for a year.
+
 ## [0.1.0] - 2026-09-07
 
 The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
@@ -70,4 +152,5 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/clivedsouza1010/rudra-js/releases/tag/v0.1.0
