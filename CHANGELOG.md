@@ -28,6 +28,15 @@ break them.
   currency code before the number, the rupee and the krona, a score as "4.8 out
   of 5", "limited stock", a count that "remains", and money off with no percent
   sign on it.
+- The READMEs say what leaves the machine. The core README lists, per mode,
+  every field that reaches the model and every one that stays behind —
+  `user.id`, timestamps, dwell time, prices, currencies and `imageUrl` are in
+  neither prompt — what belongs in `segment` and what does not, the
+  three-method interface any provider sits behind, and what an entry in the
+  cache holds. The anthropic README names the endpoint a generation posts to,
+  and says an EU or UK shop sending personal data to Anthropic is the one that
+  needs a data processing agreement, not this package. SECURITY.md says how to
+  check a published package with `npm audit signatures`.
 - The core README gains an options table for `createComponentGenerator` with
   every default, a "What the model decides, by mode" table, a "Watching it in
   production" section on what to compute from `onEvent` and what to alert on,
@@ -49,7 +58,7 @@ break them.
 - Both cache keys carry a fingerprint of the system prompt, so editing the
   prompt moves every key. An entry written under 0.1.0's prompt is never read
   back: it misses once and is generated again.
-- All three packages need Node 22.12 or later. The floor was
+- **Breaking.** All three packages need Node 22.12 or later. The floor was
   `^20.19.0 || >=22.12.0`; Node 20 is end of life, and the check that installs
   the packages from outside the repo needs `--experimental-strip-types`, which
   20.19 does not have.
@@ -57,6 +66,10 @@ break them.
   `^4.5.4`. The tool schema depends on a change zod made in 4.5.0 and on
   nothing later; the narrower range came from a weekly dependency bump
   rewriting the peer by accident.
+- The release workflow checks the tag before it publishes anything: the tagged
+  commit has to be an ancestor of `main`, and the tag has to equal the `version`
+  in `packages/core/package.json`. A `v*` tag pushed on any branch used to
+  publish, with valid provenance on it.
 - Releases publish through npm trusted publishing. The workflow mints a
   short-lived OIDC token at publish time and no npm token is stored anywhere.
 - The example shop is styled by default. The note at the top still says the
@@ -79,13 +92,16 @@ break them.
   model wrote used to land in the list an evaluation reads.
 - The documents that said the model picks the products. It does under
   `generation: 'per-shopper'`; under `cohort`, the default, every product but
-  the one a hero names is filled in per request. The react README and four
-  source comments are corrected.
+  the one a hero names is filled in per request. The root README, the react
+  README and four source comments are corrected.
 - SECURITY.md said the generator that would emit monitoring events does not
   exist. It does: one `GenerationEvent` per call through `onEvent`, and wiring
   that to a log or a rate limiter is the host's job.
 - The anthropic README names its default model, `claude-opus-5`, rather than
   calling it the current one.
+- The anthropic install line asks for `zod@^4`, the range its peer takes and the
+  range the other three READMEs print. It said `zod`, which reads as though any
+  major would do.
 - `defaultFormatBundlePrice` guards what `defaultFormatPrice` guards — building
   the formatter, not running it — which is the parity the react README claims.
 - The example's placeholder image carries a width and a height, so an unstyled
