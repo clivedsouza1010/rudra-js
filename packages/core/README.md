@@ -40,6 +40,19 @@ To render a spec you wrote yourself, without a model, pass
 that spec, which is how the tests exercise blocks the deterministic component
 never emits.
 
+## Options
+
+Everything `createComponentGenerator` takes, and what it does without it.
+
+| Option           | What it does                                                                                         | Default                   |
+| ---------------- | ---------------------------------------------------------------------------------------------------- | ------------------------- |
+| `provider`       | The model adapter. `null` runs without a model and bills nothing.                                    | `null`                    |
+| `cache`          | Where generated specs are kept between requests. Pass `createNullSpecCache()` to keep none.          | `createMemorySpecCache()` |
+| `generation`     | `'cohort'` shares one component between shoppers who look alike; `'per-shopper'` generates for each. | `'cohort'`                |
+| `modelTimeoutMs` | How long the model gets. Past this the request is aborted and the deterministic component renders.   | `1500`                    |
+| `cacheTimeoutMs` | How long a cache read gets. Past this the request generates as if the store had nothing.             | `50`                      |
+| `onEvent`        | Called once per `generate` with a `GenerationEvent`. A hook that throws is swallowed.                | none                      |
+
 ## `tracking-input`
 
 The boundary between a host application and rudra-js. rudra-js collects,
@@ -321,6 +334,24 @@ Pass your own store — Redis, Memcached, whatever you already run — and it ke
 entries on its own terms. What that store holds, and for how long, is yours to
 declare to your users, because this package does not set it. Pass
 `createNullSpecCache()` to store nothing at all.
+
+## Watching it in production
+
+The generator never fails a render, so a provider that has been down for a
+week only shows as plainer pages. The way to know is `onEvent`: every call to
+`generate` that gets past input validation reports exactly one
+`GenerationEvent`, and these are the numbers to keep from it. A payload that
+fails `parseTrackingInput` throws instead, and reports nothing.
+
+- **Fallback share** — the share of events with `source: 'fallback'`. Alert
+  when it climbs. `degradedReason` says which way the call failed, and `error`
+  carries what was thrown when the reason is `'provider-error'` or `'timeout'`.
+- **Cache hit rate** — `cache: 'hit'` over the events that have a `cache`
+  field. A store that is down now shows as `cache: 'error'`, and a slow one as
+  `cache: 'timeout'`, rather than as a rising bill.
+- **Spend** — sum `usage` over the events where `calledModel` is true.
+  Requests that joined an in-flight generation carry the same `usage`, so
+  summing over every event counts one call many times.
 
 ## Licence
 
