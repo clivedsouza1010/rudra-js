@@ -28,6 +28,9 @@ jobs:
         with:
           persist-credentials: false
 
+      # codeql-action v3.x.y and v4.x.y with the same x.y.z are one release built
+      # twice, for node20 and node24. A bump from v3 to v4 is that swap, not a
+      # jump forward and not a downgrade.
       - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           languages: javascript-typescript

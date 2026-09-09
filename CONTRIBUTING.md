@@ -140,15 +140,20 @@ test is vacuous or the mutation is equivalent — find out which before moving o
 
 ## Checks
 
-All of these run in CI and must pass:
+`npm run check` runs all six, in order, and stops at the first failure:
 
 ```sh
 npm run build
-npm run typecheck   # includes test files, which the build does not
+npm run typecheck        # includes test files, which the build does not
 npm run lint
 npm run format:check
 npm test
+npm run verify:consumer  # packs all three packages and uses them from outside the repo
 ```
+
+All six run in CI as separate steps, so a failed run names the check that
+failed. `tests/packaging.test.ts` holds them to that: the commands in `check`
+have to be the CI steps, in the same order.
 
 ## Releasing
 
@@ -161,17 +166,61 @@ git push origin v0.2.0
 ```
 
 A `v*` tag starts [`.github/workflows/release.yml`](.github/workflows/release.yml).
-It builds, runs the same six checks a pull request runs, and then publishes
-`@rudra-js/core`, `@rudra-js/react` and `@rudra-js/anthropic` in that order with
-`npm publish --provenance`. Core goes first because react declares it as a peer.
+It runs the same six checks a pull request runs, build included, and then
+publishes `@rudra-js/core`, `@rudra-js/react` and `@rudra-js/anthropic` in that
+order with `npm publish --provenance`. Core goes first because react declares it
+as a peer.
 
-Before it publishes, the job checks two things and stops if either fails: the
-tagged commit is on `main`, and the tag equals the `version` in
-`packages/core/package.json`. Tags matching `v*` cannot be moved or deleted
-once pushed, so a tag that fails a check is left behind and the fix is to bump
-the version and tag again. The same goes for a version that did publish: npm
-rejects a republish, so a mistake is fixed by tagging a new patch version, not
-by retrying the old one.
+The first two steps, before anything is installed, check the tag and stop if
+either fails: the tagged commit is on `main`, and the tag equals the `version`
+in `packages/core/package.json`. All three manifests carry the same version and
+a test enforces that, because one tag publishes all three. Tags matching `v*`
+cannot be moved or deleted once pushed, so a tag that fails a check is left
+behind and the fix is to bump the version and tag again. The same goes for a
+version that did publish: npm rejects a republish, so a mistake is fixed by
+tagging a new patch version, not by retrying the old one.
+
+### What publishing is bound to
+
+There is no npm token anywhere in this repository. Each of the three packages
+has a trusted publisher configured on npmjs.com, and each one names three
+things: this repository, the workflow file `release.yml`, and the GitHub
+environment `npm`. The workflow's `id-token: write` mints an OIDC token that npm
+checks against those three.
+
+So renaming the workflow file, renaming the environment, or moving the
+repository stops publishing until the publisher is edited on npmjs.com to match.
+The error npm returns says the token does not match a configured publisher and
+does not say which of the three is wrong.
+
+Adding a fourth package means two edits, not one: a trusted publisher for its
+name on npmjs.com, and a `npm publish --provenance --access public` step in
+`release.yml` with its `working-directory`. A package with a publish step and no
+publisher fails the release after the earlier packages have already gone out.
+
+If a publish does half-finish — core published, react failed — there is nothing
+to publish by hand with. Bump the patch version on all three, merge, and tag
+again.
+
+## When the tool-schema golden fails
+
+`tests/golden/tool-input-schema.json` is the schema sent to the model as the
+tool's `input_schema`, so it is part of the prompt. zod writes it, and a zod
+upgrade has already rewritten it once. When the test fails:
+
+1. Run `npm run build` first. The regeneration command the test prints imports
+   `packages/core/dist/index.js`, so a stale or missing build regenerates the
+   old schema or nothing at all.
+2. Run the command the failure message prints, then `git diff` the golden.
+3. Read the diff for three things: a field whose `type` changed, a nullable
+   field written a new way (4.5.0 moved those from `anyOf` to a type array), and
+   `additionalProperties` appearing where it did not — the provider is sent the
+   `input` shape, which carries none.
+4. Run `npx vitest run packages/anthropic`. The adapter builds the request
+   around this schema, and a shape it cannot fill is a runtime refusal, not a
+   test failure here.
+5. Commit the golden with the zod version in the message, so the next reader can
+   tell a deliberate regeneration from a drift nobody looked at.
 
 ## Reporting a security issue
 

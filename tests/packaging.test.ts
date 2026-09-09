@@ -168,6 +168,10 @@ describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
     expect(range).toBe(`^${readManifest('core').version}`);
   });
 
+  it('carries the version core carries, because one tag publishes all three', () => {
+    expect(readManifest(packageName).version).toBe(readManifest('core').version);
+  });
+
   it('builds before it packs, so a tarball is never source without a build', () => {
     // `dist` is gitignored. Publishing from a clean checkout without a build
     // now ships a full `src/` tree, which looks populated while every entry
@@ -184,9 +188,51 @@ function collectExportTargets(exports: Record<string, unknown>): string[] {
   );
 }
 
-/** Only steps that actually run — a commented-out line is not a step. */
-function stepsOf(workflow: string): string[] {
-  return [...workflow.matchAll(/^\s*- run: (.+)$/gm)].map((match) => match[1]!.trim());
+interface WorkflowStep {
+  run?: string;
+  keys: string[];
+}
+
+/**
+ * Every step of one job, as its key names plus its `run:` line.
+ *
+ * The keys are what makes `continue-on-error: true` under `npm test` visible: a
+ * scrape of `- run:` lines reads a neutered step as present and passing.
+ * A commented-out line is not a step.
+ */
+function stepsOf(workflow: string, jobName: string): WorkflowStep[] {
+  const lines = workflow.split('\n');
+  const jobAt = lines.indexOf(`  ${jobName}:`);
+  if (jobAt === -1) throw new Error(`no \`${jobName}:\` job found`);
+
+  const steps: WorkflowStep[] = [];
+  let inSteps = false;
+  for (const line of lines.slice(jobAt + 1)) {
+    const text = line.trim();
+    if (text === '' || text.startsWith('#')) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent <= 2) break;
+    if (!inSteps) {
+      inSteps = indent === 4 && text === 'steps:';
+      continue;
+    }
+    if (indent <= 4) break;
+    if (indent === 6) {
+      if (!text.startsWith('- ')) throw new Error(`expected a step, got \`${text}\``);
+      steps.push({ keys: [] });
+    }
+    if (indent > 8) continue;
+
+    const step = steps.at(-1);
+    if (!step) throw new Error(`\`${text}\` sits before the first step`);
+    const field = text.replace(/^- /, '');
+    const key = field.slice(0, field.indexOf(':'));
+    step.keys.push(key);
+    if (key === 'run') step.run = field.slice(key.length + 1).trim();
+  }
+  if (!inSteps) throw new Error(`the \`${jobName}\` job has no steps`);
+
+  return steps;
 }
 
 /**
@@ -200,16 +246,11 @@ function stepsOf(workflow: string): string[] {
  * file.
  */
 function jobStepsOf(workflow: string, jobName: string): string[] {
-  const header = new RegExp(`^  ${jobName}:$`, 'm').exec(workflow);
-  if (!header) throw new Error(`no \`${jobName}:\` job found`);
-
-  const afterHeader = workflow.slice(header.index + header[0].length);
-  // The next job header at the same two-space indentation, if there is one —
-  // that is what ends this job's slice rather than the end of the file.
-  const nextJob = /^  \S.*:$/m.exec(afterHeader);
-  const body = nextJob ? afterHeader.slice(0, nextJob.index) : afterHeader;
-
-  return stepsOf(body);
+  const commands: string[] = [];
+  for (const step of stepsOf(workflow, jobName)) {
+    if (step.run !== undefined) commands.push(step.run);
+  }
+  return commands;
 }
 
 describe('the release workflow', () => {
@@ -245,18 +286,43 @@ describe('the release workflow', () => {
     ]);
 
     for (const step of jobStepsOf(ciWorkflow, 'verify')) {
-      expect(stepsOf(releaseWorkflow), `release.yml is missing \`${step}\``).toContain(step);
+      expect(
+        jobStepsOf(releaseWorkflow, 'publish'),
+        `release.yml is missing \`${step}\``,
+      ).toContain(step);
     }
   });
 
+  it('is what `npm run check` runs, after the install', () => {
+    const { scripts } = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const checks = jobStepsOf(ciWorkflow, 'verify');
+    const afterInstall = checks.slice(checks.indexOf('npm ci --ignore-scripts') + 1);
+
+    expect(scripts['check']?.split(' && ')).toEqual(afterInstall);
+  });
+
   it('verifies before it publishes', () => {
-    const steps = stepsOf(releaseWorkflow);
+    const steps = jobStepsOf(releaseWorkflow, 'publish');
     const firstPublish = steps.findIndex((step) => step.startsWith('npm publish'));
     expect(firstPublish).toBeGreaterThan(-1);
 
     // A check that runs after the publish protects nothing.
     for (const step of jobStepsOf(ciWorkflow, 'verify')) {
       expect(steps.indexOf(step), `\`${step}\` runs after publishing`).toBeLessThan(firstPublish);
+    }
+  });
+
+  it('lets no step before the publish be skipped or forgiven', () => {
+    const steps = stepsOf(releaseWorkflow, 'publish');
+    const firstPublish = steps.findIndex((step) => step.run?.startsWith('npm publish'));
+    expect(firstPublish).toBeGreaterThan(-1);
+
+    for (const step of steps.slice(0, firstPublish)) {
+      const name = step.run ?? step.keys.join(' ');
+      expect(step.keys, `\`${name}\` carries an if:`).not.toContain('if');
+      expect(step.keys, `\`${name}\` carries continue-on-error`).not.toContain('continue-on-error');
     }
   });
 });

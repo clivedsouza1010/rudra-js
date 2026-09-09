@@ -11,6 +11,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     environment: npm
+    timeout-minutes: 3
     permissions:
       contents: read
       # Mints the OIDC token npm uses to attest that this build produced this
@@ -21,6 +22,11 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+
+      # A tag on any branch would otherwise publish with valid provenance. It has
+      # to sit on main and name the version in package.json.
+      - run: git fetch --no-tags origin main && git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - run: test "v$(node -p "require('./packages/core/package.json').version")" = "$GITHUB_REF_NAME"
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -51,16 +57,14 @@ jobs:
       # npm has no transactional multi-publish. If core succeeds and react then
       # fails, the tag cannot simply be re-run — npm rejects republishing a
       # version that exists, so the job would fail on core before reaching
-      # react. Recover by publishing react by hand, or by tagging a new patch
-      # version.
-      # A tag on any branch would otherwise publish with valid provenance. It has
-      # to sit on main and name the version in package.json.
-      - run: git fetch --no-tags origin main && git merge-base --is-ancestor "$GITHUB_SHA" origin/main
-      - run: test "v$(node -p "require('./packages/core/package.json').version")" = "$GITHUB_REF_NAME"
+      # react. Publishing by hand is not the way out either: the only credential
+      # is the OIDC token this job mints, and there is no token to run npm
+      # publish with from a laptop. Recover by bumping the version and tagging a
+      # new patch release.
 
       # Node 22 ships npm 10. Trusted publishing needs 11.5, which reads the
       # OIDC token itself - no registry-url, no NODE_AUTH_TOKEN.
-      - run: npm install -g npm@^11.5.1
+      - run: npm install -g npm@11.19.1
       - run: npm --version
       - run: npm publish --provenance --access public
         working-directory: packages/core

@@ -21,7 +21,7 @@
     "directory": "packages/anthropic"
   },
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=22.12.0"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -48,7 +48,7 @@
   },
   "peerDependencies": {
     "@rudra-js/core": "^0.1.0",
-    "zod": "^4.5.4"
+    "zod": "^4.5.0"
   },
   "devDependencies": {
     "@rudra-js/core": "0.1.0",
