@@ -23,11 +23,14 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run check
 
-      - run: npm publish --dry-run
+      - run: npm install -g npm@11.19.1
+      - run: npm --version
+
+      - run: npm publish --dry-run --access public
         working-directory: packages/core
 
-      - run: npm publish --dry-run
+      - run: npm publish --dry-run --access public
         working-directory: packages/react
 
-      - run: npm publish --dry-run
+      - run: npm publish --dry-run --access public
         working-directory: packages/anthropic

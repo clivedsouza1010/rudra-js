@@ -168,15 +168,22 @@ describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
     expect(range).toBe(`^${readManifest('core').version}`);
   });
 
-  it('carries the version core carries, because one tag publishes all three', () => {
-    expect(readManifest(packageName).version).toBe(readManifest('core').version);
-  });
-
   it('builds before it packs, so a tarball is never source without a build', () => {
     // `dist` is gitignored. Publishing from a clean checkout without a build
     // now ships a full `src/` tree, which looks populated while every entry
     // point points at nothing.
     expect(readManifest(packageName)).toMatchObject({ scripts: { prepack: 'npm run build' } });
+  });
+});
+
+describe('the published packages', () => {
+  it('all carry one version, because one tag publishes all three', () => {
+    const versions = PACKAGES.map((packageName) => readManifest(packageName).version);
+    const listed = PACKAGES.map(
+      (packageName, index) => `@rudra-js/${packageName} ${versions[index]}`,
+    ).join(', ');
+
+    expect([...new Set(versions)], listed).toHaveLength(1);
   });
 });
 
@@ -247,6 +254,22 @@ function jobStepsOf(workflow: string, jobName: string): string[] {
   return commands;
 }
 
+function jobKeysOf(workflow: string, jobName: string): string[] {
+  const lines = workflow.split('\n');
+  const jobAt = lines.indexOf(`  ${jobName}:`);
+  if (jobAt === -1) throw new Error(`no \`${jobName}:\` job found`);
+
+  const keys: string[] = [];
+  for (const line of lines.slice(jobAt + 1)) {
+    const text = line.trim();
+    if (text === '' || text.startsWith('#')) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent <= 2) break;
+    if (indent === 4) keys.push(text.slice(0, text.indexOf(':')));
+  }
+  return keys;
+}
+
 describe('the release workflow', () => {
   const releaseWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/release.yml'), 'utf8');
   const ciWorkflow = readFileSync(join(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8');
@@ -308,7 +331,7 @@ describe('the release workflow', () => {
     }
   });
 
-  it('lets no step before the publish be skipped or forgiven', () => {
+  it('forgives no step, and skips none before the publish', () => {
     const steps = stepsOf(releaseWorkflow, 'publish');
     const firstPublish = steps.findIndex((step) => step.run?.startsWith('npm publish'));
     expect(firstPublish).toBeGreaterThan(-1);
@@ -316,8 +339,17 @@ describe('the release workflow', () => {
     for (const step of steps.slice(0, firstPublish)) {
       const name = step.run ?? step.keys.join(' ');
       expect(step.keys, `\`${name}\` carries an if:`).not.toContain('if');
+    }
+
+    for (const step of steps) {
+      const name = step.run ?? step.keys.join(' ');
       expect(step.keys, `\`${name}\` carries continue-on-error`).not.toContain('continue-on-error');
     }
+
+    expect(
+      jobKeysOf(releaseWorkflow, 'publish'),
+      'the publish job carries continue-on-error',
+    ).not.toContain('continue-on-error');
   });
 });
 

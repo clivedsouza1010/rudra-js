@@ -6,9 +6,9 @@ idea fits — see _Scope_ below.
 
 ## Getting set up
 
-Node `^20.19` or `>=22.12` is required; TypeScript 7 and Vitest 4 both refuse
-anything older, and fail with an error that never mentions Node. There is an
-`.nvmrc`.
+Node `>=22.12` is required. Node 20 is end of life, and
+`scripts/verify-consumer.mjs` needs `--experimental-strip-types`, which 20.19
+does not have. There is an `.nvmrc`.
 
 ```sh
 nvm use
@@ -179,6 +179,19 @@ cannot be moved or deleted once pushed, so a tag that fails a check is left
 behind and the fix is to bump the version and tag again. The same goes for a
 version that did publish: npm rejects a republish, so a mistake is fixed by
 tagging a new patch version, not by retrying the old one.
+
+### The npm pin
+
+Both `release.yml` and `rehearsal.yml` install `npm@11.19.1` before they publish.
+Node 22 ships npm 10, which cannot do trusted publishing at all — that needs npm
+11.5 or newer, which reads the OIDC token itself. The version is pinned exactly
+rather than to a range because npm is the thing doing the publishing, and a
+publisher that changes under you between two releases is not something to find
+out about during one.
+
+Nothing watches this pin, so bump it by hand. Run `rehearsal.yml` after you do:
+it installs the same npm and does a `--dry-run` publish of all three packages, so
+a broken npm shows up there instead of halfway through a release.
 
 ### What publishing is bound to
 
