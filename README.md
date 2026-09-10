@@ -1,15 +1,30 @@
 # rudra-js
 
-A framework of server side components built dynamically and rendered in real time.
+Recommendation blocks designed by a language model, rendered on the server by React, with every
+product fact read from your own catalog.
 
-rudra-js takes a validated payload describing what a shopper has done, asks a language model to
-design a recommendation component for that shopper, and server-renders the result into the initial
-HTML response. The model never returns markup: it returns a specification drawn from a closed
-vocabulary, which a registry of components renders. So the model picks the arrangement and the
-words, the registry writes the markup, and every product fact — title, price, image, link — is read
-from your own catalog when the page is served. What the model wrote is rendered as escaped text.
+A model that writes HTML can put a price on the page that is not real. This one never writes HTML.
+It returns a specification drawn from a closed vocabulary: a layout, a headline and the wording.
+There is no field in it for a price, and none for a product name, an image or a link. Products are
+named by SKU, and only from the list you sent. In the default mode the products in a grid or a
+carousel are picked per request from that list, not by the model.
 
-> **Status: `0.1.0`, early.** Installable and usable — the Getting started below runs as a test on
+![The example shop's product page. The heading, the order, the highlighting and the paragraph are the model's. Every title, price and image is the shop's.](docs/demo.png)
+
+React Server Components turn that specification into markup, reading the title, price, image and
+link from your catalog as the page is served. What the model wrote renders as escaped text.
+
+The model's words are also read for prices, discounts, ratings, delivery dates and stock counts, and
+text that makes one of those claims is dropped. That check reads words, so a careful rewording can
+get past it. The structure is what holds. The model is never told a price, and the specification has
+no field to put one in.
+
+The block is in the first HTML response and ships no client JavaScript, so a crawler that does not
+run JavaScript still reads it. On the 500-shopper benchmark the default mode makes 460 model calls
+per 1,000 page views, against 1,000 when you generate for each shopper. Running with no model at all
+is a supported setting rather than a stub, and it bills nothing.
+
+> **Status: `0.1.0`, early.** Installable and usable. The Getting started below runs as a test on
 > every commit. The public contracts may still change between minor versions before `1.0`, and the
 > changelog says when they do.
 
