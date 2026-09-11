@@ -24,7 +24,7 @@ run JavaScript still reads it. On the 500-shopper benchmark the default mode mak
 per 1,000 page views, against 1,000 when you generate for each shopper. Running with no model at all
 is a supported setting rather than a stub, and it bills nothing.
 
-> **Status: `0.1.0`, early.** Installable and usable. The Getting started below runs as a test on
+> **Status: `0.2.0`, early.** Installable and usable. The Getting started below runs as a test on
 > every commit. The public contracts may still change between minor versions before `1.0`, and the
 > changelog says when they do.
 
