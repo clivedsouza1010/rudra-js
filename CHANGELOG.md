@@ -10,6 +10,27 @@ break them.
 
 ## [Unreleased]
 
+### Fixed
+
+- The deterministic selector no longer writes `Highly rated` as a product's
+  reason. Its basis is `popular`, so the prose stated something the basis did
+  not, and the claim screen deleted it: on a well-rated catalog every card in
+  cohort mode lost its reason line, and each deletion was counted as the model
+  making an unverifiable rating claim when the model had written nothing. The
+  rating still decides the ordering, through its own weight in the score. A
+  test now drives every branch of the selector through the screen, so a reason
+  the screen would delete fails the suite.
+- `@rudra-js/anthropic` sends `thinking: { type: 'disabled' }` by default and
+  defaults to `claude-sonnet-5`. Generation runs on the request path inside
+  `modelTimeoutMs`, which core defaults to 1500ms, and a model that reasons
+  before answering does not finish inside that. Following the package's own
+  quickstart therefore billed a call on every request and then timed out on
+  every request, rendering the deterministic component every time. The model
+  default alone did not fix this, because Sonnet 5 also reasons when `thinking`
+  is left out; turning it off explicitly is what makes the budget reachable.
+  Pass `thinking: null` to send no `thinking` field, which is what a model that
+  rejects an explicit `disabled` needs, and raise `modelTimeoutMs` to match.
+
 ## [0.2.0] - 2026-09-10
 
 ### Added

@@ -95,9 +95,6 @@ function basisFor(
   if (evidence.hasCart) {
     return { basis: 'complements_cart', reason: 'Goes with what is in your cart' };
   }
-  if ((product.rating ?? 0) >= 4.5) {
-    return { basis: 'popular', reason: 'Highly rated' };
-  }
   return { basis: 'popular', reason: `Popular in ${product.category}` };
 }
 

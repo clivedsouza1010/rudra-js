@@ -7,6 +7,7 @@ import {
   type ProductReference,
   type RecommendationBasis,
 } from './component-spec.js';
+import { selectProducts } from './product-selection.js';
 import { buildDigest } from './signal-digest.js';
 import { MAX_BLOCKS, reconcileSpec, type ReconcileResult } from './reconciliation.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
@@ -62,6 +63,62 @@ function reconcile(spec: GeneratedSpec, overrides: Partial<TrackingInputDraft> =
   const input = inputFor(overrides);
   return reconcileSpec(spec, input, buildDigest(input));
 }
+
+const WELL_RATED = [
+  product('TR-101', { rating: 4.9 }),
+  product('TR-102', { rating: 4.8 }),
+  product('NU-201', { category: 'Nutrition', rating: 4.7 }),
+];
+
+describe('the selector writes reasons its own screen accepts', () => {
+  // Every branch of basisFor, driven through selectProducts so the reasons are
+  // the real ones. A reason the screen deletes is a card that loses its line
+  // and a violation counted against a model that said nothing.
+  const SHAPES: Array<[string, RecommendationBasis, Partial<TrackingInputDraft>]> = [
+    ['a cold-start shopper', 'popular', {}],
+    [
+      'a shopper on a category page',
+      'similar_to_current',
+      { context: { surface: 'pdp', currentCategory: 'Trail Running' } },
+    ],
+    [
+      'a shopper with something in the cart',
+      'complements_cart',
+      { signals: { cart: [{ sku: 'TR-102', at: Date.now() }] } },
+    ],
+    [
+      'a shopper who viewed a product',
+      'most_viewed',
+      { signals: { mostViewed: [{ sku: 'TR-101', at: Date.now(), views: 3 }] } },
+    ],
+    ['a well-rated catalog', 'popular', { candidates: WELL_RATED }],
+  ];
+
+  it.each(SHAPES)('keeps every reason for %s', (_name, expectedBasis, overrides) => {
+    const input = inputFor(overrides);
+    const picks = selectProducts(input, buildDigest(input));
+    expect(picks.length).toBeGreaterThan(0);
+    // Without this the intended basisFor branch may never run: a precedence
+    // change could pick a different valid reason and leave the test green.
+    expect(picks.map((pick) => pick.basis)).toContain(expectedBasis);
+
+    const items = picks.map((pick) =>
+      ref(pick.product.sku, { basis: pick.basis, reason: pick.reason }),
+    );
+    const result = reconcile(
+      specWith([{ kind: 'grid', title: null, columns: 2, items }]),
+      overrides,
+    );
+
+    const placed = result.spec.blocks.flatMap((block) =>
+      block.kind === 'grid' || block.kind === 'carousel' ? block.items : [],
+    );
+    for (const item of placed) {
+      expect(item.reason, `the selector's reason for ${item.sku} was deleted`).not.toBeNull();
+    }
+    expect(result.violations.filter((v) => v.startsWith('unverifiable-claim'))).toEqual([]);
+  });
+});
 
 /** The first product reference of a spec whose only block is a grid. */
 const basisOf = (result: ReconcileResult): ProductReference | undefined => {

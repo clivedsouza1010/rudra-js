@@ -18,6 +18,14 @@ export interface AnthropicProviderOptions {
    * infer which one a request acts in and rejects it with a 400.
    */
   workspaceId?: string;
+  /**
+   * Sent as the request's `thinking`. Defaults to `{ type: 'disabled' }`,
+   * because core budgets 1500ms for the whole call and a model that reasons
+   * before answering does not finish inside it. Pass `null` to send nothing,
+   * which is what a model that rejects an explicit `disabled` needs, and raise
+   * `modelTimeoutMs` to match when you do.
+   */
+  thinking?: { type: 'adaptive' | 'disabled' } | null;
   /** Injected so the adapter is testable without a network or an SDK. */
   fetch?: typeof globalThis.fetch;
 }
@@ -25,10 +33,9 @@ export interface AnthropicProviderOptions {
 const TOOL_NAME = 'emit_component_spec';
 
 /**
- * This model runs adaptive thinking by default, and thinking draws on the
- * same output budget as the tool call. A cap too close to what reasoning
- * alone can spend leaves no room for the tool block, so the default is well
- * above a typical spec's size rather than tuned to it.
+ * A model that reasons before answering draws on the same output budget as the
+ * tool call, and a cap close to what a spec needs leaves no room for it. The
+ * default is well above a typical spec's size rather than tuned to it.
  */
 const DEFAULT_MAX_TOKENS = 8192;
 
@@ -70,7 +77,9 @@ function isToolUseBlock(candidate: unknown): candidate is ToolUseBlock {
  * and reach the generator as `provider-error` events.
  */
 export function createAnthropicProvider(options: AnthropicProviderOptions): ComponentProvider {
-  const model = options.model ?? 'claude-opus-5';
+  const model = options.model ?? 'claude-sonnet-5';
+  const thinking =
+    options.thinking === undefined ? { type: 'disabled' as const } : options.thinking;
   const call = options.fetch ?? globalThis.fetch;
   // Trimmed so a caller-supplied `baseUrl` ending in `/` cannot turn into
   // `//v1/messages`. Done with a loop rather than `/\/+$/`: that pattern
@@ -106,6 +115,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
         body: JSON.stringify({
           model,
           max_tokens: maxTokens,
+          ...(thinking ? { thinking } : {}),
           // Marked as the cached prefix. Anything per-shopper interpolated here
           // would destroy the prompt cache hit rate.
           system: [{ type: 'text', text: request.system, cache_control: { type: 'ephemeral' } }],
