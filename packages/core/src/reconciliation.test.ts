@@ -70,6 +70,32 @@ const WELL_RATED = [
   product('NU-201', { category: 'Nutrition', rating: 4.7 }),
 ];
 
+describe("a reason the shop supplied is the shop's own words", () => {
+  // The claim screen exists to catch the model. A sentence the host declared
+  // about the host's own product is not the model's, and is left alone — the
+  // same rule the titles and prices already follow.
+  const withHostReason = (reason: string) =>
+    reconcile(grid([ref('TR-101', { reason })]), {
+      candidates: [product('TR-101', { reason }), product('TR-102')],
+    });
+
+  it('keeps a host reason the screen would have deleted from the model', () => {
+    const kept = withHostReason('Only 2 left at this price');
+    const items = kept.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
+
+    expect(items[0]?.reason).toBe('Only 2 left at this price');
+    expect(kept.violations).toEqual([]);
+  });
+
+  it('still screens the same sentence when the shop did not supply it', () => {
+    const result = reconcile(grid([ref('TR-101', { reason: 'Only 2 left at this price' })]));
+    const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
+
+    expect(items[0]?.reason).toBeNull();
+    expect(result.violations.join()).toMatch(/^unverifiable-claim:[a-z]+:reason:TR-101$/);
+  });
+});
+
 describe('the selector writes reasons its own screen accepts', () => {
   // Every branch of basisFor, driven through selectProducts so the reasons are
   // the real ones. A reason the screen deletes is a card that loses its line

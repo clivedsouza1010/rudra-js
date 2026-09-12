@@ -125,3 +125,58 @@ describe('the stated basis', () => {
     }
   });
 });
+
+describe('a host that brings its own ranking', () => {
+  const CANDIDATES = [
+    { sku: 'Z-9', title: 'Last alphabetically, first by the shop', category: 'Trail', price: 10 },
+    { sku: 'A-1', title: 'First alphabetically', category: 'Trail', price: 20, rating: 5 },
+    { sku: 'M-5', title: 'In the middle', category: 'Trail', price: 30 },
+  ];
+
+  const inputFor = (overrides: Record<string, unknown> = {}) =>
+    parseTrackingInput({
+      user: { id: 'shopper-1' },
+      context: { surface: 'pdp' },
+      candidates: CANDIDATES,
+      ...overrides,
+    });
+
+  it('keeps the order it was sent', () => {
+    const input = inputFor();
+    const picks = selectProducts(input, buildDigest(input), { rank: 'given' });
+
+    expect(picks.map((pick) => pick.product.sku)).toEqual(['Z-9', 'A-1', 'M-5']);
+  });
+
+  it('scores instead when nothing is asked for, which is the default', () => {
+    const input = inputFor();
+    const byScore = selectProducts(input, buildDigest(input));
+
+    // A-1 is the only rated product, so scoring has to move it off its sent
+    // position. If this ever matches the sent order the test proves nothing.
+    expect(byScore.map((pick) => pick.product.sku)).not.toEqual(['Z-9', 'A-1', 'M-5']);
+    expect(byScore[0]?.product.sku).toBe('A-1');
+  });
+
+  it('still drops what the shopper must not be shown, in either order', () => {
+    const input = inputFor({ signals: { cart: [{ sku: 'Z-9', at: Date.now() }] } });
+    const picks = selectProducts(input, buildDigest(input), { rank: 'given' });
+
+    expect(picks.map((pick) => pick.product.sku)).toEqual(['A-1', 'M-5']);
+  });
+
+  it('uses the reason the shop supplied, and its basis stays verifiable', () => {
+    const input = parseTrackingInput({
+      user: { id: 'shopper-1' },
+      context: { surface: 'pdp' },
+      candidates: [
+        { ...CANDIDATES[0]!, reason: 'Bought together with your boots' },
+        CANDIDATES[1]!,
+      ],
+    });
+    const picks = selectProducts(input, buildDigest(input), { rank: 'given' });
+
+    expect(picks[0]?.reason).toBe('Bought together with your boots');
+    expect(picks[1]?.reason).not.toBe('Bought together with your boots');
+  });
+});

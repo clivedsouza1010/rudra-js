@@ -17,7 +17,7 @@ import {
   placeableHeroSkus,
   reconcileSpec,
 } from './reconciliation.js';
-import { selectProducts, type ProductPick } from './product-selection.js';
+import { selectProducts, type RankOrder, type ProductPick } from './product-selection.js';
 import { fitToShopper } from './fit-to-shopper.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import {
@@ -113,6 +113,14 @@ export interface ComponentGeneratorOptions {
    * 'cohort'.
    */
   generation?: 'cohort' | 'per-shopper';
+  /**
+   * How the products are ordered. 'signals' scores each candidate from this
+   * shopper's signals. 'given' keeps the order you sent, for a shop whose own
+   * ranking is better than four weights. Either way the exclusions and the
+   * stock check still apply, and each product still carries a basis
+   * reconciliation can verify. Defaults to 'signals'.
+   */
+  rank?: RankOrder;
   /** Observability. Never allowed to break a render. */
   onEvent?: (event: GenerationEvent) => void;
 }
@@ -242,8 +250,9 @@ function fitCohortSpec(
   spec: GeneratedSpec,
   input: TrackingInput,
   digest: SignalDigest,
+  rank: RankOrder,
 ): GeneratedSpec {
-  const picks = selectProducts(input, digest);
+  const picks = selectProducts(input, digest, { rank });
   // Blocks past the cap never render, so a set is not worth reserving for one.
   const blocks = spec.blocks.slice(0, MAX_BLOCKS);
 
@@ -292,6 +301,7 @@ export function createComponentGenerator(
   const provider = options.provider ?? null;
   const cache = options.cache ?? createMemorySpecCache();
   const generation = options.generation ?? 'cohort';
+  const rank = options.rank ?? 'signals';
   const modelTimeoutMs = options.modelTimeoutMs ?? 1_500;
   const cacheTimeoutMs = options.cacheTimeoutMs ?? 50;
   const singleFlight = createSingleFlight<ModelCall>();
@@ -330,7 +340,7 @@ export function createComponentGenerator(
       degradedReason,
     });
 
-    return withProvenance(buildFallbackSpec(input, digest), {
+    return withProvenance(buildFallbackSpec(input, digest, { rank }), {
       slot: digest.slot,
       source: 'fallback',
       generatedAt: finishedAt,
@@ -501,7 +511,7 @@ export function createComponentGenerator(
       // from, and always against the facts of the shopper asking now.
       // A cohort spec names products chosen for whoever asked first.
       const served =
-        generation === 'cohort' ? fitCohortSpec(answer.spec, input, digest) : answer.spec;
+        generation === 'cohort' ? fitCohortSpec(answer.spec, input, digest, rank) : answer.spec;
 
       const reconciled = reconcileSpec(served, input, digest);
       if (!reconciled.isUsable) {

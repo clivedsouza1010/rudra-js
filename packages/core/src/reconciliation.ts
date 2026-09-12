@@ -375,13 +375,21 @@ function reconcileItems(
     const hasSupportedBasis = verifyBasis(item.basis, product, digest);
     if (!hasSupportedBasis) tracker.record(`unsupported-basis:${item.basis}:${item.sku}`);
 
+    // A reason the host declared for this product is the shop's own words, like
+    // the title, and is left alone. A model can only reach this by writing the
+    // host's own sentence about the host's own product, which the host already
+    // stands behind.
+    const isHostReason = item.reason !== null && item.reason === product.reason;
+
     kept.push({
       sku: item.sku,
       basis: hasSupportedBasis ? item.basis : 'popular',
       // The prose exists to state the basis. If the basis did not hold, the
       // prose is a claim we just decided is untrue.
       reason: hasSupportedBasis
-        ? screenClaim(clampNullable(item.reason, CLAMP.reason), `reason:${item.sku}`, tracker)
+        ? isHostReason
+          ? clampNullable(item.reason, CLAMP.reason)
+          : screenClaim(clampNullable(item.reason, CLAMP.reason), `reason:${item.sku}`, tracker)
         : null,
       badge: clampNullable(item.badge, CLAMP.badge),
       emphasis: item.emphasis,
