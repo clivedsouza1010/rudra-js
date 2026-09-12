@@ -55,6 +55,7 @@ const sentBodyOf = (fetch: typeof globalThis.fetch) =>
   ) as {
     system: { cache_control?: unknown }[];
     tools: { input_schema: { type?: string; required?: string[] } }[];
+    thinking?: { type: string };
   };
 
 describe('the Anthropic adapter', () => {
@@ -337,6 +338,20 @@ describe('the Anthropic adapter', () => {
     const provider = createAnthropicProvider({ apiKey: 'k', fetch: answer(toolAnswer(spec)) });
 
     expect(provider.model).toBe('claude-sonnet-5');
+  });
+
+  it('turns thinking off by default, because core budgets 1500ms', async () => {
+    const fetch = answer(toolAnswer(spec));
+    await createAnthropicProvider({ apiKey: 'k', fetch }).generate(request());
+
+    expect(sentBodyOf(fetch).thinking).toEqual({ type: 'disabled' });
+  });
+
+  it('sends no thinking at all when the caller passes null', async () => {
+    const fetch = answer(toolAnswer(spec));
+    await createAnthropicProvider({ apiKey: 'k', thinking: null, fetch }).generate(request());
+
+    expect(sentBodyOf(fetch).thinking).toBeUndefined();
   });
 });
 

@@ -74,27 +74,33 @@ describe('the selector writes reasons its own screen accepts', () => {
   // Every branch of basisFor, driven through selectProducts so the reasons are
   // the real ones. A reason the screen deletes is a card that loses its line
   // and a violation counted against a model that said nothing.
-  const SHAPES: Array<[string, Partial<TrackingInputDraft>]> = [
-    ['a cold-start shopper', {}],
+  const SHAPES: Array<[string, RecommendationBasis, Partial<TrackingInputDraft>]> = [
+    ['a cold-start shopper', 'popular', {}],
     [
       'a shopper on a category page',
+      'similar_to_current',
       { context: { surface: 'pdp', currentCategory: 'Trail Running' } },
     ],
     [
       'a shopper with something in the cart',
+      'complements_cart',
       { signals: { cart: [{ sku: 'TR-102', at: Date.now() }] } },
     ],
     [
       'a shopper who viewed a product',
+      'most_viewed',
       { signals: { mostViewed: [{ sku: 'TR-101', at: Date.now(), views: 3 }] } },
     ],
-    ['a well-rated catalog', { candidates: WELL_RATED }],
+    ['a well-rated catalog', 'popular', { candidates: WELL_RATED }],
   ];
 
-  it.each(SHAPES)('keeps every reason for %s', (_name, overrides) => {
+  it.each(SHAPES)('keeps every reason for %s', (_name, expectedBasis, overrides) => {
     const input = inputFor(overrides);
     const picks = selectProducts(input, buildDigest(input));
     expect(picks.length).toBeGreaterThan(0);
+    // Without this the intended basisFor branch may never run: a precedence
+    // change could pick a different valid reason and leave the test green.
+    expect(picks.map((pick) => pick.basis)).toContain(expectedBasis);
 
     const items = picks.map((pick) =>
       ref(pick.product.sku, { basis: pick.basis, reason: pick.reason }),

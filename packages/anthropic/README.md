@@ -21,14 +21,19 @@ const provider = createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY
 const generator = createComponentGenerator({ provider });
 ```
 
-`model` defaults to `claude-sonnet-5`. Generation runs on the request path
-inside `modelTimeoutMs`, which core defaults to 1500ms, and the default model is
-one that answers inside that budget. Pass `model` to pin a different one, and
-raise `modelTimeoutMs` when you do: a model that reasons before answering takes
-far longer than 1500ms, so leaving the budget alone means every request is
-billed and then times out, and every page renders the deterministic component.
-The example shop pins `claude-opus-5` and sets `modelTimeoutMs` to 60 seconds
-for that reason, which is a demo setting rather than a production one.
+`model` defaults to `claude-sonnet-5`, and `thinking` defaults to
+`{ type: 'disabled' }`. Both defaults exist for the same reason: generation runs
+on the request path inside `modelTimeoutMs`, which core defaults to 1500ms, and
+a model that reasons before answering does not finish inside that. Sonnet 5
+reasons by default when `thinking` is left out, so leaving it out is what would
+break, not the model choice.
+
+Pass `model` to pin a different one, and raise `modelTimeoutMs` to match when
+you do. Some models reject an explicit `{ type: 'disabled' }` and always reason;
+pass `thinking: null` for those, which sends no `thinking` field at all. The
+example shop pins `claude-opus-5` and sets `modelTimeoutMs` to 60 seconds, which
+is a demo setting rather than a production one.
+
 `maxTokens` and `baseUrl` are also optional.
 
 ### An identity-linked key needs a workspace
