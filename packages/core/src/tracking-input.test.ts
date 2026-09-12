@@ -116,6 +116,11 @@ const capCases: Array<[string, keyof typeof FIELD_LIMITS, (size: number) => Trac
     (size) => minimalPayload({ candidates: [{ ...aProduct, title: repeat(size) }] }),
   ],
   [
+    "the shop's own reason for a product",
+    'reason',
+    (size) => minimalPayload({ candidates: [{ ...aProduct, reason: repeat(size) }] }),
+  ],
+  [
     'an interaction type',
     'identifier',
     (size) => minimalPayload({ signals: { interactions: [{ type: repeat(size) }] } }),

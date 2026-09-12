@@ -49,6 +49,7 @@ Everything `createComponentGenerator` takes, and what it does without it.
 | `provider`       | The model adapter. `null` runs without a model and bills nothing.                                    | `null`                    |
 | `cache`          | Where generated specs are kept between requests. Pass `createNullSpecCache()` to keep none.          | `createMemorySpecCache()` |
 | `generation`     | `'cohort'` shares one component between shoppers who look alike; `'per-shopper'` generates for each. | `'cohort'`                |
+| `rank`           | `'signals'` orders products by this shopper's signals; `'given'` keeps the order you sent.           | `'signals'`               |
 | `modelTimeoutMs` | How long the model gets. Past this the request is aborted and the deterministic component renders.   | `1500`                    |
 | `cacheTimeoutMs` | How long a cache read gets. Past this the request generates as if the store had nothing.             | `50`                      |
 | `onEvent`        | Called once per `generate` with a `GenerationEvent`. A hook that throws is swallowed.                | none                      |
@@ -216,6 +217,42 @@ Every fixed-shape object is a `strictObject`. A host that misspells
 `recentSearches` gets an error, not a shopper who silently looks like a
 first-time visitor. `interaction.meta` is the one dynamic shape — an open
 record, minus the keys that would mutate a prototype instead of the object.
+
+## Bringing your own ranking
+
+By default this orders the products for you, scoring each candidate against the
+shopper's signals. If you already have a recommender you trust — bought
+together, an engine trained on your orders, a merchandiser's hand-picked row —
+pass `rank: 'given'` and the order you sent is the order that renders.
+
+```ts
+const generator = createComponentGenerator({ provider, rank: 'given' });
+```
+
+You keep the rest either way. Products the shopper must not be shown are still
+dropped: out of stock, already bought, in the basket, disliked, and the one
+being looked at. Every product still carries a basis that reconciliation checks
+against the shopper's real signals, and everything the model writes is still
+screened.
+
+Each candidate can carry its own `reason`, which is the phrase shown under the
+product. Use it when your ranking knows something the signals do not:
+
+```ts
+candidates: [
+  {
+    sku: 'A-2',
+    title: 'Enamel dutch oven',
+    category: 'Cookware',
+    price: 89,
+    reason: 'Bought together with your skillet',
+  },
+];
+```
+
+A reason you supply is your own words, like the title, so it is rendered as
+written and not screened. Without one, the basis is stated for you from the
+shopper's signals.
 
 ## What the model sees
 

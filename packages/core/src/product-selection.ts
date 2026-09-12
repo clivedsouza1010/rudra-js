@@ -104,7 +104,24 @@ function basisFor(
  * Ties break on SKU so the order is total: two runs over the same payload
  * produce the same list, which is what makes the control arm reproducible.
  */
-export function selectProducts(input: TrackingInput, digest: SignalDigest): ProductPick[] {
+/** How the picks are ordered once the unplaceable ones are gone. */
+export type RankOrder = 'signals' | 'given';
+
+export interface SelectOptions {
+  /**
+   * `signals` scores each candidate and orders by that score. `given` keeps the
+   * order you sent, for a shop whose own ranking is better than four weights.
+   * Either way the exclusions and the stock check still apply, and every pick
+   * still carries a basis reconciliation can verify.
+   */
+  rank?: RankOrder;
+}
+
+export function selectProducts(
+  input: TrackingInput,
+  digest: SignalDigest,
+  options: SelectOptions = {},
+): ProductPick[] {
   const affinityByCategory = new Map(
     digest.categoryAffinity.map((affinity) => [affinity.category, affinity.score]),
   );
@@ -141,8 +158,10 @@ export function selectProducts(input: TrackingInput, digest: SignalDigest): Prod
       hasCart,
     });
 
-    picks.push({ product, basis, reason, score });
+    picks.push({ product, basis, reason: product.reason ?? reason, score });
   }
+
+  if (options.rank === 'given') return picks;
 
   return picks.toSorted(
     (left, right) => right.score - left.score || left.product.sku.localeCompare(right.product.sku),
