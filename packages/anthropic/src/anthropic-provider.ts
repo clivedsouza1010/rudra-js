@@ -25,10 +25,9 @@ export interface AnthropicProviderOptions {
 const TOOL_NAME = 'emit_component_spec';
 
 /**
- * This model runs adaptive thinking by default, and thinking draws on the
- * same output budget as the tool call. A cap too close to what reasoning
- * alone can spend leaves no room for the tool block, so the default is well
- * above a typical spec's size rather than tuned to it.
+ * A model that reasons before answering draws on the same output budget as the
+ * tool call, and a cap close to what a spec needs leaves no room for it. The
+ * default is well above a typical spec's size rather than tuned to it.
  */
 const DEFAULT_MAX_TOKENS = 8192;
 
@@ -70,7 +69,7 @@ function isToolUseBlock(candidate: unknown): candidate is ToolUseBlock {
  * and reach the generator as `provider-error` events.
  */
 export function createAnthropicProvider(options: AnthropicProviderOptions): ComponentProvider {
-  const model = options.model ?? 'claude-opus-5';
+  const model = options.model ?? 'claude-sonnet-5';
   const call = options.fetch ?? globalThis.fetch;
   // Trimmed so a caller-supplied `baseUrl` ending in `/` cannot turn into
   // `//v1/messages`. Done with a loop rather than `/\/+$/`: that pattern

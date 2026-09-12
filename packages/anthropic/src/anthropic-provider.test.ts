@@ -332,6 +332,12 @@ describe('the Anthropic adapter', () => {
     expect(provider.name).toBe('anthropic');
     expect(provider.model).toBe('claude-opus-5');
   });
+
+  it("defaults to a model that fits core's request-path budget", async () => {
+    const provider = createAnthropicProvider({ apiKey: 'k', fetch: answer(toolAnswer(spec)) });
+
+    expect(provider.model).toBe('claude-sonnet-5');
+  });
 });
 
 describe('what reaches the caller on a failure', () => {
