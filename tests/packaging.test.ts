@@ -374,6 +374,53 @@ describe('the release workflow', () => {
   });
 });
 
+describe('the react package and its peer range', () => {
+  // The range says React 18 works. It works because nothing here calls a React
+  // API: the source takes types only, and the build emits jsx-runtime, which
+  // has existed since React 17. Add a hook and the range becomes a promise the
+  // code does not keep, so this fails and asks you to narrow it.
+  const sourceFiles = readdirSync(join(REPO_ROOT, 'packages/react/src'), {
+    recursive: true,
+    encoding: 'utf8',
+  }).filter((name) => /\.tsx?$/.test(name) && !name.includes('.test.'));
+
+  it('takes React 18 as well as 19', () => {
+    const range = readManifest('react').peerDependencies?.['react'];
+    expect(range, 'the react peer range is missing').toBeDefined();
+    expect(range).toContain('18');
+    expect(range).toContain('19');
+  });
+
+  it('imports types from react and nothing else', () => {
+    expect(sourceFiles.length).toBeGreaterThan(5);
+
+    for (const name of sourceFiles) {
+      const source = readFileSync(join(REPO_ROOT, 'packages/react/src', name), 'utf8');
+      for (const line of source.split('\n')) {
+        if (!/from 'react'/.test(line)) continue;
+        expect(line.trimStart(), `${name} imports a react value, not a type`).toMatch(
+          /^import type /,
+        );
+      }
+    }
+  });
+
+  it('builds to a bundle that touches only the jsx runtime', () => {
+    const dist = join(REPO_ROOT, 'packages/react/dist');
+    if (!existsSync(dist)) return;
+
+    const built = readdirSync(dist).filter((name) => name.endsWith('.js'));
+    expect(built.length).toBeGreaterThan(0);
+
+    for (const name of built) {
+      const source = readFileSync(join(dist, name), 'utf8');
+      for (const match of source.matchAll(/from "(react[^"]*)"/g)) {
+        expect(match[1], `${name} imports ${match[1]}`).toBe('react/jsx-runtime');
+      }
+    }
+  });
+});
+
 describe('the README', () => {
   it('lists every package that gets published', () => {
     const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
