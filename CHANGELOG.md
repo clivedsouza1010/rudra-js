@@ -10,6 +10,15 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- `@rudra-js/react` takes React 18 as well as 19. The peer range said `^19.0.0`
+  while the package imports only two types from React and no runtime API, so
+  the build touches nothing but `react/jsx-runtime`, which has existed since
+  React 17. The range was refusing installs the code supports. A test now fails
+  if anything in the package imports a React value rather than a type, so the
+  range stays true.
+
 ### Fixed
 
 - The deterministic selector no longer writes `Highly rated` as a product's
