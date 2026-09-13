@@ -255,12 +255,95 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
   },
 ];
 
+/**
+ * Letters that render as a Latin letter but are not one. A Cyrillic о in
+ * "in stоck" would otherwise carry a stock claim straight past the rule written
+ * for it, and the shopper would read the claim anyway.
+ */
+const CONFUSABLES: Record<string, string> = {
+  а: 'a',
+  в: 'b',
+  е: 'e',
+  к: 'k',
+  м: 'm',
+  н: 'h',
+  о: 'o',
+  р: 'p',
+  с: 'c',
+  т: 't',
+  х: 'x',
+  у: 'y',
+  ѕ: 's',
+  і: 'i',
+  ј: 'j',
+  ԁ: 'd',
+  һ: 'h',
+  ӏ: 'l',
+  α: 'a',
+  ε: 'e',
+  ι: 'i',
+  κ: 'k',
+  ν: 'v',
+  ο: 'o',
+  ρ: 'p',
+  τ: 't',
+  υ: 'u',
+  χ: 'x',
+  ϲ: 'c',
+};
+
+/**
+ * Characters that render as nothing: format characters, default-ignorable code
+ * points and the controls. Cf and Default_Ignorable each hold characters the
+ * other does not.
+ *
+ * The same class @rudra-js/attested strips in its own `hidden.ts`. A second copy,
+ * because core carries no dependencies and is not about to take one — which means
+ * widening one and not the other is the mistake to watch for.
+ */
+const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
+
+/**
+ * The controls that do take room. Deleting these would read `Only 2\n3 left` as 23.
+ *
+ * No test pins this line, and none can: clamping collapses every run of whitespace
+ * before a claim is screened, so nothing here ever sees one. It is kept so the class
+ * reads the same in both copies.
+ */
+const SPACING = /[\t\n\v\f\r\u0085]/;
+
+/**
+ * Marks that hang on the character before them instead of taking a column of their
+ * own. Dropped after composition, so an accented e keeps its accent while an
+ * overline, which composes with nothing, cannot hide a word from its own rule.
+ */
+const MARKS = /[\p{Mn}\p{Me}]/gu;
+
+/**
+ * One shape for the text before the patterns read it, so a word that renders as
+ * "in stock" is read as "in stock" however it was spelled.
+ *
+ * Only the reading is normalised. What renders is what the model wrote.
+ */
+function normaliseForClaims(text: string): string {
+  const lowered = text
+    .replace(INVISIBLE, (char) => (SPACING.test(char) ? char : ''))
+    .normalize('NFKC')
+    .toLowerCase()
+    .normalize('NFC')
+    .replace(MARKS, '');
+
+  let folded = '';
+  for (const char of lowered) folded += CONFUSABLES[char] ?? char;
+  return folded;
+}
+
 /** Names the first forbidden claim the text makes, or null when it makes none. */
 function claimIn(text: string): string | null {
-  const lower = text.toLowerCase();
+  const normalised = normaliseForClaims(text);
   for (const claim of CLAIM_PATTERNS) {
     for (const pattern of claim.patterns) {
-      if (pattern.test(lower)) return claim.kind;
+      if (pattern.test(normalised)) return claim.kind;
     }
   }
   return null;

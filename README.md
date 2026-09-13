@@ -16,9 +16,9 @@ React Server Components turn that specification into markup, reading the title, 
 link from your catalog as the page is served. Whatever the model wrote is rendered as escaped text.
 
 We also scan the model's words for prices, discounts, ratings, delivery dates, and stock counts. If
-the text makes one of those claims, it gets dropped. That check reads raw words, so a careful
-rewording might slip past it, which is why the structural boundaries are the real defence. The model
-is never told a price, and the specification has nowhere to put one.
+the text makes one of those claims, it gets dropped. That check matches patterns, not meaning, so a
+careful rewording might slip past it, which is why the structural boundaries are the real defence.
+The model is never told a price, and the specification has nowhere to put one.
 
 Because the block is in the initial HTML response and needs zero client-side JavaScript, a crawler
 that never runs JavaScript still reads it. It's efficient too: on our 500-shopper benchmark the

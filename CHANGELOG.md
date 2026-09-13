@@ -81,6 +81,21 @@ break them.
   through it, so the denylist catches `"Free\n\nshipping"`, but an allowance
   will not bridge one. The two rules pull opposite ways on purpose.
 
+- `@rudra-js/core`'s claim screen read the model's text with nothing but
+  `toLowerCase()` in front of it, so a banned claim only had to be spelled with
+  characters the pattern did not expect. A zero-width space, a soft hyphen or a
+  control character dropped inside a word, an overline hung on a letter, a
+  Cyrillic o standing in for a Latin one, a blank-rendering Hangul filler, or the
+  whole phrase typed fullwidth — every one of those renders to the shopper as the
+  claim it is, and every one walked straight past the rule written for it. The
+  text is now read through the same normalising pass `@rudra-js/attested` uses:
+  the characters that take no room come off, compatibility spellings fold to
+  plain ASCII, and a short table of Cyrillic and Greek look-alikes maps back to
+  Latin. Only the reading changes — what renders is still exactly what the model
+  wrote, character for character. The screen is the same best-effort backstop it
+  always was: a reworded claim still gets through, and the structural boundaries
+  are still the real defence.
+
 ### Changed
 
 - `@rudra-js/attested` documents three holes it does not close, all in the

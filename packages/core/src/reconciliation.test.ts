@@ -1097,6 +1097,56 @@ describe('claims the renderer cannot check', () => {
 });
 
 /**
+ * The patterns read words, and a word can be spelled with characters that are
+ * not the ones it looks like. Every reason below renders as the sentence a rule
+ * is already written for, and every one of them used to walk straight past it.
+ *
+ * This is the backstop, not the defence. A reworded claim still gets through.
+ */
+describe('a claim spelled in characters the patterns do not expect', () => {
+  const reasonFor = (text: string): string | null | undefined =>
+    basisOf(reconcile(grid([ref('TR-101', { reason: text })])))?.reason;
+
+  const DISGUISED_STOCK: { hidden: string; reason: string }[] = [
+    { hidden: 'a zero-width space', reason: 'in st\u200Bock in your size' },
+    { hidden: 'a variation selector', reason: 'in st\uFE0Fock in your size' },
+    { hidden: 'a soft hyphen', reason: 'in st\u00ADock in your size' },
+    { hidden: 'a Cyrillic look-alike', reason: 'in st\u043Eck in your size' },
+    { hidden: 'a blank-rendering Hangul letter', reason: 'in st\u3164ock in your size' },
+    { hidden: 'a combining mark', reason: 'in sto\u0305ck in your size' },
+    { hidden: 'a control character', reason: 'in st\u0008ock in your size' },
+    { hidden: 'an Arabic format character', reason: 'in st\u0600ock in your size' },
+    {
+      hidden: 'fullwidth letters',
+      reason: '\uFF29\uFF2E \uFF33\uFF34\uFF2F\uFF23\uFF2B in your size',
+    },
+  ];
+
+  for (const row of DISGUISED_STOCK) {
+    it(`drops a stock claim hidden behind ${row.hidden}`, () => {
+      expect(reasonFor(row.reason)).toBeNull();
+    });
+  }
+
+  it('drops a discount claim hidden behind a Greek look-alike', () => {
+    expect(reasonFor('20% \u03BFff for the rest of the week')).toBeNull();
+  });
+
+  // Lowercasing without a locale turns the Turkish capital into i plus a
+  // combining dot, which is not the i the pattern is looking for.
+  it('drops a price claim hidden behind a Turkish dotted capital I', () => {
+    expect(reasonFor('PR\u0130CED to move')).toBeNull();
+  });
+
+  // Normalising is how the text is read, not how it is written back.
+  it('renders honest copy exactly as the model wrote it', () => {
+    const reason = '\uFF33uper light for long days';
+
+    expect(reasonFor(reason)).toBe(reason);
+  });
+});
+
+/**
  * The screen once ran on four fields, so the same claim could be deleted from a
  * product's small print and kept in the heading right above it. Every string the
  * model writes is read now. Host text is not: a product title, a category and a
