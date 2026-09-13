@@ -251,8 +251,13 @@ candidates: [
 ```
 
 A reason you supply is your own words, like the title, so it is rendered as
-written and not screened. Without one, the basis is stated for you from the
-shopper's signals.
+written and not screened. That only applies where this request actually used it,
+which is the default `cohort` mode. In `per-shopper` mode the model writes the
+reasons itself, so every one of them is screened, including one that happens to
+read the same as yours.
+
+Without a reason of your own, the basis is stated for you from the shopper's
+signals.
 
 ## What the model sees
 

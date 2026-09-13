@@ -356,6 +356,7 @@ function reconcileItems(
   candidatesBySku: Map<string, Product>,
   digest: SignalDigest,
   tracker: PlacementTracker,
+  hostReasonSkus: ReadonlySet<string>,
 ): ProductReference[] {
   const kept: ProductReference[] = [];
 
@@ -375,11 +376,8 @@ function reconcileItems(
     const hasSupportedBasis = verifyBasis(item.basis, product, digest);
     if (!hasSupportedBasis) tracker.record(`unsupported-basis:${item.basis}:${item.sku}`);
 
-    // A reason the host declared for this product is the shop's own words, like
-    // the title, and is left alone. A model can only reach this by writing the
-    // host's own sentence about the host's own product, which the host already
-    // stands behind.
-    const isHostReason = item.reason !== null && item.reason === product.reason;
+    const isHostReason =
+      item.reason !== null && hostReasonSkus.has(item.sku) && item.reason === product.reason;
 
     kept.push({
       sku: item.sku,
@@ -524,6 +522,7 @@ function reconcileBlock(
   digest: SignalDigest,
   bundles: readonly Bundle[],
   tracker: PlacementTracker,
+  hostReasonSkus: ReadonlySet<string>,
 ): Block | null {
   switch (block.kind) {
     case 'hero': {
@@ -560,7 +559,14 @@ function reconcileBlock(
     }
 
     case 'grid': {
-      const items = reconcileItems(block.items, allowlist, candidatesBySku, digest, tracker);
+      const items = reconcileItems(
+        block.items,
+        allowlist,
+        candidatesBySku,
+        digest,
+        tracker,
+        hostReasonSkus,
+      );
       if (items.length === 0) {
         tracker.record('empty-block:grid');
         return null;
@@ -575,7 +581,14 @@ function reconcileBlock(
     }
 
     case 'carousel': {
-      const items = reconcileItems(block.items, allowlist, candidatesBySku, digest, tracker);
+      const items = reconcileItems(
+        block.items,
+        allowlist,
+        candidatesBySku,
+        digest,
+        tracker,
+        hostReasonSkus,
+      );
       if (items.length === 0) {
         tracker.record('empty-block:carousel');
         return null;
@@ -651,6 +664,12 @@ export function reconcileSpec(
   generated: GeneratedSpec,
   input: TrackingInput,
   digest: SignalDigest,
+  /**
+   * SKUs whose reason this request wrote from the host's own candidate. Only
+   * `fitToShopper` fills it, so in `per-shopper` mode it is empty and every
+   * reason is the model's, including one that happens to read the same.
+   */
+  hostReasonSkus: ReadonlySet<string> = new Set(),
 ): ReconcileResult {
   const allowlist = buildAllowlist(input, digest);
   const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
@@ -669,6 +688,7 @@ export function reconcileSpec(
       digest,
       input.bundles,
       tracker,
+      hostReasonSkus,
     );
     if (reconciled !== null) blocks.push(reconciled);
   }

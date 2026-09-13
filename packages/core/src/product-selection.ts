@@ -23,6 +23,8 @@ export interface ProductPick {
   basis: RecommendationBasis;
   /** How the basis reads to a shopper. */
   reason: string;
+  /** True when `reason` is the host's own sentence from the candidate. */
+  reasonFromHost: boolean;
   /** Unnormalised. Only the ordering is meaningful. */
   score: number;
 }
@@ -158,7 +160,13 @@ export function selectProducts(
       hasCart,
     });
 
-    picks.push({ product, basis, reason: product.reason ?? reason, score });
+    picks.push({
+      product,
+      basis,
+      reason: product.reason ?? reason,
+      reasonFromHost: product.reason !== undefined,
+      score,
+    });
   }
 
   if (options.rank === 'given') return picks;

@@ -251,6 +251,7 @@ function fitCohortSpec(
   input: TrackingInput,
   digest: SignalDigest,
   rank: RankOrder,
+  hostReasonSkus: Set<string>,
 ): GeneratedSpec {
   const picks = selectProducts(input, digest, { rank });
   // Blocks past the cap never render, so a set is not worth reserving for one.
@@ -265,26 +266,26 @@ function fitCohortSpec(
     }
     aboveBundle.push(block);
   }
-  if (!hasBundleBlock) return fitToShopper(spec, picks, digest.maxItems);
+  if (!hasBundleBlock) return fitToShopper(spec, picks, digest.maxItems, hostReasonSkus);
 
   // Only the heroes above the bundle block are placed when it is reached, so
   // they are all the choice may account for.
   const chosen = bundleForShopper(input, digest, placeableHeroSkus(aboveBundle, input, digest));
-  if (!chosen) return fitToShopper(spec, picks, digest.maxItems);
+  if (!chosen) return fitToShopper(spec, picks, digest.maxItems, hostReasonSkus);
 
   const spokenFor = new Set<string>(chosen.skus);
   for (const sku of placeableHeroSkus(blocks, input, digest)) spokenFor.add(sku);
 
   const roomLeft = digest.maxItems - spokenFor.size;
   // A set is worth showing, but not at the cost of an empty grid.
-  if (roomLeft <= 0) return fitToShopper(spec, picks, digest.maxItems);
+  if (roomLeft <= 0) return fitToShopper(spec, picks, digest.maxItems, hostReasonSkus);
 
   const forGrid: ProductPick[] = [];
   for (const pick of picks) {
     if (!spokenFor.has(pick.product.sku)) forGrid.push(pick);
   }
 
-  return fitToShopper(spec, forGrid, roomLeft);
+  return fitToShopper(spec, forGrid, roomLeft, hostReasonSkus);
 }
 
 /** Attaches the provenance the server owns. The model never supplies any of it. */
@@ -510,10 +511,15 @@ export function createComponentGenerator(
       // One place where anything is served, whichever side of the cache it came
       // from, and always against the facts of the shopper asking now.
       // A cohort spec names products chosen for whoever asked first.
+      // Only the cohort path writes a host reason into a spec, so in
+      // per-shopper mode this stays empty and every reason is screened.
+      const hostReasonSkus = new Set<string>();
       const served =
-        generation === 'cohort' ? fitCohortSpec(answer.spec, input, digest, rank) : answer.spec;
+        generation === 'cohort'
+          ? fitCohortSpec(answer.spec, input, digest, rank, hostReasonSkus)
+          : answer.spec;
 
-      const reconciled = reconcileSpec(served, input, digest);
+      const reconciled = reconcileSpec(served, input, digest, hostReasonSkus);
       if (!reconciled.isUsable) {
         return buildDeterministic(input, digest, startedAt, key, 'unusable-on-serve', {
           calledModel,
