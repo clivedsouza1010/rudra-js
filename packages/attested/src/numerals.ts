@@ -1,10 +1,7 @@
 // Everything here is string work. No float ever holds a value, so a twenty-digit
 // order number compares exactly.
 
-// Both classes are needed: the variation selectors are default-ignorable but not Cf,
-// and 32 Cf characters, the Arabic number signs among them, are not default-ignorable.
-/** Invisible characters, dropped so a zero-width space cannot split one number into two. */
-const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}]/gu;
+import { stripInvisible, stripMarks } from './hidden.js';
 
 /** A dot or a comma. Either mark is a decimal point in one locale and grouping in another. */
 const AMBIGUOUS = '.,';
@@ -185,35 +182,48 @@ function collect(found: Numeral[], token: string): void {
 
 export function numeralsIn(text: string): Numeral[] {
   const found: Numeral[] = [];
-  for (const match of text.replace(INVISIBLE, '').matchAll(SCAN)) collect(found, match[0]);
+  for (const match of stripMarks(stripInvisible(text)).matchAll(SCAN)) collect(found, match[0]);
   return found;
 }
 
+/** A whole fact in exponent notation and nothing else, so expanding it swallows no prose. */
+const BARE_EXPONENT = /^[+-]?\d+(?:\.\d+)?[eE][+-]?\d+$/;
+
 /** `String(1e21)` is `1e+21`, which reads as the two numerals 1 and 21. Lay the same digits out in place. */
-function plainDigits(value: number): string {
-  const written = String(value);
-  const marker = written.indexOf('e');
+function positional(written: string): string {
+  const marker = written.search(/[eE]/);
   if (marker < 0) return written;
 
   const power = Number(written.slice(marker + 1));
-  const sign = written[0] === '-' ? '-' : '';
-  const body = written.slice(sign.length, marker);
+  // The sign never reaches a numeral, so dropping it here mints no digit the host lacks.
+  const body = written.slice(0, marker).replace(/^[+-]/, '');
   const point = body.indexOf('.');
   const digits = point < 0 ? body : body.slice(0, point) + body.slice(point + 1);
   const place = (point < 0 ? body.length : point) + power;
 
-  if (place <= 0) return `${sign}0.${'0'.repeat(-place)}${digits}`;
-  if (place >= digits.length) return `${sign}${digits}${'0'.repeat(place - digits.length)}`;
-  return `${sign}${digits.slice(0, place)}.${digits.slice(place)}`;
+  if (place <= 0) return `0.${'0'.repeat(-place)}${digits}`;
+  if (place >= digits.length) return `${digits}${'0'.repeat(place - digits.length)}`;
+  return `${digits.slice(0, place)}.${digits.slice(place)}`;
+}
+
+/**
+ * A string fact is read as the host typed it, except when the whole of it is a number
+ * in exponent notation: `String`, `JSON.stringify`, a CSV export and an API that writes
+ * 64-bit values as strings all produce that, and none of them is the host choosing digits.
+ */
+function digitsOf(value: string | number | bigint): string {
+  if (typeof value === 'number') return positional(String(value));
+  if (typeof value !== 'string') return String(value);
+
+  const trimmed = value.trim();
+  return BARE_EXPONENT.test(trimmed) ? positional(trimmed) : value;
 }
 
 /** Every reading of every numeral the host stands behind. */
-export function supportedValues(values: readonly (string | number)[]): Set<string> {
+export function supportedValues(values: readonly (string | number | bigint)[]): Set<string> {
   const supported = new Set<string>();
   for (const value of values) {
-    // A string fact carries digits the host typed; with a number, `String` chose the notation.
-    const written = typeof value === 'number' ? plainDigits(value) : value;
-    for (const numeral of numeralsIn(written)) {
+    for (const numeral of numeralsIn(digitsOf(value))) {
       for (const form of numeral.forms) supported.add(form);
     }
   }

@@ -243,8 +243,29 @@ describe('supportedValues', () => {
     expect(supportedValues([NaN, Infinity, -Infinity])).toEqual(new Set());
   });
 
-  it('leaves a string fact alone, because there the host typed the digits', () => {
-    // Deliberate: '1e21' still mints 1 and 21. With a number, String chose the notation.
-    expect(supportedValues(['1e21'])).toEqual(new Set(['1', '21']));
+  it('lays out a string fact that is a bare number in exponent notation', () => {
+    // `String(v)`, `JSON.stringify(v)`, a CSV export and a JSON API that writes 64-bit
+    // values as strings all land here, so the host did not choose these digits either.
+    expect(supportedValues(['1e21'])).toEqual(new Set(['1000000000000000000000']));
+    expect(supportedValues(['1.23E+15'])).toEqual(new Set(['1230000000000000']));
+    expect(supportedValues([' 1e-7 '])).toEqual(new Set(['0.0000001']));
+  });
+
+  it('leaves a string fact alone when the exponent is part of something longer', () => {
+    // There the host really did type the digits, and a SKU is not a number.
+    expect(supportedValues(['SKU AX-220e5'])).toEqual(new Set(['220', '5']));
+    expect(supportedValues(['1e21 ohms'])).toEqual(new Set(['1', '21']));
+  });
+
+  it('takes a bigint exactly, which is the only way past 2^53', () => {
+    expect(supportedValues([12345678901234567890n])).toEqual(new Set(['12345678901234567890']));
+  });
+
+  it('stands behind nothing for a value that is neither, rather than throwing', () => {
+    // An optional product field arrives as null, and taking the whole call down over
+    // one missing price is worse than standing behind no numeral for it.
+    expect(supportedValues([null, undefined, true] as unknown as (string | number)[])).toEqual(
+      new Set(),
+    );
   });
 });

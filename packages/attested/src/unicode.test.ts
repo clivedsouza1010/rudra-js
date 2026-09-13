@@ -80,29 +80,36 @@ describe('every decimal digit in Unicode', () => {
 });
 
 /**
- * A character that renders as nothing can split a number into two the host did supply,
- * or split a banned phrase off its own entry. The class that drops them was `\p{Cf}`,
- * which left every variation selector in. Both layers sweep the whole of Unicode here
- * rather than trusting a hand-written list.
+ * A character that takes no column of its own can split a number into two the host did
+ * supply, or split a banned phrase off its own entry. The class that drops them was
+ * `\p{Cf}`, which left every variation selector in; widening it to the default-ignorable
+ * code points still left the controls and the combining marks. Both layers sweep the
+ * whole of Unicode here rather than trusting a hand-written list.
  */
-function invisibleCodePoints(): number[] {
-  const ignorable = /\p{Default_Ignorable_Code_Point}/u;
-  const format = /\p{Cf}/u;
+const SPACING_CONTROL = /[\t\n\v\f\r\u0085]/;
+
+function weightlessCodePoints(): number[] {
+  const hangs = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Mn}\p{Me}\p{Cc}]/u;
 
   const found: number[] = [];
   for (let code = 0; code <= 0x10ffff; code += 1) {
     if (code >= 0xd800 && code <= 0xdfff) continue;
     const char = String.fromCodePoint(code);
-    if (ignorable.test(char) || format.test(char)) found.push(code);
+    if (SPACING_CONTROL.test(char)) continue;
+    if (hangs.test(char)) found.push(code);
   }
   return found;
 }
 
-const INVISIBLE = invisibleCodePoints();
+const WEIGHTLESS = weightlessCodePoints();
 
-describe('every character that renders as nothing', () => {
+describe('every character that takes no room on the page', () => {
+  it('is a class worth sweeping, not a handful', () => {
+    expect(WEIGHTLESS.length).toBeGreaterThan(3000);
+  });
+
   it('cannot split one number into two the host did supply', () => {
-    for (const code of INVISIBLE) {
+    for (const code of WEIGHTLESS) {
       const text = `1${String.fromCodePoint(code)}3`;
       const [numeral, ...rest] = numeralsIn(text);
       expect(numeral?.token, `U+${code.toString(16).toUpperCase()}`).toBe('13');
@@ -111,9 +118,59 @@ describe('every character that renders as nothing', () => {
   });
 
   it('cannot split a phrase off its own entry on the denylist', () => {
-    for (const code of INVISIBLE) {
+    for (const code of WEIGHTLESS) {
+      if (composesOnto('r', code)) continue;
       const text = `fr${String.fromCodePoint(code)}ee shipping`;
       expect(normalisePhrasing(text), `U+${code.toString(16).toUpperCase()}`).toBe('free shipping');
+    }
+  });
+
+  it('is almost all of the class, so the exception above hides nothing', () => {
+    let composing = 0;
+    for (const code of WEIGHTLESS) if (composesOnto('r', code)) composing += 1;
+    expect(composing).toBeLessThan(10);
+  });
+});
+
+/** Whether NFC folds this mark into the letter before it, leaving one character. */
+function composesOnto(letter: string, code: number): boolean {
+  return (letter + String.fromCodePoint(code)).normalize('NFC').length === 1;
+}
+
+describe('a mark that composes with the letter before it', () => {
+  it('stays, because it renders as an accent the shopper can see', () => {
+    // The line this package draws: compose first, then drop what composed with
+    // nothing. An acute over an r is a visible letter; an overline is decoration.
+    expect(normalisePhrasing('fŕee shipping')).toBe('fŕee shipping');
+    expect(normalisePhrasing('fr̅ee shipping')).toBe('free shipping');
+  });
+
+  it('keeps honest accented copy readable as itself', () => {
+    expect(normalisePhrasing('Últimas unidades')).toBe('últimas unidades');
+    expect(normalisePhrasing('café')).toBe('café');
+  });
+});
+
+describe('a character that does take room', () => {
+  it('still separates two numbers when it is a control that breaks the line', () => {
+    // Deleting these wholesale would read `Only 2\n3 left` as 23 and reject it.
+    for (const char of ['\t', '\n', '\v', '\f', '\r', '\u0085']) {
+      const found = numeralsIn(`1${char}3`);
+      expect(
+        found.map((numeral) => numeral.token),
+        JSON.stringify(char),
+      ).toEqual(['1', '3']);
+    }
+  });
+
+  it('still separates two numbers when it is a spacing combining mark', () => {
+    // Mc marks advance the cursor, so the shopper sees them between the digits.
+    for (const char of ['ः', 'ा', 'ா']) {
+      const found = numeralsIn(`1${char}3`);
+      expect(
+        found.map((numeral) => numeral.token),
+        JSON.stringify(char),
+      ).toEqual(['1', '3']);
     }
   });
 });

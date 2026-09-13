@@ -85,11 +85,17 @@ grouping is impossible the decimal reading survives, so `1234,567` is still
 - A run no locale reads as a number — `24.12.2026`, `3.14.15`. These are
   supported only by a fact written exactly the same way.
 
-Invisible characters are dropped before any of this, so a zero-width space, a
-soft hyphen or a variation selector cannot split `213` into a `2` and a `13`
-that happen to be supported separately. "Invisible" is every format character
-and every default-ignorable code point, which is a rule over the whole of
-Unicode rather than a list someone kept up to date.
+Characters that take no room on the page are dropped before any of this, so a
+zero-width space, a soft hyphen, a variation selector, a backspace or a
+combining overline cannot split `213` into a `2` and a `13` that happen to be
+supported separately. That class is every format character, every
+default-ignorable code point, every control character and every mark that hangs
+on the character before it — a rule over the whole of Unicode rather than a list
+someone kept up to date.
+
+A character that does take room still separates two numbers. A tab, a line break
+and a Devanagari matra all leave a gap the shopper can see, so `"Only 2\n3 left"`
+is two numbers and a fact of 23 does not stand behind it.
 
 ### Layer two — wording. This is the best-effort half.
 
@@ -130,15 +136,26 @@ Three things are worth knowing before you write one:
   later version.** `['in stock and ready to ship']` forgives nothing extra
   today; the day `ready to ship` joins the list, that allowance silences it
   wherever your sentence appears. Keep them tight.
+- **An allowance does not cross a line break.** The denylist reads straight
+  through one, so `"Free\n\nshipping"` is still caught, but an allowance will
+  not bridge it. The model picks where the paragraph breaks fall, and
+  `"We do not offer"` above a horizontal rule, with the free shipping claim
+  below it, is two things a shopper reads apart. The two rules pull opposite
+  ways on purpose: the denylist catches more, the allowance forgives less, and
+  both err toward reporting.
 
 It is also the way around negation. The list matches substrings, so
 `"there is no sale on this product"` reads as a sale claim; allow `no sale` and
 that sentence passes while a `sale` later in the same text still fails.
 
-Matching is case-insensitive. Hyphens and line breaks become spaces, accents are
-composed, fullwidth forms are folded, invisible characters are dropped, and a
+Matching is case-insensitive. Hyphens become spaces, accents are composed,
+fullwidth forms are folded, characters that take no room are dropped, and a
 handful of Cyrillic and Greek letters that render as Latin ones are folded to
-Latin. Spaces are dropped from both sides before matching, so `送料 無料` still
+Latin. Accents are composed before anything is dropped, so `café` keeps its `é`
+while an overline, which composes with nothing, cannot hide `free` from its own
+entry. A line break stays a line break: matching reads through it, and only an
+allowance refuses to cross it. Spaces are dropped from both sides before
+matching, so `送料 無料` still
 reads as `送料無料`. A phrase whose first or last character is an ASCII letter or
 digit will not match glued inside a longer word, so `cheap` misses `cheapskate`,
 but a trailing `s` is allowed, so `discount` catches `discounts`.
@@ -176,7 +193,7 @@ read, so `"Only ② left"` is a finding rather than a silent zero.
 
 ```ts
 interface Facts {
-  values: readonly (string | number)[];
+  values: readonly (string | number | bigint)[];
   bannedPhrases?: readonly string[];
   allowedPhrases?: readonly string[];
 }
@@ -188,9 +205,18 @@ numeral in each one becomes a supported value.
 
 A number is laid out in positional notation first, whatever `String` would have
 made of it, so a fact of `1e21` stands behind
-`'1,000,000,000,000,000,000,000'` and behind neither `1` nor `21`. A string is
-read exactly as you typed it, because there you chose the digits: `'1e21'` does
-still mint 1 and 21.
+`'1,000,000,000,000,000,000,000'` and behind neither `1` nor `21`. A string
+whose whole content is a number in exponent notation is laid out the same way:
+`String`, `JSON.stringify`, a spreadsheet export and an API that writes 64-bit
+values as strings all produce one, and none of those is you choosing the digits.
+Any other string is read exactly as you typed it, so `'SKU AX-220e5'` still
+mints 220 and 5.
+
+Past 2^53 a number has lost its exact digits before it ever reaches here —
+`JSON.parse` turns `9007199254740993` into `...92` — so hand a long id over as a
+bigint or as a string. A value that is none of the three stands behind no
+numeral rather than throwing, so one null field does not take the whole call
+down.
 
 Flat rather than typed (money, count, rating, date) because typing only helps if
 the extractor can classify a token in the text, and it cannot. The `2` in
@@ -272,6 +298,17 @@ last hour"`, `"Save $39 today"` and `"Under $39"` all pass. Supply a rating
 product"` is caught as a sale claim on its own. There is no rule that reads the
   `no`; `allowedPhrases: ['no sale']` is the way out, and it is narrow by
   design — a `sale` elsewhere in the same text still fails.
+- **A character that folds into your allowance.** An allowance is matched
+  against normalised copy, so anything that folds to those words counts as those
+  words. Allow `no sale` and `"№ SALE"` passes, because U+2116 folds to `no`;
+  a superscript `ⁿᵒ` does the same. The shopper reads the numero sign as
+  decoration and the verifier reads it as a word. Keep allowances tight and
+  written the way a shop really writes them.
+- **A letter glued to the end of a phrase.** `"FREE SHIPPINGᵃ see terms"` is not
+  reported. The superscript folds to an `a`, which glues to `shipping`, and the
+  word-gap rule that stops `cheap` matching `cheapskate` then treats the whole
+  thing as a longer word. It holds for every entry on the list, and a footnote
+  marker is exactly how a real shop writes one.
 
 ### Preconditions the package cannot check for you
 
@@ -279,6 +316,11 @@ product"` is caught as a sale claim on its own. There is no rule that reads the
   If anything downstream decodes it — an HTML sink turning `&half;` into ½, or
   `&#50;` into a 2 — then the string that was checked and the string on the page
   are different documents, and the guarantee covers the first one.
+- **The font has to agree with Unicode about what renders as nothing.** The
+  layer drops what Unicode marks as taking no room. Where a font gives one of
+  those a visible glyph the two disagree, and U+3164 HANGUL FILLER is the one
+  people really paste as a blank: the layer reads `"1<U+3164>3"` as 13, and a
+  font that widens it shows the shopper `1 3`.
 - **Everything that is not a number or a phrase.** A claim about materials,
   compatibility, a certification, a warranty condition or a person is entirely
   out of scope.
@@ -302,6 +344,11 @@ The guarantee errs toward rejection, and that has a bill:
   a unit, not a multiplier.
 - **A run no locale reads as a number needs its exact spelling.** `24.12.2026`
   is supported by a fact of `'24.12.2026'` and by nothing else.
+- **Scientific notation in the copy is unsupported by construction.** A fact of
+  `1e-7` is laid out as `0.0000001`, and the text `"1e-7 g"` reads as the two
+  numerals 1 and 7, so the two never meet. `"0.0000001 g"` passes. This is the
+  bill for laying facts out positionally, and a lab or bulk-goods shop that
+  prints the value the way its own data prints it pays it.
 
 ## Licence
 

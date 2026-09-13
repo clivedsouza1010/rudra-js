@@ -52,6 +52,45 @@ break them.
   hole the README names — allowing `no sale` clears
   `"there is no sale on this product"` while a `sale` later in the same text
   still fails.
+- `@rudra-js/attested` still let a control character or a combining mark split a
+  number, because neither is a format character or default-ignorable.
+  `"$1<U+0008>3"` and `"$4<U+0305>9"` both render as the joined number and both
+  passed against the two digits apart. The class is now every character that
+  takes no room on the page: format characters, default-ignorable code points,
+  the controls that are not whitespace, and the marks that hang on the character
+  before them. Whitespace controls and spacing marks stay, because a tab, a line
+  break and a Devanagari matra are gaps the shopper can see, so two numbers on
+  two lines are still two numbers. The wording layer takes the same class, and it
+  composes accents before dropping anything, so `café` keeps its `é` while
+  `"fr<U+0305>ee shipping"` no longer hides from its own entry.
+- `@rudra-js/attested` minted garbage from a string fact in exponent notation.
+  The number arm was laid out positionally, but the string arm was not, so
+  `'1e21'` still stood behind `"Only 21 sold"`. A string whose whole content is
+  a number in exponent notation is now laid out the same way; any other string
+  is still read exactly as typed, so `'SKU AX-220e5'` keeps minting 220 and 5.
+- `@rudra-js/attested` threw a `TypeError` on any fact that was not a number or
+  a string. `values: [product.price]` with a null price took the whole call
+  down, and a bigint — the only way to hand over an id past 2^53 without
+  `JSON.parse` rounding it — threw as well. `values` now takes bigints, and
+  anything else stands behind no numeral instead of throwing.
+- `@rudra-js/attested` let an allowance reach across a paragraph break. The
+  allowance works on normalised copy, where a blank line and a `---` rule both
+  collapsed to a space, so `['we do not offer free shipping']` forgave
+  `"We do not offer"` above a rule with `"Free shipping on every order"` below
+  it. A line break now survives normalisation: matching still reads straight
+  through it, so the denylist catches `"Free\n\nshipping"`, but an allowance
+  will not bridge one. The two rules pull opposite ways on purpose.
+
+### Changed
+
+- `@rudra-js/attested` documents three holes it does not close, all in the
+  best-effort wording layer. A character that folds into an allowance counts as
+  that allowance, so `"№ SALE"` passes under `['no sale']`. A footnote marker
+  glued to a phrase drops the finding, so `"FREE SHIPPINGᵃ"` is not reported.
+  And the quantity layer trusts Unicode about what renders as nothing, which a
+  font is free to disagree with. Laying facts out positionally also costs
+  scientific notation in the copy: `"1e-7 g"` no longer matches a fact of
+  `1e-7`, and the value has to be written out in full.
 
 ## [0.3.1] - 2026-09-13
 

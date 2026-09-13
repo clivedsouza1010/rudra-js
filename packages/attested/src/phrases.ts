@@ -1,3 +1,5 @@
+import { stripInvisible, stripMarks } from './hidden.js';
+
 /** Claims with no value behind them. Stored in the form `normalisePhrasing` produces. */
 export const BANNED_PHRASES: readonly string[] = [
   'cheap',
@@ -120,27 +122,24 @@ const CONFUSABLES: Record<string, string> = {
   ϲ: 'c',
 };
 
-// Both classes are needed: the variation selectors are default-ignorable but not Cf,
-// and 32 Cf characters, the Arabic number signs among them, are not default-ignorable.
-const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}]/gu;
+/** A run of whitespace holding one of these is a break the shopper sees. */
+const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
 
-/** One shape for text and phrases, so a line break or a hyphen cannot hide a claim. */
+/** One shape for text and phrases, so a hyphen or a stray mark cannot hide a claim. */
 export function normalisePhrasing(text: string): string {
-  const lowered = text
-    .replace(INVISIBLE, '')
-    .normalize('NFKC')
-    .toLowerCase()
-    .normalize('NFC')
-    // Locale-independent lowercasing turns the Turkish İ into i plus a combining dot.
-    .replace(/i\u0307/g, 'i');
+  // Marks come off after composition, so an accented e keeps its accent while an
+  // overline, which composes with nothing, does not hide `free` from its own entry.
+  const lowered = stripMarks(stripInvisible(text).normalize('NFKC').toLowerCase().normalize('NFC'));
 
   let folded = '';
   for (const char of lowered) folded += CONFUSABLES[char] ?? char;
 
+  // A line break survives as itself. Matching reads straight through it, and only
+  // the allowance in verify.ts cares, because it will not forgive across a break.
   return folded
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[-_\u2010-\u2015]+/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/\s+/g, (run) => (LINE_BREAK.test(run) ? '\n' : ' '))
     .trim();
 }
 
@@ -166,13 +165,15 @@ export function phraseSpans(text: string, phrase: string): Span[] {
   const tight: string[] = [];
   const spots: number[] = [];
   for (let index = 0; index < text.length; index += 1) {
-    if (text[index] === ' ') continue;
-    tight.push(text[index] ?? '');
+    const char = text[index] ?? '';
+    // A line break reads like a space here, so a claim split over two lines is caught.
+    if (char === ' ' || char === '\n') continue;
+    tight.push(char);
     spots.push(index);
   }
 
   const spans: Span[] = [];
-  const needle = phrase.replaceAll(' ', '');
+  const needle = phrase.replaceAll(' ', '').replaceAll('\n', '');
   if (needle.length === 0) return spans;
 
   const guardStart = ASCII_WORD.test(needle[0] ?? '');

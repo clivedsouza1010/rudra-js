@@ -35,7 +35,7 @@ export interface VerifyResult {
 
 export interface Facts {
   /** In any shape they are written: `39`, `'$1,299.00'`, `'4,8'`. Every numeral in one counts. */
-  values: readonly (string | number)[];
+  values: readonly (string | number | bigint)[];
   /** Claims to ban on top of the built-in English list, for the host's own language. */
   bannedPhrases?: readonly string[];
   /** Wording the shop stands behind. A banned claim inside one of these is not reported. */
@@ -120,7 +120,12 @@ function checkWording(text: string, phrases: string[], allowed: string[]): Layer
 
   const spans: Span[] = [];
   for (const phrase of allowed) {
-    for (const span of phraseSpans(normalised, phrase)) spans.push(span);
+    for (const span of phraseSpans(normalised, phrase)) {
+      // The denylist reads through a break and the allowance does not, so both rules
+      // err toward reporting. A model that puts the negation in one block and the
+      // claim in another has written two things the shopper reads apart.
+      if (!normalised.slice(span.start, span.end + 1).includes('\n')) spans.push(span);
+    }
   }
 
   const findings: Finding[] = [];

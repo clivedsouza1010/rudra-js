@@ -59,8 +59,27 @@ describe('normalisePhrasing', () => {
     expect(normalisePhrasing('next\u2013day')).toBe('next day');
   });
 
-  it('collapses runs of whitespace, so a line break inside a phrase still reads', () => {
-    expect(normalisePhrasing('selling\n  fast')).toBe('selling fast');
+  it('keeps a line break as a line break, because an allowance may not cross one', () => {
+    // Matching reads straight through it, so `selling\nfast` is still caught. It
+    // survives normalisation only so an allowance can refuse to bridge a paragraph.
+    expect(normalisePhrasing('selling\n  fast')).toBe('selling\nfast');
+    expect(normalisePhrasing('not\n\n---\n\nin stock')).toBe('not\nin stock');
+  });
+
+  it('drops a combining mark that composes with nothing', () => {
+    // U+0305 has no precomposed form, so NFC leaves it sitting between two letters,
+    // where it renders as a line over the r and hides the phrase from its own entry.
+    expect(normalisePhrasing('fr̅ee shipping')).toBe('free shipping');
+    expect(normalisePhrasing('s̃old out')).toBe('sold out');
+  });
+
+  it('drops a control character, which renders as nothing at all', () => {
+    expect(normalisePhrasing('fr\u0008ee shipping')).toBe('free shipping');
+    expect(normalisePhrasing('fr\u001dee shipping')).toBe('free shipping');
+  });
+
+  it('collapses runs of whitespace', () => {
+    expect(normalisePhrasing('selling   fast')).toBe('selling fast');
     expect(normalisePhrasing('送料\u3000無料')).toBe('送料 無料');
   });
 
