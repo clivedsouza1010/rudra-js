@@ -53,16 +53,18 @@ second half matters as much as the first.
 
 ### The short version
 
-The model has no tools, no network and no data access. It emits a fixed JSON shape and nothing else,
-and it cannot **place** a product the shop didn't supply, because every SKU is checked against the
-shop's own list. It can still write a product name into prose. Nothing prevents that.
+The model gets exactly one tool, and it's how it hands back its answer: a schema to fill in. It has
+no tool that fetches anything, writes anything or calls anything, and no network or data access of
+its own. It emits a fixed JSON shape and nothing else, and it cannot **place** a product the shop
+didn't supply, because every SKU is checked against the shop's own list. It can still write a
+product name into prose. Nothing prevents that.
 
 Say an injection succeeds completely, and the model does exactly what the attacker's text tells it
 to. What that buys is the wording and the ordering of a recommendation block. That's the reach it
 has: the response is parsed against a schema, every SKU is checked against the shop's list, every
 stated reason is checked against the shopper's signals, and whatever survives is rendered as escaped
-text by React. On the model's side of the boundary there's no tool call, no network access and no
-data access to aim at.
+text by React. The one tool on the model's side of the boundary is the schema it fills in to answer,
+so there's no tool that does anything, and no network or data access to aim at.
 
 None of that is a happy accident. The defence is what the model is _able_ to emit, not what we can
 persuade it to avoid.
@@ -71,7 +73,7 @@ persuade it to avoid.
 
 | Technique                         | How                                                                                                                                                                                                                    |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Least privilege                   | The model calls nothing and reads nothing. There's no tool to scope, because there are no tools                                                                                                                        |
+| Least privilege                   | The model's only tool is the one it answers through. It fetches nothing, writes nothing and reads nothing, so there's no capability to scope                                                                           |
 | Separating instructions from data | Two prompt halves. The instruction half is byte-identical for every request and holds no shopper value at all, and a test asserts that                                                                                 |
 | Marking untrusted data            | Shopper and product data sit between `BEGIN_UNTRUSTED_DATA` and `END_UNTRUSTED_DATA`, and the instruction half says nothing inside them is an instruction                                                              |
 | Input length limits               | Every free-text field and every array is capped in the payload contract, before a prompt is built                                                                                                                      |

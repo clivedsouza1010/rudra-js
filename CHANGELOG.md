@@ -24,16 +24,14 @@ break them.
   is your own words, like the title, so it renders as written and is not
   screened. The same sentence from the model still is.
 
-### Changed
-
-- `@rudra-js/react` takes React 18 as well as 19. The peer range said `^19.0.0`
-  while the package imports only two types from React and no runtime API, so
-  the build touches nothing but `react/jsx-runtime`, which has existed since
-  React 17. The range was refusing installs the code supports. A test now fails
-  if anything in the package imports a React value rather than a type, so the
-  range stays true.
-
 ### Fixed
+
+- A product's `badge` is now read for banned claims like every other field the
+  model writes. It was clamped and escaped but never screened, so in
+  `per-shopper` mode a badge could carry "Only 2 left" or "Save 30%" straight to
+  the page. The schema's own example for the field was "Back in stock", which is
+  a stock claim, so the contract invited exactly what the screen exists to stop.
+  In `cohort` mode nothing changes, because the badge was already dropped there.
 
 - The deterministic selector no longer writes `Highly rated` as a product's
   reason. Its basis is `popular`, so the prose stated something the basis did
@@ -53,6 +51,15 @@ break them.
   is left out; turning it off explicitly is what makes the budget reachable.
   Pass `thinking: null` to send no `thinking` field, which is what a model that
   rejects an explicit `disabled` needs, and raise `modelTimeoutMs` to match.
+
+### Changed
+
+- `@rudra-js/react` takes React 18 as well as 19. The peer range said `^19.0.0`
+  while the package imports only two types from React and no runtime API, so
+  the build touches nothing but `react/jsx-runtime`, which has existed since
+  React 17. The range was refusing installs the code supports. A test now fails
+  if anything in the package imports a React value rather than a type, so the
+  range stays true.
 
 ## [0.2.0] - 2026-09-10
 

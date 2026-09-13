@@ -389,7 +389,10 @@ function reconcileItems(
           ? clampNullable(item.reason, CLAMP.reason)
           : screenClaim(clampNullable(item.reason, CLAMP.reason), `reason:${item.sku}`, tracker)
         : null,
-      badge: clampNullable(item.badge, CLAMP.badge),
+      // A badge is the shortest, loudest text on the card, and the schema's own
+      // example for it was "Back in stock" — a stock claim. It renders, so it is
+      // read for claims like every other sentence the model writes.
+      badge: screenClaim(clampNullable(item.badge, CLAMP.badge), `badge:${item.sku}`, tracker),
       emphasis: item.emphasis,
     });
   }

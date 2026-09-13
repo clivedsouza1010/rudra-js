@@ -112,6 +112,30 @@ describe("a reason the shop supplied is the shop's own words", () => {
     expect(items[0]?.reason).toBeNull();
   });
 });
+
+describe('a badge is screened like any other sentence', () => {
+  // The shortest, loudest text on a card, and the one most likely to carry
+  // "30% OFF" or "ONLY 2 LEFT". It renders, so it gets read.
+  it.each([
+    ['a discount', 'Save 30%'],
+    ['a stock level', 'Only 2 left'],
+    ['a rating', 'Top rated'],
+  ])('drops a badge claiming %s', (_kind, badge) => {
+    const result = reconcile(grid([ref('TR-101', { badge })]));
+    const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
+
+    expect(items[0]?.badge).toBeNull();
+    expect(result.violations.join()).toMatch(/^unverifiable-claim:[a-z]+:badge:TR-101$/);
+  });
+
+  it('keeps a badge that claims nothing', () => {
+    const result = reconcile(grid([ref('TR-101', { badge: 'Worth a look' })]));
+    const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
+
+    expect(items[0]?.badge).toBe('Worth a look');
+    expect(result.violations).toEqual([]);
+  });
+});
 describe('the selector writes reasons its own screen accepts', () => {
   // Every branch of basisFor, driven through selectProducts so the reasons are
   // the real ones. A reason the screen deletes is a card that loses its line
