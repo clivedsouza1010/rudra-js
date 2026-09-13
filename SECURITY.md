@@ -88,8 +88,8 @@ persuade it to avoid.
 instructions" or "developer mode". On a shopping site, people search for those. Block a legitimate
 search and you've traded a visible bug for a defence that a rephrasing walks straight past. The
 structural controls above don't depend on recognising an attack, so they hold against ones nobody
-has thought of. One clarification: the pattern list under _Residual risk_ below is a denylist on the
-model's output, not on what a shopper types.
+has thought of. One clarification: the two word lists under _Residual risk_ below are denylists on
+the model's output, not on what a shopper types.
 
 **No guardrail classifier.** A second model screening inputs and outputs is proportionate when the
 primary model can act. Ours can't.
@@ -100,11 +100,24 @@ primary model can act. Ours can't.
 
 - **Wording.** Roughly a kilobyte of model-written prose reaches the page per render. It's
   length-clamped, and it can't contain markup, because the schema has no field that carries markup.
-  We read every model-written field for the claims the prompt bans: a customer rating, a price, a
-  discount, a delivery date, a stock level. Any field that makes one of those gets dropped. The check
-  is a set of patterns, not a classifier, so it isn't complete. A reworded claim can get through, and
-  anything outside those five kinds — a competitor's product name, say — we don't look for at all.
+  Every model-written field goes through three passes. First, a set of patterns for the claims the
+  prompt bans: a customer rating, a price, a discount, a delivery date, a stock level. Second,
+  `@rudra-js/attested`'s phrase list, for claims that carry no number to check — "best seller",
+  "while stocks last", "top pick". Third, a check that every digit in the sentence is one the shop
+  supplied for this request. Any field that fails a pass is dropped, recorded as `quantity` or
+  `wording` for the last two.
+
+  What that still leaves. Two of the three passes are word lists, not classifiers, so a reworded
+  claim can get through: of 38 rewordings we wrote to dodge the patterns, 27 pass all three. The
+  digit check reads digit characters only, so "four and a half stars from hikers" is not a number
+  to it. The facts it checks against are every category and tag in the request, not the one product
+  the sentence is about, so a digit in any category name is a digit the model may then write
+  anywhere in the block. Each field is read on its own, so "Free" in a heading and "delivery on
+  every order" beneath it are two innocent fields and one claim to a shopper. The phrase list also
+  eats honest copy — a banner reading "free returns" is dropped even from a shop that offers them.
+  And anything outside those kinds — a competitor's product name, say — we don't look for at all.
   Host text is never screened, since it's the shop's own words.
+
 - **Instruction disclosure.** A determined injection could get fragments of the instruction half
   echoed back inside a text field. Those instructions are open source and sitting in this repository,
   so the loss is small. It isn't zero.

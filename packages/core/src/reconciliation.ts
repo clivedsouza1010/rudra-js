@@ -1,3 +1,4 @@
+import { verify } from '@rudra-js/attested';
 import type {
   Block,
   GeneratedSpec,
@@ -152,14 +153,13 @@ function verifyBasis(basis: RecommendationBasis, product: Product, digest: Signa
  * model writes is checked here — a heading is not a safer place for a claim
  * than the small print under it.
  *
- * A claim is about money, a customer score, when it arrives, or how many are
- * left. A specification is not a claim, even when it has a number or a
- * percentage in it: "100% recycled nylon", "a comfort rating of -5C" and
- * "arrives flat-packed" are all things a shop can say about the product itself,
- * and they stay. That is why almost every rule below needs a second word beside
- * the first — "20% off", not "20%"; "rated 4.8", not "rated". A careful
- * rewording will get past this, and that is the trade we want: missing one
- * claim is better than deleting honest copy on every page.
+ * These patterns are the first of three passes and the only one that names
+ * which of the five kinds a sentence claimed, so they read the domain: "20%
+ * off", not "20%"; "rated 4.8", not "rated". Past them the text still has to
+ * stand up to @rudra-js/attested, which reads no domain at all and asks a
+ * blunter question — is every numeral in this sentence one the shop handed us.
+ * "a comfort rating of -5C" walks past every rule below and is then dropped as
+ * `quantity`, because -5 is a number the model made up.
  *
  * One rule per line, because each line is a separate judgement about where the
  * boundary sits and each one wants its own reason written next to it.
@@ -297,9 +297,11 @@ const CONFUSABLES: Record<string, string> = {
  * points and the controls. Cf and Default_Ignorable each hold characters the
  * other does not.
  *
- * The same class @rudra-js/attested strips in its own `hidden.ts`. A second copy,
- * because core carries no dependencies and is not about to take one — which means
- * widening one and not the other is the mistake to watch for.
+ * The same class @rudra-js/attested strips in its own `hidden.ts`. The second copy
+ * stays now that core calls attested, because it feeds core's own patterns and those
+ * reach two things attested's phrase list does not hold at all: "20% οff" spelled
+ * with a Greek omicron, and "PRİCED to move". Widening one and not the other is
+ * still the mistake to watch for.
  */
 const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
 
@@ -338,6 +340,34 @@ function normaliseForClaims(text: string): string {
   return folded;
 }
 
+/**
+ * Wording attested's denylist catches that this project has already ruled is not a
+ * claim, each one written next to the pattern that makes the call: "does not feel
+ * cheap" is about quality, "extra clearance for thick socks" is room inside the
+ * shoe, "the last few miles" is a distance. Kept narrow — "clearance for" on its
+ * own would let "clearance for the weekend only" through.
+ */
+const ALLOWED_PHRASES = ['does not feel cheap', 'extra clearance for', 'last few miles'];
+
+/**
+ * The shop's own strings from this request, for attested to check numerals against.
+ *
+ * Categories and tags, and nothing else. The prompt also shows the model a title
+ * and a rating, and bans it from repeating either, so a numeral out of one of those
+ * is a numeral it was told not to write. A rating is the sharp case: 4.8 reads as a
+ * price, a stock count and a delivery time as easily as it reads as a score, so
+ * handing one over blesses all four.
+ */
+function hostFacts(input: TrackingInput, digest: SignalDigest): string[] {
+  const facts: string[] = [];
+  for (const product of input.candidates) {
+    facts.push(product.category);
+    for (const tag of product.tags) facts.push(tag);
+  }
+  if (digest.currentCategory !== undefined) facts.push(digest.currentCategory);
+  return facts;
+}
+
 /** Names the first forbidden claim the text makes, or null when it makes none. */
 function claimIn(text: string): string | null {
   const normalised = normaliseForClaims(text);
@@ -357,13 +387,14 @@ function claimIn(text: string): string | null {
  * through every function. The budget and the de-duplication set are global to a
  * spec, not to a block, which is the part that is easy to get wrong.
  */
-function createPlacementTracker(maxItems: number) {
+function createPlacementTracker(maxItems: number, facts: readonly string[]) {
   const placedSkus = new Set<string>();
   const violations: string[] = [];
   let remaining = maxItems;
 
   return {
     violations,
+    facts,
     get remaining() {
       return remaining;
     },
@@ -386,6 +417,11 @@ type PlacementTracker = ReturnType<typeof createPlacementTracker>;
  * Runs after clamping, so what is screened is exactly what would have rendered.
  * Dropping means what it means everywhere else here: this field becomes null
  * and the rest of the block carries on.
+ *
+ * Three passes, most specific first. Core's patterns name one of the five kinds.
+ * `quantity` is the only proof in the stack: every numeral in the sentence has to
+ * be one the shop supplied. `wording` is a second denylist, and the weakest, so it
+ * answers last.
  */
 function screenClaim(
   value: string | null,
@@ -395,10 +431,22 @@ function screenClaim(
   if (value === null) return null;
 
   const kind = claimIn(value);
-  if (kind === null) return value;
+  if (kind !== null) {
+    tracker.record(`unverifiable-claim:${kind}:${field}`);
+    return null;
+  }
 
-  tracker.record(`unverifiable-claim:${kind}:${field}`);
-  return null;
+  const result = verify(value, { values: tracker.facts, allowedPhrases: ALLOWED_PHRASES });
+  if (!result.quantity.supported) {
+    tracker.record(`unverifiable-claim:quantity:${field}`);
+    return null;
+  }
+  if (!result.wording.supported) {
+    tracker.record(`unverifiable-claim:wording:${field}`);
+    return null;
+  }
+
+  return value;
 }
 
 /**
@@ -566,7 +614,7 @@ export function bundleForShopper(
 ): Bundle | undefined {
   const allowlist = buildAllowlist(input, digest);
   const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
-  const tracker = createPlacementTracker(digest.maxItems);
+  const tracker = createPlacementTracker(digest.maxItems, hostFacts(input, digest));
 
   for (const sku of spokenFor) tracker.place(sku);
 
@@ -759,7 +807,7 @@ export function reconcileSpec(
 ): ReconcileResult {
   const allowlist = buildAllowlist(input, digest);
   const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
-  const tracker = createPlacementTracker(digest.maxItems);
+  const tracker = createPlacementTracker(digest.maxItems, hostFacts(input, digest));
 
   if (generated.blocks.length > MAX_BLOCKS) {
     tracker.record(`too-many-blocks:${generated.blocks.length}`);

@@ -6,15 +6,27 @@ component specification.
 ## Install
 
 ```sh
-npm install @rudra-js/core zod@^4
+npm install @rudra-js/core @rudra-js/attested zod@^4
 ```
 
-`zod` is a peer dependency. The public API of this package _is_ zod schemas, so
-your app and the package have to resolve the same copy of zod. **zod 4.5 or later is
+Two peer dependencies, for two different reasons.
+
+`zod` is a peer because the public API of this package _is_ zod schemas, so your
+app and the package have to resolve the same copy of zod. **zod 4.5 or later is
 required**, which is what the peer range asks for. The schemas use zod 4 APIs,
 and installing into a zod 3 app fails with `ERESOLVE`, which isn't the most
 helpful error you'll ever read. The floor is 4.5 rather than 4.0 because 4.5
 changed how a nullable field is written into the tool schema we send the model.
+
+`@rudra-js/attested` is a peer for the opposite reason: none of its types cross
+this package's public surface, and you never have to import it. It's a peer so
+there is exactly one denylist in your tree. As a real dependency, an app that
+pins its own copy gets two — we checked, and npm 10.9.4 installs the app's
+version at the top and quietly nests ours under `@rudra-js/core` — and the two
+would then disagree about what counts as a claim. As a peer that same pin is an
+`ERESOLVE` you can see and fix. Pin nothing and the tree is identical either
+way: one copy, at the top. One tag publishes every `@rudra-js` package at one
+version, so the ranges here always move together.
 
 ## Running without a model
 
@@ -122,10 +134,26 @@ hero, a banner, a block title, the copy block, the reason under a product, and
 the words around the set. Text you supplied is never read this way. A product
 title, a category and a bundle `label` are your words, not the model's.
 
-We drop text that makes a claim we can't check. The check looks for money, a
-customer score, a delivery date and a count of what's left, and it leaves a
-specification alone even when that specification has a number in it. Spotting one
-isn't a guarantee, not the way checking a price against your catalog is.
+We drop text that makes a claim we can't check, in three passes. The first looks
+for money, a customer score, a delivery date and a count of what's left. The
+second is `@rudra-js/attested`'s phrase list, for claims with no number in them
+to check — "best seller", "while stocks last". The third asks whether every
+digit in the sentence is one you supplied.
+
+That third pass changed what happens to a specification. "a comfort rating of
+-5C" used to be kept on the strength of the words around the number. It is kept
+now only when `-5C` is on the product's own `tags`, or in a `category` name, on
+one of this request's candidates — or is the category the shopper is browsing.
+Those are the strings we hand the model and let it repeat. A `title` and a
+`rating` we also show it, and the prompt tells it never to restate either, so
+neither stands behind a number. Put your spec sheet in `tags` and the model can
+quote it; leave it out and a number in that field is one the model made up, and
+it goes.
+
+The first two passes are word lists, so spotting a claim still isn't a
+guarantee, not the way checking a price against your catalog is. The third one
+is: it reads digit characters, and a number written as a word is not a number to
+it.
 
 Some fields can't be empty, like a headline or a banner's text. Those get emptied
 instead of nulled, so the block drops the way any block with no text drops. And

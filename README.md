@@ -15,10 +15,14 @@ in a grid or carousel are chosen per request from that list, not by the model.
 React Server Components turn that specification into markup, reading the title, price, image, and
 link from your catalog as the page is served. Whatever the model wrote is rendered as escaped text.
 
-We also scan the model's words for prices, discounts, ratings, delivery dates, and stock counts. If
-the text makes one of those claims, it gets dropped. That check matches patterns, not meaning, so a
-careful rewording might slip past it, which is why the structural boundaries are the real defence.
-The model is never told a price, and the specification has nowhere to put one.
+We also read every word the model writes, in three passes. Patterns for prices, discounts, ratings,
+delivery dates and stock counts. A second list of claims that carry no number, like "best seller"
+and "while stocks last". And a check that every digit in the sentence is one your own payload
+supplied — a category or a tag on one of this request's candidates. Any field that fails a pass is
+dropped. Two of the three are still word lists, so a careful rewording with no digit in it can get
+through: of 38 rewordings we wrote to dodge them, 27 still pass. That's why the structural
+boundaries are the real defence. The model is never told a price, and the specification has nowhere
+to put one.
 
 Because the block is in the initial HTML response and needs zero client-side JavaScript, a crawler
 that never runs JavaScript still reads it. It's efficient too: on our 500-shopper benchmark the
@@ -26,7 +30,7 @@ default mode makes 460 model calls per 1,000 page views, compared to 1,000 if yo
 every shopper. And if you want to run with no model at all, that's a fully supported setting rather
 than a stub, and it won't cost you a penny.
 
-> **Status: `0.3.1`, early.** It installs and it works. The Getting started below actually runs as a
+> **Status: `0.4.0`, early.** It installs and it works. The Getting started below actually runs as a
 > test on every commit. Just keep in mind that the public contracts might still shift between minor
 > versions before we hit `1.0`, and the changelog will always tell you when they do.
 
@@ -36,7 +40,7 @@ You don't need an API key to get going. Leave the provider out and you'll get th
 component, which is a fully supported setting and the right one until you've settled on a model.
 
 ```sh
-npm install @rudra-js/core @rudra-js/react zod@^4.5
+npm install @rudra-js/core @rudra-js/react @rudra-js/attested zod@^4.5
 ```
 
 A quick heads-up: every package here lives under the `@rudra-js` scope. The unscoped `rudra-js`
@@ -97,12 +101,12 @@ straight away._
 
 ## Packages
 
-| Package                                     | What it does                                                                                       |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| [`@rudra-js/core`](packages/core)           | The contracts and logic that turn one tracking payload into one renderable component specification |
-| [`@rudra-js/react`](packages/react)         | Renders that specification as React Server Components, with no client JavaScript                   |
-| [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API, and is the only package that makes a billed call                       |
-| [`@rudra-js/attested`](packages/attested)   | Checks model-written copy against the facts a shop stands behind, with no dependencies             |
+| Package                                     | What it does                                                                                                                           |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@rudra-js/core`](packages/core)           | The contracts and logic that turn one tracking payload into one renderable component specification, screened with `@rudra-js/attested` |
+| [`@rudra-js/react`](packages/react)         | Renders that specification as React Server Components, with no client JavaScript                                                       |
+| [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API, and is the only package that makes a billed call                                                           |
+| [`@rudra-js/attested`](packages/attested)   | Checks model-written copy against the facts a shop stands behind, with no dependencies                                                 |
 
 ## Development
 

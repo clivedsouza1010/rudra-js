@@ -10,6 +10,31 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- `@rudra-js/core` now screens every model-written string with
+  `@rudra-js/attested` as well as with its own `CLAIM_PATTERNS`, which is a new
+  required peer dependency. Three passes, in this order: core's patterns, which
+  still name one of `rating`, `price`, `discount`, `delivery` and `stock`;
+  attested's quantity layer, recorded as `unverifiable-claim:quantity:<field>`;
+  attested's wording layer, recorded as `unverifiable-claim:wording:<field>`.
+  Core's patterns answer first so every violation string an evaluation already
+  counts reads the same as before. The 39 patterns all stay — measured, they
+  catch all 48 of the strings the tests say must drop, where attested's two
+  layers together reach 33, so replacing them would have been a downgrade.
+- A specification with a number in it is no longer kept on the strength of the
+  words around the number. `"a comfort rating of -5C"` and
+  `"a waterproof rating of 20,000mm"` are kept when `-5C` or `20000mm` is a
+  `tag` or a `category` on one of the request's candidates, or is the category
+  the shopper is browsing, and dropped as `quantity` when it is not. Those are
+  the strings the prompt hands the model and lets it repeat; a `title` and a
+  `rating` it is shown but told never to restate, so neither stands behind a
+  number. This reverses a documented judgement in `reconciliation.ts` and it
+  reclassifies 15 strings the test suite used to assert were kept. Put your spec
+  sheet in `tags` and the model can quote it.
+- A host-supplied `reason` is still exempt. The exemption branches around the
+  screen, so neither new pass sees the shop's own words either.
+
 ## [0.4.0] - 2026-09-13
 
 ### Added

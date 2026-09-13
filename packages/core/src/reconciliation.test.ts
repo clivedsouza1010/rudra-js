@@ -494,7 +494,7 @@ describe('usability', () => {
   it('is isUsable when a bundle is the only block carrying products', () => {
     const result = reconcile(
       specWith([
-        { kind: 'banner', tone: 'info', text: 'Free returns', ctaLabel: null },
+        { kind: 'banner', tone: 'info', text: 'Built for wet rock', ctaLabel: null },
         { kind: 'bundle', title: 'Get set up', body: null, ctaLabel: null, bundleId: null },
       ]),
       {
@@ -847,21 +847,11 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
-  // A specification is not a claim, even with a number or a percentage in it.
-  // Every line here is copy a real shop writes, and every one of them used to
-  // be deleted. They are the regression that stops this screen becoming worse
-  // than the hole it fills.
+  // A specification is not a claim. Every line here is copy a real shop writes,
+  // and every one of them used to be deleted. They are the regression that stops
+  // this screen becoming worse than the hole it fills. None of them carries a
+  // number, so the quantity layer below has nothing to weigh either.
   const SPECIFICATIONS = [
-    'made from 100% recycled nylon',
-    '100% merino wool against the skin',
-    '100% waterproof in a downpour',
-    '30% lighter than the pack it replaces',
-    'a comfort rating of -5C',
-    'an IPX7 water rating',
-    'rated 3 season for shoulder-season trips',
-    'reduced to 900g without losing warmth',
-    'a waterproof rating of 20,000mm',
-    'rated to -10C for winter nights',
     'arrives flat-packed',
     'arrives ready to ride',
     'ships flat and folds away',
@@ -878,6 +868,42 @@ describe('claims the renderer cannot check', () => {
   for (const reason of SPECIFICATIONS) {
     it(`keeps a specification: "${reason}"`, () => {
       expect(reasonFor(reason)).toBe(reason);
+    });
+  }
+
+  // Every one of these used to be kept on the strength of the words around the
+  // number. They are kept now on the strength of the number itself: the shop
+  // tagged the product with it, so the model is repeating a fact rather than
+  // writing one. Take the tag away and the same sentence goes, because -5C and
+  // 20,000mm are not things the model is ever told.
+  const NUMERIC_SPECIFICATIONS: { reason: string; tags: string[] }[] = [
+    { reason: 'made from 100% recycled nylon', tags: ['100% recycled'] },
+    { reason: '100% merino wool against the skin', tags: ['100% merino'] },
+    { reason: '100% waterproof in a downpour', tags: ['100% waterproof'] },
+    { reason: '30% lighter than the pack it replaces', tags: ['30% lighter'] },
+    { reason: 'a comfort rating of -5C', tags: ['-5C comfort'] },
+    { reason: 'an IPX7 water rating', tags: ['IPX7'] },
+    { reason: 'rated 3 season for shoulder-season trips', tags: ['3 season'] },
+    { reason: 'reduced to 900g without losing warmth', tags: ['900g'] },
+    { reason: 'a waterproof rating of 20,000mm', tags: ['20000mm'] },
+    { reason: 'rated to -10C for winter nights', tags: ['-10C rated'] },
+  ];
+
+  for (const row of NUMERIC_SPECIFICATIONS) {
+    it(`keeps "${row.reason}" when the shop supplied the number`, () => {
+      const result = reconcile(grid([ref('TR-101', { reason: row.reason })]), {
+        candidates: [product('TR-101', { tags: row.tags }), product('TR-102')],
+      });
+
+      expect(basisOf(result)?.reason).toBe(row.reason);
+      expect(result.violations).toEqual([]);
+    });
+
+    it(`drops "${row.reason}" when it did not`, () => {
+      const result = reconcile(grid([ref('TR-101', { reason: row.reason })]));
+
+      expect(basisOf(result)?.reason).toBeNull();
+      expect(result.violations).toContain('unverifiable-claim:quantity:reason:TR-101');
     });
   }
 
@@ -909,7 +935,16 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
-  const ONE_ROW_PER_CLAIM_PATTERN: { kind: string; catches: string; keeps: string }[] = [
+  // `keeps` is the near miss: the sentence this pattern must not fire on. Where
+  // that sentence carries a number, `supports` is what the shop tagged the
+  // product with, because the quantity layer would otherwise drop it before this
+  // pattern got a say and the row would prove nothing about the pattern.
+  const ONE_ROW_PER_CLAIM_PATTERN: {
+    kind: string;
+    catches: string;
+    keeps: string;
+    supports?: string[];
+  }[] = [
     { kind: 'rating', catches: 'reviewed by other hikers', keeps: 'a revised fit for wider feet' },
     {
       kind: 'rating',
@@ -926,21 +961,30 @@ describe('claims the renderer cannot check', () => {
       catches: 'the average rating in this category',
       keeps: 'the average weight of a winter pack',
     },
-    { kind: 'rating', catches: 'a rating of 4.6 from hikers', keeps: 'a comfort rating of -5C' },
+    {
+      kind: 'rating',
+      catches: 'a rating of 4.6 from hikers',
+      keeps: 'a comfort rating of -5C',
+      supports: ['-5C comfort'],
+    },
     {
       kind: 'rating',
       catches: '4.8 out of 5 from other hikers',
       keeps: '3 out of 4 pockets zip shut',
+      supports: ['3 zip pockets', '4 pockets'],
     },
     {
       kind: 'rating',
       catches: 'highly rated by other hikers',
-      keeps: 'the top pick for winter nights',
+      // "top pick" was the near miss here until the wording layer arrived, which
+      // bans it outright: it is a claim about what other shoppers chose.
+      keeps: 'well made for winter nights',
     },
     {
       kind: 'rating',
       catches: 'rated 4.8 by other hikers',
       keeps: 'rated 3 season for shoulder-season trips',
+      supports: ['3 season'],
     },
     { kind: 'rating', catches: 'our best-selling pack', keeps: 'the best pack for long days' },
     {
@@ -949,14 +993,25 @@ describe('claims the renderer cannot check', () => {
       keeps: 'loved by anyone who walks far',
     },
 
-    { kind: 'price', catches: '£89 for the pair', keeps: 'a mesh pocket for a 1 litre bottle' },
+    {
+      kind: 'price',
+      catches: '£89 for the pair',
+      keeps: 'a mesh pocket for a 1 litre bottle',
+      supports: ['1 litre'],
+    },
     {
       kind: 'price',
       catches: '40 dollars for a spare pair',
       keeps: 'a 30 litre pack for long days',
+      supports: ['30 litre'],
     },
     { kind: 'price', catches: 'yours for USD 20', keeps: 'sold in USD and EUR' },
-    { kind: 'price', catches: '249 kr for the pair', keeps: 'weighs 249 g in the stuff sack' },
+    {
+      kind: 'price',
+      catches: '249 kr for the pair',
+      keeps: 'weighs 249 g in the stuff sack',
+      supports: ['249 g'],
+    },
     {
       kind: 'price',
       catches: 'the same pack at a lower price',
@@ -985,16 +1040,27 @@ describe('claims the renderer cannot check', () => {
       keeps: 'saves weight on long hikes',
     },
 
-    { kind: 'discount', catches: '20% off this week', keeps: 'made from 100% recycled nylon' },
+    {
+      kind: 'discount',
+      catches: '20% off this week',
+      keeps: 'made from 100% recycled nylon',
+      supports: ['100% recycled'],
+    },
     {
       kind: 'discount',
       catches: 'save 25% on the pair',
       keeps: '30% lighter than the pack it replaces',
+      supports: ['30% lighter'],
     },
     { kind: 'discount', catches: 'a discount for members', keeps: 'a members-only colourway' },
     { kind: 'discount', catches: 'the summer sale ends soon', keeps: 'holds its resale value' },
     { kind: 'discount', catches: 'half off this week', keeps: 'half the weight of the old model' },
-    { kind: 'discount', catches: 'save 20 off the pair', keeps: 'saves 200 g off the base weight' },
+    {
+      kind: 'discount',
+      catches: 'save 20 off the pair',
+      keeps: 'saves 200 g off the base weight',
+      supports: ['200 g'],
+    },
     {
       kind: 'discount',
       catches: 'on clearance until the end of the month',
@@ -1004,6 +1070,7 @@ describe('claims the renderer cannot check', () => {
       kind: 'discount',
       catches: 'reduced this week',
       keeps: 'reduced to 900g without losing warmth',
+      supports: ['900g'],
     },
 
     { kind: 'delivery', catches: 'free delivery on this one', keeps: 'ships flat and folds away' },
@@ -1033,8 +1100,13 @@ describe('claims the renderer cannot check', () => {
 
   for (const row of ONE_ROW_PER_CLAIM_PATTERN) {
     it(`drops "${row.catches}" and keeps "${row.keeps}"`, () => {
-      const dropped = reconcile(grid([ref('TR-101', { reason: row.catches })]));
-      const kept = reconcile(grid([ref('TR-101', { reason: row.keeps })]));
+      const overrides =
+        row.supports === undefined
+          ? {}
+          : { candidates: [product('TR-101', { tags: row.supports }), product('TR-102')] };
+
+      const dropped = reconcile(grid([ref('TR-101', { reason: row.catches })]), overrides);
+      const kept = reconcile(grid([ref('TR-101', { reason: row.keeps })]), overrides);
 
       expect(dropped.violations).toContain(`unverifiable-claim:${row.kind}:reason:TR-101`);
       expect(kept.violations).toEqual([]);
@@ -1143,6 +1215,170 @@ describe('a claim spelled in characters the patterns do not expect', () => {
     const reason = '\uFF33uper light for long days';
 
     expect(reasonFor(reason)).toBe(reason);
+  });
+});
+
+/**
+ * Two more passes, run by @rudra-js/attested after the patterns above have had
+ * their say. `quantity` is the only proof in the stack: every numeral in the
+ * sentence has to be one this shop supplied. `wording` is a second denylist, for
+ * claims that carry no number to check.
+ */
+describe('the two passes attested adds', () => {
+  const reasonFor = (text: string): string | null | undefined =>
+    basisOf(reconcile(grid([ref('TR-101', { reason: text })])))?.reason;
+
+  const kindFor = (text: string, overrides: Partial<TrackingInputDraft> = {}): string | null => {
+    const result = reconcile(grid([ref('TR-101', { reason: text })]), overrides);
+    const violation = result.violations.find((entry) => entry.startsWith('unverifiable-claim:'));
+    return violation ? (violation.split(':')[1] ?? null) : null;
+  };
+
+  // Core's patterns answer first, so a sentence both screens catch is still
+  // reported by its kind. `violations` is what a generation-validity rate is
+  // computed from, and reading these as `wording` would erase four of the five
+  // kinds from it overnight.
+  it.each([
+    ['stock', 'in stock in your size'],
+    ['rating', 'highly rated by other hikers'],
+    ['discount', 'half off this week'],
+    ['price', 'was 120, now 80'],
+  ])('still names a %s claim by its kind', (kind, text) => {
+    expect(kindFor(text)).toBe(kind);
+  });
+
+  // The one miss real traffic has actually produced. Core's rating pattern reads
+  // "highly", "top", "best", "well", "poorly", "five" and "four" before "-rated",
+  // and the model wrote "highest".
+  it('drops the rationale the model really wrote', () => {
+    const rationale =
+      'Only signals available are the PDP category (Backpacks) and a lapsed segment with no ' +
+      'view/purchase/cart history, so I kept it to a single ordered grid of the highest-rated ' +
+      'in-category candidates plus a brief orienting copy block.';
+    const result = reconcile({ ...specWith([PRODUCT_GRID]), rationale });
+
+    expect(result.spec.rationale).toBe('');
+    expect(result.violations).toContain('unverifiable-claim:wording:rationale');
+  });
+
+  // Claims with no number in them, so only a denylist can reach them, and none of
+  // these is on core's.
+  const WORDING = [
+    'the highest-rated pack in the category',
+    'rated highest by other hikers',
+    'our most popular pack this season',
+    'a customer favourite in Backpacks',
+    'great value for a winter pack',
+    'free postage on this one',
+    'going quick in your size',
+    'flying off the shelves this week',
+    'hurry, this one moves fast',
+    'the top pick for winter nights',
+  ];
+
+  for (const reason of WORDING) {
+    it(`drops wording with nothing to check: "${reason}"`, () => {
+      expect(kindFor(reason)).toBe('wording');
+    });
+  }
+
+  // A bare number with no money word, no rating word and no stock word beside it.
+  // Core reads the words, so it reads none of these as a claim, and no wording
+  // list can hold every sentence a number can sit in.
+  const QUANTITIES = [
+    'yours today for 39',
+    'now 45',
+    'down from 80 to 60',
+    '4.8 from other hikers',
+    'scored 4.8 by buyers',
+    'take 15 off the second one',
+    'backed by 1,200 buyers',
+    'under 50 for the pair',
+  ];
+
+  for (const reason of QUANTITIES) {
+    it(`drops a number the shop never supplied: "${reason}"`, () => {
+      expect(kindFor(reason)).toBe('quantity');
+    });
+  }
+
+  // The selector writes this sentence itself and it goes through this same screen.
+  // With no facts behind it, the screen deletes core's own copy on every page in
+  // a catalogue whose categories are named like this one.
+  it("keeps the selector's own sentence when the category carries a digit", () => {
+    const overrides = {
+      candidates: [product('TN-1', { category: '3-Season Tents' })],
+      context: { surface: 'pdp', currentCategory: '3-Season Tents' },
+    };
+    const result = reconcile(
+      grid([ref('TN-1', { basis: 'similar_to_current', reason: 'More in 3-Season Tents' })]),
+      overrides,
+    );
+    const [block] = result.spec.blocks;
+    if (block?.kind !== 'grid') throw new Error('expected a grid');
+
+    expect(block.items[0]?.reason).toBe('More in 3-Season Tents');
+    expect(result.violations).toEqual([]);
+  });
+
+  // The browsed category is another string the prompt shows the model, and it is
+  // not always one of the candidates': a shopper can be looking at a category
+  // this request has nothing in stock from.
+  it('stands behind the category the shopper is browsing', () => {
+    const reason = 'A step up from the 3-Season Tents you were looking at';
+    const result = reconcile(grid([ref('BP-1', { reason })]), {
+      candidates: [product('BP-1', { category: 'Backpacks' })],
+      context: { surface: 'pdp', currentCategory: '3-Season Tents' },
+    });
+
+    expect(basisOf(result)?.reason).toBe(reason);
+    expect(result.violations).toEqual([]);
+  });
+
+  // The prompt shows the model every candidate's rating and tells it never to
+  // state one. Standing behind those numbers here would hand it back a vocabulary
+  // that reads as a price, a stock count or a delivery time just as easily.
+  it('stands behind no rating, even one the model was shown', () => {
+    const result = reconcile(grid([ref('TR-101', { reason: 'Yours for 4.9' })]), {
+      candidates: [product('TR-101', { rating: 4.9 }), product('TR-102')],
+    });
+
+    expect(basisOf(result)?.reason).toBeNull();
+    expect(result.violations).toContain('unverifiable-claim:quantity:reason:TR-101');
+  });
+
+  // The exemption branches around the screen, so neither new pass sees a host
+  // sentence either. Both of these walk past core's patterns and are dropped by
+  // attested, which is what makes them the test.
+  it.each([
+    ['a number core reads as a specification', 'Made to a 20,000mm waterproof rating'],
+    ['wording only a denylist reaches', 'A customer favourite in our Fulham store'],
+  ])("leaves the shop's own reason alone: %s", (_why, claim) => {
+    const candidates = [product('TR-101', { reason: claim }), product('TR-102')];
+
+    const kept = reconcile(
+      grid([ref('TR-101', { reason: claim })]),
+      { candidates },
+      new Set(['TR-101']),
+    );
+    expect(basisOf(kept)?.reason).toBe(claim);
+    expect(kept.violations).toEqual([]);
+
+    // The identical sentence with no host provenance is the model's, and goes.
+    const screened = reconcile(grid([ref('TR-101', { reason: claim })]), { candidates });
+    expect(basisOf(screened)?.reason).toBeNull();
+  });
+
+  // The quantity layer matches digit code points and nothing else. The one count
+  // claim in the committed transcript was spelled out, which is the half that
+  // survives, and it is the line that stops anyone writing a doc claim the code
+  // does not make.
+  it('reads digits, not words', () => {
+    const spelled = "Four packs, ordered by how well they've held up";
+    const digits = "4 packs, ordered by how well they've held up";
+
+    expect(reasonFor(spelled)).toBe(spelled);
+    expect(kindFor(digits)).toBe('quantity');
   });
 });
 
@@ -1393,26 +1629,29 @@ describe('the words the model really wrote', () => {
  * copy on every page is worse than the hole it fills.
  */
 describe('ordinary copy in the fields now screened', () => {
-  const SPECIFICATIONS = [
-    'made from 100% recycled nylon',
-    'a comfort rating of -5C',
-    'arrives flat-packed',
+  const SPECIFICATIONS: { text: string; tags: string[] }[] = [
+    { text: 'made from 100% recycled nylon', tags: ['100% recycled'] },
+    { text: 'a comfort rating of -5C', tags: ['-5C comfort'] },
+    { text: 'arrives flat-packed', tags: [] },
   ];
 
-  for (const text of SPECIFICATIONS) {
-    it(`keeps it in a headline: "${text}"`, () => {
-      const result = reconcile({ ...specWith([PRODUCT_GRID]), headline: text });
+  for (const row of SPECIFICATIONS) {
+    const overrides = { candidates: [product('TR-101', { tags: row.tags }), product('TR-102')] };
 
-      expect(result.spec.headline).toBe(text);
+    it(`keeps it in a headline: "${row.text}"`, () => {
+      const result = reconcile({ ...specWith([PRODUCT_GRID]), headline: row.text }, overrides);
+
+      expect(result.spec.headline).toBe(row.text);
       expect(result.violations).toEqual([]);
     });
 
-    it(`keeps it in a banner: "${text}"`, () => {
+    it(`keeps it in a banner: "${row.text}"`, () => {
       const result = reconcile(
-        specWith([{ kind: 'banner', tone: 'info', text, ctaLabel: null }, PRODUCT_GRID]),
+        specWith([{ kind: 'banner', tone: 'info', text: row.text, ctaLabel: null }, PRODUCT_GRID]),
+        overrides,
       );
 
-      expect(result.spec.blocks[0]).toMatchObject({ kind: 'banner', text });
+      expect(result.spec.blocks[0]).toMatchObject({ kind: 'banner', text: row.text });
       expect(result.violations).toEqual([]);
     });
   }
