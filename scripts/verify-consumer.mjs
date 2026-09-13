@@ -26,7 +26,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
-const PACKAGES = ['core', 'react', 'anthropic'];
+const PACKAGES = ['core', 'react', 'anthropic', 'verify'];
 
 /**
  * Needed to render, but not a dependency of anything published: nothing under
@@ -101,6 +101,7 @@ import {
 } from '@rudra-js/core';
 import { RudraComponent, defaultFormatBundlePrice, type ProductCatalog } from '@rudra-js/react';
 import { createAnthropicProvider } from '@rudra-js/anthropic';
+import { verify, type Facts } from '@rudra-js/verify';
 
 const products = [
   productSchema.parse({
@@ -205,6 +206,17 @@ const anthropicProvider = createAnthropicProvider({
 });
 if (typeof anthropicProvider.name !== 'string' || typeof anthropicProvider.model !== 'string') {
   throw new Error('@rudra-js/anthropic provider has no name/model strings');
+}
+
+// The guarantee half, resolving with no dependencies of its own and no node
+// builtins — which is the only reason it can claim to run anywhere.
+const facts: Facts = { values: [174] };
+const claim = verify('Only 2 left at $174', facts);
+if (claim.supported) {
+  throw new Error('@rudra-js/verify passed a quantity the facts do not carry');
+}
+if (claim.quantity.findings[0]?.token !== '2') {
+  throw new Error(\`@rudra-js/verify named the wrong token: \${JSON.stringify(claim.quantity)}\`);
 }
 
 // The consumer must not be able to reach the repository's own dependency tree —

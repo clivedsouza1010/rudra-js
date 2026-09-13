@@ -1,0 +1,50 @@
+{
+  "name": "@rudra-js/verify",
+  "version": "0.3.1",
+  "description": "Checks model-written product copy against the facts a shop stands behind",
+  "keywords": [
+    "llm",
+    "hallucination",
+    "grounding",
+    "verification",
+    "ecommerce",
+    "guardrails"
+  ],
+  "license": "MIT",
+  "author": "Clive Dsouza",
+  "homepage": "https://github.com/clivedsouza1010/rudra-js/tree/main/packages/verify#readme",
+  "bugs": {
+    "url": "https://github.com/clivedsouza1010/rudra-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clivedsouza1010/rudra-js.git",
+    "directory": "packages/verify"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src/**/*.ts",
+    "!src/**/*.test.ts"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

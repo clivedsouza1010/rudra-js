@@ -10,6 +10,18 @@ break them.
 
 ## [Unreleased]
 
+### Added
+
+- `@rudra-js/verify`, a new package with no dependencies and no node builtins.
+  It checks model-written copy against the facts a shop stands behind, in two
+  layers reported apart. The quantity layer inverts the check core's
+  `CLAIM_PATTERNS` cannot: every run of digits in the text has to be a value the
+  host supplied, whatever language the sentence is in, so "Nur noch 2 übrig" and
+  "4,8 von 5" no longer sail through. The wording layer, for claims with no
+  number in them, stays a denylist, says so in `strength: 'best-effort'` on
+  every result, and takes phrases the host adds for their own language. Nothing
+  in `@rudra-js/core` is wired to it yet.
+
 ## [0.3.1] - 2026-09-13
 
 Released as 0.3.1 because the `v0.3.0` tag was pushed at a commit that predated
