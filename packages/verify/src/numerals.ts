@@ -1,29 +1,59 @@
 // Everything here is string work. No float ever holds a value, so a twenty-digit
 // order number compares exactly.
 
-/** The decimal point and the digit-grouping mark, ASCII and Arabic. */
-const SEPARATORS = '.,\u066b\u066c';
+/** Invisible characters, dropped so a zero-width space cannot split one number into two. */
+const INVISIBLE = /[\p{Cf}\u034f]/gu;
 
-/** Runs of decimal digits joined by single separators. */
-const TOKEN = String.raw`\p{Nd}+(?:[.,\u066b\u066c]\p{Nd}+)*`;
+/** A dot or a comma. Either mark is a decimal point in one locale and grouping in another. */
+const AMBIGUOUS = '.,';
+/** The Arabic decimal separator, which is never grouping. */
+const DECIMAL_ONLY = '\u066b';
+/** Marks that are only ever grouping: Arabic thousands, the space family, the apostrophe. */
+const GROUPING_ONLY = '\u066c\u0020\u00a0\u2007\u2008\u2009\u202f\u0027\u2019';
+
+const SEPARATORS = AMBIGUOUS + DECIMAL_ONLY + GROUPING_ONLY;
+
+const RUN = `\\p{Nd}+(?:[${SEPARATORS}]\\p{Nd}+)*`;
+/** Marks that multiply the digits in front of them: 万 億 兆, and the k/M/B of English copy. */
+const MAGNITUDE = '(?:[十百千万萬億亿兆]|[kKMB](?!\\p{L}))';
+/** Numeric characters that are not decimal digits: ½ ² ② Ⅲ. */
+const OTHER_NUMERAL = '[\\p{No}\\p{Nl}]+';
+
+const SCAN = new RegExp(`${RUN}${MAGNITUDE}|${RUN}|${OTHER_NUMERAL}`, 'gu');
+const LOOSE = new RegExp(`[${GROUPING_ONLY}]`, 'u');
 
 const IS_DIGIT = /^\p{Nd}$/u;
+const STARTS_DIGIT = /^\p{Nd}/u;
+const ENDS_DIGIT = /\p{Nd}$/u;
 
 export interface Numeral {
   /** The run exactly as it appears in the text. */
   token: string;
-  /** Every reading of that run, canonical. Empty when the run reads as nothing. */
+  /** Every reading of that run, canonical. Empty when the layer cannot read the run. */
   forms: string[];
+  /** `digits` is a run this layer reads. The other two it cannot read at all. */
+  kind: 'digits' | 'magnitude' | 'other-numeral';
 }
 
-/** Unicode lays every decimal block out as ten code points in a row, so the zero is findable. */
+const zeros = new Map<number, number>();
+
+/**
+ * Unicode writes decimal digits in complete sets of ten, and adjacent sets abut, so
+ * the start of a maximal run of digit code points is a zero and the offset into that
+ * run, modulo ten, is the value. Walking back without that modulo reads every digit
+ * of the second and later sets in the maths block as a nine.
+ */
 function digitValue(char: string): number {
   const code = char.codePointAt(0) ?? 0;
-  let zero = code;
-  while (code - zero < 9 && zero > 0 && IS_DIGIT.test(String.fromCodePoint(zero - 1))) {
-    zero -= 1;
+
+  let zero = zeros.get(code);
+  if (zero === undefined) {
+    zero = code;
+    while (zero > 0 && IS_DIGIT.test(String.fromCodePoint(zero - 1))) zero -= 1;
+    zeros.set(code, zero);
   }
-  return code - zero;
+
+  return (code - zero) % 10;
 }
 
 function toAscii(token: string): string {
@@ -47,24 +77,36 @@ function canonical(whole: string, fraction: string): string {
   return tail.length === 0 ? head : `${head}.${tail}`;
 }
 
-/** Whether these runs and marks read as one grouped whole number: 12,345,678. */
-function isGrouping(groups: string[], separators: string[]): boolean {
-  if (separators.length === 0) return true;
+/** Whether these runs read as one grouped whole number: 12,345,678 or 1,29,999. */
+function isGrouping(groups: string[]): boolean {
+  if (groups.length === 1) return true;
+  if ((groups[groups.length - 1] ?? '').length !== 3) return false;
 
-  for (const separator of separators) {
-    if (separator !== separators[0]) return false;
+  let three = true;
+  let two = true;
+  for (let index = 1; index < groups.length - 1; index += 1) {
+    const size = (groups[index] ?? '').length;
+    if (size !== 3) three = false;
+    if (size !== 2) two = false;
   }
 
-  const lead = groups[0] ?? '';
-  if (lead.length < 1 || lead.length > 3) return false;
+  const lead = (groups[0] ?? '').length;
+  if (three) return lead >= 1 && lead <= 3;
+  // 1,29,999 — the Indian grouping, two digits at a time above the last three.
+  if (two) return lead >= 1 && lead <= 2;
+  return false;
+}
 
-  for (let index = 1; index < groups.length; index += 1) {
-    if ((groups[index] ?? '').length !== 3) return false;
+/** Whether every mark is the same one, and every one of them can be grouping. */
+function allGrouping(separators: string[]): boolean {
+  for (const separator of separators) {
+    if (separator !== separators[0]) return false;
+    if (DECIMAL_ONLY.includes(separator)) return false;
   }
   return true;
 }
 
-/** `1,299` is 1299 in London and 1.299 in Berlin, so both readings are kept. */
+/** `1,299` is 1299 in London and in Berlin. `1234,567` is a decimal in both. */
 function formsOf(token: string): string[] {
   const ascii = toAscii(token);
 
@@ -85,22 +127,63 @@ function formsOf(token: string): string[] {
   if (separators.length === 0) return [canonical(groups[0] ?? '', '')];
 
   const forms: string[] = [];
-  if (isGrouping(groups, separators)) forms.push(canonical(groups.join(''), ''));
+  if (allGrouping(separators) && isGrouping(groups)) forms.push(canonical(groups.join(''), ''));
 
   const whole = groups.slice(0, -1);
   const leading = separators.slice(0, -1);
-  const point = separators[separators.length - 1];
-  if (isGrouping(whole, leading) && leading[0] !== point) {
-    forms.push(canonical(whole.join(''), groups[groups.length - 1] ?? ''));
+  const point = separators[separators.length - 1] ?? '';
+  const fraction = groups[groups.length - 1] ?? '';
+
+  // One dot or comma with exactly three digits behind it is grouping wherever it is
+  // written, so `4.800` is four thousand eight hundred and never the rating 4.8.
+  const groupingWins = forms.length > 0 && leading.length === 0 && fraction.length === 3;
+
+  if (
+    !groupingWins &&
+    !GROUPING_ONLY.includes(point) &&
+    allGrouping(leading) &&
+    leading[0] !== point &&
+    isGrouping(whole)
+  ) {
+    forms.push(canonical(whole.join(''), fraction));
   }
+
   return forms;
+}
+
+function collect(found: Numeral[], token: string): void {
+  if (!STARTS_DIGIT.test(token)) {
+    found.push({ token, forms: [], kind: 'other-numeral' });
+    return;
+  }
+  if (!ENDS_DIGIT.test(token)) {
+    found.push({ token, forms: [], kind: 'magnitude' });
+    return;
+  }
+
+  const forms = formsOf(token);
+  if (forms.length > 0) {
+    found.push({ token, forms, kind: 'digits' });
+    return;
+  }
+
+  // `8 10 12` is three numbers, not one badly grouped one.
+  if (LOOSE.test(token)) {
+    for (const part of token.split(LOOSE)) {
+      if (part.length > 0) collect(found, part);
+    }
+    return;
+  }
+
+  // No locale reads `24.12.2026` as a number, so only a fact written the same way
+  // stands behind it. The raw run carries a mark, and a reading never does, so it
+  // can never be mistaken for one.
+  found.push({ token, forms: [toAscii(token)], kind: 'digits' });
 }
 
 export function numeralsIn(text: string): Numeral[] {
   const found: Numeral[] = [];
-  for (const match of text.matchAll(new RegExp(TOKEN, 'gu'))) {
-    found.push({ token: match[0], forms: formsOf(match[0]) });
-  }
+  for (const match of text.replace(INVISIBLE, '').matchAll(SCAN)) collect(found, match[0]);
   return found;
 }
 

@@ -1,4 +1,4 @@
-import { numeralsIn, supportedValues } from './numerals.js';
+import { numeralsIn, supportedValues, type Numeral } from './numerals.js';
 import { BANNED_PHRASES, normalisePhrasing, phraseIn } from './phrases.js';
 
 // Two layers, reported apart, because only one of them is a proof.
@@ -15,7 +15,10 @@ export interface Finding {
 
 export interface LayerReport {
   supported: boolean;
-  /** What this layer's verdict is worth. Only `quantity` is a proof. */
+  /**
+   * What this layer's verdict is worth. `proof` means every numeral in the text is
+   * a value the host supplied — not that the sentence around it is true.
+   */
   strength: 'proof' | 'best-effort';
   /** Numerals found, or phrases screened against. Zero means nothing was checked. */
   checked: number;
@@ -35,6 +38,8 @@ export interface Facts {
   values: readonly (string | number)[];
   /** Claims to ban on top of the built-in English list, for the host's own language. */
   bannedPhrases?: readonly string[];
+  /** Claims to drop from the list, for a shop that stands behind them. Applied last. */
+  allowedPhrases?: readonly string[];
 }
 
 export interface FieldResult {
@@ -43,18 +48,35 @@ export interface FieldResult {
 }
 
 export interface BatchResult {
-  /** True when every field is. */
+  /** True when every field is, and when the fields read as one carry no banned claim. */
   supported: boolean;
   fields: FieldResult[];
+  /** The wording layer over every field joined, so a phrase split across two fields still reads. */
+  acrossFields: LayerReport;
 }
 
 function phrasesOf(facts: Facts): string[] {
   const phrases = new Set<string>(BANNED_PHRASES);
+
   for (const phrase of facts.bannedPhrases ?? []) {
     const normalised = normalisePhrasing(phrase);
     if (normalised.length > 0) phrases.add(normalised);
   }
+  for (const phrase of facts.allowedPhrases ?? []) {
+    phrases.delete(normalisePhrasing(phrase));
+  }
+
   return [...phrases];
+}
+
+function reasonFor(numeral: Numeral): string {
+  if (numeral.kind === 'other-numeral') {
+    return `quantity: "${numeral.token}" is a numeric character this layer cannot read, so no fact can back it`;
+  }
+  if (numeral.kind === 'magnitude') {
+    return `quantity: "${numeral.token}" ends in a magnitude mark this layer cannot read, so the value it shows is unchecked`;
+  }
+  return `quantity: "${numeral.token}" is not a value the supplied facts carry`;
 }
 
 function checkQuantities(text: string, supported: Set<string>): LayerReport {
@@ -70,11 +92,7 @@ function checkQuantities(text: string, supported: Set<string>): LayerReport {
     if (backed || reported.has(numeral.token)) continue;
 
     reported.add(numeral.token);
-    findings.push({
-      layer: 'quantity',
-      token: numeral.token,
-      reason: `quantity: "${numeral.token}" is not a value the supplied facts carry`,
-    });
+    findings.push({ layer: 'quantity', token: numeral.token, reason: reasonFor(numeral) });
   }
 
   return {
@@ -124,12 +142,19 @@ export function verifyFields(fields: Record<string, string>, facts: Facts): Batc
   const phrases = phrasesOf(facts);
 
   const results: FieldResult[] = [];
+  const written: string[] = [];
   let allSupported = true;
   for (const field of Object.keys(fields)) {
-    const result = check(fields[field] ?? '', supported, phrases);
+    const text = fields[field] ?? '';
+    const result = check(text, supported, phrases);
     if (!result.supported) allSupported = false;
     results.push({ field, result });
+    written.push(text);
   }
 
-  return { supported: allSupported, fields: results };
+  // A card renders its fields next to each other, so `Free` and `delivery on every
+  // order` are one sentence to a shopper even though neither field carries one.
+  const acrossFields = checkWording(written.join(' '), phrases);
+
+  return { supported: allSupported && acrossFields.supported, fields: results, acrossFields };
 }

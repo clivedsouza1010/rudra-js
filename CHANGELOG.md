@@ -19,8 +19,13 @@ break them.
   host supplied, whatever language the sentence is in, so "Nur noch 2 übrig" and
   "4,8 von 5" no longer sail through. The wording layer, for claims with no
   number in them, stays a denylist, says so in `strength: 'best-effort'` on
-  every result, and takes phrases the host adds for their own language. Nothing
-  in `@rudra-js/core` is wired to it yet.
+  every result, and takes phrases the host adds for their own language — or
+  drops, through `allowedPhrases`, for a shop that genuinely offers free
+  shipping and would otherwise be barred from saying so. `verifyFields` also
+  reads the fields joined, because a card renders them next to each other and
+  the model picks where one field ends. The README states the guarantee in one
+  sentence and lists every bypass left open under its own heading. Nothing in
+  `@rudra-js/core` is wired to it yet.
 
 ## [0.3.1] - 2026-09-13
 

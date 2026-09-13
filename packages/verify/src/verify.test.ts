@@ -77,6 +77,106 @@ describe('verify — the quantity layer', () => {
   });
 });
 
+// Every case below is one a red team landed on this package.
+describe('verify — quantities a grouping mark used to manufacture', () => {
+  const SHOP = { values: [39.99, 4.8, 210, 12, 20, 'TR-101'] };
+
+  it('will not let a fact of 4.8 stand behind a written 4.800', () => {
+    expect(verify('4.800 Bewertungen', SHOP).supported).toBe(false);
+    expect(tokensOf(verify('4.800 Bewertungen', SHOP).quantity.findings)).toEqual(['4.800']);
+  });
+
+  it('will not let any small fact stand behind that fact times a thousand', () => {
+    expect(verify('Schon 20.000 Mal verkauft', SHOP).supported).toBe(false);
+    expect(verify('Über 12.000 zufriedene Kunden', SHOP).supported).toBe(false);
+    expect(verify('通常39,990円のところ', SHOP).supported).toBe(false);
+    expect(verify('Más de 4.800 valoraciones', SHOP).supported).toBe(false);
+    expect(verify('4,800 customer reviews', SHOP).supported).toBe(false);
+  });
+
+  it('closes the same manufacture in the Arabic thousands mark', () => {
+    expect(verify('٤\u066c٨٠٠ تقييم', SHOP).supported).toBe(false);
+    // The Arabic decimal mark still reads as a decimal point, because it is one.
+    expect(verify('٤\u066b٨ من ٥', { values: [4.8, 5] }).supported).toBe(true);
+  });
+
+  it('will not let a grouped fact mint a decimal the host never wrote', () => {
+    expect(verify('Yours for $1.24', { values: ['$39.00', '1,240'] }).supported).toBe(false);
+    expect(verify('Just 1.29 kg on your head', { values: ['Price 1,290'] }).supported).toBe(false);
+  });
+
+  it('stands behind a run no locale reads as a number when the host wrote it the same way', () => {
+    expect(verify('Lieferung am 24.12.2026', { values: ['24.12.2026'] }).supported).toBe(true);
+    expect(verify('Lieferung am 24.12.2026', { values: ['24.12.2027'] }).supported).toBe(false);
+    expect(verify('Bluetooth 5.3.1', { values: ['5.3.2'] }).supported).toBe(false);
+  });
+
+  it('still supports the same number written the way another locale groups it', () => {
+    expect(verify('Only 1 299 pairs made.', { values: ['1299 pairs made'] }).supported).toBe(true);
+    expect(verify("1'299 in Zurich", { values: [1299] }).supported).toBe(true);
+    expect(verify('Prix: 1 299,00 €', { values: ['1299.00'] }).supported).toBe(true);
+    expect(verify('₹1,29,999', { values: [129999] }).supported).toBe(true);
+  });
+});
+
+describe('verify — numerals the layer cannot read', () => {
+  it('rejects a magnitude mark glued to a supported digit', () => {
+    const facts = { values: [4.8, 12] };
+    expect(verify('4.8万件のレビュー', facts).supported).toBe(false);
+    expect(verify('販売数12万点', facts).supported).toBe(false);
+    expect(verify('4.8k reviews', facts).supported).toBe(false);
+    expect(verify('12M sold', facts).supported).toBe(false);
+  });
+
+  it('says in the finding that the magnitude, not the digit, is what it cannot read', () => {
+    const [finding] = verify('4.8万件のレビュー', { values: [4.8] }).quantity.findings;
+    expect(finding?.token).toBe('4.8万');
+    expect(finding?.reason).toContain('magnitude mark this layer cannot read');
+  });
+
+  it('rejects a numeric character that is not a decimal digit', () => {
+    expect(verify('½ price today', { values: [39] }).supported).toBe(false);
+    expect(verify('Only ② left at $39', { values: [39] }).supported).toBe(false);
+    expect(verify('Only Ⅲ pairs left', { values: [39] }).supported).toBe(false);
+    expect(verify('Now just $2⁹⁹', { values: ['2 year warranty'] }).supported).toBe(false);
+  });
+
+  it('names the character it cannot read, so the audit trail says why', () => {
+    const [finding] = verify('½ price today', { values: [39] }).quantity.findings;
+    expect(finding?.token).toBe('½');
+    expect(finding?.reason).toContain('numeric character this layer cannot read');
+  });
+
+  it('counts an unreadable numeral as checked, because it did look at it', () => {
+    expect(verify('Only ② left at $39', { values: [39] }).quantity.checked).toBe(2);
+  });
+
+  it('leaves a unit alone, so honest spec copy is not read as a magnitude claim', () => {
+    expect(verify('Weighs 250 g', { values: [250] }).supported).toBe(true);
+    expect(verify('1kg on the nose', { values: [1] }).supported).toBe(true);
+  });
+});
+
+describe('verify — digits that render as something else', () => {
+  it('reads a mathematical digit as the digit Unicode says it is', () => {
+    expect(verify('Now only $𝟭𝟵.𝟵𝟵', { values: ['$99.99'] }).supported).toBe(false);
+    expect(verify('Only 𝟮 left', { values: ['$99.99', '9 in stock'] }).supported).toBe(false);
+    expect(verify('Now $𝟷𝟹.', { values: ['$99.00'] }).supported).toBe(false);
+    expect(verify('Now just $12𝟶.', { values: ['$129.00'] }).supported).toBe(false);
+  });
+
+  it('supports a mathematical digit whose value the host did supply', () => {
+    expect(verify('Now only $𝟭𝟵.𝟵𝟵', { values: ['$19.99'] }).supported).toBe(true);
+  });
+
+  it('will not let an invisible character split one number into two supported ones', () => {
+    const facts = { values: ['2 year warranty', 'ships 13 March'] };
+    expect(verify('Rated by 2\u200b13 shoppers.', facts).supported).toBe(false);
+    expect(verify('Just $2\u00ad13 today.', facts).supported).toBe(false);
+    expect(verify('Rated by 213 shoppers.', { values: [213] }).supported).toBe(true);
+  });
+});
+
 describe('verify — the wording layer', () => {
   it('rejects a claim with no value to check', () => {
     const result = verify('Selling fast', NOTHING);
@@ -97,10 +197,51 @@ describe('verify — the wording layer', () => {
     expect(verify('selling\nfast', NOTHING).wording.supported).toBe(false);
   });
 
+  it('catches the near-misses a reworded denylist entry used to walk past', () => {
+    const rewordings = [
+      'Ships free.',
+      'Going fast.',
+      'Stock is running low.',
+      'Price just dropped.',
+      'Our most popular pick.',
+      'Rated highest in its class.',
+      'Or your money back.',
+      'Arrives tomorrow.',
+      'Extra discounts on every pair',
+    ];
+    for (const text of rewordings) {
+      expect(verify(text, NOTHING).wording.supported, text).toBe(false);
+    }
+  });
+
+  it('catches a claim an invisible or look-alike character was dropped into', () => {
+    expect(verify('F\u00adree delivery', NOTHING).wording.supported).toBe(false);
+    expect(verify('in\u200bstock now', NOTHING).wording.supported).toBe(false);
+    expect(verify('In stоck now', NOTHING).wording.supported).toBe(false);
+    expect(verify('Frеe delivery', NOTHING).wording.supported).toBe(false);
+  });
+
   it('takes a phrase the host added for their own language', () => {
     const facts = { values: [], bannedPhrases: ['nur noch'] };
     expect(verify('Nur noch wenige', facts).wording.supported).toBe(false);
     expect(verify('Nur noch wenige', NOTHING).wording.supported).toBe(true);
+  });
+
+  it('holds a host phrase against the registers their own language writes it in', () => {
+    // Turkish all-caps, Spanish decomposed accents, Japanese with a space dropped in.
+    expect(
+      verify('ÜCRETSİZ KARGO', { values: [], bannedPhrases: ['ücretsiz kargo'] }).wording.supported,
+    ).toBe(false);
+    expect(
+      verify('U\u0301ltimas unidades', { values: [], bannedPhrases: ['últimas unidades'] }).wording
+        .supported,
+    ).toBe(false);
+    expect(verify('送料 無料', { values: [], bannedPhrases: ['送料無料'] }).wording.supported).toBe(
+      false,
+    );
+    expect(
+      verify('شحن\u200fمجاني', { values: [], bannedPhrases: ['شحن مجاني'] }).wording.supported,
+    ).toBe(false);
   });
 
   it('keeps the built-in list when the host adds one', () => {
@@ -115,11 +256,31 @@ describe('verify — the wording layer', () => {
     expect(verify('Nur noch wenige', facts).wording.supported).toBe(false);
   });
 
+  it('drops a phrase the host stands behind, so a true statement can be published', () => {
+    const facts = { values: [12], allowedPhrases: ['free shipping', 'in stock'] };
+    expect(verify('Free shipping on orders over $12.', facts).supported).toBe(true);
+    expect(verify('12 in stock.', facts).supported).toBe(true);
+    expect(verify('Free shipping on orders over $12.', { values: [12] }).supported).toBe(false);
+  });
+
+  it('lets the allowance win over a phrase the host also added', () => {
+    const facts = { values: [], bannedPhrases: ['in stock'], allowedPhrases: ['in stock'] };
+    expect(verify('In stock', facts).wording.supported).toBe(true);
+  });
+
   it('counts the phrases it screened against', () => {
     const plain = verify('anything', NOTHING).wording.checked;
     const added = verify('anything', { values: [], bannedPhrases: ['nur noch'] }).wording.checked;
+    const dropped = verify('anything', { values: [], allowedPhrases: ['in stock'] }).wording
+      .checked;
     expect(plain).toBeGreaterThan(20);
     expect(added).toBe(plain + 1);
+    expect(dropped).toBe(plain - 1);
+  });
+
+  it('ignores a host phrase that normalises to nothing', () => {
+    const blank = verify('anything', { values: [], bannedPhrases: ['   '] }).wording.checked;
+    expect(blank).toBe(verify('anything', NOTHING).wording.checked);
   });
 
   it('calls the wording layer best-effort, because that is what it is', () => {
@@ -158,7 +319,56 @@ describe('verifyFields', () => {
     expect(verifyFields({ a: '$39', b: '$40' }, facts).supported).toBe(false);
   });
 
+  it('catches a claim split across two fields of the same card', () => {
+    // The model picks the field boundaries, so a per-field check is one it can choose.
+    const result = verifyFields(
+      { badge: 'Free', deliveryLine: 'delivery on every order', price: '$39' },
+      { values: [39] },
+    );
+
+    expect(result.supported).toBe(false);
+    expect(result.fields[0]?.result.supported).toBe(true);
+    expect(tokensOf(result.acrossFields.findings)).toEqual(['free delivery']);
+  });
+
+  it('calls the across-fields read best-effort, because it is the wording layer', () => {
+    const result = verifyFields({ a: 'Built for long days' }, NOTHING);
+    expect(result.acrossFields.strength).toBe('best-effort');
+    expect(result.acrossFields.supported).toBe(true);
+  });
+
   it('is supported when there is nothing to verify', () => {
-    expect(verifyFields({}, NOTHING)).toEqual({ supported: true, fields: [] });
+    const result = verifyFields({}, NOTHING);
+    expect(result.supported).toBe(true);
+    expect(result.fields).toEqual([]);
+    expect(result.acrossFields.findings).toEqual([]);
+  });
+});
+
+// The holes the README states. A test is the only thing that keeps the list honest.
+describe('verify — what it does not catch, proved to still not catch it', () => {
+  it('passes a number written as a word', () => {
+    expect(verify('Only two left.', { values: [12] }).supported).toBe(true);
+    expect(verify('残り二点', { values: [12] }).supported).toBe(true);
+  });
+
+  it('passes a real number used for something else entirely', () => {
+    expect(verify('39 sold in the last hour.', { values: ['$39.00'] }).supported).toBe(true);
+    expect(verify('Was $2,199. Now $129.', { values: ['$129.00', 'SKU AT-2199'] }).supported).toBe(
+      true,
+    );
+  });
+
+  it('passes the wrong currency on a right number', () => {
+    expect(verify('￥39.99', { values: ['$39.99'] }).supported).toBe(true);
+  });
+
+  it('passes a magnitude written as a word in any language', () => {
+    expect(verify('4,8 Millionen verkauft', { values: [4.8] }).supported).toBe(true);
+  });
+
+  it('passes a claim in a language the wording layer was never given', () => {
+    expect(verify('Livraison offerte', NOTHING).supported).toBe(true);
+    expect(verify('Gratis Versand', NOTHING).supported).toBe(true);
   });
 });
