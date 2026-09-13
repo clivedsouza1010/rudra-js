@@ -26,7 +26,7 @@ default mode makes 460 model calls per 1,000 page views, compared to 1,000 if yo
 every shopper. And if you want to run with no model at all, that's a fully supported setting rather
 than a stub, and it won't cost you a penny.
 
-> **Status: `0.3.0`, early.** It installs and it works. The Getting started below actually runs as a
+> **Status: `0.3.1`, early.** It installs and it works. The Getting started below actually runs as a
 > test on every commit. Just keep in mind that the public contracts might still shift between minor
 > versions before we hit `1.0`, and the changelog will always tell you when they do.
 

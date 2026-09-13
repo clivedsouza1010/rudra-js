@@ -10,7 +10,12 @@ break them.
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-09-13
+## [0.3.1] - 2026-09-13
+
+Released as 0.3.1 because the `v0.3.0` tag was pushed at a commit that predated
+the version bump. The release job's own guard stopped it, nothing was published,
+and `v*` tags cannot be reused. There is no 0.3.0 on the registry, and this
+release carries everything that version was meant to.
 
 ### Added
 
@@ -223,7 +228,7 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.2.0...v0.3.0
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.2.0...v0.3.1
 [0.2.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/clivedsouza1010/rudra-js/releases/tag/v0.1.0
