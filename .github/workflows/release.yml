@@ -48,24 +48,39 @@ jobs:
 
       # Provenance links the published tarball to this commit, this workflow and
       # this runner, so a consumer can check where it came from. It requires a
-      # public `repository` field in package.json matching this repo, which both
-      # packages have.
+      # public `repository` field in package.json matching this repo, which every
+      # package has.
       #
-      # Core first: @rudra-js/react declares it as a peer, so a registry that has
-      # the second without the first cannot satisfy an install.
+      # npm has no transactional multi-publish. If one package succeeds and the
+      # next fails, the tag cannot simply be re-run — npm rejects republishing a
+      # version that exists, so the job would fail on the first one again before
+      # reaching the rest. Publishing by hand is not the way out either: the only
+      # credential is the OIDC token this job mints, and there is no token to run
+      # npm publish with from a laptop. Recover by bumping the version and
+      # tagging a new patch release.
       #
-      # npm has no transactional multi-publish. If core succeeds and react then
-      # fails, the tag cannot simply be re-run — npm rejects republishing a
-      # version that exists, so the job would fail on core before reaching
-      # react. Publishing by hand is not the way out either: the only credential
-      # is the OIDC token this job mints, and there is no token to run npm
-      # publish with from a laptop. Recover by bumping the version and tagging a
-      # new patch release.
+      # So the order is by how likely a step is to fail, not by dependency.
+      # Anything published before the failure is already public and stuck at a
+      # version the next tag cannot reuse.
+      #
+      # The riskiest step is a package npm has not seen before: a trusted
+      # publisher is configured from a package's settings page, which needs the
+      # package to already exist, so a brand new name has no configuration to
+      # read and fails auth. It goes first, where a failure costs nothing.
+      # Nothing depends on @rudra-js/attested and it depends on nothing, so
+      # moving it does not strand a half-installable registry.
+      #
+      # Core leads the rest: @rudra-js/react and @rudra-js/anthropic both declare
+      # it as a peer, so a registry that has either without core cannot satisfy
+      # an install.
 
       # Node 22 ships npm 10. Trusted publishing needs 11.5, which reads the
       # OIDC token itself - no registry-url, no NODE_AUTH_TOKEN.
       - run: npm install -g npm@11.19.1
       - run: npm --version
+      - run: npm publish --provenance --access public
+        working-directory: packages/attested
+
       - run: npm publish --provenance --access public
         working-directory: packages/core
 
@@ -74,6 +89,3 @@ jobs:
 
       - run: npm publish --provenance --access public
         working-directory: packages/anthropic
-
-      - run: npm publish --provenance --access public
-        working-directory: packages/attested
