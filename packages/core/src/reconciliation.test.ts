@@ -13,6 +13,7 @@ import { buildDigest } from './signal-digest.js';
 import {
   ALLOWED_PHRASES,
   MAX_BLOCKS,
+  productFacts,
   reconcileSpec,
   type ReconcileResult,
 } from './reconciliation.js';
@@ -1187,6 +1188,57 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
+  // A pattern spelling the same claim more than one way gets a row per spelling. The
+  // table above takes one row per pattern, and the row it took was a spelling that
+  // already worked while `#1` matched nothing at all.
+  const EVERY_SPELLING: { kind: string; catches: string }[] = [
+    { kind: 'rating', catches: 'our number one seller last winter' },
+    { kind: 'rating', catches: 'our no.1 seller last winter' },
+    { kind: 'rating', catches: 'our no. 1 seller last winter' },
+    { kind: 'rating', catches: 'our no 1 seller last winter' },
+    { kind: 'rating', catches: 'our #1 seller last winter' },
+    { kind: 'rating', catches: 'our # 1 seller last winter' },
+    { kind: 'rating', catches: 'the #1 selling pack' },
+    { kind: 'price', catches: 'yours today for thirty-nine dollars' },
+    { kind: 'price', catches: 'thirty-nine euros and it is yours' },
+  ];
+
+  for (const row of EVERY_SPELLING) {
+    it(`reads "${row.catches}" as a ${row.kind} claim`, () => {
+      const result = reconcile(grid([ref('TR-101', { reason: row.catches })]));
+
+      expect(result.violations).toContain(`unverifiable-claim:${row.kind}:reason:TR-101`);
+    });
+  }
+
+  // The reach the pattern keeps on purpose. A selling point is not a sales rank, and both
+  // spellings are dropped as a rating anyway. `number one` did this before `#1` was fixed,
+  // so narrowing one would mean narrowing both, and neither sentence is worth the rule.
+  const OVER_REACHES = [
+    'the number one selling point is the hood',
+    'the #1 selling point is the hood',
+  ];
+
+  for (const reason of OVER_REACHES) {
+    it(`reads too much into "${reason}"`, () => {
+      const result = reconcile(grid([ref('TR-101', { reason })]));
+
+      expect(result.violations).toContain('unverifiable-claim:rating:reason:TR-101');
+    });
+  }
+
+  // What the neighbouring rules were careful about. "selling fast" is a stock claim, so
+  // it is dropped either way — what this holds is that the rating pattern is not why.
+  const NOT_A_SELLER_CLAIM = ['a reseller of gear', 'resell it later', 'selling fast in your size'];
+
+  for (const reason of NOT_A_SELLER_CLAIM) {
+    it(`is no rating claim: "${reason}"`, () => {
+      const result = reconcile(grid([ref('TR-101', { reason })]));
+
+      expect(result.violations).not.toContain('unverifiable-claim:rating:reason:TR-101');
+    });
+  }
+
   it('records the claim it dropped', () => {
     const result = reconcile(grid([ref('TR-101', { reason: 'rated 4.8 stars by shoppers' })]));
 
@@ -1485,6 +1537,59 @@ describe('the two passes attested adds', () => {
       expect(own.violations).toEqual([]);
     },
   );
+
+  // The cap holds for those two fields as well. A candidate past it is still placeable —
+  // it is in stock, so the allowlist takes it — and its own tag was backing its own reason
+  // and badge, on a product the model was never shown.
+  it('stands behind nothing on a candidate past the cap the model placed anyway', () => {
+    const result = reconcile(
+      grid([ref('TR-600', { reason: 'a 39 litre pack for long days', badge: '39 litre' })]),
+      { candidates: overflowing(100) },
+    );
+
+    expect(placedSkus(result.spec.blocks)).toEqual(['TR-600']);
+    expect(basisOf(result)?.reason).toBeNull();
+    expect(basisOf(result)?.badge).toBeNull();
+    expect(result.violations).toContain('unverifiable-claim:quantity:reason:TR-600');
+    expect(result.violations).toContain('unverifiable-claim:quantity:badge:TR-600');
+  });
+
+  it('stands behind the tag of the last candidate the prompt shows, in a field naming it', () => {
+    const result = reconcile(grid([ref('TR-559', { reason: 'a 39 litre pack for long days' })]), {
+      candidates: overflowing(59),
+    });
+
+    expect(basisOf(result)?.reason).toBe('a 39 litre pack for long days');
+    expect(result.violations).toEqual([]);
+  });
+
+  // attested lays a fact written as a bare exponent out digit by digit. It caps that
+  // itself now, but it is a peer dependency and the copy a host has installed may be
+  // older, where `1e2000000000` threw and `-2.5e400000000` took the process with it.
+  const ABSURD = '1e2000000000';
+
+  it('keeps a fact nothing could lay out off the list, tag or category', () => {
+    const input = inputFor({
+      candidates: [
+        product('TR-101', { category: ABSURD, tags: [ABSURD, '3 season'] }),
+        product('TR-102'),
+      ],
+    });
+    const [first] = input.candidates;
+    if (!first) throw new Error('expected a candidate');
+
+    expect(productFacts(first)).toEqual(['3 season']);
+  });
+
+  it('renders the rest of that candidate normally', () => {
+    const result = reconcile(
+      grid([ref('TR-101', { reason: 'rated 3 season for shoulder-season trips' })]),
+      { candidates: [product('TR-101', { tags: [ABSURD, '3 season'] }), product('TR-102')] },
+    );
+
+    expect(basisOf(result)?.reason).toBe('rated 3 season for shoulder-season trips');
+    expect(result.violations).toEqual([]);
+  });
 
   // The prompt shows the model every candidate's rating and tells it never to
   // state one. Standing behind those numbers here would hand it back a vocabulary

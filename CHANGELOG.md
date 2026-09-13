@@ -19,23 +19,29 @@ break them.
   attested's quantity layer, recorded as `unverifiable-claim:quantity:<field>`;
   attested's wording layer, recorded as `unverifiable-claim:wording:<field>`.
   Core's patterns answer first so every violation string an evaluation already
-  counts reads the same as before. All 41 patterns stay — measured, they catch
-  all 48 of the strings the tests say must drop by kind, where attested's two
-  layers together reach 32, so replacing them would have been a downgrade.
+  counts reads the same as before. All 41 patterns stay — measured over the 55
+  distinct strings the tests require to drop by kind, they catch all 55, where
+  attested's two layers together reach 38, so replacing them would have been a
+  downgrade. The extra pass costs what an extra pass costs: one `reconcileSpec`
+  against 0.4.0, median of nine batches of twenty, runs 0.021 ms to 0.215 ms on
+  digit-free copy over seven candidates, 0.032 ms to 0.244 ms digit-free at the
+  payload ceiling, and 0.022 ms to 0.967 ms with a digit in every field against
+  a 60-candidate spec sheet. That is 7.6x to 44x on a pass that was cheap to
+  begin with, and it runs next to a model call, not instead of one.
 - A specification with a number in it is no longer kept on the strength of the
   words around the number. `"a comfort rating of -5C"` and
   `"a waterproof rating of 20,000mm"` are kept when a `5` or a `20000` turns up
   in a `tag` or a `category` on the candidates the prompt showed the model, and
   dropped as `quantity` when it does not. The number, not the string: a tag
-  reading `5-pocket` keeps the first of those as surely as `-5C comfort` does. Those are the strings the prompt hands
-  the model and lets it repeat; a `title` and a `rating` it is shown but told
-  never to restate, so neither stands behind a number. This reverses a
-  documented judgement in `reconciliation.ts` and it reclassifies 15 strings the
-  test suite used to assert were kept. Put your spec sheet in `tags` and the
-  model can quote it. On a catalogue with no digit in any tag or category — the
-  example shop is one — the rule becomes "no digit may appear", and an emptied
-  headline makes the whole generation unusable, so one digit there costs the
-  model call.
+  reading `5-pocket` keeps the first of those as surely as `-5C comfort` does.
+  Those are the strings the prompt hands the model and lets it repeat; a `title`
+  and a `rating` it is shown but told never to restate, so neither stands behind
+  a number. This reverses a documented judgement in `reconciliation.ts` and it
+  reclassifies 15 strings the test suite used to assert were kept. Put your spec
+  sheet in `tags` and the model can quote it. On a catalogue with no digit in any
+  tag or category — the example shop is one — the rule becomes "no digit may
+  appear", and an emptied headline makes the whole generation unusable, so one
+  digit there costs the model call.
 - The numbers that stand behind a sentence are narrower than the request. Only
   candidates the prompt actually showed the model count: a product that is out
   of stock or past the 60-candidate cap stands behind nothing. `currentCategory`
@@ -69,7 +75,12 @@ break them.
   now stands behind no numeral at all — nothing a shop sells is that wide, and
   every finite JavaScript number lays out inside it, the longest being `5e-324`
   at 326 characters. Core screens every model-written string now, so a tag like
-  that reaches this code on any render.
+  that reaches this code on any render. `@rudra-js/core` keeps such a tag off
+  the fact list as well, rather than relying on the fix: attested is a peer
+  dependency, so the copy a host has installed may still be one that tries.
+  Core draws its line on the exponent and attested on the laid-out run, so a
+  few tags at the margin — `1e1000`, `9999e998` — pass core's rule and then
+  stand behind nothing here. Nothing that wide is a product fact either way.
 - `@rudra-js/attested` did two things again on every `verify` call that it only
   needed to do once: it re-read the whole fact list, and it rebuilt its index
   over the text for each of the eighty-odd phrases it screens against. A fact

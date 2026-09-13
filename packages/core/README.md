@@ -160,6 +160,15 @@ Which strings, exactly:
 - A `reason` or a `badge` sits under a named product, so it's read against that
   product's own tags and category. Every other field reads all the candidates'
   pooled.
+- A tag or category that is nothing but a number in exponent notation, and whose
+  exponent runs past a thousand, is dropped here. `1e2000000000` is twelve
+  characters that lay out into a run long enough to end the process, and
+  `@rudra-js/attested` is a peer dependency, so the copy you have installed may
+  be one that still tries. `@rudra-js/attested` draws its own line in the same
+  place but measures the laid-out run rather than the exponent, so a handful of
+  tags near the margin — `1e1000`, `1.5e1000`, `9999e998` — get past this rule
+  and then stand behind nothing on the other side of it. Nothing that wide is a
+  product fact either way.
 
 Two caveats worth saying out loud, because they're the shape of the check rather
 than bugs in it. Pooled means pooled: one product's `40 litre` tag stands behind
