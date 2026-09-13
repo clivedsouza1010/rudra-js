@@ -22,25 +22,28 @@ const generator = createComponentGenerator({ provider });
 ```
 
 `model` defaults to `claude-sonnet-5`, and `thinking` defaults to
-`{ type: 'disabled' }`. Both defaults exist for the same reason: generation runs
-on the request path inside `modelTimeoutMs`, which core defaults to 1500ms, and
-a model that reasons before answering does not finish inside that. Sonnet 5
-reasons by default when `thinking` is left out, so leaving it out is what would
-break, not the model choice.
+`{ type: 'disabled' }`.
 
-Pass `model` to pin a different one, and raise `modelTimeoutMs` to match when
-you do. Some models reject an explicit `{ type: 'disabled' }` and always reason;
-pass `thinking: null` for those, which sends no `thinking` field at all. The
-example shop pins `claude-opus-5` and sets `modelTimeoutMs` to 60 seconds, which
-is a demo setting rather than a production one.
+Both of those come from the same constraint. Generation runs on the request
+path, inside `modelTimeoutMs`, which core defaults to 1500ms. A model that
+reasons before it answers won't finish in time. Sonnet 5 reasons by default
+when `thinking` is left out, so it's the leaving out that would break the
+budget, not the choice of model.
 
-`maxTokens` and `baseUrl` are also optional.
+Want a different model? Pass `model` to pin one, and raise `modelTimeoutMs` to
+match while you're there. A quick heads-up on `thinking`: some models reject an
+explicit `{ type: 'disabled' }` and reason whatever you do. Pass
+`thinking: null` for those and we'll send no `thinking` field at all. Our
+example shop pins `claude-opus-5` and gives `modelTimeoutMs` a full 60 seconds,
+which is a demo talking, not a production setting.
+
+`maxTokens` and `baseUrl` are optional too.
 
 ### An identity-linked key needs a workspace
 
-A key created against your identity rather than inside a workspace belongs to
-you across several of them, so the API cannot infer which one a request acts in
-and answers:
+A key you made against your identity rather than inside a workspace belongs to
+you across several of them. The API can't tell which one a request is acting in,
+so it answers:
 
 ```
 400 invalid_request_error — anthropic-workspace-id is required when
@@ -56,38 +59,38 @@ createAnthropicProvider({
 });
 ```
 
-`fetch` is injectable, which is what the test suite uses in place of a network
-call.
+`fetch` is injectable. That's how our test suite stands in for a network call.
 
-The tool schema sent to the model is derived from the `schema` on the
-`ProviderRequest` — the same schema `@rudra-js/core` defines — rather than a
-copy written out here. A second copy would be a second vocabulary: the
-reconciler would enforce one thing and the model would be told another.
+The tool schema we send the model is derived from the `schema` on the
+`ProviderRequest`, the same schema `@rudra-js/core` defines. We don't keep a
+copy here. A second copy would be a second vocabulary, and then the reconciler
+enforces one thing while the model is told another.
 
 ## Data handling
 
 Each generation is one POST to `https://api.anthropic.com/v1/messages`. Set
-`baseUrl` and it goes to that host instead — a proxy, a gateway, or a
-region-specific endpoint you have.
+`baseUrl` and it goes to that host instead, whether that's a proxy, a gateway,
+or a region-specific endpoint you have.
 
-What is in that request is listed under **What the model sees** in the
+What's in that request is listed under **What the model sees** in the
 [`@rudra-js/core` README](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core#what-the-model-sees).
 Read it before you send real shopper traffic. In cohort mode, the default, the
 request carries no individual. In per-shopper mode it carries that shopper's
 likes, dislikes, purchases, basket, views and recent searches.
 
-If your shop is in the EU or the UK, you are the one sending personal data to
-Anthropic, and you need a data processing agreement with them plus a transfer
-mechanism for the data leaving your region. Your shop is Anthropic's customer;
-this package is a piece of code in the middle and is not a party to anything.
+If your shop is in the EU or the UK, you're the one sending personal data to
+Anthropic, so you'll need a data processing agreement with them plus a transfer
+mechanism for the data leaving your region. Your shop is Anthropic's customer.
+This package is a piece of code in the middle, and it _isn't_ a party to
+anything.
 
-When the API answers with an error, the thrown `Error` carries the status code
-and the vendor's error category — `anthropic responded 400
-(invalid_request_error)`. The vendor's own message is left out on purpose: it
-quotes the request back, and for this framework the request can hold a shopper's
-search terms, which an adopter's `console.error(error)` would then write to a
-log. A test in `anthropic-provider.test.ts` puts a search term in that message
-and asserts it does not reach the thrown error.
+When the API answers with an error, the `Error` we throw carries the status code
+and the vendor's error category, like `anthropic responded 400
+(invalid_request_error)`. We leave the vendor's own message out. It quotes the
+request back, and for this framework the request can hold a shopper's search
+terms, which an adopter's `console.error(error)` would then write to a log. A
+test in `anthropic-provider.test.ts` puts a search term in that message and
+asserts it does not reach the thrown error.
 
 ## Licence
 

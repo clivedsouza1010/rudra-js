@@ -1,53 +1,53 @@
 # rudra-js
 
-Recommendation blocks designed by a language model, rendered on the server by React, with every
-product fact read from your own catalog.
+rudra-js gives you recommendation blocks designed by a language model and rendered on the server by
+React, while every product fact comes from your own trusted catalog.
 
-A model that writes HTML can put a price on the page that is not real. This one never writes HTML.
-It returns a specification drawn from a closed vocabulary: a layout, a headline and the wording.
-There is no field in it for a price, and none for a product name, an image or a link. Products are
-named by SKU, and only from the list you sent. In the default mode the products in a grid or a
-carousel are picked per request from that list, not by the model.
+If a language model writes raw HTML, it can hallucinate a fake price or a product you don't sell
+onto your page. So rudra-js never lets the model write HTML. Instead it returns a specification
+drawn from a closed vocabulary: it picks a layout, writes a headline, and provides the copy. There
+are simply no fields for it to invent a price, a product name, an image, or a link. Products are
+referenced only by SKU, and only from the list you provide. In the default mode, the products shown
+in a grid or carousel are chosen per request from that list, not by the model.
 
 ![The example shop's product page. The heading, the order, the highlighting and the paragraph are the model's. Every title, price and image is the shop's.](docs/demo.png)
 
-React Server Components turn that specification into markup, reading the title, price, image and
-link from your catalog as the page is served. What the model wrote renders as escaped text.
+React Server Components turn that specification into markup, reading the title, price, image, and
+link from your catalog as the page is served. Whatever the model wrote is rendered as escaped text.
 
-The model's words are also read for prices, discounts, ratings, delivery dates and stock counts, and
-text that makes one of those claims is dropped. That check reads words, so a careful rewording can
-get past it. The structure is what holds. The model is never told a price, and the specification has
-no field to put one in.
+We also scan the model's words for prices, discounts, ratings, delivery dates, and stock counts. If
+the text makes one of those claims, it gets dropped. That check reads raw words, so a careful
+rewording might slip past it, which is why the structural boundaries are the real defence. The model
+is never told a price, and the specification has nowhere to put one.
 
-The block is in the first HTML response and ships no client JavaScript, so a crawler that does not
-run JavaScript still reads it. On the 500-shopper benchmark the default mode makes 460 model calls
-per 1,000 page views, against 1,000 when you generate for each shopper. Running with no model at all
-is a supported setting rather than a stub, and it bills nothing.
+Because the block is in the initial HTML response and needs zero client-side JavaScript, a crawler
+that never runs JavaScript still reads it. It's efficient too: on our 500-shopper benchmark the
+default mode makes 460 model calls per 1,000 page views, compared to 1,000 if you generated for
+every shopper. And if you want to run with no model at all, that's a fully supported setting rather
+than a stub, and it won't cost you a penny.
 
-> **Status: `0.2.0`, early.** Installable and usable. The Getting started below runs as a test on
-> every commit. The public contracts may still change between minor versions before `1.0`, and the
-> changelog says when they do.
+> **Status: `0.2.0`, early.** It installs and it works. The Getting started below actually runs as a
+> test on every commit. Just keep in mind that the public contracts might still shift between minor
+> versions before we hit `1.0`, and the changelog will always tell you when they do.
 
 ## Getting started
 
-Nothing here needs an API key. Leave the provider out and you get the deterministic
-component — a supported setting, not a stub, and the right one until you have decided
-on a model.
+You don't need an API key to get going. Leave the provider out and you'll get the deterministic
+component, which is a fully supported setting and the right one until you've settled on a model.
 
 ```sh
 npm install @rudra-js/core @rudra-js/react zod@^4.5
 ```
 
-Every package here lives under the `@rudra-js` scope. The unscoped `rudra-js` package on npm
-belongs to someone else and has nothing to do with this project — check the `@` before you
-install.
+A quick heads-up: every package here lives under the `@rudra-js` scope. The unscoped `rudra-js`
+package on npm belongs to someone else, so make sure you include the `@`.
 
-zod 4.5 or later is required. The public API of `@rudra-js/core` _is_ zod schemas, so your app and
-the package have to resolve the same zod, and a zod 3 app will fail to install. The floor is 4.5
-rather than 4.0 because 4.5 changed how a nullable field is written into the tool schema the model
-is asked to fill in — `tests/tool-schema.test.ts` holds the golden copy of that schema.
+You'll need zod 4.5 or later. The public API of `@rudra-js/core` _is_ zod schemas, so your app and
+the package have to resolve the same copy of zod, which means a zod 3 app won't install at all. We
+ask for 4.5 rather than 4.0 because that version changed how nullable fields are written into the
+tool schema we send the model. `tests/tool-schema.test.ts` keeps our golden copy of it.
 
-Node 22.12 or later is required. Node 20 is end of life, and nothing here is built or tested on it.
+You'll also need Node 22.12 or later. Node 20 is end of life, so we don't build or test on it.
 
 ```tsx
 import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
@@ -60,12 +60,12 @@ const catalog = [
 ];
 
 async function recommendations() {
-  // No provider means no API key and no spend. It is a supported setting, not
-  // a stub: you get the deterministic component.
+  // Passing no provider means no API key and no spend.
+  // You get a reliable, deterministic component.
   const generator = createComponentGenerator({ provider: null });
 
-  // Parsing fills in what you left out and rejects what does not belong. Pass
-  // the parsed candidates to the renderer, not your raw objects.
+  // Parsing fills in what you left out and strips anything that doesn't belong.
+  // Always pass the parsed candidates to the renderer, not your raw objects.
   const input = parseTrackingInput({
     user: { id: 'shopper-1' },
     context: { surface: 'pdp', currentSku: 'A-1', currentCategory: 'Cookware' },
@@ -79,23 +79,21 @@ async function recommendations() {
 }
 ```
 
-In Next.js, `export default recommendations` at the end makes this a page. A shopper
-looking at the skillet with the dutch oven already in their cart is shown the knife,
-under the heading "Goes with your cart". The page they are on and the thing they
-have already chosen are both left out. No model was asked, and nothing was billed.
+In Next.js, adding `export default recommendations` at the bottom turns that into a page. A shopper
+looking at the skillet with the dutch oven already in their cart is shown the knife, under the
+heading "Goes with your cart". The page they're on and the thing they've already chosen are both
+left out. No model was asked, and nothing was billed.
 
-To bring a model in, add [`@rudra-js/anthropic`](packages/anthropic) and pass it as the
-`provider`. Everything above stays the same — the model writes the wording, the layout and
-the emphasis, and by default the products in a grid or carousel are still chosen here
-rather than by the model. See [What the model decides, by
-mode](packages/core#what-the-model-decides-by-mode) for the line in each mode,
-[`@rudra-js/core`](packages/core) for the full payload, and
-[`@rudra-js/react`](packages/react) for the class names to style.
+When you're ready to bring a model in, add [`@rudra-js/anthropic`](packages/anthropic) and pass it
+as the `provider`. Everything above stays the same, except that the model now writes the wording,
+the layout and the emphasis. By default the products in a grid or carousel are still chosen by the
+core logic rather than by the model.
 
-That adapter is one option, not the only one. The three-method interface any model can sit
-behind is in [Any provider](packages/core#any-provider).
+That adapter is one option, not the only one. Any model can sit behind the small interface described
+in [Any provider](packages/core#any-provider).
 
-The code above is run as a test on every commit, so a change that breaks it fails CI.
+_We run the code block above as a test on every commit, so if a change breaks it, CI catches it
+straight away._
 
 ## Packages
 
@@ -107,11 +105,11 @@ The code above is run as a test on every commit, so a change that breaks it fail
 
 ## Development
 
-Node `>=22.12` is required. Node 20 is end of life, and
-`npm run verify:consumer` runs TypeScript through `--experimental-strip-types`,
-which 20.19 does not have. `.nvmrc` names an exact 22, and `engine-strict=true` turns a
-mismatch into a readable install error. CI runs the checks on 22.12.0 as well as
-on the `.nvmrc` version, so the floor is exercised rather than just declared.
+You'll need Node `>=22.12` to work on this. Node 20 is end of life and doesn't have the
+`--experimental-strip-types` flag that `npm run verify:consumer` relies on. `.nvmrc` names an exact
+Node 22 so the version is never a guess, and `engine-strict=true` turns a mismatch into a readable
+install error. CI runs the checks on 22.12.0 as well as on the `.nvmrc` version, so the floor we
+claim is genuinely exercised.
 
 ```sh
 nvm use
@@ -127,23 +125,26 @@ npm test
 npm run verify:consumer   # packs all three packages and uses them from outside the repo
 ```
 
-`ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run bench` measures what each generation mode costs under a stub model; [bench/README.md](bench/README.md) says what its columns mean.
+To see what each generation mode costs under a stub model, run
+`ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run bench`. [bench/README.md](bench/README.md) explains
+what the columns mean.
 
-If you have a key in your shell, run the tests as `ANTHROPIC_API_KEY= npm test`. `vitest.config.ts`
-sets `RUDRA_REPLAY_ONLY=1` for every test run, and the shop throws at start-up when that is set and
-a key is set too — so a run with a key in the shell fails to load instead of calling the model.
+If you keep a key exported in your shell, run the tests as `ANTHROPIC_API_KEY= npm test`.
+`vitest.config.ts` sets `RUDRA_REPLAY_ONLY=1` for every test run, and the shop deliberately throws
+at start-up when that flag and a key are both present, so a run with a key in the shell fails to
+load rather than quietly spending money.
 
-CI runs all six of these on every pull request as separate steps, so a failure names itself, and a
-second job builds the example shop and checks that its page still reads as one to a crawler. CI sets
-no mode, so the shop replays and that job runs the build plainly:
+We run all six checks on every pull request as separate steps, so a failure names itself, and a
+second job builds the example shop and checks its page still reads as one to a crawler. CI sets no
+mode, so the shop replays and that job runs the build plainly:
 
 ```sh
 npm run build --workspace @rudra-js/example-shop
 npm run verify:crawlable
 ```
 
-Locally that build is safe on its own — a key alone no longer spends anything, only
-`RUDRA_SHOP_MODE=record` does. The prefix makes it a rule rather than a default:
+Locally that build is safe on its own, since a key alone no longer spends anything and only
+`RUDRA_SHOP_MODE=record` does. The prefix below just makes it a rule rather than a default:
 
 ```sh
 ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/example-shop
@@ -161,15 +162,15 @@ npm run dev --workspace @rudra-js/example-shop
 ```
 
 That replays the transcripts committed under `examples/shop/recordings/`, so it bills nothing
-whatever keys are in your environment. `RUDRA_SHOP_MODE` is the switch, and `record` is the one
+whatever keys you have in your environment. `RUDRA_SHOP_MODE` is the switch, and `record` is the one
 value that spends money:
 
 ```sh
 RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop
 ```
 
-That calls Claude once for each page with no transcript yet and saves the answer as a new one. Pages
-that already have a transcript are still replayed, so browsing costs nothing after the first time.
+That calls Claude once for each page that has no transcript yet and saves the answer as a new one.
+Pages that already have one are still replayed, so browsing costs nothing after the first time.
 
 [`examples/shop/README.md`](examples/shop/README.md) covers the rest: the environment variables, how
 to re-record a transcript after a prompt change, and why the files under `recordings/` must only
@@ -177,9 +178,10 @@ ever hold demo shoppers and demo catalogs.
 
 ## Getting help
 
-- **Questions and ideas** — open a [discussion](https://github.com/clivedsouza1010/rudra-js/discussions).
+- **Questions and ideas** — come and talk in
+  [Discussions](https://github.com/clivedsouza1010/rudra-js/discussions).
 - **Bugs** — open an [issue](https://github.com/clivedsouza1010/rudra-js/issues/new/choose).
-- **Vulnerabilities** — please report privately, see [SECURITY.md](./SECURITY.md).
+- **Vulnerabilities** — please report them privately, see [SECURITY.md](./SECURITY.md).
 
 ## Contributing
 
