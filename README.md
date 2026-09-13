@@ -16,13 +16,16 @@ React Server Components turn that specification into markup, reading the title, 
 link from your catalog as the page is served. Whatever the model wrote is rendered as escaped text.
 
 We also read every word the model writes, in three passes. Patterns for prices, discounts, ratings,
-delivery dates and stock counts. A second list of claims that carry no number, like "best seller"
-and "while stocks last". And a check that every digit in the sentence is one your own payload
-supplied — a category or a tag on one of this request's candidates. Any field that fails a pass is
-dropped. Two of the three are still word lists, so a careful rewording with no digit in it can get
-through: of 38 rewordings we wrote to dodge them, 27 still pass. That's why the structural
-boundaries are the real defence. The model is never told a price, and the specification has nowhere
-to put one.
+delivery dates and stock counts. A check that every digit in the sentence is one your own payload
+supplied — a category or a tag on a candidate we showed the model. And a list of claims that carry
+no number to check, like "top pick" and "customer favourite". Any field that fails a pass is
+dropped.
+
+Two of the three are word lists, so a rewording that sits on neither gets through, and the digit
+check reads digits, so a number spelled out in words isn't a number to it. "Four and a half stars
+from other hikers" walks past all three. The tests hold a list of rewordings that still pass, so
+the gap has a size you can go and read. That's why the structural boundaries are the real defence:
+the model is never told a price, and the specification has nowhere to put one.
 
 Because the block is in the initial HTML response and needs zero client-side JavaScript, a crawler
 that never runs JavaScript still reads it. It's efficient too: on our 500-shopper benchmark the

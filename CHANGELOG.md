@@ -19,21 +19,46 @@ break them.
   attested's quantity layer, recorded as `unverifiable-claim:quantity:<field>`;
   attested's wording layer, recorded as `unverifiable-claim:wording:<field>`.
   Core's patterns answer first so every violation string an evaluation already
-  counts reads the same as before. The 39 patterns all stay — measured, they
-  catch all 48 of the strings the tests say must drop, where attested's two
-  layers together reach 33, so replacing them would have been a downgrade.
+  counts reads the same as before. All 41 patterns stay — measured, they catch
+  all 48 of the strings the tests say must drop by kind, where attested's two
+  layers together reach 32, so replacing them would have been a downgrade.
 - A specification with a number in it is no longer kept on the strength of the
   words around the number. `"a comfort rating of -5C"` and
-  `"a waterproof rating of 20,000mm"` are kept when `-5C` or `20000mm` is a
-  `tag` or a `category` on one of the request's candidates, or is the category
-  the shopper is browsing, and dropped as `quantity` when it is not. Those are
-  the strings the prompt hands the model and lets it repeat; a `title` and a
-  `rating` it is shown but told never to restate, so neither stands behind a
-  number. This reverses a documented judgement in `reconciliation.ts` and it
-  reclassifies 15 strings the test suite used to assert were kept. Put your spec
-  sheet in `tags` and the model can quote it.
-- A host-supplied `reason` is still exempt. The exemption branches around the
-  screen, so neither new pass sees the shop's own words either.
+  `"a waterproof rating of 20,000mm"` are kept when a `5` or a `20000` turns up
+  in a `tag` or a `category` on the candidates the prompt showed the model, and
+  dropped as `quantity` when it does not. The number, not the string: a tag
+  reading `5-pocket` keeps the first of those as surely as `-5C comfort` does. Those are the strings the prompt hands
+  the model and lets it repeat; a `title` and a `rating` it is shown but told
+  never to restate, so neither stands behind a number. This reverses a
+  documented judgement in `reconciliation.ts` and it reclassifies 15 strings the
+  test suite used to assert were kept. Put your spec sheet in `tags` and the
+  model can quote it. On a catalogue with no digit in any tag or category — the
+  example shop is one — the rule becomes "no digit may appear", and an emptied
+  headline makes the whole generation unusable, so one digit there costs the
+  model call.
+- The numbers that stand behind a sentence are narrower than the request. Only
+  candidates the prompt actually showed the model count: a product that is out
+  of stock or past the 60-candidate cap stands behind nothing. `currentCategory`
+  does not count at all — it is a string from the request rather than a row of
+  the catalogue, and a host that passes a URL segment into it would be handing
+  the fact list to whoever types the URL. A `reason` and a `badge` are read
+  against their own product's tags and category; every other field reads all the
+  candidates' pooled.
+- A `reason` this library wrote is exempt from the screen, not just one the host
+  supplied. In `cohort` mode `fitToShopper` replaces every item reason with the
+  host's own sentence or the selector's, so screening it was core reading back
+  its own copy — and losing, for any shop with a category called Clearance or
+  Last Chance, while the deterministic component printed the same sentence
+  unscreened. The fourth argument to `reconcileSpec` is now a
+  `ReadonlyMap<string, string>` of SKU to that sentence rather than a
+  `ReadonlySet<string>` of SKUs, and `ProductPick.reasonFromHost` is gone with
+  it.
+- Three more patterns, all closing a gap in a rule that was already there rather
+  than opening a new one. `rating` catches "number one seller", the words a model
+  reaches for when "best seller" is banned. `price` catches a currency sign with
+  no digit after it, because "$thirty-nine and it is yours" was walking past a
+  rule that asked for one, and catches "dollars" and "euros" spelled out —
+  "pounds" stays out of that one, since a pack weighs two of those.
 
 ## [0.4.0] - 2026-09-13
 

@@ -1,4 +1,5 @@
 import { verify } from '@rudra-js/attested';
+import { offeredCandidates } from './model-prompt.js';
 import type {
   Block,
   GeneratedSpec,
@@ -159,7 +160,7 @@ function verifyBasis(basis: RecommendationBasis, product: Product, digest: Signa
  * stand up to @rudra-js/attested, which reads no domain at all and asks a
  * blunter question — is every numeral in this sentence one the shop handed us.
  * "a comfort rating of -5C" walks past every rule below and is then dropped as
- * `quantity`, because -5 is a number the model made up.
+ * `quantity`, because the 5 in it is a number the model made up.
  *
  * One rule per line, because each line is a separate judgement about where the
  * boundary sits and each one wants its own reason written next to it.
@@ -184,14 +185,22 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
       /\brated\s+(?:[0-5]\.\d|(?:[0-5]|three|four|five)\s+(?:stars?|out of))\b/,
       // How many other people bought or liked it is a customer claim too.
       /\bbest[\s-]?sell(?:er|ers|ing)\b/,
+      // The same claim in the words a model reaches for when "best" is banned.
+      // Nothing honest needs "number one" in front of "seller".
+      /\b(?:number one|no\.? ?1|#\s?1)[\s-]?sell(?:er|ers|ing)\b/,
       /\bloved by (?:thousands|hundreds|millions|\d)/,
     ],
   },
   {
     kind: 'price',
     patterns: [
-      /[$£€¥₹]\s?\d/,
+      // No digit needed beside it. A currency sign has no other use in product
+      // copy, and asking for one let "$thirty-nine and it is yours" through.
+      /[$£€¥₹]/,
       /\b\d+(?:\.\d+)?\s?(?:usd|eur|gbp|dollars?|pounds?|euros?)\b/,
+      // The same, spelled out. "pounds" is missing on purpose: a pack weighs two
+      // of those, and the rule above already reads "two pounds" as money anyway.
+      /\bdollars?\b|\beuros?\b/,
       // The same codes on the other side of the number: "USD 20", "EUR 5.99".
       /\b(?:usd|eur|gbp)\s?\d/,
       // The krona is spelled out rather than drawn, so it needs a number beside it.
@@ -343,28 +352,85 @@ function normaliseForClaims(text: string): string {
 /**
  * Wording attested's denylist catches that this project has already ruled is not a
  * claim, each one written next to the pattern that makes the call: "does not feel
- * cheap" is about quality, "extra clearance for thick socks" is room inside the
- * shoe, "the last few miles" is a distance. Kept narrow — "clearance for" on its
- * own would let "clearance for the weekend only" through.
+ * cheap" is about quality, "the last few miles" is a distance.
+ *
+ * An allowance forgives a banned phrase sitting inside it, so an entry has to end
+ * on a word that finishes the thought. "extra clearance for" was on this list and
+ * is not any more: ending on a preposition forgave "clearance" for whatever came
+ * after it, so "extra clearance for the weekend only" read as a sale and rendered.
+ * Losing "extra clearance for thick socks" is the price of that, and a sentence
+ * about room inside a shoe is a cheaper thing to lose than a sale nobody is having.
+ *
+ * Every spelling is its own entry for the same reason: a span has to cover the
+ * banned word, so "doesn't feel cheap" is not covered by "does not feel cheap".
+ *
+ * Exported so a test can hold it against attested's own list. Nothing else keeps
+ * the two in step: rename a phrase over there and an entry here becomes dead
+ * weight without a word from anyone.
  */
-const ALLOWED_PHRASES = ['does not feel cheap', 'extra clearance for', 'last few miles'];
+export const ALLOWED_PHRASES = ['does not feel cheap', "doesn't feel cheap", 'last few miles'];
+
+/** Only a string with one of these in it can stand behind a numeral. */
+const DIGIT = /\p{Nd}/u;
 
 /**
- * The shop's own strings from this request, for attested to check numerals against.
- *
- * Categories and tags, and nothing else. The prompt also shows the model a title
- * and a rating, and bans it from repeating either, so a numeral out of one of those
- * is a numeral it was told not to write. A rating is the sharp case: 4.8 reads as a
- * price, a stock count and a delivery time as easily as it reads as a score, so
- * handing one over blesses all four.
+ * Anything attested reads as a numeral: the decimal digits, and the numeric
+ * characters it cannot read at all — ½, ², Ⅲ — which it reports rather than
+ * ignores, because no fact can back one.
  */
-function hostFacts(input: TrackingInput, digest: SignalDigest): string[] {
-  const facts: string[] = [];
-  for (const product of input.candidates) {
-    facts.push(product.category);
-    for (const tag of product.tags) facts.push(tag);
+const NUMERAL = /[\p{Nd}\p{No}\p{Nl}]/u;
+
+const NO_FACTS: readonly string[] = [];
+
+/**
+ * The shop's own numbers for this request, for attested to check numerals against.
+ *
+ * Categories and tags, off the candidates the model was actually shown, and nothing
+ * else. The prompt also shows it a title and a rating, and bans it from repeating
+ * either, so a numeral out of one of those is one it was told not to write. A
+ * rating is the sharp case: 4.8 reads as a price, a stock count and a delivery time
+ * as easily as it reads as a score, so handing one over blesses all four.
+ *
+ * `offeredCandidates` rather than `input.candidates`, because a product that is out
+ * of stock or past the prompt's cap never reached the model. Standing behind its
+ * numbers would let a tag on a product nobody can buy back a sentence about one
+ * they can.
+ *
+ * The browsed category is not here either. It is whatever the host put in the
+ * request rather than a row of its catalogue, so a host that passes a URL segment
+ * through would be handing this list to whoever types the URL. A browsed category
+ * the model can honestly repeat is a category some candidate is in, and that one
+ * is already here.
+ *
+ * De-duplicated, and only the strings carrying a digit, because the rest can back
+ * no numeral and this list is read again for every field.
+ *
+ * Pooled, and that is the soft part of the check. A numeral is a numeral here, so
+ * one candidate's "40 litre" backs "take 40 off" written about another. The two
+ * fields that name a product read `productFacts` instead; a headline is about the
+ * page rather than one product, so there is no narrower list to give it.
+ */
+function hostFacts(input: TrackingInput): string[] {
+  const facts = new Set<string>();
+  for (const product of offeredCandidates(input)) {
+    for (const fact of productFacts(product)) facts.add(fact);
   }
-  if (digest.currentCategory !== undefined) facts.push(digest.currentCategory);
+  return [...facts];
+}
+
+/**
+ * The numbers the shop published about one product.
+ *
+ * A `reason` and a `badge` sit under a named product and are read as being about
+ * it, so this is what they stand on. Off the pooled list, a badge reading "Only 2"
+ * was backed by a "2 person" tag on a tent three cards away.
+ */
+function productFacts(product: Product): string[] {
+  const facts: string[] = [];
+  if (DIGIT.test(product.category)) facts.push(product.category);
+  for (const tag of product.tags) {
+    if (DIGIT.test(tag)) facts.push(tag);
+  }
   return facts;
 }
 
@@ -422,11 +488,15 @@ type PlacementTracker = ReturnType<typeof createPlacementTracker>;
  * `quantity` is the only proof in the stack: every numeral in the sentence has to
  * be one the shop supplied. `wording` is a second denylist, and the weakest, so it
  * answers last.
+ *
+ * `facts` defaults to every candidate's numbers. A field that names one product
+ * passes that product's own.
  */
 function screenClaim(
   value: string | null,
   field: string,
   tracker: PlacementTracker,
+  facts: readonly string[] = tracker.facts,
 ): string | null {
   if (value === null) return null;
 
@@ -436,7 +506,13 @@ function screenClaim(
     return null;
   }
 
-  const result = verify(value, { values: tracker.facts, allowedPhrases: ALLOWED_PHRASES });
+  // A sentence with no numeral in it has nothing for the quantity layer to weigh,
+  // whatever the facts say, and reading the fact list to prove that again for
+  // every field is most of what this screen costs on a shop with a spec sheet in
+  // its tags. A test holds attested to that, since it is attested's promise.
+  const weighed = NUMERAL.test(value) ? facts : NO_FACTS;
+
+  const result = verify(value, { values: weighed, allowedPhrases: ALLOWED_PHRASES });
   if (!result.quantity.supported) {
     tracker.record(`unverifiable-claim:quantity:${field}`);
     return null;
@@ -487,7 +563,7 @@ function reconcileItems(
   candidatesBySku: Map<string, Product>,
   digest: SignalDigest,
   tracker: PlacementTracker,
-  hostReasonSkus: ReadonlySet<string>,
+  ourReasons: ReadonlyMap<string, string>,
 ): ProductReference[] {
   const kept: ProductReference[] = [];
 
@@ -507,8 +583,13 @@ function reconcileItems(
     const hasSupportedBasis = verifyBasis(item.basis, product, digest);
     if (!hasSupportedBasis) tracker.record(`unsupported-basis:${item.basis}:${item.sku}`);
 
-    const isHostReason =
-      item.reason !== null && hostReasonSkus.has(item.sku) && item.reason === product.reason;
+    // Not the model's words, so there is nothing here to screen. The sentence has
+    // to match, so a model reason that happens to read the same is still screened.
+    const isOurs = item.reason !== null && ourReasons.get(item.sku) === item.reason;
+
+    // Both fields below are read as being about this product, so they stand on
+    // what the shop published about this product.
+    const own = productFacts(product);
 
     kept.push({
       sku: item.sku,
@@ -516,14 +597,19 @@ function reconcileItems(
       // The prose exists to state the basis. If the basis did not hold, the
       // prose is a claim we just decided is untrue.
       reason: hasSupportedBasis
-        ? isHostReason
+        ? isOurs
           ? clampNullable(item.reason, CLAMP.reason)
-          : screenClaim(clampNullable(item.reason, CLAMP.reason), `reason:${item.sku}`, tracker)
+          : screenClaim(
+              clampNullable(item.reason, CLAMP.reason),
+              `reason:${item.sku}`,
+              tracker,
+              own,
+            )
         : null,
       // A badge is the shortest, loudest text on the card, and the schema's own
       // example for it was "Back in stock" — a stock claim. It renders, so it is
       // read for claims like every other sentence the model writes.
-      badge: screenClaim(clampNullable(item.badge, CLAMP.badge), `badge:${item.sku}`, tracker),
+      badge: screenClaim(clampNullable(item.badge, CLAMP.badge), `badge:${item.sku}`, tracker, own),
       emphasis: item.emphasis,
     });
   }
@@ -614,7 +700,7 @@ export function bundleForShopper(
 ): Bundle | undefined {
   const allowlist = buildAllowlist(input, digest);
   const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
-  const tracker = createPlacementTracker(digest.maxItems, hostFacts(input, digest));
+  const tracker = createPlacementTracker(digest.maxItems, hostFacts(input));
 
   for (const sku of spokenFor) tracker.place(sku);
 
@@ -656,7 +742,7 @@ function reconcileBlock(
   digest: SignalDigest,
   bundles: readonly Bundle[],
   tracker: PlacementTracker,
-  hostReasonSkus: ReadonlySet<string>,
+  ourReasons: ReadonlyMap<string, string>,
 ): Block | null {
   switch (block.kind) {
     case 'hero': {
@@ -699,7 +785,7 @@ function reconcileBlock(
         candidatesBySku,
         digest,
         tracker,
-        hostReasonSkus,
+        ourReasons,
       );
       if (items.length === 0) {
         tracker.record('empty-block:grid');
@@ -721,7 +807,7 @@ function reconcileBlock(
         candidatesBySku,
         digest,
         tracker,
-        hostReasonSkus,
+        ourReasons,
       );
       if (items.length === 0) {
         tracker.record('empty-block:carousel');
@@ -799,15 +885,20 @@ export function reconcileSpec(
   input: TrackingInput,
   digest: SignalDigest,
   /**
-   * SKUs whose reason this request wrote from the host's own candidate. Only
-   * `fitToShopper` fills it, so in `per-shopper` mode it is empty and every
+   * The reason this request wrote itself, by SKU: the host's own `reason` field
+   * on a candidate, or the sentence the selector wrote when there was none.
+   * Neither is the model's words, so neither is screened — screening the
+   * selector's "More in Clearance" is this file marking its own homework, and
+   * the deterministic component renders that sentence unscreened anyway.
+   *
+   * Only `fitToShopper` fills it, so in `per-shopper` mode it is empty and every
    * reason is the model's, including one that happens to read the same.
    */
-  hostReasonSkus: ReadonlySet<string> = new Set(),
+  ourReasons: ReadonlyMap<string, string> = new Map(),
 ): ReconcileResult {
   const allowlist = buildAllowlist(input, digest);
   const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
-  const tracker = createPlacementTracker(digest.maxItems, hostFacts(input, digest));
+  const tracker = createPlacementTracker(digest.maxItems, hostFacts(input));
 
   if (generated.blocks.length > MAX_BLOCKS) {
     tracker.record(`too-many-blocks:${generated.blocks.length}`);
@@ -822,7 +913,7 @@ export function reconcileSpec(
       digest,
       input.bundles,
       tracker,
-      hostReasonSkus,
+      ourReasons,
     );
     if (reconciled !== null) blocks.push(reconciled);
   }

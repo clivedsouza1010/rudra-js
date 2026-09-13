@@ -136,28 +136,63 @@ title, a category and a bundle `label` are your words, not the model's.
 
 We drop text that makes a claim we can't check, in three passes. The first looks
 for money, a customer score, a delivery date and a count of what's left. The
-second is `@rudra-js/attested`'s phrase list, for claims with no number in them
-to check — "best seller", "while stocks last". The third asks whether every
-digit in the sentence is one you supplied.
+second asks whether every numeral in the sentence is one you supplied. The third
+is `@rudra-js/attested`'s phrase list, for claims with no number in them to
+check — "top pick", "customer favourite".
 
-That third pass changed what happens to a specification. "a comfort rating of
+That second pass changed what happens to a specification. "a comfort rating of
 -5C" used to be kept on the strength of the words around the number. It is kept
-now only when `-5C` is on the product's own `tags`, or in a `category` name, on
-one of this request's candidates — or is the category the shopper is browsing.
-Those are the strings we hand the model and let it repeat. A `title` and a
-`rating` we also show it, and the prompt tells it never to restate either, so
-neither stands behind a number. Put your spec sheet in `tags` and the model can
-quote it; leave it out and a number in that field is one the model made up, and
-it goes.
+now only when a `5` turns up in a `tag` or a `category` name you sent us — the
+number, not the string, so a tag reading `5-pocket` keeps it as surely as one
+reading `-5C comfort`. Those are the strings we hand the model and let it repeat.
+A `title` and a `rating` we also show it, and the prompt tells it never to
+restate either, so neither stands behind a number. Put your spec sheet in `tags`
+and the model can quote it; leave it out and a number in that field is one the
+model made up, and it goes.
 
-The first two passes are word lists, so spotting a claim still isn't a
-guarantee, not the way checking a price against your catalog is. The third one
-is: it reads digit characters, and a number written as a word is not a number to
-it.
+Which strings, exactly:
+
+- Only candidates we showed the model. Out of stock, or past the 60 we send,
+  means a product the model never saw, and its tags stand behind nothing.
+- The `currentCategory` on the request is not one of them. It's a string from
+  this request rather than a row of your catalog, and plenty of sites pass a URL
+  segment straight into it.
+- A `reason` or a `badge` sits under a named product, so it's read against that
+  product's own tags and category. Every other field reads all the candidates'
+  pooled.
+
+Two caveats worth saying out loud, because they're the shape of the check rather
+than bugs in it. Pooled means pooled: one product's `40 litre` tag stands behind
+"take 40 off" written in a headline about another. And nothing in the pass knows
+which quantity a tag was about, so a tag holding a weight stands behind a price
+with the same digits in it. It proves the digits came from you. It doesn't prove
+the sentence is true.
+
+The first and third passes are word lists, so spotting a claim isn't a
+guarantee, not the way checking a price against your catalog is. The second is a
+proof of something narrower than it sounds: every digit was one of yours. A
+number written as a word isn't a number to it, so "four and a half stars" is not
+a rating it can see — while a ½ or the K in "10K" is a numeral it can't read,
+which it drops rather than waves through.
+
+The model isn't told any of this. The prompt bans prices, ratings, discounts,
+delivery dates and stock levels, and says nothing about digits, so it can't tell
+`3-season` — a tag you sent, and fine — from `2 litres`, which is not. Whatever
+the over-rejection rate is on your catalog, nothing in the prompt is steering it
+down yet.
 
 Some fields can't be empty, like a headline or a banner's text. Those get emptied
 instead of nulled, so the block drops the way any block with no text drops. And
 an emptied page headline makes the whole generation unusable.
+
+That last one is the expensive edge of the digit check, so it's worth being
+concrete: if the model writes "Our 3 favourites for wet weather" and no candidate
+carries a 3, the headline empties, the generation is unusable, and the
+deterministic component renders — a model call paid for and thrown away. In
+cohort mode the spec is cached before reconciliation, so every cache hit for the
+rest of the TTL runs the same screen and reaches the same fallback. The reason a
+`reason` under a card is exempt is the same idea from the other side: in cohort
+mode we wrote that sentence, so reading it back would only ever cost us.
 
 For the set, the prompt also tells the model to write about the offer rather than
 the products in it, and never to say the set saves money or by how much. Pass a
@@ -292,7 +327,11 @@ reasons itself, so every one of them is screened, including one that happens to
 read the same as yours.
 
 Without a reason of your own, the basis is stated for you from the shopper's
-signals.
+signals — "More in Backpacks", "Goes with what is in your cart". Those are our
+words, not the model's, so in `cohort` mode they aren't screened either. They
+used to be, and a shop with a category called Clearance or Last Chance would
+have watched the phrase list delete the reason under every card while the
+deterministic component printed the same sentence untouched.
 
 ## What the model sees
 

@@ -100,21 +100,36 @@ primary model can act. Ours can't.
 
 - **Wording.** Roughly a kilobyte of model-written prose reaches the page per render. It's
   length-clamped, and it can't contain markup, because the schema has no field that carries markup.
-  Every model-written field goes through three passes. First, a set of patterns for the claims the
-  prompt bans: a customer rating, a price, a discount, a delivery date, a stock level. Second,
-  `@rudra-js/attested`'s phrase list, for claims that carry no number to check — "best seller",
-  "while stocks last", "top pick". Third, a check that every digit in the sentence is one the shop
-  supplied for this request. Any field that fails a pass is dropped, recorded as `quantity` or
-  `wording` for the last two.
+  Every model-written field goes through three passes, in this order. A set of patterns for the
+  claims the prompt bans: a customer rating, a price, a discount, a delivery date, a stock level.
+  Then a check that every numeral in the sentence is one the shop supplied for this request,
+  recorded as `quantity`. Then `@rudra-js/attested`'s phrase list, for claims that carry no number
+  to check — "top pick", "customer favourite", "going quick" — recorded as `wording`. Any field
+  that fails a pass is dropped.
 
-  What that still leaves. Two of the three passes are word lists, not classifiers, so a reworded
-  claim can get through: of 38 rewordings we wrote to dodge the patterns, 27 pass all three. The
-  digit check reads digit characters only, so "four and a half stars from hikers" is not a number
-  to it. The facts it checks against are every category and tag in the request, not the one product
-  the sentence is about, so a digit in any category name is a digit the model may then write
-  anywhere in the block. Each field is read on its own, so "Free" in a heading and "delivery on
-  every order" beneath it are two innocent fields and one claim to a shopper. The phrase list also
-  eats honest copy — a banner reading "free returns" is dropped even from a shop that offers them.
+  What that still leaves. Two of the three passes are word lists, not classifiers, so a rewording
+  that sits on neither gets through; the test file holds a list of ones that do, which is the
+  honest size of it. The digit check reads digit characters, so "four and a half stars from hikers"
+  is not a number to it — though a numeral it cannot read, a ½ or the K in "10K", is a drop rather
+  than a pass.
+
+  The facts behind the digit check are every category and tag on the candidates we showed the
+  model. A `reason` or a `badge` is read against its own product's; everything else reads all of
+  them pooled, so one product's "40 litre" tag backs "take 40 off" in a headline. Nothing in that
+  pass knows which quantity a tag was about, so a tag with a 40 in it stands behind any 40.
+
+  Each field is read on its own, so "Our best" in a heading and "seller three years running"
+  beneath it are two innocent fields and one claim to a shopper. `verifyFields` in that package
+  closes exactly this and we don't call it.
+
+  It eats honest copy too, both ways. A banner reading "free returns" is dropped from a shop that
+  offers them. And on a catalogue with no digit in any tag or category name — the example shop in
+  this repo is one — the rule stops being "every digit must be one you supplied" and becomes "no
+  digit may appear", so "Built for 3 season use" goes along with the invented prices. A required
+  field like a headline is emptied rather than nulled, and an empty headline makes the whole
+  generation unusable, so one digit there costs the model call and renders the deterministic
+  component instead.
+
   And anything outside those kinds — a competitor's product name, say — we don't look for at all.
   Host text is never screened, since it's the shop's own words.
 
