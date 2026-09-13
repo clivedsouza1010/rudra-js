@@ -44,6 +44,9 @@ export const FIELD_LIMITS = {
   bundles: 20,
   localeTag: 35,
   maxItems: 12,
+  // Matches CLAMP.reason in reconciliation: a host reason is rendered in the
+  // same place a model's is, so the same length has to hold.
+  reason: 120,
 } as const;
 
 /** Assigning this as an object key mutates the prototype instead of the object. */
@@ -95,6 +98,10 @@ export const productSchema = z.strictObject({
   // scheme to abuse.
   imageUrl: imageReference().optional(),
   rating: z.number().min(0).max(5).optional(),
+  // Your phrase for why this product is here, when your own ranking already has
+  // one. It renders as the item's reason and is not screened: these are your
+  // words about your product, like the title, so you stand behind them.
+  reason: z.string().min(1).max(FIELD_LIMITS.reason).optional(),
   isInStock: z.boolean().default(true),
   tags: z
     .array(z.string().min(1).max(FIELD_LIMITS.tag))

@@ -49,6 +49,7 @@ out.
 | `provider`       | The model adapter. `null` runs without a model and bills nothing.                               | `null`                    |
 | `cache`          | Where generated specs live between requests. Pass `createNullSpecCache()` to keep none.         | `createMemorySpecCache()` |
 | `generation`     | `'cohort'` shares one component between shoppers who look alike; `'per-shopper'` does each one. | `'cohort'`                |
+| `rank`           | `'signals'` orders products by the shopper's signals; `'given'` keeps the order you sent.       | `'signals'`               |
 | `modelTimeoutMs` | How long the model gets. Past that, we abort the request and render the deterministic one.      | `1500`                    |
 | `cacheTimeoutMs` | How long a cache read gets. Past that, the request generates as if the store had nothing.       | `50`                      |
 | `onEvent`        | Called once per `generate` with a `GenerationEvent`. If your hook throws, we swallow it.        | none                      |
@@ -207,6 +208,7 @@ instead of finding them out from a rejection.
 | `bundles`            | 20    | `bundles`                                                           |
 | `localeTag`          | 35    | `context.locale`, which also has to be one language tag             |
 | `maxItems`           | 12    | `context.maxItems`, which also needs at least 1                     |
+| `reason`             | 120   | `candidates[].reason`, your own phrase for a product                |
 
 These bound each field on its own. They aren't an aggregate prompt budget.
 Fitting a payload into a context window is `digest`'s job, and it trims rather
@@ -218,6 +220,47 @@ Every fixed-shape object is a `strictObject`. Misspell `recentSearches` and
 you'll get an error, not a shopper who quietly looks like a first-time visitor.
 `interaction.meta` is the one dynamic shape: an open record, minus the keys that
 would mutate a prototype instead of the object.
+
+## Bringing your own ranking
+
+By default we order the products for you, scoring each candidate against the
+shopper's signals. But you might already have a recommender you trust: bought
+together, an engine trained on your own orders, or a merchandiser's hand-picked
+row. Pass `rank: 'given'` and the order you sent is the order that renders.
+
+```ts
+const generator = createComponentGenerator({ provider, rank: 'given' });
+```
+
+You keep the rest either way. We still drop anything the shopper shouldn't be
+shown, whether it's out of stock, already bought, in the basket, disliked, or
+the product they're looking at right now. Every product still carries a basis
+we check against their real signals, and everything the model writes is still
+screened.
+
+Each candidate can carry its own `reason`, the phrase shown under the product.
+Reach for it when your ranking knows something the signals don't:
+
+```ts
+candidates: [
+  {
+    sku: 'A-2',
+    title: 'Enamel dutch oven',
+    category: 'Cookware',
+    price: 89,
+    reason: 'Bought together with your skillet',
+  },
+];
+```
+
+A reason you supply is your own words, like the title, so it is rendered as
+written and not screened. That only applies where this request actually used it,
+which is the default `cohort` mode. In `per-shopper` mode the model writes the
+reasons itself, so every one of them is screened, including one that happens to
+read the same as yours.
+
+Without a reason of your own, the basis is stated for you from the shopper's
+signals.
 
 ## What the model sees
 

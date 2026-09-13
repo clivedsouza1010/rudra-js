@@ -10,6 +10,20 @@ break them.
 
 ## [Unreleased]
 
+### Added
+
+- `rank` on `createComponentGenerator`. The default, `'signals'`, orders
+  products by the shopper's signals as before. `'given'` keeps the order you
+  sent, for a shop whose own recommender is better than four weights. Either
+  way the exclusions and the stock check still apply, every product still
+  carries a basis reconciliation verifies, and everything the model writes is
+  still screened. Until now the host's ordering never reached the page in
+  either generation mode, so adopting this meant replacing a ranker you trust.
+- A candidate can carry its own `reason`, the phrase shown under the product,
+  for when your ranking knows something the signals do not. A reason you supply
+  is your own words, like the title, so it renders as written and is not
+  screened. The same sentence from the model still is.
+
 ### Changed
 
 - `@rudra-js/react` takes React 18 as well as 19. The peer range said `^19.0.0`

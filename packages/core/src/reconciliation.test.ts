@@ -59,9 +59,13 @@ const grid = (items: ProductReference[]) =>
 const PRODUCT_GRID: Block = { kind: 'grid', title: null, columns: 2, items: [ref('TR-101')] };
 
 /** Runs a spec through reconciliation against a given payload. */
-function reconcile(spec: GeneratedSpec, overrides: Partial<TrackingInputDraft> = {}) {
+function reconcile(
+  spec: GeneratedSpec,
+  overrides: Partial<TrackingInputDraft> = {},
+  hostReasonSkus?: ReadonlySet<string>,
+) {
   const input = inputFor(overrides);
-  return reconcileSpec(spec, input, buildDigest(input));
+  return reconcileSpec(spec, input, buildDigest(input), hostReasonSkus);
 }
 
 const WELL_RATED = [
@@ -70,6 +74,44 @@ const WELL_RATED = [
   product('NU-201', { category: 'Nutrition', rating: 4.7 }),
 ];
 
+describe("a reason the shop supplied is the shop's own words", () => {
+  // The screen exists to catch the model. A sentence the host declared about
+  // its own product is not the model's, so it is left alone, the same rule the
+  // titles and prices already follow. What marks it as the host's is that this
+  // request wrote it from the candidate, not that the text happens to match.
+  const CLAIM = 'Only 2 left at this price';
+  const candidates = [product('TR-101', { reason: CLAIM }), product('TR-102')];
+
+  it('keeps it when the cohort path wrote it from the candidate', () => {
+    const result = reconcile(
+      grid([ref('TR-101', { reason: CLAIM })]),
+      { candidates },
+      new Set(['TR-101']),
+    );
+    const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
+
+    expect(items[0]?.reason).toBe(CLAIM);
+    expect(result.violations).toEqual([]);
+  });
+
+  it('screens the identical sentence when the model wrote it', () => {
+    // per-shopper mode: fitToShopper never ran, so nothing is host-written.
+    // Before provenance was carried, matching the host's text was enough to
+    // skip the screen, which let the model launder a claim through it.
+    const result = reconcile(grid([ref('TR-101', { reason: CLAIM })]), { candidates });
+    const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
+
+    expect(items[0]?.reason).toBeNull();
+    expect(result.violations.join()).toMatch(/^unverifiable-claim:[a-z]+:reason:TR-101$/);
+  });
+
+  it('screens it when the shop never supplied one at all', () => {
+    const result = reconcile(grid([ref('TR-101', { reason: CLAIM })]));
+    const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
+
+    expect(items[0]?.reason).toBeNull();
+  });
+});
 describe('the selector writes reasons its own screen accepts', () => {
   // Every branch of basisFor, driven through selectProducts so the reasons are
   // the real ones. A reason the screen deletes is a card that loses its line
