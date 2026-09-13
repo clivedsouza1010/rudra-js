@@ -1,6 +1,6 @@
 {
   "name": "@rudra-js/core",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "The contracts and logic that turn one tracking payload into one renderable component specification",
   "keywords": [
     "llm",

@@ -1,6 +1,6 @@
 {
   "name": "@rudra-js/attested",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Checks model-written product copy against the facts a shop stands behind",
   "keywords": [
     "llm",
