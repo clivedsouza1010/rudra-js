@@ -14,12 +14,12 @@ const catalog = [
 ];
 
 async function recommendations() {
-  // No provider means no API key and no spend. It is a supported setting, not
-  // a stub: you get the deterministic component.
+  // Passing no provider means no API key and no spend.
+  // You get a reliable, deterministic component.
   const generator = createComponentGenerator({ provider: null });
 
-  // Parsing fills in what you left out and rejects what does not belong. Pass
-  // the parsed candidates to the renderer, not your raw objects.
+  // Parsing fills in what you left out and strips anything that doesn't belong.
+  // Always pass the parsed candidates to the renderer, not your raw objects.
   const input = parseTrackingInput({
     user: { id: 'shopper-1' },
     context: { surface: 'pdp', currentSku: 'A-1', currentCategory: 'Cookware' },
