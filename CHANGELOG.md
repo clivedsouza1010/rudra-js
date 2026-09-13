@@ -10,6 +10,88 @@ break them.
 
 ## [Unreleased]
 
+### Added
+
+- `@rudra-js/attested`, a new package with no dependencies and no node builtins.
+  It checks model-written copy against the facts a shop stands behind, in two
+  layers reported apart. The quantity layer inverts the check core's
+  `CLAIM_PATTERNS` cannot: every run of digits in the text has to be a value the
+  host supplied, whatever language the sentence is in, so "Nur noch 2 übrig" and
+  "4,8 von 5" no longer sail through. The wording layer, for claims with no
+  number in them, stays a denylist, says so in `strength: 'best-effort'` on
+  every result, and takes phrases the host adds for their own language — or,
+  through `allowedPhrases`, wording the shop stands behind, so a shop that
+  genuinely offers free shipping is not barred from saying so. `verifyFields` also
+  reads the fields joined, because a card renders them next to each other and
+  the model picks where one field ends. The README states the guarantee in one
+  sentence and lists every bypass left open under its own heading. Nothing in
+  `@rudra-js/core` is wired to it yet.
+
+### Fixed
+
+- `@rudra-js/attested` dropped only format characters as invisible, so a
+  variation selector survived both layers. `"$1<U+FE0F>3"` renders as `$13` and
+  passed against facts of 1 and 3 — a false acceptance in the layer the package
+  calls a proof — and `"fr<U+FE0F>ee shipping"` walked past the built-in entry.
+  The class is now every format character and every default-ignorable code
+  point, which covers the variation selectors, the combining grapheme joiner and
+  the zero-width set, and a sweep over the whole of Unicode holds it there.
+- `@rudra-js/attested` read a number fact through `String()`, so `1e21` arrived
+  as `1e+21` and minted 1 and 21 as supported values. Both `"1 left"` and
+  `"Only 21 sold"` then passed. A number is now laid out in positional notation
+  first, keeping exactly the digits `String()` chose and adding only the zeros
+  the exponent implies. String facts are untouched, because there the host typed
+  the digits.
+- `@rudra-js/attested` could not actually allow 7 of its 81 built-in phrases.
+  `allowedPhrases` deleted the exact string while matching ignored spaces and
+  phrases nest, so allowing `best seller` left `bestseller` firing and allowing
+  `back in stock` left `in stock` firing. An allowance now works on the text
+  rather than on the list: where one of the host's phrases appears, a banned
+  claim sitting wholly inside it is not reported, and the same words elsewhere
+  still are. `checked` stays at the full list. This also closes the negation
+  hole the README names — allowing `no sale` clears
+  `"there is no sale on this product"` while a `sale` later in the same text
+  still fails.
+- `@rudra-js/attested` still let a control character or a combining mark split a
+  number, because neither is a format character or default-ignorable.
+  `"$1<U+0008>3"` and `"$4<U+0305>9"` both render as the joined number and both
+  passed against the two digits apart. The class is now every character that
+  takes no room on the page: format characters, default-ignorable code points,
+  the controls that are not whitespace, and the marks that hang on the character
+  before them. Whitespace controls and spacing marks stay, because a tab, a line
+  break and a Devanagari matra are gaps the shopper can see, so two numbers on
+  two lines are still two numbers. The wording layer takes the same class, and it
+  composes accents before dropping anything, so `café` keeps its `é` while
+  `"fr<U+0305>ee shipping"` no longer hides from its own entry.
+- `@rudra-js/attested` minted garbage from a string fact in exponent notation.
+  The number arm was laid out positionally, but the string arm was not, so
+  `'1e21'` still stood behind `"Only 21 sold"`. A string whose whole content is
+  a number in exponent notation is now laid out the same way; any other string
+  is still read exactly as typed, so `'SKU AX-220e5'` keeps minting 220 and 5.
+- `@rudra-js/attested` threw a `TypeError` on any fact that was not a number or
+  a string. `values: [product.price]` with a null price took the whole call
+  down, and a bigint — the only way to hand over an id past 2^53 without
+  `JSON.parse` rounding it — threw as well. `values` now takes bigints, and
+  anything else stands behind no numeral instead of throwing.
+- `@rudra-js/attested` let an allowance reach across a paragraph break. The
+  allowance works on normalised copy, where a blank line and a `---` rule both
+  collapsed to a space, so `['we do not offer free shipping']` forgave
+  `"We do not offer"` above a rule with `"Free shipping on every order"` below
+  it. A line break now survives normalisation: matching still reads straight
+  through it, so the denylist catches `"Free\n\nshipping"`, but an allowance
+  will not bridge one. The two rules pull opposite ways on purpose.
+
+### Changed
+
+- `@rudra-js/attested` documents three holes it does not close, all in the
+  best-effort wording layer. A character that folds into an allowance counts as
+  that allowance, so `"№ SALE"` passes under `['no sale']`. A footnote marker
+  glued to a phrase drops the finding, so `"FREE SHIPPINGᵃ"` is not reported.
+  And the quantity layer trusts Unicode about what renders as nothing, which a
+  font is free to disagree with. Laying facts out positionally also costs
+  scientific notation in the copy: `"1e-7 g"` no longer matches a fact of
+  `1e-7`, and the value has to be written out in full.
+
 ## [0.3.1] - 2026-09-13
 
 Released as 0.3.1 because the `v0.3.0` tag was pushed at a commit that predated

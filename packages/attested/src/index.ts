@@ -1,0 +1,15 @@
+// @rudra-js/attested — the guarantee that a model cannot lie about a product.
+
+export {
+  verify,
+  verifyFields,
+  type BatchResult,
+  type Facts,
+  type FieldResult,
+  type Finding,
+  type Layer,
+  type LayerReport,
+  type VerifyResult,
+} from './verify.js';
+
+export { BANNED_PHRASES } from './phrases.js';
