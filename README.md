@@ -102,7 +102,7 @@ straight away._
 | [`@rudra-js/core`](packages/core)           | The contracts and logic that turn one tracking payload into one renderable component specification |
 | [`@rudra-js/react`](packages/react)         | Renders that specification as React Server Components, with no client JavaScript                   |
 | [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API, and is the only package that makes a billed call                       |
-| [`@rudra-js/verify`](packages/verify)       | Checks model-written copy against the facts a shop stands behind, with no dependencies             |
+| [`@rudra-js/attested`](packages/attested)   | Checks model-written copy against the facts a shop stands behind, with no dependencies             |
 
 ## Development
 

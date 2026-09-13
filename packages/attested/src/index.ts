@@ -1,4 +1,4 @@
-// @rudra-js/verify — the guarantee that a model cannot lie about a product.
+// @rudra-js/attested — the guarantee that a model cannot lie about a product.
 
 export {
   verify,

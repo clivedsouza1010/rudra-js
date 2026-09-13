@@ -1,5 +1,5 @@
 {
-  "name": "@rudra-js/verify",
+  "name": "@rudra-js/attested",
   "version": "0.3.1",
   "description": "Checks model-written product copy against the facts a shop stands behind",
   "keywords": [
@@ -12,14 +12,14 @@
   ],
   "license": "MIT",
   "author": "Clive Dsouza",
-  "homepage": "https://github.com/clivedsouza1010/rudra-js/tree/main/packages/verify#readme",
+  "homepage": "https://github.com/clivedsouza1010/rudra-js/tree/main/packages/attested#readme",
   "bugs": {
     "url": "https://github.com/clivedsouza1010/rudra-js/issues"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/clivedsouza1010/rudra-js.git",
-    "directory": "packages/verify"
+    "directory": "packages/attested"
   },
   "engines": {
     "node": ">=22.12.0"

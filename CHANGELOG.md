@@ -12,7 +12,7 @@ break them.
 
 ### Added
 
-- `@rudra-js/verify`, a new package with no dependencies and no node builtins.
+- `@rudra-js/attested`, a new package with no dependencies and no node builtins.
   It checks model-written copy against the facts a shop stands behind, in two
   layers reported apart. The quantity layer inverts the check core's
   `CLAIM_PATTERNS` cannot: every run of digits in the text has to be a value the

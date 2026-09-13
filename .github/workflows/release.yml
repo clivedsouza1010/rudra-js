@@ -76,4 +76,4 @@ jobs:
         working-directory: packages/anthropic
 
       - run: npm publish --provenance --access public
-        working-directory: packages/verify
+        working-directory: packages/attested

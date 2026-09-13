@@ -1,4 +1,4 @@
-# @rudra-js/verify
+# @rudra-js/attested
 
 Checks model-written product copy against the facts a shop stands behind.
 
@@ -26,11 +26,11 @@ later; it is the shape of what a closed check over digits can promise.
 ## Install
 
 ```sh
-npm install @rudra-js/verify
+npm install @rudra-js/attested
 ```
 
 ```ts
-import { verify } from '@rudra-js/verify';
+import { verify } from '@rudra-js/attested';
 
 const result = verify('Only 2 left at $39', { values: [39, 'SKU TR-101'] });
 
@@ -187,7 +187,7 @@ follow from it that are worth doing:
 ## Many fields, one product
 
 ```ts
-import { verifyFields } from '@rudra-js/verify';
+import { verifyFields } from '@rudra-js/attested';
 
 const result = verifyFields(
   { headline: 'Yours for $39', badge: 'Only 2 left', body: 'Built for long days' },

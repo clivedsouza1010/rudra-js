@@ -26,7 +26,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
-const PACKAGES = ['core', 'react', 'anthropic', 'verify'];
+const PACKAGES = ['core', 'react', 'anthropic', 'attested'];
 
 /**
  * Needed to render, but not a dependency of anything published: nothing under
@@ -101,7 +101,7 @@ import {
 } from '@rudra-js/core';
 import { RudraComponent, defaultFormatBundlePrice, type ProductCatalog } from '@rudra-js/react';
 import { createAnthropicProvider } from '@rudra-js/anthropic';
-import { verify, type Facts } from '@rudra-js/verify';
+import { verify, type Facts } from '@rudra-js/attested';
 
 const products = [
   productSchema.parse({
@@ -213,10 +213,10 @@ if (typeof anthropicProvider.name !== 'string' || typeof anthropicProvider.model
 const facts: Facts = { values: [174] };
 const claim = verify('Only 2 left at $174', facts);
 if (claim.supported) {
-  throw new Error('@rudra-js/verify passed a quantity the facts do not carry');
+  throw new Error('@rudra-js/attested passed a quantity the facts do not carry');
 }
 if (claim.quantity.findings[0]?.token !== '2') {
-  throw new Error(\`@rudra-js/verify named the wrong token: \${JSON.stringify(claim.quantity)}\`);
+  throw new Error(\`@rudra-js/attested named the wrong token: \${JSON.stringify(claim.quantity)}\`);
 }
 
 // The consumer must not be able to reach the repository's own dependency tree —

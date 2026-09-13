@@ -11,7 +11,7 @@
       "path": "packages/anthropic"
     },
     {
-      "path": "packages/verify"
+      "path": "packages/attested"
     }
   ]
 }
