@@ -60,6 +60,29 @@ break them.
   rule that asked for one, and catches "dollars" and "euros" spelled out —
   "pounds" stays out of that one, since a pack weighs two of those.
 
+### Fixed
+
+- `@rudra-js/attested` laid a string fact out from its exponent without weighing
+  the run first, so a twelve-character catalogue tag took the process down.
+  `'1e2000000000'` threw a `RangeError`, and `'-2.5e400000000'` reached a heap
+  abort no caller can catch. An exponent that would run past a thousand digits
+  now stands behind no numeral at all — nothing a shop sells is that wide, and
+  every finite JavaScript number lays out inside it, the longest being `5e-324`
+  at 326 characters. Core screens every model-written string now, so a tag like
+  that reaches this code on any render.
+- `@rudra-js/attested` did two things again on every `verify` call that it only
+  needed to do once: it re-read the whole fact list, and it rebuilt its index
+  over the text for each of the eighty-odd phrases it screens against. A fact
+  list is now read once per list rather than once per call, held against a copy
+  of what the list carried so a host that writes to its own array still gets a
+  fresh reading. Measured on one call, median of nine batches of twenty: handed
+  the same array again, as core does for the fields of one pass, 0.052 ms to
+  0.025 ms on a digit-free field, 0.251 ms to 0.016 ms against 420 facts and
+  2.245 ms to 0.022 ms against 4200; handed a new array every call, as core's
+  per-product `reason` and `badge` are, 0.045 ms to 0.018 ms, 0.251 ms to
+  0.231 ms and 2.224 ms to 2.300 ms. The second set is the index saving on its
+  own, and at 4200 facts the copy costs a shade more than it saves.
+
 ## [0.4.0] - 2026-09-13
 
 ### Added

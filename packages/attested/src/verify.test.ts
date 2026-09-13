@@ -101,6 +101,39 @@ describe('verify — the quantity layer', () => {
     expect(verify('0.0000001 grams', { values: [1e-7] }).quantity.supported).toBe(true);
   });
 
+  it('survives a host value whose exponent is past anything a shop could mean', () => {
+    // These laid the digits out before anything could weigh the run: a RangeError at
+    // 1e2000000000, and at -2.5e400000000 a heap abort no caller can catch.
+    const wild = ['1e2000000000', '1e-2000000000', '-2.5e400000000', `1e${'9'.repeat(400)}`];
+    for (const value of wild) {
+      expect(verify('1000000 sold', { values: [value] }).quantity.supported).toBe(false);
+    }
+    expect(verify('1000000 sold', { values: ['1e6'] }).quantity.supported).toBe(true);
+  });
+
+  it('reads each fact list on its own, whatever was verified before it', () => {
+    const green = ['3 season'];
+    const blue = ['4 season'];
+    expect(verify('a 3 season quilt', { values: green }).quantity.supported).toBe(true);
+    expect(verify('a 3 season quilt', { values: blue }).quantity.supported).toBe(false);
+    expect(verify('a 3 season quilt', { values: green }).quantity.supported).toBe(true);
+  });
+
+  it('reads a list the host wrote to again, at the same array', () => {
+    const facts = ['3 season'];
+    expect(verify('a 3 season quilt', { values: facts }).quantity.supported).toBe(true);
+
+    facts[0] = '4 season';
+    expect(verify('a 3 season quilt', { values: facts }).quantity.supported).toBe(false);
+    expect(verify('a 4 season quilt', { values: facts }).quantity.supported).toBe(true);
+
+    facts.push('2 person');
+    expect(verify('a 2 person tent', { values: facts }).quantity.supported).toBe(true);
+
+    facts.length = 0;
+    expect(verify('a 4 season quilt', { values: facts }).quantity.supported).toBe(false);
+  });
+
   it('calls the quantity layer a proof', () => {
     expect(verify('anything', NOTHING).quantity.strength).toBe('proof');
   });
