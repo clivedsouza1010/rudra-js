@@ -10,9 +10,11 @@ npm install @rudra-js/core zod@^4
 ```
 
 `zod` is a peer dependency: the package's public API _is_ zod schemas, so your
-application and this package must resolve the same zod instance. **zod 4 is
-required** — the schemas use zod 4 APIs, and installing into a zod 3 app fails
-with `ERESOLVE` rather than anything more helpful.
+application and this package must resolve the same zod instance. **zod 4.5 or later is
+required**, which is what the peer range asks for. The schemas use zod 4 APIs,
+and installing into a zod 3 app fails with `ERESOLVE` rather than anything more
+helpful. The floor is 4.5 rather than 4.0 because 4.5 changed how a nullable
+field is written into the tool schema the model is asked to fill in.
 
 ## Running without a model
 
@@ -29,8 +31,10 @@ the benchmark, and the right setting for anyone who has not yet decided on a
 provider. `generate` returns a promise either way, so the shape of your code
 does not change when you add one.
 
-The deterministic component emits exactly one **grid** block — or nothing, when
-no candidate is in stock — with a headline from a fixed set of four. Every other
+The deterministic component emits exactly one **grid** block, with a headline
+from a fixed set of four, or no blocks at all when there is nothing left to
+show. That happens when no candidate is in stock, and equally when every one of
+them is ruled out for this shopper. Every other
 block kind in the vocabulary (hero, carousel, banner, copy, bundle) only ever
 comes from a model. If you are wiring bundles and none appear, that is why, and
 not your catalog.

@@ -62,7 +62,9 @@ without the second half is not a posture.
 
 ### The short version
 
-The model has no tools, no network and no data access. It emits a fixed JSON
+The model gets exactly one tool, and it is how it hands back its answer: a
+schema to fill in. It has no tool that fetches anything, writes anything or
+calls anything, and no network or data access of its own. It emits a fixed JSON
 shape and nothing else, and it cannot **place** a product the shop did not
 supply — every SKU is checked against the shop's own list. It can still write a
 product name into prose, which nothing prevents.
@@ -71,8 +73,9 @@ attacker's text says — can change the wording and the ordering of a
 recommendation block. That is the reach it has: the response is parsed against a
 schema, every SKU is checked against the shop's list, every stated reason is
 checked against the shopper's signals, and what survives is rendered as escaped
-text by React. There is no tool call, no network access and no data access on
-the model's side of the boundary to aim at.
+text by React. The one tool on the model's side of the boundary is the schema it
+fills in to answer, so there is no tool that does anything, and no network or
+data access to aim at.
 
 That is the design, rather than a happy accident: the defence is what the model
 is _able_ to emit, not what we can persuade it to avoid.
@@ -81,7 +84,7 @@ is _able_ to emit, not what we can persuade it to avoid.
 
 | Technique                         | How                                                                                                                                                                                                                   |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Least privilege                   | The model calls nothing and reads nothing. There is no tool to scope, because there are no tools                                                                                                                      |
+| Least privilege                   | The model's only tool is the one it answers through. It fetches nothing, writes nothing and reads nothing, so there is no capability to scope                                                                         |
 | Separating instructions from data | Two prompt halves. The instruction half is byte-identical for every request and contains no shopper value at all — a test asserts it                                                                                  |
 | Marking untrusted data            | Shopper and product data sit between `BEGIN_UNTRUSTED_DATA` and `END_UNTRUSTED_DATA`, and the instruction half says nothing inside them is an instruction                                                             |
 | Input length limits               | Every free-text field and every array is capped in the payload contract, before a prompt is built                                                                                                                     |

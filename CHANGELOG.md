@@ -10,6 +10,15 @@ break them.
 
 ## [Unreleased]
 
+### Fixed
+
+- A product's `badge` is now read for banned claims like every other field the
+  model writes. It was clamped and escaped but never screened, so in
+  `per-shopper` mode a badge could carry "Only 2 left" or "Save 30%" straight to
+  the page. The schema's own example for the field was "Back in stock", which is
+  a stock claim, so the contract invited exactly what the screen exists to stop.
+  In `cohort` mode nothing changes, because the badge was already dropped there.
+
 ### Changed
 
 - `@rudra-js/react` takes React 18 as well as 19. The peer range said `^19.0.0`

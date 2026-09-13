@@ -92,7 +92,7 @@ export const productReferenceSchema = z.object({
    * true, but the prose asserting that reason must not render.
    */
   reason: z.string().nullable(),
-  /** Short accent label, e.g. "Back in stock". Null when nothing warrants one. */
+  /** Short accent label, e.g. "Worth a look". Null when nothing warrants one. */
   badge: z.string().nullable(),
   emphasis: z.enum(EMPHASIS),
 });
