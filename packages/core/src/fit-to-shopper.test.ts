@@ -15,6 +15,7 @@ const pick = (sku: string, basis: ProductPick['basis'] = 'popular'): ProductPick
   },
   basis,
   reason: `chosen because ${basis}`,
+  reasonFromHost: false,
   score: 1,
 });
 
@@ -140,5 +141,33 @@ describe('fitting a shared component to one shopper', () => {
 
     expect(fitted.headline).toBe('Picked for you');
     expect(fitted.tone).toBe('neutral');
+  });
+});
+
+describe('reporting which reasons came from the shop', () => {
+  it('names the SKU it placed a host reason on, and only that one', () => {
+    const hostReasonSkus = new Set<string>();
+    const picks: ProductPick[] = [
+      { ...pick('HOST-1'), reason: 'Bought together with your boots', reasonFromHost: true },
+      pick('DERIVED-1'),
+    ];
+    const cohortSpec: GeneratedSpec = {
+      tone: 'neutral',
+      headline: 'H',
+      subheadline: null,
+      rationale: 'r',
+      blocks: [
+        {
+          kind: 'grid',
+          title: null,
+          columns: 2,
+          items: [modelItem(), modelItem()],
+        },
+      ],
+    };
+
+    fitToShopper(cohortSpec, picks, 4, hostReasonSkus);
+
+    expect([...hostReasonSkus]).toEqual(['HOST-1']);
   });
 });

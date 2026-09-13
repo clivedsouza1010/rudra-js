@@ -10,6 +10,20 @@ break them.
 
 ## [Unreleased]
 
+### Added
+
+- `rank` on `createComponentGenerator`. The default, `'signals'`, orders
+  products by the shopper's signals as before. `'given'` keeps the order you
+  sent, for a shop whose own recommender is better than four weights. Either
+  way the exclusions and the stock check still apply, every product still
+  carries a basis reconciliation verifies, and everything the model writes is
+  still screened. Until now the host's ordering never reached the page in
+  either generation mode, so adopting this meant replacing a ranker you trust.
+- A candidate can carry its own `reason`, the phrase shown under the product,
+  for when your ranking knows something the signals do not. A reason you supply
+  is your own words, like the title, so it renders as written and is not
+  screened. The same sentence from the model still is.
+
 ### Fixed
 
 - A product's `badge` is now read for banned claims like every other field the
@@ -18,17 +32,6 @@ break them.
   the page. The schema's own example for the field was "Back in stock", which is
   a stock claim, so the contract invited exactly what the screen exists to stop.
   In `cohort` mode nothing changes, because the badge was already dropped there.
-
-### Changed
-
-- `@rudra-js/react` takes React 18 as well as 19. The peer range said `^19.0.0`
-  while the package imports only two types from React and no runtime API, so
-  the build touches nothing but `react/jsx-runtime`, which has existed since
-  React 17. The range was refusing installs the code supports. A test now fails
-  if anything in the package imports a React value rather than a type, so the
-  range stays true.
-
-### Fixed
 
 - The deterministic selector no longer writes `Highly rated` as a product's
   reason. Its basis is `popular`, so the prose stated something the basis did
@@ -48,6 +51,15 @@ break them.
   is left out; turning it off explicitly is what makes the budget reachable.
   Pass `thinking: null` to send no `thinking` field, which is what a model that
   rejects an explicit `disabled` needs, and raise `modelTimeoutMs` to match.
+
+### Changed
+
+- `@rudra-js/react` takes React 18 as well as 19. The peer range said `^19.0.0`
+  while the package imports only two types from React and no runtime API, so
+  the build touches nothing but `react/jsx-runtime`, which has existed since
+  React 17. The range was refusing installs the code supports. A test now fails
+  if anything in the package imports a React value rather than a type, so the
+  range stays true.
 
 ## [0.2.0] - 2026-09-10
 

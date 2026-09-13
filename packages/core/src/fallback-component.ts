@@ -1,6 +1,6 @@
 import type { GeneratedSpec, ProductReference } from './component-spec.js';
 import type { SignalDigest } from './signal-digest.js';
-import { selectProducts, type ProductPick } from './product-selection.js';
+import { selectProducts, type SelectOptions, type ProductPick } from './product-selection.js';
 import type { TrackingInput } from './tracking-input.js';
 
 /**
@@ -57,8 +57,12 @@ function toProductReference(pick: ProductPick, index: number, total: number): Pr
  * the renderer treats as "render nothing" — an empty recommendation region is
  * worse than none.
  */
-export function buildFallbackSpec(input: TrackingInput, digest: SignalDigest): GeneratedSpec {
-  const picks = selectProducts(input, digest).slice(0, digest.maxItems);
+export function buildFallbackSpec(
+  input: TrackingInput,
+  digest: SignalDigest,
+  options: SelectOptions = {},
+): GeneratedSpec {
+  const picks = selectProducts(input, digest, options).slice(0, digest.maxItems);
   const { headline, subheadline } = headlineFor(digest);
   const items = picks.map((pick, index) => toProductReference(pick, index, picks.length));
 
