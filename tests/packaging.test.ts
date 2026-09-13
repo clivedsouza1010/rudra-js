@@ -177,7 +177,7 @@ describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
 });
 
 describe('the published packages', () => {
-  it('all carry one version, because one tag publishes all three', () => {
+  it('all carry one version, because one tag publishes every one', () => {
     const versions = PACKAGES.map((packageName) => readManifest(packageName).version);
     const listed = PACKAGES.map(
       (packageName, index) => `@rudra-js/${packageName} ${versions[index]}`,

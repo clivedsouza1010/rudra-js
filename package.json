@@ -1,6 +1,6 @@
 {
   "name": "rudra-js",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "A framework of server side components built dynamically and rendered in real time",
   "license": "MIT",

@@ -123,7 +123,7 @@ npm run typecheck    # includes test files, which the build does not
 npm run lint
 npm run format:check
 npm test
-npm run verify:consumer   # packs all three packages and uses them from outside the repo
+npm run verify:consumer   # packs all four packages and uses them from outside the repo
 ```
 
 To see what each generation mode costs under a stub model, run

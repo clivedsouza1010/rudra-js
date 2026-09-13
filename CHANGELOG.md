@@ -10,6 +10,8 @@ break them.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-13
+
 ### Added
 
 - `@rudra-js/attested`, a new package with no dependencies and no node builtins.
@@ -325,7 +327,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.3.1...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.2.0...v0.3.1
 [0.2.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/clivedsouza1010/rudra-js/releases/tag/v0.1.0
