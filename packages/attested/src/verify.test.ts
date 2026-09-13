@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BANNED_PHRASES } from './phrases.js';
 import { verify, verifyFields } from './verify.js';
 
 const NOTHING = { values: [] };
@@ -70,6 +71,20 @@ describe('verify — the quantity layer', () => {
 
   it('reads a numeral the host wrote in another script', () => {
     expect(verify('٣٩ euro', { values: [39] }).quantity.supported).toBe(true);
+  });
+
+  it('reads a number the host wrote large or small enough for String to use an exponent', () => {
+    // `String(1e21)` is `1e+21`, which used to mint the two values 1 and 21.
+    expect(verify('Only 21 sold', { values: [1e21] }).supported).toBe(false);
+    expect(verify('1 left', { values: [1e21] }).supported).toBe(false);
+    expect(verify('1000000000000000000000 in stock', { values: [1e21] }).quantity.supported).toBe(
+      true,
+    );
+    expect(
+      verify('1,000,000,000,000,000,000,000 made', { values: [1e21] }).quantity.supported,
+    ).toBe(true);
+    expect(verify('7 left', { values: [1e-7] }).supported).toBe(false);
+    expect(verify('0.0000001 grams', { values: [1e-7] }).quantity.supported).toBe(true);
   });
 
   it('calls the quantity layer a proof', () => {
@@ -175,6 +190,17 @@ describe('verify — digits that render as something else', () => {
     expect(verify('Just $2\u00ad13 today.', facts).supported).toBe(false);
     expect(verify('Rated by 213 shoppers.', { values: [213] }).supported).toBe(true);
   });
+
+  it('will not let a variation selector split one number into two supported ones', () => {
+    // A shopper reads $13; the facts carry only 1 and 3. The zero-width case was
+    // closed and this one was not, because U+FE0F is category Mn rather than Cf.
+    expect(verify('$1\ufe0f3', { values: [1, 3] }).supported).toBe(false);
+    expect(verify('$1\ufe003', { values: [1, 3] }).supported).toBe(false);
+    expect(verify('$1\u{e0100}3', { values: [1, 3] }).supported).toBe(false);
+    expect(verify('$1\u034f3', { values: [1, 3] }).supported).toBe(false);
+    expect(verify('$1\u200b3', { values: [1, 3] }).supported).toBe(false);
+    expect(verify('$13', { values: [13] }).supported).toBe(true);
+  });
 });
 
 describe('verify — the wording layer', () => {
@@ -221,6 +247,12 @@ describe('verify — the wording layer', () => {
     expect(verify('Frеe delivery', NOTHING).wording.supported).toBe(false);
   });
 
+  it('catches a claim a variation selector was dropped into', () => {
+    expect(verify('fr️ee shipping', NOTHING).wording.supported).toBe(false);
+    expect(verify('sel︀ling fast', NOTHING).wording.supported).toBe(false);
+    expect(verify('in st͏ock now', NOTHING).wording.supported).toBe(false);
+  });
+
   it('takes a phrase the host added for their own language', () => {
     const facts = { values: [], bannedPhrases: ['nur noch'] };
     expect(verify('Nur noch wenige', facts).wording.supported).toBe(false);
@@ -256,7 +288,7 @@ describe('verify — the wording layer', () => {
     expect(verify('Nur noch wenige', facts).wording.supported).toBe(false);
   });
 
-  it('drops a phrase the host stands behind, so a true statement can be published', () => {
+  it('forgives a phrase the host stands behind, so a true statement can be published', () => {
     const facts = { values: [12], allowedPhrases: ['free shipping', 'in stock'] };
     expect(verify('Free shipping on orders over $12.', facts).supported).toBe(true);
     expect(verify('12 in stock.', facts).supported).toBe(true);
@@ -275,7 +307,8 @@ describe('verify — the wording layer', () => {
       .checked;
     expect(plain).toBeGreaterThan(20);
     expect(added).toBe(plain + 1);
-    expect(dropped).toBe(plain - 1);
+    // An allowance works on the text, not the list, so the whole list is still screened.
+    expect(dropped).toBe(plain);
   });
 
   it('ignores a host phrase that normalises to nothing', () => {
@@ -295,6 +328,111 @@ describe('verify — the wording layer', () => {
 
   it('passes wording that claims nothing', () => {
     expect(verify('Built for long days on the trail', NOTHING).wording.supported).toBe(true);
+  });
+});
+
+// An allowance masks the text: a banned claim sitting wholly inside one of the
+// host's phrases is not reported, and the same words elsewhere still are.
+describe('verify — allowedPhrases', () => {
+  const NESTED: [string, string][] = [
+    ['best seller', 'One of our best sellers.'],
+    ['best selling', 'A best selling shoe.'],
+    ['bestseller', 'A bestseller here.'],
+    ['bestselling', 'A bestselling shoe.'],
+    ['back in stock', 'Back in stock today.'],
+    ['almost sold out', 'Almost sold out now.'],
+    ['nearly sold out', 'Nearly sold out now.'],
+  ];
+
+  it('forgives a phrase another listed phrase sits inside', () => {
+    // Deleting the exact string left these seven allowable in name only: the
+    // matcher drops spaces, so `best seller` was still caught as `bestseller`.
+    for (const [allowed, text] of NESTED) {
+      const result = verify(text, { values: [], allowedPhrases: [allowed] });
+      expect(tokensOf(result.wording.findings), `${allowed} in "${text}"`).toEqual([]);
+    }
+  });
+
+  it('allows every phrase on the built-in list, one at a time', () => {
+    for (const phrase of BANNED_PHRASES) {
+      const text = `We say: ${phrase}.`;
+      const result = verify(text, { values: [], allowedPhrases: [phrase] });
+      expect(tokensOf(result.wording.findings), phrase).toEqual([]);
+    }
+  });
+
+  it('forgives only where the allowed wording actually appears', () => {
+    const facts = { values: [2], allowedPhrases: ['back in stock'] };
+    expect(tokensOf(verify('Only 2 in stock, selling fast', facts).wording.findings)).toEqual([
+      'in stock',
+      'selling fast',
+    ]);
+  });
+
+  it('forgives one hit and still reports the same phrase elsewhere', () => {
+    const facts = { values: [], allowedPhrases: ['back in stock'] };
+    const result = verify('Back in stock. Also in stock elsewhere.', facts);
+    expect(tokensOf(result.wording.findings)).toEqual(['in stock']);
+  });
+
+  it('forgives inwards and never outwards', () => {
+    // The mirror of the bug above, and correct: `in stock` is not a promise about
+    // `back in stock`, which claims a restock as well.
+    expect(
+      tokensOf(
+        verify('Back in stock', { values: [], allowedPhrases: ['in stock'] }).wording.findings,
+      ),
+    ).toEqual(['back in stock']);
+    expect(
+      tokensOf(
+        verify('Almost sold out', { values: [], allowedPhrases: ['sold out'] }).wording.findings,
+      ),
+    ).toEqual(['almost sold out']);
+  });
+
+  it('does not let two allowances compose into a phrase neither one carries', () => {
+    const facts = { values: [], allowedPhrases: ['sold', 'out'] };
+    expect(tokensOf(verify('sold out', facts).wording.findings)).toEqual(['sold out']);
+  });
+
+  it('does not join two allowances that abut in the text', () => {
+    const facts = { values: [], allowedPhrases: ['back in', 'stock'] };
+    expect(tokensOf(verify('Back in stock', facts).wording.findings)).toEqual([
+      'in stock',
+      'back in stock',
+    ]);
+  });
+
+  it('does not mint a claim the text never made by blanking out the allowed run', () => {
+    // Spaces are dropped before matching, so masking `in stock` with spaces would
+    // glue `free` to `shipping` and report a phrase nobody wrote.
+    const facts = { values: [], allowedPhrases: ['in stock'] };
+    expect(tokensOf(verify('free in stock shipping', facts).wording.findings)).toEqual([]);
+  });
+
+  it('normalises an allowance the same way it normalises everything else', () => {
+    const written = ['BACK IN STOCK', 'Back-In-Stock', '  back in stock  ', 'back in stоck'];
+    for (const phrase of written) {
+      const result = verify('Back in stock today', { values: [], allowedPhrases: [phrase] });
+      expect(tokensOf(result.wording.findings), phrase).toEqual([]);
+    }
+  });
+
+  it('ignores an allowance that normalises to nothing', () => {
+    // The length guard is clarity, not load-bearing: an empty phrase spans nothing.
+    const result = verify('on sale now', { values: [], allowedPhrases: ['   '] });
+    expect(tokensOf(result.wording.findings)).toEqual(['sale']);
+    expect(result.wording.checked).toBe(BANNED_PHRASES.length);
+  });
+
+  it('is the way out of the negation hole the README names', () => {
+    const facts = { values: [], allowedPhrases: ['no sale'] };
+    expect(tokensOf(verify('there is no sale on this product', facts).wording.findings)).toEqual(
+      [],
+    );
+    expect(
+      tokensOf(verify('there is no sale here, but a sale there', facts).wording.findings),
+    ).toEqual(['sale']);
   });
 });
 
@@ -329,6 +467,21 @@ describe('verifyFields', () => {
     expect(result.supported).toBe(false);
     expect(result.fields[0]?.result.supported).toBe(true);
     expect(tokensOf(result.acrossFields.findings)).toEqual(['free delivery']);
+  });
+
+  it('honours an allowance across the joined fields', () => {
+    const facts = { values: [], allowedPhrases: ['free shipping'] };
+    const joined = verifyFields({ a: 'Free', b: 'shipping on every order' }, facts);
+    expect(tokensOf(joined.acrossFields.findings)).toEqual([]);
+    expect(joined.supported).toBe(true);
+
+    // The allowance is global across the call, but it is still positional inside it.
+    const split = verifyFields(
+      { a: 'Back in stock', b: 'In stock now' },
+      { values: [], allowedPhrases: ['back in stock'] },
+    );
+    expect(tokensOf(split.acrossFields.findings)).toEqual(['in stock']);
+    expect(split.supported).toBe(false);
   });
 
   it('calls the across-fields read best-effort, because it is the wording layer', () => {

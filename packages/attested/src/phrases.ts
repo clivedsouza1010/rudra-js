@@ -120,7 +120,9 @@ const CONFUSABLES: Record<string, string> = {
   ϲ: 'c',
 };
 
-const INVISIBLE = /[\p{Cf}\u034f]/gu;
+// Both classes are needed: the variation selectors are default-ignorable but not Cf,
+// and 32 Cf characters, the Arabic number signs among them, are not default-ignorable.
+const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}]/gu;
 
 /** One shape for text and phrases, so a line break or a hyphen cannot hide a claim. */
 export function normalisePhrasing(text: string): string {
@@ -148,10 +150,16 @@ function isGlued(char: string | undefined): boolean {
   return char !== undefined && ASCII_WORD.test(char);
 }
 
-/** Both arguments must already be normalised. */
+export interface Span {
+  start: number;
+  /** The last character of the match, not one past it. */
+  end: number;
+}
+
+/** Both arguments must already be normalised. Spans index the text passed in. */
 // The word-gap rule only guards an ASCII edge, so `cheap` misses `cheapskate`
 // while a Japanese phrase — which has no word gaps to find — still matches.
-export function phraseIn(text: string, phrase: string): boolean {
+export function phraseSpans(text: string, phrase: string): Span[] {
   // Matching runs with every space dropped, because 送料 無料 is 送料無料 to anyone
   // and a space is free. `spots` carries each character back to where it really sat,
   // so the word-gap guard still reads the neighbours the shopper sees.
@@ -163,8 +171,9 @@ export function phraseIn(text: string, phrase: string): boolean {
     spots.push(index);
   }
 
+  const spans: Span[] = [];
   const needle = phrase.replaceAll(' ', '');
-  if (needle.length === 0) return false;
+  if (needle.length === 0) return spans;
 
   const guardStart = ASCII_WORD.test(needle[0] ?? '');
   const guardEnd = ASCII_WORD.test(needle[needle.length - 1] ?? '');
@@ -173,7 +182,7 @@ export function phraseIn(text: string, phrase: string): boolean {
   let from = 0;
   for (;;) {
     const at = haystack.indexOf(needle, from);
-    if (at === -1) return false;
+    if (at === -1) return spans;
 
     const start = spots[at] ?? 0;
     const end = spots[at + needle.length - 1] ?? 0;
@@ -183,8 +192,12 @@ export function phraseIn(text: string, phrase: string): boolean {
 
     const before = guardStart && isGlued(text[start - 1]);
     const after = guardEnd && isGlued(next) && !plural;
-    if (!before && !after) return true;
+    if (!before && !after) spans.push({ start, end });
 
     from = at + 1;
   }
+}
+
+export function phraseIn(text: string, phrase: string): boolean {
+  return phraseSpans(text, phrase).length > 0;
 }

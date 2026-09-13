@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { numeralsIn } from './numerals.js';
+import { normalisePhrasing } from './phrases.js';
 
 /**
  * The decoder's premise is that Unicode writes decimal digits in complete sets of
@@ -75,5 +76,44 @@ describe('every decimal digit in Unicode', () => {
 
     // 50 of them are the maths block alone, which is where the bug lived.
     expect(checked).toBeGreaterThan(60);
+  });
+});
+
+/**
+ * A character that renders as nothing can split a number into two the host did supply,
+ * or split a banned phrase off its own entry. The class that drops them was `\p{Cf}`,
+ * which left every variation selector in. Both layers sweep the whole of Unicode here
+ * rather than trusting a hand-written list.
+ */
+function invisibleCodePoints(): number[] {
+  const ignorable = /\p{Default_Ignorable_Code_Point}/u;
+  const format = /\p{Cf}/u;
+
+  const found: number[] = [];
+  for (let code = 0; code <= 0x10ffff; code += 1) {
+    if (code >= 0xd800 && code <= 0xdfff) continue;
+    const char = String.fromCodePoint(code);
+    if (ignorable.test(char) || format.test(char)) found.push(code);
+  }
+  return found;
+}
+
+const INVISIBLE = invisibleCodePoints();
+
+describe('every character that renders as nothing', () => {
+  it('cannot split one number into two the host did supply', () => {
+    for (const code of INVISIBLE) {
+      const text = `1${String.fromCodePoint(code)}3`;
+      const [numeral, ...rest] = numeralsIn(text);
+      expect(numeral?.token, `U+${code.toString(16).toUpperCase()}`).toBe('13');
+      expect(rest, `U+${code.toString(16).toUpperCase()}`).toEqual([]);
+    }
+  });
+
+  it('cannot split a phrase off its own entry on the denylist', () => {
+    for (const code of INVISIBLE) {
+      const text = `fr${String.fromCodePoint(code)}ee shipping`;
+      expect(normalisePhrasing(text), `U+${code.toString(16).toUpperCase()}`).toBe('free shipping');
+    }
   });
 });

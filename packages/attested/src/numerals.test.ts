@@ -145,6 +145,27 @@ describe('numeralsIn', () => {
     expect(formsOf('2\u00ad13')).toEqual(['213']);
   });
 
+  it('drops a variation selector, which renders as nothing but is not a format character', () => {
+    // U+FE0F and U+FE00 are category Mn. A class of Cf alone left them in, and
+    // "$1<VS16>3" then read as the two supported numerals 1 and 3.
+    expect(numeralsIn('1\ufe0f3')).toEqual([{ token: '13', forms: ['13'], kind: 'digits' }]);
+    expect(formsOf('1\ufe003')).toEqual(['13']);
+    expect(formsOf('1\u{e0100}3')).toEqual(['13']);
+  });
+
+  it('drops the combining grapheme joiner and the Mongolian variation selectors', () => {
+    expect(formsOf('1\u034f3')).toEqual(['13']);
+    expect(formsOf('1\u180b3')).toEqual(['13']);
+  });
+
+  it('still drops a format character that is not default-ignorable', () => {
+    // The Arabic number signs and the interlinear annotation marks are Cf but not
+    // default-ignorable, so the class has to be the union of the two, not either one.
+    expect(formsOf('1\u06003')).toEqual(['13']);
+    expect(formsOf('1\ufff93')).toEqual(['13']);
+    expect(formsOf('1\u{13430}3')).toEqual(['13']);
+  });
+
   it('reads a numeric character that is not a decimal digit as one it cannot read', () => {
     expect(numeralsIn('½')).toEqual([{ token: '½', forms: [], kind: 'other-numeral' }]);
     expect(kindsOf('Only ② left')).toEqual(['other-numeral']);
@@ -193,5 +214,37 @@ describe('supportedValues', () => {
 
   it('is empty when the host stands behind nothing', () => {
     expect(supportedValues([])).toEqual(new Set());
+  });
+
+  it('lays a number out in positional notation rather than letting String pick exponents', () => {
+    // `String(1e21)` is `1e+21`, which used to read as the two numerals 1 and 21.
+    expect(supportedValues([1e21])).toEqual(new Set(['1000000000000000000000']));
+    expect(supportedValues([1e-7])).toEqual(new Set(['0.0000001']));
+  });
+
+  it('keeps every digit of a significand, on both sides of the exponent', () => {
+    expect(supportedValues([6.02e23])).toEqual(new Set(['602000000000000000000000']));
+    expect(supportedValues([1.5e-7])).toEqual(new Set(['0.00000015']));
+  });
+
+  it('keeps a negative number on the small side out of the digits', () => {
+    // Splicing the sign back in the middle would mint a 0 the host never supplied.
+    expect(supportedValues([-1.5e-7])).toEqual(new Set(['0.00000015']));
+  });
+
+  it('lays out the digits String chose, never a wider exact expansion', () => {
+    // 0.1 + 0.2 is exactly 0.3000000000000000444089209850062616169452667236328125, but
+    // every renderer in the host's stack writes the shortest round-trip form, so that
+    // is the run the model will write and the only one worth standing behind.
+    expect(supportedValues([0.1 + 0.2])).toEqual(new Set(['0.30000000000000004']));
+  });
+
+  it('stands behind no numeral for a number that is not finite', () => {
+    expect(supportedValues([NaN, Infinity, -Infinity])).toEqual(new Set());
+  });
+
+  it('leaves a string fact alone, because there the host typed the digits', () => {
+    // Deliberate: '1e21' still mints 1 and 21. With a number, String chose the notation.
+    expect(supportedValues(['1e21'])).toEqual(new Set(['1', '21']));
   });
 });

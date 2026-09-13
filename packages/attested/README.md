@@ -85,9 +85,11 @@ grouping is impossible the decimal reading survives, so `1234,567` is still
 - A run no locale reads as a number — `24.12.2026`, `3.14.15`. These are
   supported only by a fact written exactly the same way.
 
-Invisible characters are dropped before any of this, so a zero-width space or a
-soft hyphen cannot split `213` into a `2` and a `13` that happen to be supported
-separately.
+Invisible characters are dropped before any of this, so a zero-width space, a
+soft hyphen or a variation selector cannot split `213` into a `2` and a `13`
+that happen to be supported separately. "Invisible" is every format character
+and every default-ignorable code point, which is a rule over the whole of
+Unicode rather than a list someone kept up to date.
 
 ### Layer two — wording. This is the best-effort half.
 
@@ -101,18 +103,37 @@ verify('Selling fast', { values: [] }).wording;
 // { supported: false, strength: 'best-effort', checked: 81, findings: [...] }
 ```
 
-Add your own for your own language, and drop the ones you stand behind:
+Add your own for your own language, and name the wording you stand behind:
 
 ```ts
 verify('Nur noch wenige', { values: [], bannedPhrases: ['nur noch'] });
 verify('In stock, ships today', { values: [], allowedPhrases: ['in stock'] });
 ```
 
-`bannedPhrases` is added to the built-in list; `allowedPhrases` is removed from
-it, and is applied last, so a shop that genuinely offers free shipping can say
-so. Without that, a denylist bans the truthful disclosure as hard as the
-fabricated one — it has no notion of negation, so "we do not discount this item"
-reads to it exactly like "discount".
+`bannedPhrases` is added to the built-in list. `allowedPhrases` works on the
+text, not on the list: **where one of your phrases appears, a banned claim
+sitting wholly inside it is not reported, and the same words elsewhere in the
+copy still are.** So `['back in stock']` clears `"Back in stock"` and still
+catches the `in stock` in `"Only 2 in stock, selling fast"`. `checked` is the
+whole list either way, because nothing leaves it.
+
+Without an allowance a denylist bans the truthful disclosure as hard as the
+fabricated one, and a shop that genuinely offers free shipping cannot say so.
+Three things are worth knowing before you write one:
+
+- **Containment runs one way.** Allowing `in stock` does not clear
+  `back in stock`, which claims a restock on top of it.
+- **Allowances do not compose, and they do not join.**
+  `['sold', 'out']` leaves `sold out` caught, and `['back in', 'stock']` leaves
+  both `in stock` and `back in stock` caught.
+- **An allowance forgives whatever nests inside it, including entries added in a
+  later version.** `['in stock and ready to ship']` forgives nothing extra
+  today; the day `ready to ship` joins the list, that allowance silences it
+  wherever your sentence appears. Keep them tight.
+
+It is also the way around negation. The list matches substrings, so
+`"there is no sale on this product"` reads as a sale claim; allow `no sale` and
+that sentence passes while a `sale` later in the same text still fails.
 
 Matching is case-insensitive. Hyphens and line breaks become spaces, accents are
 composed, fullwidth forms are folded, invisible characters are dropped, and a
@@ -164,6 +185,12 @@ interface Facts {
 `values` is a flat list, not a typed one. Write them however they are written in
 your own system — `39`, `'$1,299.00'`, `'4,8'`, `'ships 13 March'` — and every
 numeral in each one becomes a supported value.
+
+A number is laid out in positional notation first, whatever `String` would have
+made of it, so a fact of `1e21` stands behind
+`'1,000,000,000,000,000,000,000'` and behind neither `1` nor `21`. A string is
+read exactly as you typed it, because there you chose the digits: `'1e21'` does
+still mint 1 and 21.
 
 Flat rather than typed (money, count, rating, date) because typing only helps if
 the extractor can classify a token in the text, and it cannot. The `2` in
@@ -242,7 +269,9 @@ last hour"`, `"Save $39 today"` and `"Under $39"` all pass. Supply a rating
   `"Gratis Versand"`, `"Livraison offerte"` and `"شحن مجاني"` all pass by
   default. `bannedPhrases` is the answer, and it is your list to keep.
 - **Negation.** The list matches substrings, so `"there is no sale on this
-product"` is caught as a sale claim. `allowedPhrases` is the way out.
+product"` is caught as a sale claim on its own. There is no rule that reads the
+  `no`; `allowedPhrases: ['no sale']` is the way out, and it is narrow by
+  design — a `sale` elsewhere in the same text still fails.
 
 ### Preconditions the package cannot check for you
 

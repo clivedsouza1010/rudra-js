@@ -19,13 +19,39 @@ break them.
   host supplied, whatever language the sentence is in, so "Nur noch 2 übrig" and
   "4,8 von 5" no longer sail through. The wording layer, for claims with no
   number in them, stays a denylist, says so in `strength: 'best-effort'` on
-  every result, and takes phrases the host adds for their own language — or
-  drops, through `allowedPhrases`, for a shop that genuinely offers free
-  shipping and would otherwise be barred from saying so. `verifyFields` also
+  every result, and takes phrases the host adds for their own language — or,
+  through `allowedPhrases`, wording the shop stands behind, so a shop that
+  genuinely offers free shipping is not barred from saying so. `verifyFields` also
   reads the fields joined, because a card renders them next to each other and
   the model picks where one field ends. The README states the guarantee in one
   sentence and lists every bypass left open under its own heading. Nothing in
   `@rudra-js/core` is wired to it yet.
+
+### Fixed
+
+- `@rudra-js/attested` dropped only format characters as invisible, so a
+  variation selector survived both layers. `"$1<U+FE0F>3"` renders as `$13` and
+  passed against facts of 1 and 3 — a false acceptance in the layer the package
+  calls a proof — and `"fr<U+FE0F>ee shipping"` walked past the built-in entry.
+  The class is now every format character and every default-ignorable code
+  point, which covers the variation selectors, the combining grapheme joiner and
+  the zero-width set, and a sweep over the whole of Unicode holds it there.
+- `@rudra-js/attested` read a number fact through `String()`, so `1e21` arrived
+  as `1e+21` and minted 1 and 21 as supported values. Both `"1 left"` and
+  `"Only 21 sold"` then passed. A number is now laid out in positional notation
+  first, keeping exactly the digits `String()` chose and adding only the zeros
+  the exponent implies. String facts are untouched, because there the host typed
+  the digits.
+- `@rudra-js/attested` could not actually allow 7 of its 81 built-in phrases.
+  `allowedPhrases` deleted the exact string while matching ignored spaces and
+  phrases nest, so allowing `best seller` left `bestseller` firing and allowing
+  `back in stock` left `in stock` firing. An allowance now works on the text
+  rather than on the list: where one of the host's phrases appears, a banned
+  claim sitting wholly inside it is not reported, and the same words elsewhere
+  still are. `checked` stays at the full list. This also closes the negation
+  hole the README names — allowing `no sale` clears
+  `"there is no sale on this product"` while a `sale` later in the same text
+  still fails.
 
 ## [0.3.1] - 2026-09-13
 

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BANNED_PHRASES, normalisePhrasing, phraseIn } from './phrases.js';
+import { BANNED_PHRASES, normalisePhrasing, phraseIn, phraseSpans } from './phrases.js';
 
 describe('normalisePhrasing', () => {
   it('lowercases', () => {
@@ -21,6 +21,27 @@ describe('normalisePhrasing', () => {
     expect(normalisePhrasing('F\u00adree delivery')).toBe('free delivery');
     expect(normalisePhrasing('in\u200bstock')).toBe('instock');
     expect(normalisePhrasing('شحن\u200fمجاني')).toBe('شحنمجاني');
+  });
+
+  it('drops a variation selector, which renders as nothing but is not a format character', () => {
+    // U+FE0F and U+FE00 are category Mn, so a class of Cf alone kept them and
+    // `fr<VS16>ee shipping` walked past the built-in entry.
+    expect(normalisePhrasing('fr️ee shipping')).toBe('free shipping');
+    expect(normalisePhrasing('fr︀ee shipping')).toBe('free shipping');
+    expect(normalisePhrasing('fr\u{e0100}ee shipping')).toBe('free shipping');
+  });
+
+  it('drops the combining grapheme joiner and the Mongolian variation selectors', () => {
+    expect(normalisePhrasing('fr͏ee shipping')).toBe('free shipping');
+    expect(normalisePhrasing('fr᠋ee shipping')).toBe('free shipping');
+  });
+
+  it('still drops a format character that is not default-ignorable', () => {
+    // Cf and Default_Ignorable_Code_Point each hold characters the other does not,
+    // so the class has to be the union of the two and not either one alone.
+    expect(normalisePhrasing('fr؀ee shipping')).toBe('free shipping');
+    expect(normalisePhrasing('fr￹ee shipping')).toBe('free shipping');
+    expect(normalisePhrasing('fr\u{13430}ee shipping')).toBe('free shipping');
   });
 
   it('folds a letter that renders as a Latin one but is not', () => {
@@ -100,6 +121,34 @@ describe('phraseIn', () => {
 
   it('finds nothing for an empty phrase', () => {
     expect(phraseIn('anything at all', '')).toBe(false);
+  });
+});
+
+describe('phraseSpans', () => {
+  it('indexes the text it was handed, not the space-free one it matches against', () => {
+    // The spans are what decides containment, so the two coordinate systems must
+    // never be mixed. Short strings hide this; a leading space does not.
+    expect(phraseSpans('back in stock today', 'in stock')).toEqual([{ start: 5, end: 12 }]);
+    expect(phraseSpans('送料 無料', '送料無料')).toEqual([{ start: 0, end: 4 }]);
+  });
+
+  it('ends the span at the last character the phrase matched and no further', () => {
+    expect(phraseSpans('one of our best sellers', 'best seller')).toEqual([{ start: 11, end: 21 }]);
+  });
+
+  it('collects every accepted hit, not just the first', () => {
+    expect(phraseSpans('back in stock. also in stock elsewhere.', 'in stock')).toEqual([
+      { start: 5, end: 12 },
+      { start: 20, end: 27 },
+    ]);
+  });
+
+  it('leaves out a hit the word-gap guard rejects', () => {
+    expect(phraseSpans('a cheapskate, but cheap', 'cheap')).toEqual([{ start: 18, end: 22 }]);
+  });
+
+  it('finds nothing for an empty phrase', () => {
+    expect(phraseSpans('anything at all', '')).toEqual([]);
   });
 });
 

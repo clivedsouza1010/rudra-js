@@ -1,8 +1,10 @@
 // Everything here is string work. No float ever holds a value, so a twenty-digit
 // order number compares exactly.
 
+// Both classes are needed: the variation selectors are default-ignorable but not Cf,
+// and 32 Cf characters, the Arabic number signs among them, are not default-ignorable.
 /** Invisible characters, dropped so a zero-width space cannot split one number into two. */
-const INVISIBLE = /[\p{Cf}\u034f]/gu;
+const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}]/gu;
 
 /** A dot or a comma. Either mark is a decimal point in one locale and grouping in another. */
 const AMBIGUOUS = '.,';
@@ -187,11 +189,31 @@ export function numeralsIn(text: string): Numeral[] {
   return found;
 }
 
+/** `String(1e21)` is `1e+21`, which reads as the two numerals 1 and 21. Lay the same digits out in place. */
+function plainDigits(value: number): string {
+  const written = String(value);
+  const marker = written.indexOf('e');
+  if (marker < 0) return written;
+
+  const power = Number(written.slice(marker + 1));
+  const sign = written[0] === '-' ? '-' : '';
+  const body = written.slice(sign.length, marker);
+  const point = body.indexOf('.');
+  const digits = point < 0 ? body : body.slice(0, point) + body.slice(point + 1);
+  const place = (point < 0 ? body.length : point) + power;
+
+  if (place <= 0) return `${sign}0.${'0'.repeat(-place)}${digits}`;
+  if (place >= digits.length) return `${sign}${digits}${'0'.repeat(place - digits.length)}`;
+  return `${sign}${digits.slice(0, place)}.${digits.slice(place)}`;
+}
+
 /** Every reading of every numeral the host stands behind. */
 export function supportedValues(values: readonly (string | number)[]): Set<string> {
   const supported = new Set<string>();
   for (const value of values) {
-    for (const numeral of numeralsIn(String(value))) {
+    // A string fact carries digits the host typed; with a number, `String` chose the notation.
+    const written = typeof value === 'number' ? plainDigits(value) : value;
+    for (const numeral of numeralsIn(written)) {
       for (const form of numeral.forms) supported.add(form);
     }
   }

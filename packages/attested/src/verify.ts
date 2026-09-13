@@ -1,5 +1,5 @@
 import { numeralsIn, supportedValues, type Numeral } from './numerals.js';
-import { BANNED_PHRASES, normalisePhrasing, phraseIn } from './phrases.js';
+import { BANNED_PHRASES, normalisePhrasing, phraseSpans, type Span } from './phrases.js';
 
 // Two layers, reported apart, because only one of them is a proof.
 
@@ -38,7 +38,7 @@ export interface Facts {
   values: readonly (string | number)[];
   /** Claims to ban on top of the built-in English list, for the host's own language. */
   bannedPhrases?: readonly string[];
-  /** Claims to drop from the list, for a shop that stands behind them. Applied last. */
+  /** Wording the shop stands behind. A banned claim inside one of these is not reported. */
   allowedPhrases?: readonly string[];
 }
 
@@ -62,11 +62,16 @@ function phrasesOf(facts: Facts): string[] {
     const normalised = normalisePhrasing(phrase);
     if (normalised.length > 0) phrases.add(normalised);
   }
-  for (const phrase of facts.allowedPhrases ?? []) {
-    phrases.delete(normalisePhrasing(phrase));
-  }
-
   return [...phrases];
+}
+
+function allowedOf(facts: Facts): string[] {
+  const allowed: string[] = [];
+  for (const phrase of facts.allowedPhrases ?? []) {
+    const normalised = normalisePhrasing(phrase);
+    if (normalised.length > 0) allowed.push(normalised);
+  }
+  return allowed;
 }
 
 function reasonFor(numeral: Numeral): string {
@@ -103,12 +108,29 @@ function checkQuantities(text: string, supported: Set<string>): LayerReport {
   };
 }
 
-function checkWording(text: string, phrases: string[]): LayerReport {
-  const normalised = normalisePhrasing(text);
-  const findings: Finding[] = [];
+function standsBehind(allowed: Span[], hit: Span): boolean {
+  for (const span of allowed) {
+    if (span.start <= hit.start && hit.end <= span.end) return true;
+  }
+  return false;
+}
 
+function checkWording(text: string, phrases: string[], allowed: string[]): LayerReport {
+  const normalised = normalisePhrasing(text);
+
+  const spans: Span[] = [];
+  for (const phrase of allowed) {
+    for (const span of phraseSpans(normalised, phrase)) spans.push(span);
+  }
+
+  const findings: Finding[] = [];
   for (const phrase of phrases) {
-    if (!phraseIn(normalised, phrase)) continue;
+    // One hit inside allowed wording is forgiven; the same phrase elsewhere is not.
+    let caught = false;
+    for (const hit of phraseSpans(normalised, phrase)) {
+      if (!standsBehind(spans, hit)) caught = true;
+    }
+    if (!caught) continue;
 
     findings.push({
       layer: 'wording',
@@ -125,28 +147,34 @@ function checkWording(text: string, phrases: string[]): LayerReport {
   };
 }
 
-function check(text: string, supported: Set<string>, phrases: string[]): VerifyResult {
+function check(
+  text: string,
+  supported: Set<string>,
+  phrases: string[],
+  allowed: string[],
+): VerifyResult {
   const quantity = checkQuantities(text, supported);
-  const wording = checkWording(text, phrases);
+  const wording = checkWording(text, phrases, allowed);
   return { supported: quantity.supported && wording.supported, quantity, wording };
 }
 
 /** Whether one piece of model-written text stands on the facts the host supplied. */
 export function verify(text: string, facts: Facts): VerifyResult {
-  return check(text, supportedValues(facts.values), phrasesOf(facts));
+  return check(text, supportedValues(facts.values), phrasesOf(facts), allowedOf(facts));
 }
 
 /** The same check over every field of one product, without repeating the facts. */
 export function verifyFields(fields: Record<string, string>, facts: Facts): BatchResult {
   const supported = supportedValues(facts.values);
   const phrases = phrasesOf(facts);
+  const allowed = allowedOf(facts);
 
   const results: FieldResult[] = [];
   const written: string[] = [];
   let allSupported = true;
   for (const field of Object.keys(fields)) {
     const text = fields[field] ?? '';
-    const result = check(text, supported, phrases);
+    const result = check(text, supported, phrases, allowed);
     if (!result.supported) allSupported = false;
     results.push({ field, result });
     written.push(text);
@@ -154,7 +182,7 @@ export function verifyFields(fields: Record<string, string>, facts: Facts): Batc
 
   // A card renders its fields next to each other, so `Free` and `delivery on every
   // order` are one sentence to a shopper even though neither field carries one.
-  const acrossFields = checkWording(written.join(' '), phrases);
+  const acrossFields = checkWording(written.join(' '), phrases, allowed);
 
   return { supported: allSupported && acrossFields.supported, fields: results, acrossFields };
 }
