@@ -34,10 +34,18 @@ const PACKAGES = readdirSync(join(REPO_ROOT, 'packages'), { withFileTypes: true 
 const ALLOWED = /^(LICENSE|README\.md|package\.json|dist\/.+|src\/.+\.tsx?)$/;
 const IS_TEST_FILE = /\.(test|spec)\.|(^|\/)__(tests|mocks)__\//;
 
+// Every shape that pulls a sibling in at run time: `from`, a side-effect import,
+// `import()` and `require`. Anchored to the keyword because a comment naming a
+// package is not a dependency, and `src/index.ts` names its own package in one.
+// Single quotes only: prettier rewrites the others, so double-quoted source
+// never reaches a commit.
+const SIBLING_IMPORT = /(?:from|import|require)\s*\(?\s*'(@rudra-js\/[a-z-]+)'/g;
+
 interface Manifest {
   version: string;
   main: string;
   types: string;
+  dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   exports: Record<string, unknown>;
   files: string[];
@@ -155,17 +163,44 @@ describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
     expect(readManifest(packageName).exports['./package.json']).toBe('./package.json');
   });
 
-  it('declares a peer range on core that the published core satisfies', () => {
+  it('declares a range on every sibling that the published sibling satisfies', () => {
     const manifest = readManifest(packageName);
-    const range = manifest.peerDependencies?.['@rudra-js/core'];
-    if (!range) return;
+    const declared = {
+      ...manifest.dependencies,
+      ...manifest.peerDependencies,
+    };
 
-    // Inside the workspace this range is never evaluated — npm links
-    // node_modules/@rudra-js/core straight at packages/core, so a range naming
-    // a version that does not exist resolves anyway. A consumer installing both
+    // Inside the workspace these ranges are never evaluated — npm links
+    // node_modules/@rudra-js/* straight at packages/*, so a range naming a
+    // version that does not exist resolves anyway. A consumer installing both
     // gets ERESOLVE and nothing else in the pipeline sees it. release.yml
-    // publishes both packages from one tag, so lockstep is the contract.
-    expect(range).toBe(`^${readManifest('core').version}`);
+    // publishes every package from one tag, so lockstep is the contract.
+    for (const [name, range] of Object.entries(declared)) {
+      if (!name.startsWith('@rudra-js/')) continue;
+      expect(range, name).toBe(`^${readManifest(name.slice('@rudra-js/'.length)).version}`);
+    }
+  });
+
+  it('declares every sibling its own source imports', () => {
+    // The peer range above only guards siblings already named. A source file
+    // importing one that nothing declares resolves inside the workspace and
+    // fails for a consumer, which is the failure this catches.
+    const manifest = readManifest(packageName);
+    const declared = new Set([
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.peerDependencies ?? {}),
+    ]);
+
+    const directory = join(REPO_ROOT, 'packages', packageName, 'src');
+    const imported = new Set<string>();
+    for (const file of readdirSync(directory, { recursive: true, withFileTypes: true })) {
+      if (!file.isFile()) continue;
+      if (IS_TEST_FILE.test(file.name)) continue;
+      const source = readFileSync(join(file.parentPath, file.name), 'utf8');
+      for (const match of source.matchAll(SIBLING_IMPORT)) imported.add(match[1]!);
+    }
+
+    for (const name of imported) expect([...declared], name).toContain(name);
   });
 
   it('builds before it packs, so a tarball is never source without a build', () => {
@@ -173,6 +208,33 @@ describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
     // now ships a full `src/` tree, which looks populated while every entry
     // point points at nothing.
     expect(readManifest(packageName)).toMatchObject({ scripts: { prepack: 'npm run build' } });
+  });
+});
+
+describe('the sibling-import matcher', () => {
+  const found = (source: string) => {
+    SIBLING_IMPORT.lastIndex = 0;
+    const names: string[] = [];
+    for (const match of source.matchAll(SIBLING_IMPORT)) names.push(match[1]!);
+    return names;
+  };
+
+  it('reads every shape that pulls a sibling in at run time', () => {
+    expect(found("import { verify } from '@rudra-js/attested';")).toEqual(['@rudra-js/attested']);
+    expect(found("export { verify } from '@rudra-js/attested';")).toEqual(['@rudra-js/attested']);
+    expect(found("import '@rudra-js/attested';")).toEqual(['@rudra-js/attested']);
+    expect(found("const m = await import('@rudra-js/attested');")).toEqual(['@rudra-js/attested']);
+    expect(found("const m = require('@rudra-js/attested');")).toEqual(['@rudra-js/attested']);
+  });
+
+  it('leaves a package named in prose alone, including the file its own package owns', () => {
+    // `packages/core/src/index.ts` opens by naming @rudra-js/core, and core does
+    // not declare itself. Matching prose would fail this suite on that line.
+    expect(found(' * @rudra-js/core — the contracts and logic for one payload')).toEqual([]);
+    expect(found(' * The same class @rudra-js/attested strips in its own hidden.ts.')).toEqual([]);
+    expect(
+      found("throw new Error('objects must satisfy productSchema from @rudra-js/core');"),
+    ).toEqual([]);
   });
 });
 

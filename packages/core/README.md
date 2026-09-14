@@ -6,15 +6,27 @@ component specification.
 ## Install
 
 ```sh
-npm install @rudra-js/core zod@^4
+npm install @rudra-js/core @rudra-js/attested zod@^4
 ```
 
-`zod` is a peer dependency. The public API of this package _is_ zod schemas, so
-your app and the package have to resolve the same copy of zod. **zod 4.5 or later is
+Two peer dependencies, for two different reasons.
+
+`zod` is a peer because the public API of this package _is_ zod schemas, so your
+app and the package have to resolve the same copy of zod. **zod 4.5 or later is
 required**, which is what the peer range asks for. The schemas use zod 4 APIs,
 and installing into a zod 3 app fails with `ERESOLVE`, which isn't the most
 helpful error you'll ever read. The floor is 4.5 rather than 4.0 because 4.5
 changed how a nullable field is written into the tool schema we send the model.
+
+`@rudra-js/attested` is a peer for the opposite reason: none of its types cross
+this package's public surface, and you never have to import it. It's a peer so
+there is exactly one denylist in your tree. As a real dependency, an app that
+pins its own copy gets two — we checked, and npm 10.9.4 installs the app's
+version at the top and quietly nests ours under `@rudra-js/core` — and the two
+would then disagree about what counts as a claim. As a peer that same pin is an
+`ERESOLVE` you can see and fix. Pin nothing and the tree is identical either
+way: one copy, at the top. One tag publishes every `@rudra-js` package at one
+version, so the ranges here always move together.
 
 ## Running without a model
 
@@ -122,14 +134,74 @@ hero, a banner, a block title, the copy block, the reason under a product, and
 the words around the set. Text you supplied is never read this way. A product
 title, a category and a bundle `label` are your words, not the model's.
 
-We drop text that makes a claim we can't check. The check looks for money, a
-customer score, a delivery date and a count of what's left, and it leaves a
-specification alone even when that specification has a number in it. Spotting one
-isn't a guarantee, not the way checking a price against your catalog is.
+We drop text that makes a claim we can't check, in three passes. The first looks
+for money, a customer score, a delivery date and a count of what's left. The
+second asks whether every numeral in the sentence is one you supplied. The third
+is `@rudra-js/attested`'s phrase list, for claims with no number in them to
+check — "top pick", "customer favourite".
+
+That second pass changed what happens to a specification. "a comfort rating of
+-5C" used to be kept on the strength of the words around the number. It is kept
+now only when a `5` turns up in a `tag` or a `category` name you sent us — the
+number, not the string, so a tag reading `5-pocket` keeps it as surely as one
+reading `-5C comfort`. Those are the strings we hand the model and let it repeat.
+A `title` and a `rating` we also show it, and the prompt tells it never to
+restate either, so neither stands behind a number. Put your spec sheet in `tags`
+and the model can quote it; leave it out and a number in that field is one the
+model made up, and it goes.
+
+Which strings, exactly:
+
+- Only candidates we showed the model. Out of stock, or past the 60 we send,
+  means a product the model never saw, and its tags stand behind nothing.
+- The `currentCategory` on the request is not one of them. It's a string from
+  this request rather than a row of your catalog, and plenty of sites pass a URL
+  segment straight into it.
+- A `reason` or a `badge` sits under a named product, so it's read against that
+  product's own tags and category. Every other field reads all the candidates'
+  pooled.
+- A tag or category that is nothing but a number in exponent notation, and whose
+  exponent runs past a thousand, is dropped here. `1e2000000000` is twelve
+  characters that lay out into a run long enough to end the process, and
+  `@rudra-js/attested` is a peer dependency, so the copy you have installed may
+  be one that still tries. `@rudra-js/attested` draws its own line in the same
+  place but measures the laid-out run rather than the exponent, so a handful of
+  tags near the margin — `1e1000`, `1.5e1000`, `9999e998` — get past this rule
+  and then stand behind nothing on the other side of it. Nothing that wide is a
+  product fact either way.
+
+Two caveats worth saying out loud, because they're the shape of the check rather
+than bugs in it. Pooled means pooled: one product's `40 litre` tag stands behind
+"take 40 off" written in a headline about another. And nothing in the pass knows
+which quantity a tag was about, so a tag holding a weight stands behind a price
+with the same digits in it. It proves the digits came from you. It doesn't prove
+the sentence is true.
+
+The first and third passes are word lists, so spotting a claim isn't a
+guarantee, not the way checking a price against your catalog is. The second is a
+proof of something narrower than it sounds: every digit was one of yours. A
+number written as a word isn't a number to it, so "four and a half stars" is not
+a rating it can see — while a ½ or the K in "10K" is a numeral it can't read,
+which it drops rather than waves through.
+
+The model isn't told any of this. The prompt bans prices, ratings, discounts,
+delivery dates and stock levels, and says nothing about digits, so it can't tell
+`3-season` — a tag you sent, and fine — from `2 litres`, which is not. Whatever
+the over-rejection rate is on your catalog, nothing in the prompt is steering it
+down yet.
 
 Some fields can't be empty, like a headline or a banner's text. Those get emptied
 instead of nulled, so the block drops the way any block with no text drops. And
 an emptied page headline makes the whole generation unusable.
+
+That last one is the expensive edge of the digit check, so it's worth being
+concrete: if the model writes "Our 3 favourites for wet weather" and no candidate
+carries a 3, the headline empties, the generation is unusable, and the
+deterministic component renders — a model call paid for and thrown away. In
+cohort mode the spec is cached before reconciliation, so every cache hit for the
+rest of the TTL runs the same screen and reaches the same fallback. The reason a
+`reason` under a card is exempt is the same idea from the other side: in cohort
+mode we wrote that sentence, so reading it back would only ever cost us.
 
 For the set, the prompt also tells the model to write about the offer rather than
 the products in it, and never to say the set saves money or by how much. Pass a
@@ -264,7 +336,11 @@ reasons itself, so every one of them is screened, including one that happens to
 read the same as yours.
 
 Without a reason of your own, the basis is stated for you from the shopper's
-signals.
+signals — "More in Backpacks", "Goes with what is in your cart". Those are our
+words, not the model's, so in `cohort` mode they aren't screened either. They
+used to be, and a shop with a category called Clearance or Last Chance would
+have watched the phrase list delete the reason under every card while the
+deterministic component printed the same sentence untouched.
 
 ## What the model sees
 

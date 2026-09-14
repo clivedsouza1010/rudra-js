@@ -51,9 +51,11 @@
     "access": "public"
   },
   "peerDependencies": {
+    "@rudra-js/attested": "^0.4.0",
     "zod": "^4.5.0"
   },
   "devDependencies": {
+    "@rudra-js/attested": "0.4.0",
     "@types/node": "^26.4.1",
     "zod": "^4.5.4"
   }

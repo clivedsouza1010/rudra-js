@@ -155,13 +155,23 @@ export interface Span {
   end: number;
 }
 
-/** Both arguments must already be normalised. Spans index the text passed in. */
-// The word-gap rule only guards an ASCII edge, so `cheap` misses `cheapskate`
-// while a Japanese phrase — which has no word gaps to find — still matches.
-export function phraseSpans(text: string, phrase: string): Span[] {
-  // Matching runs with every space dropped, because 送料 無料 is 送料無料 to anyone
-  // and a space is free. `spots` carries each character back to where it really sat,
-  // so the word-gap guard still reads the neighbours the shopper sees.
+export interface Indexed {
+  /** The text as it was handed in, which is what spans index and the word gap reads. */
+  text: string;
+  /** The same characters with the gaps dropped, which is what matching runs against. */
+  haystack: string;
+  /** Where each character of `haystack` really sat in `text`. */
+  spots: number[];
+}
+
+/**
+ * Build this once and read every phrase off it. The text must already be normalised.
+ *
+ * Matching runs with every space dropped, because 送料 無料 is 送料無料 to anyone and a
+ * space is free. `spots` carries each character back to where it really sat, so the
+ * word-gap guard still reads the neighbours the shopper sees.
+ */
+export function indexPhrasing(text: string): Indexed {
   const tight: string[] = [];
   const spots: number[] = [];
   for (let index = 0; index < text.length; index += 1) {
@@ -172,13 +182,21 @@ export function phraseSpans(text: string, phrase: string): Span[] {
     spots.push(index);
   }
 
+  return { text, haystack: tight.join(''), spots };
+}
+
+/** Spans index the text the index was built from. The phrase must already be normalised. */
+// The word-gap rule only guards an ASCII edge, so `cheap` misses `cheapskate`
+// while a Japanese phrase — which has no word gaps to find — still matches.
+export function spansIn(indexed: Indexed, phrase: string): Span[] {
+  const { text, haystack, spots } = indexed;
+
   const spans: Span[] = [];
   const needle = phrase.replaceAll(' ', '').replaceAll('\n', '');
   if (needle.length === 0) return spans;
 
   const guardStart = ASCII_WORD.test(needle[0] ?? '');
   const guardEnd = ASCII_WORD.test(needle[needle.length - 1] ?? '');
-  const haystack = tight.join('');
 
   let from = 0;
   for (;;) {
@@ -197,6 +215,11 @@ export function phraseSpans(text: string, phrase: string): Span[] {
 
     from = at + 1;
   }
+}
+
+/** Both arguments must already be normalised. Spans index the text passed in. */
+export function phraseSpans(text: string, phrase: string): Span[] {
+  return spansIn(indexPhrasing(text), phrase);
 }
 
 export function phraseIn(text: string, phrase: string): boolean {

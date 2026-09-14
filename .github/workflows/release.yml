@@ -67,8 +67,10 @@ jobs:
       # publisher is configured from a package's settings page, which needs the
       # package to already exist, so a brand new name has no configuration to
       # read and fails auth. It goes first, where a failure costs nothing.
-      # Nothing depends on @rudra-js/attested and it depends on nothing, so
-      # moving it does not strand a half-installable registry.
+      # @rudra-js/attested depends on nothing, and core now declares it as a
+      # peer, so it has to land before core either way. Going first is both the
+      # cheap place for an auth failure and the only order an install can
+      # satisfy.
       #
       # Core leads the rest: @rudra-js/react and @rudra-js/anthropic both declare
       # it as a peer, so a registry that has either without core cannot satisfy

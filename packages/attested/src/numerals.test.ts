@@ -257,6 +257,16 @@ describe('supportedValues', () => {
     expect(supportedValues(['1e21 ohms'])).toEqual(new Set(['1', '21']));
   });
 
+  it('lays out a thousand digits and stands behind nothing past that', () => {
+    // A twelve-character fact must not become a digit run big enough to take the
+    // process down. Every finite JS number lays out inside a thousand digits — the
+    // widest is 5e-324, at 326 — and no shop sells anything wider.
+    expect(supportedValues(['1e999'])).toEqual(new Set([`1${'0'.repeat(999)}`]));
+    expect(supportedValues(['1e-1000'])).toEqual(new Set([`0.${'0'.repeat(999)}1`]));
+    expect(supportedValues(['1e1000'])).toEqual(new Set());
+    expect(supportedValues(['1e-1001'])).toEqual(new Set());
+  });
+
   it('takes a bigint exactly, which is the only way past 2^53', () => {
     expect(supportedValues([12345678901234567890n])).toEqual(new Set(['12345678901234567890']));
   });

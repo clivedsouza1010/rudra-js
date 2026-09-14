@@ -7,7 +7,7 @@ export function fitToShopper(
   spec: GeneratedSpec,
   picks: readonly ProductPick[],
   maxItems: number,
-  hostReasonSkus?: Set<string>,
+  ourReasons?: Map<string, string>,
 ): GeneratedSpec {
   // Picks are ordered best first. Every slot takes the next one.
   let next = 0;
@@ -25,7 +25,9 @@ export function fitToShopper(
       for (const item of block.items) {
         if (next >= limit) break; // shrink, never pad
         const chosen = picks[next]!;
-        if (chosen.reasonFromHost) hostReasonSkus?.add(chosen.product.sku);
+        // Every reason here is written by this library or handed to it by the
+        // shop. None of them is the model's, whatever the model wrote in this slot.
+        ourReasons?.set(chosen.product.sku, chosen.reason);
         items.push({
           sku: chosen.product.sku,
           basis: chosen.basis,

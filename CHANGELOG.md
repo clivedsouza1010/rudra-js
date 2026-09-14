@@ -10,6 +10,90 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- `@rudra-js/core` now screens every model-written string with
+  `@rudra-js/attested` as well as with its own `CLAIM_PATTERNS`, which is a new
+  required peer dependency. Three passes, in this order: core's patterns, which
+  still name one of `rating`, `price`, `discount`, `delivery` and `stock`;
+  attested's quantity layer, recorded as `unverifiable-claim:quantity:<field>`;
+  attested's wording layer, recorded as `unverifiable-claim:wording:<field>`.
+  Core's patterns answer first so every violation string an evaluation already
+  counts reads the same as before. All 41 patterns stay — measured over the 55
+  distinct strings the tests require to drop by kind, they catch all 55, where
+  attested's two layers together reach 38, so replacing them would have been a
+  downgrade. The extra pass costs what an extra pass costs: one `reconcileSpec`
+  against 0.4.0, median of nine batches of twenty, runs 0.021 ms to 0.215 ms on
+  digit-free copy over seven candidates, 0.032 ms to 0.244 ms digit-free at the
+  payload ceiling, and 0.022 ms to 0.967 ms with a digit in every field against
+  a 60-candidate spec sheet. That is 7.6x to 44x on a pass that was cheap to
+  begin with, and it runs next to a model call, not instead of one.
+- A specification with a number in it is no longer kept on the strength of the
+  words around the number. `"a comfort rating of -5C"` and
+  `"a waterproof rating of 20,000mm"` are kept when a `5` or a `20000` turns up
+  in a `tag` or a `category` on the candidates the prompt showed the model, and
+  dropped as `quantity` when it does not. The number, not the string: a tag
+  reading `5-pocket` keeps the first of those as surely as `-5C comfort` does.
+  Those are the strings the prompt hands the model and lets it repeat; a `title`
+  and a `rating` it is shown but told never to restate, so neither stands behind
+  a number. This reverses a documented judgement in `reconciliation.ts` and it
+  reclassifies 15 strings the test suite used to assert were kept. Put your spec
+  sheet in `tags` and the model can quote it. On a catalogue with no digit in any
+  tag or category — the example shop is one — the rule becomes "no digit may
+  appear", and an emptied headline makes the whole generation unusable, so one
+  digit there costs the model call.
+- The numbers that stand behind a sentence are narrower than the request. Only
+  candidates the prompt actually showed the model count: a product that is out
+  of stock or past the 60-candidate cap stands behind nothing. `currentCategory`
+  does not count at all — it is a string from the request rather than a row of
+  the catalogue, and a host that passes a URL segment into it would be handing
+  the fact list to whoever types the URL. A `reason` and a `badge` are read
+  against their own product's tags and category; every other field reads all the
+  candidates' pooled.
+- A `reason` this library wrote is exempt from the screen, not just one the host
+  supplied. In `cohort` mode `fitToShopper` replaces every item reason with the
+  host's own sentence or the selector's, so screening it was core reading back
+  its own copy — and losing, for any shop with a category called Clearance or
+  Last Chance, while the deterministic component printed the same sentence
+  unscreened. The fourth argument to `reconcileSpec` is now a
+  `ReadonlyMap<string, string>` of SKU to that sentence rather than a
+  `ReadonlySet<string>` of SKUs, and `ProductPick.reasonFromHost` is gone with
+  it.
+- Three more patterns, all closing a gap in a rule that was already there rather
+  than opening a new one. `rating` catches "number one seller", the words a model
+  reaches for when "best seller" is banned. `price` catches a currency sign with
+  no digit after it, because "$thirty-nine and it is yours" was walking past a
+  rule that asked for one, and catches "dollars" and "euros" spelled out —
+  "pounds" stays out of that one, since a pack weighs two of those.
+
+### Fixed
+
+- `@rudra-js/attested` laid a string fact out from its exponent without weighing
+  the run first, so a twelve-character catalogue tag took the process down.
+  `'1e2000000000'` threw a `RangeError`, and `'-2.5e400000000'` reached a heap
+  abort no caller can catch. An exponent that would run past a thousand digits
+  now stands behind no numeral at all — nothing a shop sells is that wide, and
+  every finite JavaScript number lays out inside it, the longest being `5e-324`
+  at 326 characters. Core screens every model-written string now, so a tag like
+  that reaches this code on any render. `@rudra-js/core` keeps such a tag off
+  the fact list as well, rather than relying on the fix: attested is a peer
+  dependency, so the copy a host has installed may still be one that tries.
+  Core draws its line on the exponent and attested on the laid-out run, so a
+  few tags at the margin — `1e1000`, `9999e998` — pass core's rule and then
+  stand behind nothing here. Nothing that wide is a product fact either way.
+- `@rudra-js/attested` did two things again on every `verify` call that it only
+  needed to do once: it re-read the whole fact list, and it rebuilt its index
+  over the text for each of the eighty-odd phrases it screens against. A fact
+  list is now read once per list rather than once per call, held against a copy
+  of what the list carried so a host that writes to its own array still gets a
+  fresh reading. Measured on one call, median of nine batches of twenty: handed
+  the same array again, as core does for the fields of one pass, 0.052 ms to
+  0.025 ms on a digit-free field, 0.251 ms to 0.016 ms against 420 facts and
+  2.245 ms to 0.022 ms against 4200; handed a new array every call, as core's
+  per-product `reason` and `badge` are, 0.045 ms to 0.018 ms, 0.251 ms to
+  0.231 ms and 2.224 ms to 2.300 ms. The second set is the index saving on its
+  own, and at 4200 facts the copy costs a shade more than it saves.
+
 ## [0.4.0] - 2026-09-13
 
 ### Added

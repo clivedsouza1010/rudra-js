@@ -21,10 +21,8 @@ export interface ProductPick {
   product: Product;
   /** Why this product, stated so reconciliation can check it. */
   basis: RecommendationBasis;
-  /** How the basis reads to a shopper. */
+  /** How the basis reads to a shopper. The host's own sentence when it wrote one. */
   reason: string;
-  /** True when `reason` is the host's own sentence from the candidate. */
-  reasonFromHost: boolean;
   /** Unnormalised. Only the ordering is meaningful. */
   score: number;
 }
@@ -164,7 +162,6 @@ export function selectProducts(
       product,
       basis,
       reason: product.reason ?? reason,
-      reasonFromHost: product.reason !== undefined,
       score,
     });
   }

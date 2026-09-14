@@ -189,7 +189,17 @@ export function numeralsIn(text: string): Numeral[] {
 /** A whole fact in exponent notation and nothing else, so expanding it swallows no prose. */
 const BARE_EXPONENT = /^[+-]?\d+(?:\.\d+)?[eE][+-]?\d+$/;
 
-/** `String(1e21)` is `1e+21`, which reads as the two numerals 1 and 21. Lay the same digits out in place. */
+/**
+ * The widest digit run a fact may lay out to. Every finite JS number fits — 5e-324 is
+ * the longest, at 326 characters — and nothing a shop sells is wider than that.
+ */
+const DIGIT_LIMIT = 1000;
+
+/**
+ * `String(1e21)` is `1e+21`, which reads as the two numerals 1 and 21. Lay the same digits
+ * out in place. Empty past the limit: `1e2000000000` is twelve characters and no product
+ * fact, and laying it out builds a run long enough to take the process down with it.
+ */
 function positional(written: string): string {
   const marker = written.search(/[eE]/);
   if (marker < 0) return written;
@@ -201,8 +211,14 @@ function positional(written: string): string {
   const digits = point < 0 ? body : body.slice(0, point) + body.slice(point + 1);
   const place = (point < 0 ? body.length : point) + power;
 
-  if (place <= 0) return `0.${'0'.repeat(-place)}${digits}`;
-  if (place >= digits.length) return `${digits}${'0'.repeat(place - digits.length)}`;
+  if (place <= 0) {
+    if (digits.length - place > DIGIT_LIMIT) return '';
+    return `0.${'0'.repeat(-place)}${digits}`;
+  }
+  if (place >= digits.length) {
+    if (place > DIGIT_LIMIT) return '';
+    return `${digits}${'0'.repeat(place - digits.length)}`;
+  }
   return `${digits.slice(0, place)}.${digits.slice(place)}`;
 }
 

@@ -227,10 +227,23 @@ function describeCandidate(product: Product): string {
  */
 const MAX_CANDIDATES = 60;
 
+/**
+ * The candidates the model is actually shown.
+ *
+ * An out-of-stock product is dropped during reconciliation whatever the model
+ * does with it, so offering one only costs the shopper a slot.
+ *
+ * Exported because reconciliation checks the numerals the model writes against
+ * the strings on this list, and a candidate it was never shown cannot be where
+ * one came from. Two copies of "what the model saw" would drift, and the pair
+ * that drifted would be the prompt and the screen reading it back.
+ */
+export function offeredCandidates(input: TrackingInput): Product[] {
+  return input.candidates.filter((product) => product.isInStock).slice(0, MAX_CANDIDATES);
+}
+
 export function buildPrompt(input: TrackingInput, digest: SignalDigest): PromptPair {
-  // An out-of-stock product is dropped during reconciliation whatever the model
-  // does with it, so offering one only costs the shopper a slot.
-  const offered = input.candidates.filter((product) => product.isInStock).slice(0, MAX_CANDIDATES);
+  const offered = offeredCandidates(input);
 
   // The markers are OWASP's labelled-block recommendation. They are safe as
   // boundaries because every value between them is quoted and stripped of

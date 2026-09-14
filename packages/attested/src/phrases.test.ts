@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BANNED_PHRASES, normalisePhrasing, phraseIn, phraseSpans } from './phrases.js';
+import {
+  BANNED_PHRASES,
+  indexPhrasing,
+  normalisePhrasing,
+  phraseIn,
+  phraseSpans,
+  spansIn,
+} from './phrases.js';
 
 describe('normalisePhrasing', () => {
   it('lowercases', () => {
@@ -168,6 +175,16 @@ describe('phraseSpans', () => {
 
   it('finds nothing for an empty phrase', () => {
     expect(phraseSpans('anything at all', '')).toEqual([]);
+  });
+});
+
+describe('indexPhrasing', () => {
+  it('reads every phrase off one index, each against the offsets it was built from', () => {
+    const indexed = indexPhrasing('free delivery. a sale, and the last few pairs');
+    expect(spansIn(indexed, 'free delivery')).toEqual([{ start: 0, end: 12 }]);
+    expect(spansIn(indexed, 'sale')).toEqual([{ start: 17, end: 20 }]);
+    expect(spansIn(indexed, 'last few')).toEqual([{ start: 31, end: 38 }]);
+    expect(spansIn(indexed, 'free shipping')).toEqual([]);
   });
 });
 

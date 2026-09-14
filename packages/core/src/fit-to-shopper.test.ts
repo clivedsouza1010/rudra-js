@@ -15,7 +15,6 @@ const pick = (sku: string, basis: ProductPick['basis'] = 'popular'): ProductPick
   },
   basis,
   reason: `chosen because ${basis}`,
-  reasonFromHost: false,
   score: 1,
 });
 
@@ -144,11 +143,14 @@ describe('fitting a shared component to one shopper', () => {
   });
 });
 
-describe('reporting which reasons came from the shop', () => {
-  it('names the SKU it placed a host reason on, and only that one', () => {
-    const hostReasonSkus = new Set<string>();
+describe('reporting which reasons this library wrote', () => {
+  // Every reason it places is either the shop's own sentence or the selector's,
+  // so none of them is the model's and none of them wants screening. Reporting
+  // only the shop's half left the screen reading core's own copy.
+  it('names every reason it placed, with the words it placed', () => {
+    const ourReasons = new Map<string, string>();
     const picks: ProductPick[] = [
-      { ...pick('HOST-1'), reason: 'Bought together with your boots', reasonFromHost: true },
+      { ...pick('HOST-1'), reason: 'Bought together with your boots' },
       pick('DERIVED-1'),
     ];
     const cohortSpec: GeneratedSpec = {
@@ -166,8 +168,11 @@ describe('reporting which reasons came from the shop', () => {
       ],
     };
 
-    fitToShopper(cohortSpec, picks, 4, hostReasonSkus);
+    fitToShopper(cohortSpec, picks, 4, ourReasons);
 
-    expect([...hostReasonSkus]).toEqual(['HOST-1']);
+    expect([...ourReasons]).toEqual([
+      ['HOST-1', 'Bought together with your boots'],
+      ['DERIVED-1', 'chosen because popular'],
+    ]);
   });
 });
