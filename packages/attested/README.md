@@ -222,9 +222,12 @@ characters.
 
 Past 2^53 a number has lost its exact digits before it ever reaches here —
 `JSON.parse` turns `9007199254740993` into `...92` — so hand a long id over as a
-bigint or as a string. A value that is none of the three stands behind no
-numeral rather than throwing, so one null field does not take the whole call
-down.
+bigint or as a string. A null or undefined field stands behind no numeral rather
+than throwing, so one empty field does not take the whole call down. Anything
+else is read through `String()` and mints whatever digits that produces, which
+for a `Date` is the day, the year and every digit of the clock — so a `listedAt`
+handed straight through is the hazard named under **What it cannot catch**, not
+an ignored field.
 
 Flat rather than typed (money, count, rating, date) because typing only helps if
 the extractor can classify a token in the text, and it cannot. The `2` in

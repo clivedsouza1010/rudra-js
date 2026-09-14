@@ -233,9 +233,10 @@ list, and not an `Accept-Language` header.
 By default one generated component is shared between shoppers who look alike, and
 each shopper's own products are filled in per request. A cohort is the shopper's
 segment, the surface and slot, the locale, the item count, whether they're a
-first-time visitor, and the category they lean towards. Everything that makes a
-person an individual stays out of it: who they are, what they liked, viewed or
-searched for. That's what lets many page views reuse one call.
+first-time visitor, the category being browsed, and the category they lean
+towards. Everything that makes a person an individual stays out of it: who they
+are, what they liked, viewed or searched for. That's what lets many page views
+reuse one call.
 
 The candidate list is part of the cohort too, since the model is shown those
 products and writes about them. In most shops candidates come from the page, so
