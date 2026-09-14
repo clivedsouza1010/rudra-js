@@ -213,9 +213,12 @@ Any other string is read exactly as you typed it, so `'SKU AX-220e5'` still
 mints 220 and 5.
 
 An exponent that would lay out past a thousand digits stands behind no numeral at
-all. `'1e1000'` is no product fact under any reading, and writing the run out
-would cost more memory than the process has. Every finite JavaScript number fits
-well inside the limit — the longest is `5e-324`, at 326 characters.
+all, and the length is weighed before any of it is written. `'1e1000'` is no
+product fact under any reading, so it is refused at the limit rather than laid
+out. The limit is what stops the far end: `'1e2000000000'` is twelve characters,
+and writing its run out would cost more memory than the process has. Every finite
+JavaScript number fits well inside the limit — the longest is `5e-324`, at 326
+characters.
 
 Past 2^53 a number has lost its exact digits before it ever reaches here —
 `JSON.parse` turns `9007199254740993` into `...92` — so hand a long id over as a
