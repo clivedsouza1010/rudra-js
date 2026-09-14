@@ -31,44 +31,24 @@ import { RudraComponent } from '@rudra-js/react';
 /**
  * Sentences in the documentation, held to the code they describe.
  *
- * Each row carries a verbatim fragment of a sentence and an assertion about the
- * thing that sentence describes, and both are checked. Edit the sentence and
- * the fragment half fails, so a reworded promise has to be re-verified rather
- * than quietly restated. Change the code and the assertion half fails. Neither
- * side can drift alone.
+ * A row quotes a sentence and asserts what it states. Reword the sentence and
+ * the quote fails; change the code and the assertion fails.
  *
- * WHAT THIS CANNOT CHECK, and it is most of what goes wrong here. It pins that
- * a sentence is true. It cannot pin that a sentence gives the right reason for
- * something true. All three of the drift bugs this file exists because of were
- * right behaviour with a wrong reason attached — a JSDoc calling a fact list
- * "every candidate's numbers" when it held only the offered ones, a comment
- * justifying a cache with a `readonly` that is gone at run time, a README
- * saying `'1e1000'` was refused for memory when it is a kilobyte and refused by
- * a length check. Not one of them would have failed anything below. Neither
- * would a shipped figure that matches no revision of the table it describes,
- * which a review also found here. Read a green run as "these sentences are not
- * lying about behaviour", and nothing wider.
+ * Read a green run as "these sentences are not lying about behaviour", and
+ * nothing wider. It cannot tell whether a sentence gives the right reason, a
+ * false sentence written beside a pinned one still passes, and prose nobody
+ * wrote a row for is watched by nothing.
  *
- * Four more things it does not reach. A universal — "every numeral in the text
- * is one you supplied" quantifies over all texts and all fact sets, and the
- * rows below pin instances of it. A judgement — "our adapters are thin", "the
- * loss is small". A promise about the future — "entries are added as they are
- * found". And anything outside this process: whether a host's HTML sink decodes
- * what was checked, whether a font draws U+3164 as a blank, whether the vendor's
- * model really reasons by default, whether a maintainer ever published by hand.
- *
- * Fragments are matched against whitespace-flattened text, because prettier
- * hard-wraps this prose at 100 columns and most quotable sentences cross a line
- * break. Store them flattened, and paste them out of the file rather than
- * retyping them. One line per fragment; each one occurs exactly once in its
- * file.
- *
- * Adding a row is meant to be cheap: doc path, the fragment, the assertion.
+ * Fragments match against whitespace-flattened text, so paste one out of the
+ * doc rather than retyping it. Quote a whole sentence: half a clause leaves the
+ * other half free to be rewritten.
  */
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (path: string): string => readFileSync(join(REPO_ROOT, path), 'utf8');
 const flat = (text: string): string => text.replace(/\s+/g, ' ');
+
+const REPO_VERSION = (JSON.parse(read('package.json')) as { version: string }).version;
 
 const README = read('README.md');
 const CORE_README = read('packages/core/README.md');
@@ -188,12 +168,63 @@ function renderAll(options: RenderOptions = {}): string {
   );
 }
 
+/**
+ * Where a literal a slice depends on sits, or a failure that names the literal.
+ *
+ * Without this a moved heading makes `slice` scan the wrong span and the row
+ * fails as though the code had changed.
+ */
+function anchor(text: string, doc: string, marker: string): number {
+  const at = text.indexOf(marker);
+  expect(
+    at,
+    `THE DOC MOVED, NOT THE CODE — ignore this test's title.\n` +
+      `${doc} no longer holds the line this row slices from:\n  ${marker}\n` +
+      "The row's own ‘still says it’ failure names the claim. Fix the doc, " +
+      'or update the marker in tests/doc-claims.test.ts.',
+  ).toBeGreaterThan(-1);
+  return at;
+}
+
+/** The rows of the markdown table that starts right after `marker`. */
+function tableAfter(text: string, doc: string, marker: string): string[] {
+  const rows: string[] = [];
+  let started = false;
+  for (const line of text.slice(anchor(text, doc, marker)).split('\n')) {
+    if (line.startsWith('|')) {
+      started = true;
+      rows.push(line);
+    } else if (started) break;
+  }
+  expect(rows.length, `${doc}: no table follows ${marker}`).toBeGreaterThan(2);
+  return rows.slice(2);
+}
+
+/**
+ * A tripwire on source text, for a value no fast test can reach.
+ *
+ * The failure prints the pattern rather than the file, and says which half of
+ * the row moved — a refactor that keeps the behaviour trips this too.
+ */
+function mentions(source: string, path: string, pattern: RegExp): void {
+  expect(
+    pattern.test(source),
+    `${path} no longer matches:\n  ${pattern}\n` +
+      'This pins source text, not behaviour, because the value it names is out ' +
+      'of a fast test’s reach. If you refactored and the documented value ' +
+      'still holds, update the pattern. If the value moved, fix the doc.',
+  ).toBe(true);
+}
+
+const CLASS_TABLE = "Every element we emit carries a class. Here's all of them:";
+
 /** The classes the react README's own table lists. */
 function documentedClasses(): Set<string> {
-  const from = REACT_README.indexOf("Every element we emit carries a class. Here's all of them:");
-  const section = REACT_README.slice(from, REACT_README.indexOf('\n### Attributes'));
   const names = new Set<string>();
-  for (const match of section.matchAll(/`\.([A-Za-z0-9_-]+)`/g)) names.add(match[1]!);
+  // Table rows only. Styling advice below it names host selectors we do not emit.
+  for (const row of tableAfter(REACT_README, 'packages/react/README.md', CLASS_TABLE)) {
+    for (const match of row.matchAll(/`\.([A-Za-z0-9_-]+)`/g)) names.add(match[1]!);
+  }
   return names;
 }
 
@@ -201,6 +232,15 @@ const gridItems = (served: ComponentSpec): ProductReference[] => {
   const block = served.blocks[0]!;
   return block.kind === 'grid' ? block.items : [];
 };
+
+/** A number written out positionally, which is what the quantity layer reads. */
+function laidOut(value: number): string {
+  const [mantissa, exponent] = value.toExponential().split('e');
+  const digits = mantissa!.replace('.', '');
+  const shift = Number(exponent);
+  if (shift < 0) return `0.${'0'.repeat(-shift - 1)}${digits}`;
+  return digits.padEnd(shift + 1, '0');
+}
 
 const caughtIn = (text: string, allowedPhrases: string[] = []): string[] =>
   verify(text, { values: [], allowedPhrases }).wording.findings.map((finding) => finding.token);
@@ -343,6 +383,101 @@ const CLAIMS: Claim[] = [
   },
   {
     doc: 'README.md',
+    says: 'a claim on neither word list, with no digit in it, walks past all three passes',
+    fragments: [
+      'Two of the three are word lists, so a rewording that sits on neither gets through, and the digit check reads digits, so a number spelled out in words isn\'t a number to it. "Four and a half stars from other hikers" walks past all three.',
+    ],
+    elsewhere: [
+      {
+        doc: 'SECURITY.md',
+        fragment:
+          'The digit check reads digit characters, so "four and a half stars from hikers" is not a number to it',
+      },
+    ],
+    check() {
+      const input = baseInput();
+      const digest = buildDigest(input);
+      const walks = 'Four and a half stars from other hikers';
+
+      const served = reconcileSpec(
+        spec([gridSpec().blocks[0]!], { headline: walks }),
+        input,
+        digest,
+      );
+      expect(served.spec.headline, 'the rating claim was dropped after all').toBe(walks);
+      expect(served.violations).toEqual([]);
+      expect(verify(walks, { values: [] }).supported).toBe(true);
+      expect(verify(walks, { values: [] }).quantity.checked, 'a numeral was found in it').toBe(0);
+
+      // The control: the same claim with a digit in it, which all three do bite.
+      const rated = reconcileSpec(
+        spec([gridSpec().blocks[0]!], { headline: 'Rated 4.8 by customers' }),
+        input,
+        digest,
+      );
+      expect(rated.spec.headline).toBe('');
+      expect(rated.violations).toContain('unverifiable-claim:rating:headline');
+    },
+  },
+  {
+    doc: 'README.md',
+    says: 'cohort mode shares a generation, and per-shopper mode bills each shopper',
+    fragments: [
+      "It's efficient too: on our 500-shopper benchmark the default mode makes 460 model calls per 1,000 page views, compared to 1,000 if you generated for every shopper.",
+    ],
+    async check() {
+      // 460 is bench/'s number, off a cold 500-shopper pass this suite is far
+      // too fast to repeat, and it is not re-derived here. What is checked is
+      // the shape the figure comes out of.
+      const count = async (generation: 'cohort' | 'per-shopper'): Promise<number> => {
+        let calls = 0;
+        const generator = createComponentGenerator({
+          provider: {
+            name: 'fake',
+            model: 'fake',
+            generate: () => {
+              calls += 1;
+              return Promise.resolve({ spec: gridSpec() });
+            },
+          },
+          generation,
+          modelTimeoutMs: 10_000,
+        });
+        const view = (id: string) =>
+          generator.generate(
+            baseInput({ user: { id }, context: { surface: 'pdp', currentCategory: 'Cookware' } }),
+          );
+        await view('one');
+        await view('two');
+        await view('three');
+        return calls;
+      };
+
+      expect(await count('cohort'), 'three lookalike shoppers were three generations').toBe(1);
+      expect(await count('per-shopper'), 'a per-shopper run shared a generation').toBe(3);
+    },
+  },
+  {
+    doc: 'README.md',
+    says: 'the packages are still 0.x, so a minor release is allowed to break a contract',
+    fragments: [
+      'Just keep in mind that the public contracts might still shift between minor versions before we hit `1.0`, and the changelog will always tell you when they do.',
+    ],
+    check() {
+      // Semver lets a 0.x minor break, which is what makes "might" the honest
+      // word. Cutting 1.0 fails this row, and sends whoever cuts it back to the
+      // sentence.
+      expect(REPO_VERSION, 'the repo is past 1.0').toMatch(/^0\./);
+      for (const name of readdirSync(join(REPO_ROOT, 'packages'))) {
+        const { version } = JSON.parse(read(`packages/${name}/package.json`)) as {
+          version: string;
+        };
+        expect(version, `${name} is past 1.0`).toMatch(/^0\./);
+      }
+    },
+  },
+  {
+    doc: 'README.md',
     says: 'the block needs no client JavaScript, so a crawler reads it',
     fragments: [
       'Because the block is in the initial HTML response and needs zero client-side JavaScript, a crawler that never runs JavaScript still reads it.',
@@ -368,12 +503,15 @@ const CLAIMS: Claim[] = [
   {
     doc: 'README.md',
     says: 'the status line names the version the repo is on',
-    fragments: ['**Status: `0.4.0`, early.**'],
+    // Built from package.json, not typed out: a release bumps both together and
+    // must not have to edit this file as well.
+    fragments: [`**Status: \`${REPO_VERSION}\`, early.**`],
     check() {
-      const { version } = JSON.parse(read('package.json')) as { version: string };
       const named = /\*\*Status: `([^`]+)`, early\.\*\*/.exec(README);
       expect(named, 'the status line no longer names a version').not.toBeNull();
-      expect(named![1], 'the status line names a version the repo has moved past').toBe(version);
+      expect(named![1], 'the status line names a version the repo has moved past').toBe(
+        REPO_VERSION,
+      );
     },
   },
   {
@@ -428,10 +566,11 @@ const CLAIMS: Claim[] = [
       // vendor. It pins that the mode set is {replay, record}, that replay is the
       // default, and that the billed branch is gated on `record` — not that
       // nothing else in the shop ever spends.
-      const context = read('examples/shop/src/shop-context.ts');
-      expect(context).toContain("const mode = process.env['RUDRA_SHOP_MODE'] || 'replay'");
-      expect(context).toContain("if (mode !== 'replay' && mode !== 'record')");
-      expect(context).toContain("if (mode === 'record')");
+      const path = 'examples/shop/src/shop-context.ts';
+      const context = read(path);
+      mentions(context, path, /RUDRA_SHOP_MODE'\] \|\| 'replay'/);
+      mentions(context, path, /mode !== 'replay' && mode !== 'record'/);
+      mentions(context, path, /mode === 'record'/);
     },
   },
   {
@@ -465,7 +604,9 @@ const CLAIMS: Claim[] = [
         };
         expect(manifest.engines.node, `${name} engines.node`).toBe('>=22.12.0');
       }
-      expect(read('.github/workflows/ci.yml')).toContain("node: ['22.12.0', '22']");
+      const ci = read('.github/workflows/ci.yml');
+      mentions(ci, '.github/workflows/ci.yml', /node: \[[^\]]*'22\.12\.0'/);
+      mentions(ci, '.github/workflows/ci.yml', /node: \[[^\]]*'22'/);
     },
   },
 
@@ -620,10 +761,17 @@ const CLAIMS: Claim[] = [
         }
       }
 
-      const kinds = [...RECONCILIATION_SRC.matchAll(/^ {4}kind: '(\w+)',$/gm)].map(
-        (match) => match[1]!,
-      );
-      expect(kinds.toSorted()).toEqual(['delivery', 'discount', 'price', 'rating', 'stock']);
+      const path = 'packages/core/src/reconciliation.ts';
+      const from = anchor(RECONCILIATION_SRC, path, 'const CLAIM_PATTERNS');
+      const list = RECONCILIATION_SRC.slice(from, RECONCILIATION_SRC.indexOf('\n];', from));
+      const kinds = [...list.matchAll(/kind: '(\w+)'/g)].map((match) => match[1]!);
+      expect(kinds.toSorted(), `the claim kinds in ${path}`).toEqual([
+        'delivery',
+        'discount',
+        'price',
+        'rating',
+        'stock',
+      ]);
 
       const long = reconcileSpec(spec([], { headline: 'word '.repeat(200) }), input, digest);
       expect(long.spec.headline.length).toBeLessThanOrEqual(90);
@@ -864,6 +1012,88 @@ const CLAIMS: Claim[] = [
   },
   {
     doc: 'SECURITY.md',
+    says: 'a product it cannot place, it can still name in prose',
+    fragments: [
+      "it cannot **place** a product the shop didn't supply, because every SKU is checked against the shop's own list. It can still write a product name into prose. Nothing prevents that.",
+    ],
+    check() {
+      const input = baseInput();
+      const digest = buildDigest(input);
+      const name = 'the Acme Trailhead Tent';
+
+      // Named as a card: refused.
+      const placed = reconcileSpec(
+        spec([{ kind: 'grid', title: null, columns: 2, items: [reference('ACME-TENT')] }]),
+        input,
+        digest,
+      );
+      expect(placed.violations).toContain('unknown-sku:ACME-TENT');
+
+      // Named in prose: rendered, exactly as written. This is the disclosure,
+      // and it has to keep failing for the sentence to stay honest.
+      const written = reconcileSpec(
+        spec([gridSpec().blocks[0]!], { headline: `Better than ${name}` }),
+        input,
+        digest,
+      );
+      expect(written.spec.headline).toBe(`Better than ${name}`);
+      expect(written.violations).toEqual([]);
+      expect(written.isUsable).toBe(true);
+    },
+  },
+  {
+    doc: 'SECURITY.md',
+    says: 'the digit check stands on the candidates the model saw, not on all you sent',
+    fragments: [
+      'The facts behind the digit check are every category and tag on the candidates we showed the model. A `reason` or a `badge` is read against its own product\'s; everything else reads all of them pooled, so one product\'s "40 litre" tag backs "take 40 off" in a headline.',
+    ],
+    elsewhere: [
+      {
+        doc: 'packages/core/README.md',
+        fragment:
+          '- Only candidates we showed the model. Out of stock, or past the 60 we send, means a product the model never saw, and its tags stand behind nothing.',
+      },
+      {
+        doc: 'packages/core/README.md',
+        fragment:
+          "- A `reason` or a `badge` sits under a named product, so it's read against that product's own tags and category. Every other field reads all the candidates' pooled.",
+      },
+    ],
+    check() {
+      const served = (isInStock: boolean, generated: GeneratedSpec) => {
+        const input = parseTrackingInput({
+          user: { id: 'u' },
+          context: { surface: 'pdp' },
+          candidates: [product('A-1'), product('A-2', { tags: ['40 litre'], isInStock })],
+        });
+        return reconcileSpec(generated, input, buildDigest(input));
+      };
+      const headline = spec([gridSpec().blocks[0]!], { headline: 'Take 40 off' });
+
+      // Pooled, so another product's tag backs the number in a headline.
+      const shown = served(true, headline);
+      expect(shown.spec.headline).toBe('Take 40 off');
+      expect(shown.violations).toEqual([]);
+
+      // Out of stock is a product the model never saw, so its tag is not a fact.
+      const hidden = served(false, headline);
+      expect(hidden.spec.headline).toBe('');
+      expect(hidden.violations).toContain('unverifiable-claim:quantity:headline');
+
+      // A badge reads its own product's facts, not the pool.
+      const badge = spec([
+        {
+          kind: 'grid',
+          title: 'For you',
+          columns: 2,
+          items: [reference('A-1', { badge: 'Pick 40' })],
+        },
+      ]);
+      expect(served(true, badge).violations).toContain('unverifiable-claim:quantity:badge:A-1');
+    },
+  },
+  {
+    doc: 'SECURITY.md',
     says: 'the model gets one tool, and it is how it answers',
     fragments: [
       "The model gets exactly one tool, and it's how it hands back its answer: a schema to fill in. It has",
@@ -904,7 +1134,7 @@ const CLAIMS: Claim[] = [
     doc: 'packages/core/README.md',
     says: 'the shopper, their timestamps, prices and interaction detail stay out of the prompt',
     fragments: [
-      '- `user.id`',
+      '### Left out of both - `user.id` - every timestamp (`at`), which we use to sort signals and then drop',
       '- `interaction.value` and `interaction.meta`. The model is told which kinds of interaction happened and how often, and no more',
     ],
     check() {
@@ -987,15 +1217,64 @@ const CLAIMS: Claim[] = [
   },
   {
     doc: 'packages/core/README.md',
+    says: 'the browsed category is not a fact, so a URL segment cannot mint a number',
+    fragments: [
+      "- The `currentCategory` on the request is not one of them. It's a string from this request rather than a row of your catalog, and plenty of sites pass a URL segment straight into it.",
+    ],
+    check() {
+      const draft = (currentCategory: string) => ({
+        user: { id: 'u' },
+        context: { surface: 'pdp', currentCategory },
+        candidates: [product('A-1', { category: 'Cookware' })],
+      });
+
+      // The same digits, once in a candidate's category and once in the
+      // request's, so only where the string came from separates the two.
+      const fromCatalog = parseTrackingInput({
+        ...draft('Cookware'),
+        candidates: [product('A-1', { category: '40 litre packs' })],
+      });
+      const fromUrl = parseTrackingInput(draft('40 litre packs'));
+      const headline = spec([gridSpec().blocks[0]!], { headline: 'Take 40 off' });
+
+      expect(
+        reconcileSpec(headline, fromCatalog, buildDigest(fromCatalog)).spec.headline,
+        'a category on a candidate stopped backing a numeral',
+      ).toBe('Take 40 off');
+      expect(
+        reconcileSpec(headline, fromUrl, buildDigest(fromUrl)).violations,
+        'the browsed category backed a numeral',
+      ).toContain('unverifiable-claim:quantity:headline');
+    },
+  },
+  {
+    doc: 'packages/core/README.md',
+    says: 'attested is a peer, so a tree holds one denylist',
+    fragments: [
+      "`@rudra-js/attested` is a peer for the opposite reason: none of its types cross this package's public surface, and you never have to import it. It's a peer so there is exactly one denylist in your tree.",
+    ],
+    check() {
+      const manifest = JSON.parse(read('packages/core/package.json')) as {
+        dependencies?: Record<string, string>;
+        peerDependencies: Record<string, string>;
+      };
+      expect(manifest.peerDependencies['@rudra-js/attested']).toBeDefined();
+      expect(manifest.dependencies?.['@rudra-js/attested']).toBeUndefined();
+    },
+  },
+  {
+    doc: 'packages/core/README.md',
     says: 'the limits table is FIELD_LIMITS',
     fragments: ['| `signalsPerCategory` | 500 | each array under `signals` |'],
     check() {
       const documented = new Map<string, number>();
-      const table = CORE_README.slice(CORE_README.indexOf('| `identifier`'));
-      for (const line of table.split('\n')) {
+      for (const line of tableAfter(CORE_README, 'packages/core/README.md', '| Limit ')) {
         const row = /^\| `(\w+)`\s+\| (\d+)\s+\|/.exec(line);
-        if (!row) break;
-        documented.set(row[1]!, Number(row[2]));
+        expect(
+          row,
+          `a row of the limits table is not \`name\` | number:\n  ${line}`,
+        ).not.toBeNull();
+        documented.set(row![1]!, Number(row![2]));
       }
       expect(Object.fromEntries(documented)).toEqual({ ...FIELD_LIMITS });
     },
@@ -1007,14 +1286,11 @@ const CLAIMS: Claim[] = [
       '| `modelTimeoutMs` | How long the model gets. Past that, we abort the request and render the deterministic one. | `1500` |',
     ],
     check() {
-      const section = CORE_README.slice(
-        CORE_README.indexOf('## Options'),
-        CORE_README.indexOf('## `tracking-input`'),
-      );
       const documented = new Map<string, string>();
-      for (const line of section.split('\n')) {
+      for (const line of tableAfter(CORE_README, 'packages/core/README.md', '| Option ')) {
         const row = /^\| `(\w+)`\s+\|.*\|\s*(`[^`]+`|none)\s*\|$/.exec(line);
-        if (row) documented.set(row[1]!, row[2]!);
+        expect(row, `a row of the options table has no default in it:\n  ${line}`).not.toBeNull();
+        documented.set(row![1]!, row![2]!);
       }
 
       // Read out of the source: two of the seven are timeouts no fast test can
@@ -1024,7 +1300,13 @@ const CLAIMS: Claim[] = [
         if (match[1] !== match[2]) continue;
         actual.set(match[1]!, `\`${match[3]!.replace(/_/g, '')}\``);
       }
-      expect(GENERATOR_SRC).toContain('if (!options.onEvent) return;');
+      expect(
+        actual.size,
+        'component-generator.ts no longer writes its defaults as `const x = options.x ?? y;`, ' +
+          'so this row read none of them. The table may still be right: re-read the source, ' +
+          'then update the pattern in tests/doc-claims.test.ts.',
+      ).toBeGreaterThan(3);
+      mentions(GENERATOR_SRC, 'packages/core/src/component-generator.ts', /!options\.onEvent/);
       actual.set('onEvent', 'none');
 
       expect([...documented.keys()].toSorted()).toEqual([...actual.keys()].toSorted());
@@ -1036,7 +1318,9 @@ const CLAIMS: Claim[] = [
   {
     doc: 'packages/core/README.md',
     says: 'at most 60 in-stock products go to the model, in the order you sent them',
-    fragments: ['and at most 60 products go, in the order you supplied them.'],
+    fragments: [
+      'The candidate list is trimmed on the way out. An out-of-stock product is dropped, and at most 60 products go, in the order you supplied them.',
+    ],
     check() {
       const candidates = Array.from({ length: 70 }, (_, index) =>
         product(`S-${index}`, { title: `Product ${index}`, isInStock: index !== 3 }),
@@ -1063,8 +1347,7 @@ const CLAIMS: Claim[] = [
     doc: 'packages/core/README.md',
     says: 'the memory cache holds an entry a minute, and evicts the one read longest ago',
     fragments: [
-      'for `ttlMs`, 60,000 milliseconds by default, so one minute. It holds up to',
-      "Once it's full, the entry read longest ago is the first to go.",
+      "for `ttlMs`, 60,000 milliseconds by default, so one minute. It holds up to `maxEntries`, 10,000 by default. Once it's full, the entry read longest ago is the first to go.",
     ],
     async check() {
       let clock = 0;
@@ -1086,8 +1369,17 @@ const CLAIMS: Claim[] = [
       expect(await small.get('a')).toEqual(entry);
       expect(await small.get('c')).toEqual(entry);
 
-      // Reaching 10,000 behaviourally would mean writing ten thousand entries.
-      expect(SPEC_CACHE_SRC).toContain('options.maxEntries ?? 10_000');
+      // The default ceiling, written out rather than read off the source, so a
+      // refactor that keeps 10,000 does not fail this.
+      const full = createMemorySpecCache({ now: () => 0 });
+      // Insertion order comes from the calls, not the awaits: the memory
+      // store's `set` has no await in it.
+      const writes: Promise<void>[] = [];
+      for (let index = 0; index < 10_000; index += 1) writes.push(full.set(`k${index}`, entry));
+      await Promise.all(writes);
+      expect(await full.get('k0'), 'the cache evicted before 10,000 entries').toEqual(entry);
+      await full.set('k10000', entry);
+      expect(await full.get('k1'), 'the cache held more than 10,000 entries').toBeUndefined();
     },
   },
   {
@@ -1202,7 +1494,10 @@ const CLAIMS: Claim[] = [
       // Driving four branches proves there are at least four. Counting the
       // literals proves there are no more.
       expect(headlines.size).toBe(4);
-      expect([...FALLBACK_SRC.matchAll(/headline: '/g)]).toHaveLength(4);
+      expect(
+        [...FALLBACK_SRC.matchAll(/headline: '/g)].length,
+        'fallback-component.ts writes a number of headline literals the README does not say',
+      ).toBe(4);
 
       const outOfStock = await built({ candidates: [product('A-1', { isInStock: false })] });
       expect(outOfStock.blocks).toEqual([]);
@@ -1299,7 +1594,7 @@ const CLAIMS: Claim[] = [
   {
     doc: 'packages/react/README.md',
     says: 'every class it emits is in the table, and nothing else is',
-    fragments: ["Every element we emit carries a class. Here's all of them:"],
+    fragments: [CLASS_TABLE],
     check() {
       const emitted = new Set<string>();
       for (const match of renderAll({ hasDiagnostics: true }).matchAll(/class="([^"]+)"/g)) {
@@ -1493,8 +1788,9 @@ const CLAIMS: Claim[] = [
           );
         }
       }
-      // Without this the loop passes by matching nothing.
-      expect(found).toBe(3);
+      // Without this the loop passes by matching nothing. A ceiling would fail
+      // on an added link that resolves perfectly well.
+      expect(found, 'no file links into the core README any more').toBeGreaterThanOrEqual(3);
     },
   },
 
@@ -1598,7 +1894,11 @@ const CLAIMS: Claim[] = [
     ],
     check() {
       // A cross-package number, and nothing else in the repo connects the two.
-      expect(GENERATOR_SRC).toContain('options.modelTimeoutMs ?? 1_500');
+      mentions(
+        GENERATOR_SRC,
+        'packages/core/src/component-generator.ts',
+        /modelTimeoutMs[\s\S]*1_500|1_500[\s\S]*modelTimeoutMs/,
+      );
     },
   },
   {
@@ -1608,9 +1908,9 @@ const CLAIMS: Claim[] = [
       'Our example shop pins `claude-opus-5` and gives `modelTimeoutMs` a full 60 seconds',
     ],
     check() {
-      const shop = read('examples/shop/src/shop-context.ts');
-      expect(shop).toContain("export const MODEL_ID = 'claude-opus-5'");
-      expect(shop).toContain('const MODEL_TIMEOUT_MS = 60_000');
+      const path = 'examples/shop/src/shop-context.ts';
+      mentions(read(path), path, /MODEL_ID = 'claude-opus-5'/);
+      mentions(read(path), path, /MODEL_TIMEOUT_MS = 60_000/);
     },
   },
 
@@ -1873,9 +2173,19 @@ const CLAIMS: Claim[] = [
   },
   {
     doc: 'packages/attested/README.md',
-    says: 'a Latin-looking Cyrillic letter is folded, and a real accent is not',
-    fragments: ['handful of Cyrillic and Greek letters that render as Latin ones are folded to'],
+    says: 'matching is case-insensitive, and a Latin-looking Cyrillic letter is folded',
+    fragments: [
+      'Matching is case-insensitive. Hyphens become spaces, accents are composed, fullwidth forms are folded, characters that take no room are dropped, and a handful of Cyrillic and Greek letters that render as Latin ones are folded to Latin.',
+    ],
     check() {
+      expect(caughtIn('IN STOCK'), 'matching is case-sensitive').toContain('in stock');
+      expect(caughtIn('Free-shipping'), 'a hyphen is not a space').toContain('free shipping');
+      expect(caughtIn('ｆｒｅｅ ｓｈｉｐｐｉｎｇ'), 'fullwidth forms are not folded').toContain(
+        'free shipping',
+      );
+      expect(caughtIn('fre​e shipping'), 'a zero-width space hid a phrase').toContain(
+        'free shipping',
+      );
       expect(verify('In stоck', { values: [] }).wording.findings.map((one) => one.token)).toContain(
         'in stock',
       );
@@ -1953,6 +2263,36 @@ const CLAIMS: Claim[] = [
       expect(verify('5', facts).quantity.supported).toBe(true);
       // Widen the bare-exponent rule and the SKU expands to a number nobody typed.
       expect(verify('22000000', facts).quantity.supported).toBe(false);
+    },
+  },
+  {
+    doc: 'packages/attested/README.md',
+    says: 'an exponent past a thousand digits is refused at the limit, weighed before it is written',
+    fragments: [
+      "An exponent that would lay out past a thousand digits stands behind no numeral at all, and the length is weighed before any of it is written. `'1e1000'` is no product fact under any reading, so it is refused at the limit rather than laid out. The limit is what stops the far end: `'1e2000000000'` is twelve characters, and writing its run out would cost more memory than the process has.",
+      'Every finite JavaScript number fits well inside the limit — the longest is `5e-324`, at 326 characters.',
+    ],
+    check() {
+      // The sentence this repo already shipped wrong once, saying `'1e1000'`
+      // was refused for memory when it is a kilobyte and refused by a length
+      // check. Both halves below are what make the corrected wording true.
+      expect('1e2000000000'.length).toBe(12);
+
+      // 1e999 lays out to exactly a thousand digits and is read.
+      expect(verify(`1${'0'.repeat(999)}`, { values: ['1e999'] }).quantity.supported).toBe(true);
+      // 1e1000 is one digit past, and stands behind nothing — not 1000, not 1.
+      for (const text of ['1000', '1', `1${'0'.repeat(1000)}`]) {
+        expect(verify(text, { values: ['1e1000'] }).quantity.supported, text).toBe(false);
+      }
+      // Returning at all is the proof the length was weighed first: two billion
+      // digits is past what a string can hold, so writing it would throw.
+      expect(verify('1', { values: ['1e2000000000'] }).quantity.supported).toBe(false);
+
+      const smallest = laidOut(Number.MIN_VALUE);
+      expect(smallest.length, 'the longest finite number lays out to a different width').toBe(326);
+      expect(verify(smallest, { values: [Number.MIN_VALUE] }).quantity.supported).toBe(true);
+      // The other extreme, so "the longest" is not the only one tested.
+      expect(laidOut(Number.MAX_VALUE).length).toBe(309);
     },
   },
   {
@@ -2101,7 +2441,9 @@ const CLAIMS: Claim[] = [
   {
     doc: 'packages/attested/README.md',
     says: 'a three-digit tail is always grouping, both ways',
-    fragments: ['**A three-digit tail is always grouping.** `1.299 kg` reads as 1299, so a'],
+    fragments: [
+      '**A three-digit tail is always grouping.** `1.299 kg` reads as 1299, so a genuine three-decimal number — a weight, or a price in a currency with three decimal places — cannot be written with a dot or a comma. Supply it, and write it, the same way.',
+    ],
     check() {
       expect(verify('1.299 kg', { values: [1299] }).quantity.supported).toBe(true);
       // The surprising half: both sides collapse to 1299.
@@ -2141,43 +2483,62 @@ const DOC_TEXT = new Map<string, string>();
 function docText(path: string): string {
   let text = DOC_TEXT.get(path);
   if (text === undefined) {
-    text = flat(read(path));
+    // Blockquote markers go before flattening, so a sentence inside one is
+    // quotable and a reflow that moves the `>` does not fail a row.
+    text = flat(read(path).replace(/^\s*>\s?/gm, ''));
     DOC_TEXT.set(path, text);
   }
   return text;
 }
 
-describe('every documented claim', () => {
-  it('names a file that exists', () => {
-    for (const claim of CLAIMS) {
-      for (const { doc } of quotedBy(claim)) {
-        expect(existsSync(join(REPO_ROOT, doc)), doc).toBe(true);
-      }
-    }
-  });
-
-  it('quotes a fragment that appears exactly once, so no row can drift onto another sentence', () => {
-    for (const claim of CLAIMS) {
-      for (const { doc, fragment } of quotedBy(claim)) {
-        const found = docText(doc).split(fragment).length - 1;
-        expect(`${doc} holds ${found}x: ${fragment}`).toBe(`${doc} holds 1x: ${fragment}`);
-      }
-    }
-  });
-});
-
 describe.each(CLAIMS)('$doc — $says', (claim) => {
   it('still says it, in those words', () => {
+    // Every fragment is reported at once. One at a time means a PR that touches
+    // two sentences is told about one, fixes it, and is told about the other.
+    const gone: string[] = [];
     for (const { doc, fragment } of quotedBy(claim)) {
-      // Asserted as a boolean rather than with toContain: a miss on a whole
-      // flattened document otherwise prints the document.
-      expect(
-        docText(doc).includes(fragment),
-        `${doc} no longer contains, in these words:\n  ${fragment}\n` +
-          'If the rewording is deliberate, re-verify the claim, then update the fragment.',
-      ).toBe(true);
+      if (!docText(doc).includes(fragment)) gone.push(`  ${doc}:\n    ${fragment}`);
     }
+    expect(
+      gone.join('\n'),
+      `${claim.doc} — ${claim.says}\n` +
+        'These sentences are no longer in the docs, in these words:\n' +
+        `${gone.join('\n')}\n` +
+        'The doc moved, not the code. If the rewording is deliberate, re-verify ' +
+        'the claim against what this row asserts, then paste the new sentence in here.',
+    ).toBe('');
   });
 
   it('and the code still does it', claim.check);
+});
+
+describe('every documented claim', () => {
+  it('names a file that exists', () => {
+    const missing: string[] = [];
+    for (const claim of CLAIMS) {
+      for (const { doc } of quotedBy(claim)) {
+        if (!existsSync(join(REPO_ROOT, doc))) missing.push(doc);
+      }
+    }
+    expect(missing.join(', ')).toBe('');
+  });
+
+  it('quotes a fragment that appears exactly once, so no row can drift onto another sentence', () => {
+    const wrong: string[] = [];
+    for (const claim of CLAIMS) {
+      for (const { doc, fragment } of quotedBy(claim)) {
+        const found = docText(doc).split(fragment).length - 1;
+        if (found !== 1) wrong.push(`  ${doc} holds ${found} of:\n    ${fragment}`);
+      }
+    }
+    expect(
+      wrong.join('\n'),
+      'A row has to quote one sentence and only one, or its assertion can end up ' +
+        'about a different sentence than the one it pins:\n' +
+        `${wrong.join('\n')}\n` +
+        'Zero means the doc was reworded — the row above this one says which claim. ' +
+        'Two or more means the words now appear somewhere else too: lengthen the ' +
+        'fragment until it is unique again.',
+    ).toBe('');
+  });
 });
