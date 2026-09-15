@@ -10,6 +10,8 @@ break them.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-14
+
 ### Changed
 
 - `@rudra-js/core` now screens every model-written string with
@@ -411,7 +413,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.2.0...v0.3.1
 [0.2.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.1.0...v0.2.0
