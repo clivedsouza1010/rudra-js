@@ -98,8 +98,10 @@ primary model can act. Ours can't.
 
 ### Residual risk, stated plainly
 
-- **Wording.** Roughly a kilobyte of model-written prose reaches the page per render. It's
-  length-clamped, and it can't contain markup, because the schema has no field that carries markup.
+- **Wording.** A couple of kilobytes of model-written prose reach the page per render at the ceiling
+  — around 2,200 characters on the default four items, and around 3,400 with `maxItems` at 12,
+  because a reason and a badge are bounded per item rather than per block. It's length-clamped, and
+  it can't contain markup, because the schema has no field that carries markup.
   Every model-written field goes through three passes, in this order. A set of patterns for the
   claims the prompt bans: a customer rating, a price, a discount, a delivery date, a stock level.
   Then a check that every numeral in the sentence is one the shop supplied for this request,

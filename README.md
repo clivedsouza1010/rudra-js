@@ -116,7 +116,7 @@ straight away._
 You'll need Node `>=22.12` to work on this. Node 20 is end of life and doesn't have the
 `--experimental-strip-types` flag that `npm run verify:consumer` relies on. `.nvmrc` names an exact
 Node 22 so the version is never a guess, and `engine-strict=true` turns a mismatch into a readable
-install error. CI runs the checks on 22.12.0 as well as on the `.nvmrc` version, so the floor we
+install error. CI runs the checks on 22.12.0 as well as on the latest Node 22, so the floor we
 claim is genuinely exercised.
 
 ```sh
