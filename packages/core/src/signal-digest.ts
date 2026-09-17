@@ -29,6 +29,7 @@ export interface CategoryAffinity {
 export interface ViewedProduct {
   sku: string;
   views: number;
+  dwellMs?: number;
 }
 
 export interface InteractionCount {
@@ -210,6 +211,7 @@ function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
     const running = totalsBySku.get(view.sku);
     if (running) {
       running.views += view.views;
+      if (view.dwellMs !== undefined) running.dwellMs = (running.dwellMs ?? 0) + view.dwellMs;
       if (view.category !== undefined) running.category ??= view.category;
       running.weight = Math.max(running.weight, effectiveWeight(view));
       continue;
@@ -217,6 +219,7 @@ function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
     totalsBySku.set(view.sku, {
       sku: view.sku,
       views: view.views,
+      ...(view.dwellMs !== undefined ? { dwellMs: view.dwellMs } : {}),
       ...(view.category !== undefined ? { category: view.category } : {}),
       weight: effectiveWeight(view),
     });
@@ -233,7 +236,9 @@ function mostViewedProducts(views: ViewSignal[]): ViewedProduct[] {
 
   const products: ViewedProduct[] = [];
   for (const merged of top) {
-    products.push({ sku: merged.sku, views: merged.views });
+    const product: ViewedProduct = { sku: merged.sku, views: merged.views };
+    if (merged.dwellMs !== undefined) product.dwellMs = merged.dwellMs;
+    products.push(product);
   }
   return products;
 }

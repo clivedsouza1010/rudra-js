@@ -146,12 +146,12 @@ describe('most viewed', () => {
       },
     });
 
-    expect(digest.topViewed).toEqual([{ sku: 'TR-101', views: 5 }]);
+    expect(digest.topViewed).toEqual([{ sku: 'TR-101', views: 5, dwellMs: 1_500 }]);
   });
 
-  it('keeps dwell time out of the digest', () => {
+  it('omits dwell time entirely when no view reported any', () => {
     const digest = digestOf({
-      signals: { mostViewed: [{ sku: 'TR-101', views: 1, dwellMs: 9_000 }] },
+      signals: { mostViewed: [{ sku: 'TR-101', views: 1 }] },
     });
 
     expect(digest.topViewed[0]).not.toHaveProperty('dwellMs');
