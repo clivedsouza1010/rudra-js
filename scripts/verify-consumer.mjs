@@ -38,6 +38,7 @@ const RENDERER = ['react-dom'];
 /** Resolvable from the repo root and from nowhere the consumer can legally reach. */
 const MUST_NOT_RESOLVE = 'prettier';
 const FORBIDDEN_PLACEHOLDER = '__FORBIDDEN_PACKAGE__';
+const FORBIDDEN_DECLARATION = `const forbidden: string = '${FORBIDDEN_PLACEHOLDER}';`;
 
 const run = (command, args, cwd) =>
   execFileSync(command, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
@@ -90,10 +91,10 @@ try {
   );
 
   const fixture = readFileSync(join(REPO_ROOT, 'scripts/consumer-fixture.ts'), 'utf8');
-  // Without the placeholder the fixture imports a name nothing can resolve, so the
-  // isolation check passes while checking nothing.
-  if (!fixture.includes(FORBIDDEN_PLACEHOLDER)) {
-    throw new Error(`consumer-fixture.ts no longer contains ${FORBIDDEN_PLACEHOLDER}`);
+  // The isolation check passes when the import fails, so a fixture the script stops
+  // substituting checks nothing. Match the declaration; a bare name match is weaker.
+  if (!fixture.includes(FORBIDDEN_DECLARATION)) {
+    throw new Error(`consumer-fixture.ts no longer declares: ${FORBIDDEN_DECLARATION}`);
   }
 
   writeFileSync(

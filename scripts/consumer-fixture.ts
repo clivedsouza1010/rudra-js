@@ -142,7 +142,7 @@ try {
 }
 if (leaked) {
   throw new Error(
-    "the consumer resolved '__FORBIDDEN_PACKAGE__', so it is not isolated from the repo — " +
+    `the consumer resolved '${forbidden}', so it is not isolated from the repo — ` +
       'this check cannot be trusted until that is fixed',
   );
 }
