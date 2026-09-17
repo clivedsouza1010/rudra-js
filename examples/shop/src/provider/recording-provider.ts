@@ -40,7 +40,7 @@ export function createRecordingProvider(
   inner: ComponentProvider,
   directory: string,
 ): ComponentProvider {
-  const replay = createReplayProvider({ directory, model: inner.model, onMiss: 'throw' });
+  const replay = createReplayProvider({ directory, model: inner.model });
 
   return {
     name: inner.name,
@@ -75,7 +75,6 @@ export function createRecordingProvider(
 export function createReplayProvider(options: {
   directory: string;
   model: string;
-  onMiss: 'throw' | 'fallback';
 }): ComponentProvider {
   return {
     name: 'anthropic',
@@ -86,11 +85,7 @@ export function createReplayProvider(options: {
 
       if (!existsSync(path)) {
         const message = `no recording for this request at ${path}`;
-        if (options.onMiss === 'throw') throw new Error(message);
-
-        // Rejecting rather than returning nothing: the generator's own fallback
-        // path is the right way to degrade, and it records why.
-        console.warn(`${message} — falling back`);
+        console.warn(message);
         throw new Error(message);
       }
 
