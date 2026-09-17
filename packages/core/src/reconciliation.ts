@@ -10,28 +10,12 @@ import type { SignalDigest } from './signal-digest.js';
 import type { Bundle, Product, TrackingInput } from './tracking-input.js';
 
 /**
- * Reconciliation — the boundary between what the model said and what renders.
- *
- * Schema validation guarantees shape. It cannot guarantee truth: a well-formed
- * spec can still name a product that does not exist, one the shopper told us
- * they dislike, one that sold out since the candidate set was assembled, or
- * claim the shopper viewed something they never saw. This pass is where those
- * become impossible.
- *
- * Nothing here trusts the model. A generation that survives every rule and
- * still has nothing to show degrades to `isUsable: false`, and the caller renders
- * the deterministic component instead.
- *
- * Repair, not rejection, is the default. A slightly clipped headline is a better
- * outcome for the shopper than a discarded generation, so text is truncated and
- * unverifiable claims are downgraded. Only an empty result fails outright.
+ * Nothing here trusts the model. Repair, not rejection, is the default: text is
+ * truncated and unverifiable claims are downgraded, and only an empty result
+ * fails outright.
  */
 
-/**
- * Length ceilings, applied by truncation. These live here rather than in the
- * schema because a provider's strict structured-output mode rejects string
- * length bounds — see the note in `component-spec.ts`.
- */
+/** Truncation ceilings. Not in the schema — a provider's strict mode rejects length bounds. See `component-spec.ts`. */
 const CLAMP = {
   headline: 90,
   subheadline: 140,
@@ -66,8 +50,7 @@ function clamp(value: string, limit: number): string {
   const collapsed = value.trim().replace(/\s+/g, ' ');
   if (collapsed.length <= limit) return collapsed;
 
-  // The ellipsis counts against the limit, so leave room for it. Otherwise a
-  // clamped string is one character longer than the cap it was clamped to.
+  // The ellipsis counts against the limit, so leave room for it.
   const cut = collapsed.slice(0, limit - 1);
   const lastSpace = cut.lastIndexOf(' ');
   const base = lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut;
@@ -81,9 +64,7 @@ function clampNullable(value: string | null, limit: number): string | null {
 }
 
 interface Allowlist {
-  /** SKUs the model may place. */
   allowed: Set<string>;
-  /** SKUs that must never be placed, whatever the model decided. */
   blocked: Set<string>;
 }
 
@@ -108,24 +89,12 @@ export function neverRecommend(digest: SignalDigest): Set<string> {
 function buildAllowlist(input: TrackingInput, digest: SignalDigest): Allowlist {
   const allowed = new Set<string>();
   for (const product of input.candidates) {
-    // An out-of-stock candidate is not a recommendation, it is a dead end.
     if (product.isInStock) allowed.add(product.sku);
   }
 
-  // Blocked structurally rather than by asking the model nicely. The prompt
-  // says not to place these; this is what makes it true when it ignores us.
   return { allowed, blocked: neverRecommend(digest) };
 }
 
-/**
- * Checks the model's stated reason for a pick against the shopper's actual
- * signals.
- *
- * `basis` is a factual claim — "you viewed this", "this goes with your cart" —
- * and the model has every incentive to reach for the most flattering one. A
- * claim we cannot support becomes `popular`, which asserts nothing, and the
- * prose that stated it is dropped along with it.
- */
 function verifyBasis(basis: RecommendationBasis, product: Product, digest: SignalDigest): boolean {
   switch (basis) {
     case 'most_viewed':
@@ -144,25 +113,6 @@ function verifyBasis(basis: RecommendationBasis, product: Product, digest: Signa
   }
 }
 
-/**
- * Free text that states something the renderer cannot check.
- *
- * The prompt bans prices, discounts, delivery dates, stock levels and ratings
- * because every one of them moves after the words are written, and a cohort
- * component is cached and served again later. `verifyBasis` checks the basis a
- * pick claims; nothing checks the sentences around it, so every string the
- * model writes is checked here — a heading is not a safer place for a claim
- * than the small print under it.
- *
- * These patterns are the first of three passes and the only one that names which
- * of the five kinds a sentence claimed, so they read the domain: "20% off", not
- * "20%"; "rated 4.8", not "rated". A specification walks past all of them and is
- * then weighed by @rudra-js/attested, which reads no domain at all and asks only
- * whether the shop supplied the number.
- *
- * One rule per line, because each line is a separate judgement about where the
- * boundary sits and each one wants its own reason written next to it.
- */
 const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
   {
     // Customers scoring the product. "rated for winter use", "rated to -10C"
@@ -260,11 +210,7 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
   },
 ];
 
-/**
- * Letters that render as a Latin letter but are not one. A Cyrillic о in
- * "in stоck" would otherwise carry a stock claim straight past the rule written
- * for it, and the shopper would read the claim anyway.
- */
+/** Letters that render as a Latin letter but are not one — a Cyrillic о in "in stоck". */
 const CONFUSABLES: Record<string, string> = {
   а: 'a',
   в: 'b',
@@ -298,10 +244,8 @@ const CONFUSABLES: Record<string, string> = {
 };
 
 /**
- * Characters that render as nothing: format characters, default-ignorable code
- * points and the controls. Cf and Default_Ignorable each hold characters the
- * other does not.
- *
+ * Characters that render as nothing: format characters, default-ignorable code points and the
+ * controls. Cf and Default_Ignorable each hold characters the other does not.
  * A second copy of the class in attested's `hidden.ts`, pinned to it by a test.
  */
 const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
@@ -310,18 +254,13 @@ const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
 const SPACING = /[\t\n\v\f\r\u0085]/;
 
 /**
- * Marks that hang on the character before them instead of taking a column of their
- * own. Dropped after composition, so an accented e keeps its accent while an
- * overline, which composes with nothing, cannot hide a word from its own rule.
+ * Marks that hang on the character before them instead of taking a column of their own.
+ * Dropped after composition, so an accented e keeps its accent while an overline,
+ * which composes with nothing, cannot hide a word from its own rule.
  */
 const MARKS = /[\p{Mn}\p{Me}]/gu;
 
-/**
- * One shape for the text before the patterns read it, so a word that renders as
- * "in stock" is read as "in stock" however it was spelled.
- *
- * Only the reading is normalised. What renders is what the model wrote.
- */
+/** Only the reading is normalised. What renders is what the model wrote. */
 function normaliseForClaims(text: string): string {
   const lowered = text
     .replace(INVISIBLE, (char) => (SPACING.test(char) ? char : ''))
@@ -409,7 +348,6 @@ function hostFacts(input: TrackingInput): HostFacts {
   return { pooled: [...pooled], bySku };
 }
 
-/** Names the first forbidden claim the text makes, or null when it makes none. */
 function claimIn(text: string): string | null {
   const normalised = normaliseForClaims(text);
   for (const claim of CLAIM_PATTERNS) {
@@ -420,14 +358,7 @@ function claimIn(text: string): string | null {
   return null;
 }
 
-/**
- * The running state of one reconciliation pass: what has been placed, how much
- * of the item budget is left, and what was changed along the way.
- *
- * This is deliberately one named thing rather than three parameters threaded
- * through every function. The budget and the de-duplication set are global to a
- * spec, not to a block, which is the part that is easy to get wrong.
- */
+/** The budget and the de-duplication set are global to a spec, not to a block. */
 function createPlacementTracker(maxItems: number, facts: HostFacts) {
   const placedSkus = new Set<string>();
   const violations: string[] = [];
@@ -454,16 +385,11 @@ function createPlacementTracker(maxItems: number, facts: HostFacts) {
 type PlacementTracker = ReturnType<typeof createPlacementTracker>;
 
 /**
- * Drops text that makes a claim we cannot check, and names what it claimed.
- *
  * Runs after clamping, so what is screened is exactly what would have rendered.
- * Dropping means what it means everywhere else here: this field becomes null
- * and the rest of the block carries on.
  *
  * Three passes, most specific first. Core's patterns name one of the five kinds; `quantity`
  * is the only proof in the stack, every numeral having to be one the shop supplied; `wording`
- * is a second denylist and the weakest, so it answers last. `facts` defaults to the pooled
- * list, and a field that names one product passes that product's own.
+ * is a second denylist and the weakest, so it answers last.
  */
 function screenClaim(
   value: string | null,
@@ -497,24 +423,20 @@ function screenClaim(
 }
 
 /**
- * The same screen for a field that cannot be null. Emptying it hands the field
- * to the rule that already drops a block, or a whole generation, whose text
- * clamps to nothing — so a banner reading "20% off" disappears rather than
- * rendering blank.
+ * Emptying a field that cannot be null hands it to the rule that already drops a block,
+ * or a whole generation, whose text clamps to nothing — so a banner reading "20% off"
+ * disappears rather than rendering blank.
  */
 function screenRequired(value: string, field: string, tracker: PlacementTracker): string {
   return screenClaim(value, field, tracker) ?? '';
 }
 
 /**
- * Decides whether one SKU may be placed, and names the reason when it may not.
  * Does not consume budget — the caller does that once it commits.
  *
- * Order matters. The budget is checked last because it is the least specific
- * cause: a hallucinated SKU that arrives after the budget is spent is still a
- * hallucination, and reporting it as `budget:dropped` would understate how
- * often the model invents products. These strings are the evaluation signal,
- * so each one has to name the fault that actually fired.
+ * Order matters. The budget is checked last because it is the least specific cause:
+ * these strings are the evaluation signal, and reporting a hallucinated SKU as
+ * `budget:dropped` would understate how often the model invents products.
  */
 function rejectionFor(sku: string, allowlist: Allowlist, tracker: PlacementTracker): string | null {
   // A rejected SKU is whatever the model wrote, and the schema cannot bound it.
@@ -560,8 +482,7 @@ function reconcileItems(
     const own = tracker.factsFor(item.sku);
     const clampedReason = clampNullable(item.reason, CLAMP.reason);
 
-    // The prose exists to state the basis. If the basis did not hold, the prose
-    // is a claim we just decided is untrue.
+    // The prose exists to state the basis. If the basis did not hold, the prose is untrue.
     let reason: string | null = null;
     if (hasSupportedBasis) {
       reason = isOurs
@@ -573,9 +494,7 @@ function reconcileItems(
       sku: item.sku,
       basis: hasSupportedBasis ? item.basis : 'popular',
       reason,
-      // A badge is the shortest, loudest text on the card, and the schema's own
-      // example for it was "Back in stock" — a stock claim. It renders, so it is
-      // read for claims like every other sentence the model writes.
+      // The schema's own example badge was "Back in stock" — a stock claim, and it renders.
       badge: screenClaim(clampNullable(item.badge, CLAMP.badge), `badge:${item.sku}`, tracker, own),
       emphasis: item.emphasis,
     });
@@ -584,8 +503,7 @@ function reconcileItems(
   return kept;
 }
 
-// Three separate counts, not one score — cart beats views beats category
-// regardless of how the counts compare, so they can't be summed.
+// Cart beats views beats category however the counts compare, so they can't be summed.
 interface BundleFit {
   cartHits: number;
   viewedHits: number;
@@ -608,7 +526,6 @@ function fitOf(
   return fit;
 }
 
-/** In the cart beats recently viewed, which beats the category being looked at. */
 function isBetterFit(fit: BundleFit, best: BundleFit | undefined): boolean {
   if (!best) return true;
   if (fit.cartHits !== best.cartHits) return fit.cartHits > best.cartHits;
@@ -627,14 +544,12 @@ function chooseBundle(
   let bestFit: BundleFit | undefined;
 
   for (const bundle of bundles) {
-    // A bundle needs room for every product at once.
     if (bundle.skus.length > tracker.remaining) continue;
 
     let isPlaceable = true;
     for (const sku of bundle.skus) {
       if (!allowlist.allowed.has(sku)) isPlaceable = false;
       if (digest.dislikedSkus.includes(sku)) isPlaceable = false;
-      // Already shown by an earlier block — twice on a page looks broken.
       if (tracker.hasPlaced(sku)) isPlaceable = false;
     }
     if (!isPlaceable) continue;
@@ -694,7 +609,6 @@ export function placeableHeroSkus(
     if (block.kind !== 'hero') continue;
     if (block.sku === null) continue;
     if (!allowlist.allowed.has(block.sku) || allowlist.blocked.has(block.sku)) continue;
-    // Two heroes naming the same product: only the first one gets to place it.
     if (skus.includes(block.sku)) continue;
     skus.push(block.sku);
   }
@@ -724,9 +638,7 @@ function reconcileBlock(
           tracker.place(sku);
         }
       }
-      // Every other block kind disappears when its content clamps to nothing.
-      // A hero with no headline and no product is the same empty region, and
-      // it would otherwise render above real content.
+      // A hero with no headline and no product is the empty region every other kind drops for.
       const headline = screenRequired(
         clamp(block.headline, CLAMP.headline),
         'hero-headline',
@@ -835,14 +747,12 @@ function reconcileBlock(
   }
 }
 
-/** True when a spec contains at least one block that actually shows a product. */
 function showsAnyProduct(blocks: Block[]): boolean {
   return blocks.some(
     (block) =>
       (block.kind === 'grid' && block.items.length > 0) ||
       (block.kind === 'carousel' && block.items.length > 0) ||
       (block.kind === 'hero' && block.sku !== null) ||
-      // A bundle shows products too, so it counts the same as grid/carousel/hero.
       (block.kind === 'bundle' && block.bundleId !== null),
   );
 }
@@ -895,9 +805,7 @@ export function reconcileSpec(
     rationale: screenRequired(clamp(generated.rationale, CLAMP.rationale), 'rationale', tracker),
   };
 
-  // A component that recommends nothing is worse than no component at all.
-  // Recorded separately: "no products survived" and "the model returned no
-  // headline" are different failures and want different fixes.
+  // Recorded separately: no products and no headline are different failures.
   if (!showsAnyProduct(blocks)) tracker.record('unusable:no-products');
   if (spec.headline.length === 0) tracker.record('unusable:no-headline');
   const isUsable = showsAnyProduct(blocks) && spec.headline.length > 0;
