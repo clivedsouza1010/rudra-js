@@ -77,20 +77,9 @@ export const RECOMMENDATION_BASES = [
 export const productReferenceSchema = z.object({
   /** Must be a SKU the host supplied in `TrackingInput.candidates`. */
   sku: z.string(),
-  /**
-   * The strategy behind this pick. Reconciliation checks it against the
-   * shopper's signals, so the model cannot assert a relationship that is not
-   * there.
-   */
+  /** Checked against the shopper's signals, so the model cannot assert a pick it did not earn. */
   basis: z.enum(RECOMMENDATION_BASES),
-  /**
-   * How the basis is phrased for the shopper, e.g. "Pairs with the boots you
-   * bought". Free text, but it has to be consistent with `basis`, which is not.
-   *
-   * Nullable because reconciliation clears it when it cannot verify the basis:
-   * a pick may still be worth showing when the stated reason for it is not
-   * true, but the prose asserting that reason must not render.
-   */
+  /** How the basis is phrased, e.g. "Pairs with the boots you bought". Null once unverifiable. */
   reason: z.string().nullable(),
   /** Short accent label, e.g. "Worth a look". Null when nothing warrants one. */
   badge: z.string().nullable(),
@@ -177,13 +166,11 @@ export const generatedSpecSchema = z.object({
   headline: z.string(),
   subheadline: z.string().nullable(),
   blocks: z.array(blockSchema),
-  /**
-   * One sentence on why this arrangement was chosen. For engineers reading
-   * generation logs, not for shoppers; it is not rendered by default.
-   */
+  /** One sentence for generation logs, not for shoppers. Not rendered by default. */
   rationale: z.string(),
 });
 export type GeneratedSpec = z.infer<typeof generatedSpecSchema>;
+export type GeneratedSpecResult = z.ZodSafeParseResult<GeneratedSpec>;
 
 /** How a spec came to exist. Surfaced for benchmarking and observability. */
 export type SpecSource = 'llm' | 'cache' | 'fallback';
@@ -238,6 +225,6 @@ export function parseGeneratedSpec(value: unknown): GeneratedSpec {
 }
 
 /** Non-throwing variant, for validating untrusted model output. */
-export function safeParseGeneratedSpec(value: unknown) {
+export function safeParseGeneratedSpec(value: unknown): GeneratedSpecResult {
   return generatedSpecSchema.safeParse(value);
 }

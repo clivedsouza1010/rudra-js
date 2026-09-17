@@ -61,6 +61,7 @@ export {
   type ComponentSpec,
   type CopyBlock,
   type GeneratedSpec,
+  type GeneratedSpecResult,
   type GridBlock,
   type HeroBlock,
   type ProductReference,

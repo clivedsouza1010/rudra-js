@@ -64,6 +64,16 @@ describe('parseTrackingInput', () => {
     expect(input.signals.mostViewed[0]?.views).toBe(1);
   });
 
+  // Nothing reads dwell time now, but this schema is strict: dropping the field
+  // would reject a payload that parses today.
+  it('still accepts dwell time on a view signal', () => {
+    const input = parseTrackingInput(
+      minimalPayload({ signals: { mostViewed: [{ sku: 'TR-104', dwellMs: 9_000 }] } }),
+    );
+
+    expect(input.signals.mostViewed[0]?.dwellMs).toBe(9_000);
+  });
+
   it('rejects a payload with no candidates, because nothing could be recommended', () => {
     const result = safeParseTrackingInput(minimalPayload({ candidates: [] }));
 

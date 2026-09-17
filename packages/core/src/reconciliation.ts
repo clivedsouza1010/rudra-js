@@ -302,10 +302,7 @@ const CONFUSABLES: Record<string, string> = {
  * points and the controls. Cf and Default_Ignorable each hold characters the
  * other does not.
  *
- * The same class @rudra-js/attested strips in its own `hidden.ts`. The second copy stays
- * now that core calls attested, because it feeds core's own patterns and those reach two
- * things attested's phrase list does not hold: "20% οff" spelled with a Greek omicron,
- * and "PRİCED to move". Widening one and not the other is still the mistake to watch for.
+ * A second copy of the class in attested's `hidden.ts`, pinned to it by a test.
  */
 const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
 

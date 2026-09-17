@@ -378,7 +378,7 @@ Everything above, and:
 
 - `user.id`
 - every timestamp (`at`), which we use to sort signals and then drop
-- dwell time (`dwellMs`), added up in the digest and left out of the prompt
+- dwell time (`dwellMs`), accepted on a view signal and then dropped
 - every price, and every currency
 - `imageUrl`
 - `interaction.value` and `interaction.meta`. The model is told which kinds of
