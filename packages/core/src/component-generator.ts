@@ -440,18 +440,11 @@ export function createComponentGenerator(
       }
 
       const providerId = `${provider.name}:${provider.model}`;
+      const candidateSkus = input.candidates.map((product) => product.sku);
       const key =
         generation === 'cohort'
-          ? cohortCacheKey(
-              digest,
-              input.candidates.map((product) => product.sku),
-              providerId,
-            )
-          : specCacheKey(
-              digest,
-              input.candidates.map((product) => product.sku),
-              providerId,
-            );
+          ? cohortCacheKey(digest, candidateSkus, providerId)
+          : specCacheKey(digest, candidateSkus, providerId);
 
       const read = await readCache(key);
       const cached = read.entry;

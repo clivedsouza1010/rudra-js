@@ -200,9 +200,7 @@ export function specCacheKey(
 }
 
 // Leaves out the fields that make a key personal: who the shopper is, what they
-// liked, viewed or searched for. Candidates go too, because every shopper's list
-// is different — that is safe because the SKUs in a cohort spec get replaced
-// before the page is served.
+// liked, viewed or searched for.
 export function cohortCacheKey(
   digest: SignalDigest,
   candidateSkus: readonly string[],
@@ -222,10 +220,6 @@ export function cohortCacheKey(
     // served on a tent page.
     currentCategory: digest.currentCategory ?? null,
     topCategory: digest.categoryAffinity[0]?.category ?? null,
-    // The model is shown these, so they belong in the key. Normally they come
-    // from the page and everyone on it shares them. A shop that picks
-    // candidates per shopper gets smaller cohorts, which is the honest result:
-    // its prompt really is personal.
     candidates: candidateSkus.toSorted(),
   });
 

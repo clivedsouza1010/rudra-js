@@ -72,18 +72,8 @@ describe('a product page', () => {
     );
   });
 
-  it('sends no JavaScript for the recommendation area', async () => {
-    // This cannot fail. `render` calls the page function directly and pipes
-    // its output through `renderToStaticMarkup` — a bootstrap `<script>` tag
-    // is something Next's own pipeline adds, and that pipeline never runs
-    // here. The page genuinely ships no client JavaScript for this area
-    // today, but this test is not what proves it; see the README for the
-    // check that would.
-    const markup = await render(SKU, richShopper.id);
-
-    expect(markup).not.toContain('<script');
-  });
-
+  // Whether the slot ships client JavaScript is checked by `npm run verify:crawlable`,
+  // which reads a page off a running server. Nothing here can see it.
   it('renders for a cold-start shopper as well as a rich one', async () => {
     // Different digests, different cache keys, different code paths through
     // selection. A page that only works for one is not working.

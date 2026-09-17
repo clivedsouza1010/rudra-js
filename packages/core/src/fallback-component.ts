@@ -6,15 +6,10 @@ import type { TrackingInput } from './tracking-input.js';
 /**
  * The deterministic component — what renders when no model does.
  *
- * The manuscript names data latency as the central risk of moving
- * personalisation onto the server path: any delay in the recommendation engine
- * blocks the page. This module is the answer. It is pure, synchronous, and
- * cannot fail, so the server always has something correct to render — whether
- * the model is slow, erroring, rate-limited, or simply not configured.
- *
- * It reads the same digest and uses the same selector the model path does, so a
- * degraded render is a weaker version of the same decision rather than an
- * unrelated one. Only the presentation is fixed.
+ * Pure and synchronous, so the server always has something to render whether the
+ * model is slow, erroring, rate-limited or not configured. It reads the same
+ * digest and selector the model path does, so a degraded render is a weaker
+ * version of the same decision rather than an unrelated one.
  */
 
 /** A featured lead only reads as deliberate when something follows it. */

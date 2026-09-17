@@ -142,7 +142,7 @@ npm run typecheck        # includes test files, which the build does not
 npm run lint
 npm run format:check
 npm test
-npm run verify:consumer  # packs all three packages and uses them from outside the repo
+npm run verify:consumer  # packs all four packages and uses them from outside the repo
 ```
 
 All six run in CI as separate steps, so a failed run names the check that failed.
@@ -160,14 +160,21 @@ git push origin v0.2.0
 ```
 
 A `v*` tag starts [`.github/workflows/release.yml`](.github/workflows/release.yml). It runs the
-same six checks a pull request runs, build included, and then publishes `@rudra-js/core`,
-`@rudra-js/react` and `@rudra-js/anthropic` in that order with `npm publish --provenance`. Core
-goes first because react declares it as a peer.
+same six checks a pull request runs, build included, and then publishes `@rudra-js/attested`,
+`@rudra-js/core`, `@rudra-js/react` and `@rudra-js/anthropic` in that order with
+`npm publish --provenance`.
+
+The order is by what's most likely to fail, not by what depends on what. npm can't publish over a
+half-finished release, so anything that goes out before a failure is public and stuck at a version
+the next tag can't reuse. A name npm hasn't seen is the riskiest step — a trusted publisher is
+configured from a package's settings page, so a brand new name has nothing to read and fails auth —
+and it goes first, where failing costs nothing. Core leads the rest, because react and anthropic
+both declare it as a peer.
 
 The first two steps run before anything is installed, and they stop the release if either fails:
 the tagged commit has to be on `main`, and the tag has to equal the `version` in
-`packages/core/package.json`. All three manifests carry the same version and a test enforces that,
-because one tag publishes all three.
+`packages/core/package.json`. All four manifests carry the same version and a test enforces that,
+because one tag publishes all four.
 
 A quick heads-up on tags. Anything matching `v*` can't be moved or deleted once you've pushed it,
 so a tag that fails a check is spent, and the fix is to bump the version and tag again. It's the
@@ -192,12 +199,12 @@ publisher that changes under you between two releases is not something you want 
 during one.
 
 Nothing watches this pin, so bump it by hand. Run `rehearsal.yml` once you have. It installs the
-same npm and does a `--dry-run` publish of all three packages, so a broken npm shows up there
+same npm and does a `--dry-run` publish of all four packages, so a broken npm shows up there
 instead of halfway through a release.
 
 ### What publishing is bound to
 
-There's no npm token anywhere in this repository. Each of the three packages has a trusted
+There's no npm token anywhere in this repository. Each of the four packages has a trusted
 publisher configured on npmjs.com, and each one names three things: this repository, the workflow
 file `release.yml`, and the GitHub environment `npm`. The workflow's `id-token: write` mints an
 OIDC token that npm checks against those three.
@@ -206,13 +213,14 @@ So renaming the workflow file, renaming the environment, or moving the repositor
 until someone edits the publisher on npmjs.com to match. The error npm returns says the token
 doesn't match a configured publisher. It won't tell you which of the three is wrong.
 
-Adding a fourth package means two edits, not one: a trusted publisher for its name on npmjs.com,
-and a `npm publish --provenance --access public` step in `release.yml` with its `working-directory`.
-A package with a publish step and no publisher fails the release after the earlier packages have
-already gone out.
+Adding a package means two edits, not one: a trusted publisher for its name on npmjs.com, and a
+`npm publish --provenance --access public` step in `release.yml` with its `working-directory`. The
+publisher can't be created until the package exists, so publish a placeholder version by hand first,
+then configure it. Put the new step first, ahead of the packages that already publish, so an auth
+failure costs nothing.
 
-If a publish does half-finish — core published, react failed — there's nothing to publish by hand
-with. Bump the patch version on all three, merge, and tag again.
+If a publish does half-finish — attested published, core failed — there's nothing to publish by hand
+with. Bump the patch version on all four, merge, and tag again.
 
 ## When the tool-schema golden fails
 
