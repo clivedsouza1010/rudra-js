@@ -60,21 +60,6 @@
   margin: 0;
 }
 
-/* Honoured where even four cards clear the 13rem above; narrower, auto-fill decides. */
-@media (min-width: 64rem) {
-  .rudra-grid[data-rudra-columns='2'] .rudra-grid__items {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .rudra-grid[data-rudra-columns='3'] .rudra-grid__items {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .rudra-grid[data-rudra-columns='4'] .rudra-grid__items {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 /* Nothing here scrolls it with JavaScript, so the track has to scroll itself. */
 .rudra-carousel__track {
   grid-auto-flow: column;
