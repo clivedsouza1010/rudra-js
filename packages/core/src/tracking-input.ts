@@ -49,10 +49,8 @@ export const FIELD_LIMITS = {
   reason: 120,
 } as const;
 
-/** Assigning this as an object key mutates the prototype instead of the object. */
 const RESERVED_META_KEY = '__proto__';
 
-/** Upper bound on any timestamp: 2100-01-01. */
 const MAX_EPOCH_MS = Date.UTC(2100, 0, 1);
 
 const identifier = () => z.string().min(1).max(FIELD_LIMITS.identifier);
@@ -92,10 +90,6 @@ export const productSchema = z.strictObject({
     .string()
     .regex(/^[A-Z]{3}$/, 'expected a three-letter ISO 4217 code')
     .default('USD'),
-  // This lands in an `<img src>` the host did not write, so the scheme matters:
-  // a bare capped string would accept '' and 'javascript:'. Root-relative paths
-  // are allowed because most catalogs store images that way, and they carry no
-  // scheme to abuse.
   imageUrl: imageReference().optional(),
   rating: z.number().min(0).max(5).optional(),
   // Your phrase for why this product is here, when your own ranking already has
@@ -183,7 +177,6 @@ export type Interaction = z.infer<typeof interactionSchema>;
 export const renderContextSchema = z.strictObject({
   /** 'pdp', 'home', 'cart', 'search', or any host-defined surface. */
   surface: identifier(),
-  /** Named placement, e.g. 'below-fold-recommendations'. */
   slot: z.string().min(1).max(FIELD_LIMITS.identifier).default('recommendations'),
   currentSku: optionalIdentifier(),
   currentCategory: optionalIdentifier(),
@@ -244,15 +237,10 @@ export const trackingInputSchema = z
       isReturning: z.boolean().optional(),
     }),
     context: renderContextSchema,
-    // A payload with no `signals` block at all is the cold-start case, not an
-    // error. Every category defaults to empty, so a first-time visitor needs no
-    // special handling from the host.
+    // A payload with no `signals` block at all is the cold-start case, not an error.
     signals: trackingSignalsSchema.prefault({}),
     /**
-     * The only products the generated component may place. Merchandising rules
-     * belong here: whatever the host leaves out cannot be recommended, which is
-     * what makes it impossible to surface a product that does not exist or is not
-     * merchandised for this shopper.
+     * The only products the generated component may place.
      *
      * SKUs must be unique — a duplicate is a host bug that spends prompt budget
      * twice and invites the same product in two slots.
