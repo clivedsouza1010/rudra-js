@@ -124,6 +124,14 @@ const bundleIdOf = (spec: { blocks: GeneratedSpec['blocks'] }): string | null =>
   return null;
 };
 
+/** The reason under the first product in the first grid, if there is one. */
+const reasonOn = (spec: { blocks: GeneratedSpec['blocks'] }): string | null => {
+  for (const block of spec.blocks) {
+    if (block.kind === 'grid') return block.items[0]?.reason ?? null;
+  }
+  return null;
+};
+
 /** The product the hero kept, if it kept one. */
 const heroSkuOf = (spec: { blocks: GeneratedSpec['blocks'] }): string | null => {
   for (const block of spec.blocks) {
@@ -1217,5 +1225,40 @@ describe('what one shopper can put in another shopper page', () => {
 
     expect(second.source).toBe('cache');
     expect(JSON.stringify(second)).not.toContain('maternity leggings');
+  });
+});
+
+describe('which reasons reach the page unscreened', () => {
+  const CLAIM = 'Only 2 left at this price';
+
+  const shopper = payload({ candidates: [product('TR-101', { reason: CLAIM })] });
+
+  const gridWithReason = (sku: string, reason: string): GeneratedSpec =>
+    specOf([
+      {
+        kind: 'grid',
+        title: null,
+        columns: 2,
+        items: [{ sku, basis: 'popular', reason, badge: null, emphasis: 'normal' }],
+      },
+    ]);
+
+  it("keeps the shop's own sentence in cohort mode, not the model's", async () => {
+    const rendered = await generatorWith({
+      provider: countingProvider(gridWithReason('MODEL-X', 'whatever the model wrote')).provider,
+    }).generate(shopper);
+
+    expect(placedSkus(rendered)).toEqual(['TR-101']);
+    expect(reasonOn(rendered)).toBe(CLAIM);
+  });
+
+  it('screens the identical sentence in per-shopper mode', async () => {
+    const rendered = await generatorWith({
+      provider: countingProvider(gridWithReason('TR-101', CLAIM)).provider,
+      generation: 'per-shopper',
+    }).generate(shopper);
+
+    expect(placedSkus(rendered)).toEqual(['TR-101']);
+    expect(reasonOn(rendered)).toBeNull();
   });
 });
