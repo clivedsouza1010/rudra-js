@@ -155,13 +155,7 @@ on.`;
  */
 const UNPRINTABLE = /(?!\u200D)[\p{Cc}\p{Cf}\p{Cn}\p{Co}\p{Zl}\p{Zp}\u{E0100}-\u{E01EF}]/gu;
 
-/**
- * Host-supplied text, written so it cannot introduce structure of its own.
- *
- * Quoting handles the obvious half. Escaping the characters above handles the
- * half that looks identical to a reader: after this, a value occupies exactly
- * one line, reads in one direction, and contains nothing a log cannot show.
- */
+/** Host-supplied text, written so it cannot introduce structure of its own. */
 const quote = (value: string) =>
   JSON.stringify(value).replace(UNPRINTABLE, (character) => {
     const codePoint = character.codePointAt(0)!;
@@ -207,7 +201,6 @@ function describeShopper(digest: SignalDigest): string {
   return lines.filter((line): line is string => line !== null).join('\n');
 }
 
-/** One candidate per line. */
 function describeCandidate(product: Product): string {
   const parts = [quote(product.sku), quote(product.title), quote(product.category)];
   if (product.rating !== undefined) parts.push(`rated ${product.rating}`);

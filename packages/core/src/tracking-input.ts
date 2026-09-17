@@ -52,7 +52,6 @@ export const FIELD_LIMITS = {
 /** Assigning this as an object key mutates the prototype instead of the object. */
 const RESERVED_META_KEY = '__proto__';
 
-/** Upper bound on any timestamp: 2100-01-01. */
 const MAX_EPOCH_MS = Date.UTC(2100, 0, 1);
 
 const identifier = () => z.string().min(1).max(FIELD_LIMITS.identifier);
@@ -244,9 +243,7 @@ export const trackingInputSchema = z
       isReturning: z.boolean().optional(),
     }),
     context: renderContextSchema,
-    // A payload with no `signals` block at all is the cold-start case, not an
-    // error. Every category defaults to empty, so a first-time visitor needs no
-    // special handling from the host.
+    // A payload with no `signals` block at all is the cold-start case, not an error.
     signals: trackingSignalsSchema.prefault({}),
     /**
      * The only products the generated component may place. Merchandising rules
