@@ -127,9 +127,6 @@ const registry = extendRegistry({
 <RudraComponent spec={spec} products={catalog} registry={registry} />;
 ```
 
-A grid, carousel or bundle whose products have left your catalog since the spec was generated is
-dropped before your renderer is called, so you never get handed an empty one.
-
 ## Props
 
 | Prop                | Notes                                                                                                                                                                                         |

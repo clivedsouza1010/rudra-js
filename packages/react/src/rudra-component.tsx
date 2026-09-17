@@ -76,8 +76,7 @@ function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
 
 // Whether a block still has anything to say once the catalog is applied. A SKU
 // can sell out between generating a spec and rendering it: grid and carousel
-// lose the products that did, a bundle loses itself if any one member did. The
-// renderers rely on this and do not check again.
+// lose the products that did, a bundle loses itself if any one member did.
 function hasContent(
   block: Block,
   products: ReadonlyMap<string, Product>,
