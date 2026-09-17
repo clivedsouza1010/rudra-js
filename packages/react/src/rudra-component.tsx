@@ -54,21 +54,10 @@ export interface RudraComponentProps {
 /** A list of products, or anything keyed by SKU that answers `get` and `has`. */
 export type ProductCatalog = readonly Product[] | ReadonlyMap<string, Product>;
 
-/**
- * Whether the catalog is already keyed by SKU.
- *
- * Asks what the renderers actually call rather than which class the host
- * happened to construct. `instanceof Map` was wrong twice over: a Map that
- * crossed a realm boundary — a `node:vm` context, a worker — fails it, and so
- * does a host's own `ReadonlyMap`, which the prop type has always allowed. Both
- * then fell into the list branch, where `catalog.map is not a function` throws
- * while the render context is being built, before any block renders. That takes
- * down the whole page, not just this component.
- *
- * Keyed before list, because a collection can answer both: an Immutable.js map
- * has `map`, and converting through it yields a catalog whose every value is a
- * `[sku, product]` pair rather than a product.
- */
+// Asks what the renderers call rather than which class the host built, since
+// `instanceof Map` is per-realm. Checked before the list branch because a
+// collection can answer both: an Immutable.js map has `map`, and converting
+// through it yields `[sku, product]` pairs rather than products.
 function isKeyedBySku(catalog: ProductCatalog): catalog is ReadonlyMap<string, Product> {
   const candidate = catalog as { get?: unknown; has?: unknown };
   return typeof candidate.get === 'function' && typeof candidate.has === 'function';
@@ -77,10 +66,6 @@ function isKeyedBySku(catalog: ProductCatalog): catalog is ReadonlyMap<string, P
 function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
   if (isKeyedBySku(catalog)) return catalog;
   if (typeof (catalog as { map?: unknown }).map !== 'function') {
-    // A Set of products, a plain object keyed by SKU, a Map that has been
-    // through JSON. Refusing here names the prop while the stack still points
-    // at it. Carried through instead, a grid renders nothing and a banner
-    // renders a healthy-looking page, and the shop finds out from a dashboard.
     throw new TypeError(
       'the `products` prop must be a list of products, or keyed by SKU with `get` and `has` — ' +
         `received ${Object.prototype.toString.call(catalog)}`,
@@ -89,15 +74,9 @@ function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
   return new Map(catalog.map((product) => [product.sku, product]));
 }
 
-/**
- * Whether a block still has anything to say once the catalog is applied.
- *
- * Three block kinds can come up empty: reconciliation ran against the catalog
- * as it was when the spec was generated, and a SKU can sell out between then
- * and this render. Grid and carousel lose just the products that did; a
- * bundle loses itself entirely if any one of its members did. The rest carry
- * their own words.
- */
+// Whether a block still has anything to say once the catalog is applied. A SKU
+// can sell out between generating a spec and rendering it: grid and carousel
+// lose the products that did, a bundle loses itself if any one member did.
 function hasContent(
   block: Block,
   products: ReadonlyMap<string, Product>,
@@ -117,7 +96,6 @@ function hasContent(
       return bundle !== undefined && bundle.skus.every((sku) => products.has(sku));
     }
     default:
-      // A kind this renderer predates renders nothing, so it counts as nothing.
       block satisfies never;
       return false;
   }
@@ -143,9 +121,7 @@ function renderBlock(
     case 'bundle':
       return <registry.bundle key={index} block={block} context={context} />;
     default:
-      // A newer core carrying a block kind this renderer predates loses that
-      // block rather than the page. In this repo the assertion below fails the
-      // build instead, which is the moment it is cheap to notice.
+      // A block kind this renderer predates loses that block, not the page.
       block satisfies never;
       return null;
   }
@@ -185,17 +161,12 @@ export function RudraComponent({
     formatBundlePrice: formatBundlePrice ?? ((bundle) => defaultFormatBundlePrice(bundle, locale)),
   };
 
-  // An empty recommendation area is worse than none: it takes up space and
-  // tells the shopper the page is broken. That includes the subtler version —
-  // a headline and an empty box, because every product in the spec has sold out
-  // since it was generated — which is why this asks what is left rather than
-  // how many blocks arrived.
   const visible = spec.blocks.filter((block) =>
     hasContent(block, context.products, context.bundles),
   );
   if (visible.length === 0) return null;
 
-  // React omits a data-* attribute whose value is undefined, so degradedReason
+  // React drops a data-* attribute whose value is undefined, so degradedReason
   // needs no branch of its own.
   const diagnosticAttributes = hasDiagnostics
     ? {
@@ -208,15 +179,8 @@ export function RudraComponent({
 
   return (
     <section
-      // Extended rather than replaced: every child class is namespaced under
-      // `rudra`, and the package ships no stylesheet, so a host will pass one.
       className={className ? `rudra ${className}` : 'rudra'}
       data-rudra-slot={spec.slot}
-      // Where the component came from travels with the markup on purpose, so
-      // hit rate and fallback share can be read off a rendered page — which
-      // means `source="fallback"` is public. What stays behind the diagnostics
-      // flag is everything more specific than that: which vendor, which model,
-      // how slow, and why it fell back.
       data-rudra-source={spec.source}
       data-rudra-tone={spec.tone}
       {...diagnosticAttributes}

@@ -1,4 +1,5 @@
 import { BANNED_PHRASES, verify } from '@rudra-js/attested';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   RECOMMENDATION_BASES,
@@ -1344,6 +1345,16 @@ describe('a claim spelled in characters the patterns do not expect', () => {
   });
 });
 
+function declarationOf(path: string, name: string): string {
+  const source = readFileSync(new URL(path, import.meta.url), 'utf8');
+  const start = source.indexOf(`const ${name}`);
+  const end = source.indexOf(';\n\n', start);
+
+  expect(start, `${name} is missing from ${path}`).toBeGreaterThan(-1);
+  expect(end, `${name} does not end where expected in ${path}`).toBeGreaterThan(start);
+  return source.slice(start, end);
+}
+
 /**
  * Two more passes, run by @rudra-js/attested after the patterns above have had
  * their say. `quantity` is the only proof in the stack: every numeral in the
@@ -1688,6 +1699,20 @@ describe('the two passes attested adds', () => {
       expect(kindFor(reason)).toBe('quantity');
     },
   );
+
+  // Core keeps its own copy of these classes and may not import attested's. Nothing
+  // else would notice the two drifting apart, so this reads both declarations.
+  it('keeps its unicode classes identical to the ones in attested', () => {
+    for (const [name, attestedPath] of [
+      ['INVISIBLE', '../../attested/src/hidden.ts'],
+      ['MARKS', '../../attested/src/hidden.ts'],
+      ['CONFUSABLES', '../../attested/src/phrases.ts'],
+    ] as const) {
+      expect(declarationOf('./reconciliation.ts', name), `${name} has drifted`).toBe(
+        declarationOf(attestedPath, name),
+      );
+    }
+  });
 
   // The two ends of the allowance list. An entry that names nothing attested bans
   // is dead weight — someone renamed a phrase over there and nothing said so. An

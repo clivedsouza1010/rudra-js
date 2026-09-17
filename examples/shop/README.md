@@ -53,7 +53,6 @@ gitignored; `.env.example` isn't.
 | `RUDRA_SHOP_MODE`        | `replay` (the default when unset) or `record`. Any other value and the shop won't start.                                         |
 | `RUDRA_REPLAY_ONLY`      | A hard stop on spending: the shop won't start if a key is set or the mode is `record`. The test run and the crawler both set it. |
 | `RUDRA_SHOP_RECORDINGS`  | Where transcripts live. Defaults to `recordings/` under the working directory; the test run points it at this folder.            |
-| `CI`                     | When it's set, a replay miss throws instead of degrading, so a CI run can't quietly measure the fallback component.              |
 
 ## Re-recording a transcript
 

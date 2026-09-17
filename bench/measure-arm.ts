@@ -19,14 +19,7 @@ export interface TokenPrices {
   cacheReadPerMillion: number;
 }
 
-/**
- * Where an arm's numbers came from.
- *
- * 'stub' is a fixed answer with a recorded call's token counts. 'replay' is a
- * recording of real answers. 'live' is a real model, on the network, billing.
- * The numbers read the same in all three, which is why the run has to say
- * which one it was.
- */
+/** The numbers read the same whichever answered, so a run has to say which one it was. */
 export type ArmMode = 'stub' | 'replay' | 'live';
 
 /** What an arm claims about itself, next to what actually answered it. */
@@ -50,16 +43,14 @@ export interface ArmResult {
   modelCallsPerThousand: number;
   inputTokens: number;
   outputTokens: number;
-  // Kept apart from the input tokens rather than folded in, so a reader can
-  // re-price the cached prefix at read rates instead of write rates.
+  // Kept out of the input tokens, so a reader can re-price the cached prefix at read rates.
   cacheWriteTokens: number;
   cacheReadTokens: number;
   costPerThousandViews: number;
   // Filled in by run-arm, which measures a whole process.
   cpuUserMs?: number;
   cpuSystemMs?: number;
-  // Absent for a stub run. The stub answers far below the millisecond that
-  // Date.now() can see, so its median is a 0 dressed up as a measurement.
+  // Absent for a stub run: the stub answers far below what Date.now() can see.
   elapsedMs?: { median: number; p95: number; p99: number };
   violations: Record<string, number>;
 }
@@ -90,8 +81,7 @@ export function summarise(
     sources[event.source] += 1;
     timings.push(event.elapsedMs);
 
-    // Only the request that was sent is billed. One that joined an in-flight
-    // generation carries the same usage and would double the bill.
+    // A view that joined an in-flight generation carries the same usage and would double the bill.
     if (event.calledModel) {
       modelCalls += 1;
       inputTokens += event.usage?.inputTokens ?? 0;
@@ -148,27 +138,16 @@ export interface SourceRule {
   fallback: 'none' | 'all';
   minCacheHitRate?: number;
   maxCacheHitRate?: number;
-  /**
-   * 'none' means the arm must not have called a model at all. This is a
-   * different check than `fallback: 'all'`: a call that timed out or errored
-   * still counts as `calledModel`, and still bills, even though its source
-   * comes back as fallback. `fallback: 'all'` alone would not catch that.
-   */
+  /** Not the same check as `fallback: 'all'`: a call that timed out still bills. */
   modelCalls?: 'none';
 }
 
-// A run whose sources do not match its arm is a different arm under the wrong
-// name. Throwing is the only way a benchmark can refuse to publish that.
 export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
-  // A run that measured nothing cannot be evidence of anything.
   if (result.views === 0) {
     throw new Error(`arm ${result.arm}: no views were measured`);
   }
 
-  // The mode is typed into the arm by hand; the provider name comes off
-  // whatever object answered the calls. Two different sources, so they can
-  // disagree — and a run labelled live that a stub answered is the exact
-  // mistake this benchmark was written after.
+  // The mode is typed in by hand, the provider name comes off whatever answered: they can disagree.
   const stubbed = result.providerName === null || result.providerName === 'stub';
   if (result.mode !== 'stub' && stubbed) {
     throw new Error(
@@ -208,11 +187,8 @@ export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
   }
 }
 
-// Up to four, because one product that the shopper already has in their cart
-// is dropped by reconciliation and a single-item grid would empty.
 function candidateSkus(userPrompt: string, limit: number): string[] {
-  // Only read the candidates section, so nothing else in the prompt can be
-  // mistaken for one.
+  // Only the candidates section, so nothing else in the prompt can be read as a SKU.
   const start = userPrompt.indexOf('## Candidates');
   if (start < 0) throw new Error('the stub found no candidates section in the prompt');
   const candidates = userPrompt.slice(start);
@@ -226,15 +202,16 @@ function candidateSkus(userPrompt: string, limit: number): string[] {
   return skus;
 }
 
-// The stub answers like a model does, with products from the list it was
-// shown. A SKU the shopper was never offered is dropped by reconciliation,
-// and the arm would fall back.
+// Reconciliation drops a SKU the shopper was never offered and one already in their
+// cart, so the stub picks from the prompt, with a spare.
+const STUB_GRID_ITEMS = 4;
+
 export function createStubProvider(usage: TokenUsage): ComponentProvider {
   return {
     name: 'stub',
     model: 'stub',
     async generate(request) {
-      return { spec: buildStubSpec(candidateSkus(request.user, 4)), usage };
+      return { spec: buildStubSpec(candidateSkus(request.user, STUB_GRID_ITEMS)), usage };
     },
   };
 }
@@ -247,21 +224,10 @@ export interface ArmSpec {
   rule: SourceRule;
 }
 
-/**
- * How many shoppers look at the same page.
- *
- * This one number sets the headline cache hit rate: it decides how many
- * shoppers can share a cohort, and nothing else in the run moves it as much.
- * Ten is an assumption about traffic, not a measurement — an earlier
- * ten-per-cohort figure was withdrawn because it counted a different page
- * assignment. It is a parameter and it goes into the result file so whoever
- * writes the numbers up can say what was assumed, or sweep it.
- */
+/** An assumption about traffic, not a measurement, and it sets the headline cache hit rate. */
 export const SHOPPERS_PER_PAGE = 10;
 
-// Real traffic puts many shoppers on the same page, and the cohort key
-// includes the page's category — a unique product per shopper would mean a
-// unique cohort per shopper, and nothing would ever be shared.
+// A unique product per shopper would mean a unique cohort per shopper, and nothing shared.
 export function skuFor(
   index: number,
   shopperCount: number,
@@ -274,18 +240,12 @@ export function skuFor(
   }
   if (inStock.length === 0) throw new Error('the catalog has nothing in stock');
 
-  // Clamped rather than folded: folding a page count bigger than the catalog
-  // back onto it (with a second modulo) hands the wrapped-around pages a
-  // second helping of shoppers, which merges cohorts and inflates the cache
-  // hit rate — the exact distortion this whole benchmark exists to measure
-  // honestly. Once there are more pages than products, one page per product
-  // is the most pages there can honestly be.
+  // Clamped rather than folded: folding more pages than products back onto the catalog
+  // would merge cohorts and inflate the cache hit rate.
   const pages = Math.min(Math.max(1, Math.floor(shopperCount / shoppersPerPage)), inStock.length);
   return inStock[index % pages]!.sku;
 }
 
-// The stub always answers with this, one grid item per SKU it picked from the
-// prompt.
 export function buildStubSpec(skus: readonly string[]): GeneratedSpec {
   const items: ProductReference[] = [];
   for (const sku of skus) {
@@ -323,14 +283,11 @@ export async function measureArm(
     },
   });
 
-  // In population order on a cold cache: the first shopper of a cohort misses
-  // and the rest hit, which is what really happens.
+  // Population order on a cold cache: the first shopper of a cohort misses and the rest hit.
   for (let index = 0; index < shoppers.length; index += 1) {
     const shopper = shoppers[index]!;
     const sku = skuFor(index, shoppers.length, catalog, shoppersPerPage);
-    // One at a time is the measurement: running these together would let
-    // shoppers of one cohort race the first request, and the cache hit rate is
-    // what we came for.
+    // One at a time is the measurement: in parallel, a cohort would race its own first request.
     // oxlint-disable-next-line no-await-in-loop
     await generator.generate(buildTrackingInput(shopper, sku, catalog, []));
   }

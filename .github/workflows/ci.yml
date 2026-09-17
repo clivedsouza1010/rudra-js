@@ -78,8 +78,7 @@ jobs:
 
       - run: npm ci --ignore-scripts
       - run: npm run build
-      # No RUDRA_SHOP_MODE here: the shop replays, and a replay miss is an
-      # error in CI rather than a quiet fallback.
+      # No RUDRA_SHOP_MODE here: the shop replays, and a replay miss is an error.
       - run: npm run build --workspace @rudra-js/example-shop
       # Seconds, and it runs before the step that starts a server.
       - run: npm run typecheck --workspace @rudra-js/example-shop

@@ -33,12 +33,9 @@ export function HeroRenderer({
         >
           {product.title}
           <span className="rudra-hero__price">{context.formatPrice(product)}</span>
+          {block.ctaLabel ? <span className="rudra-hero__cta">{block.ctaLabel}</span> : null}
         </a>
       ) : null}
-      {/* Only alongside a product: a "Shop now" with no destination is worse
-          than no call to action, and the model can set one for a SKU the
-          catalog does not have. */}
-      {product && block.ctaLabel ? <span className="rudra-hero__cta">{block.ctaLabel}</span> : null}
     </section>
   );
 }

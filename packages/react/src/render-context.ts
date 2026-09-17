@@ -41,11 +41,6 @@ export function defaultHrefForSku(sku: string): string {
  * the shopper's — a shop serving more than one should pass the shopper's.
  */
 export function defaultFormatPrice(product: Product, locale?: string): string {
-  // A price that is not a finite number is a broken catalog, not a formatting
-  // problem, and Intl will happily render it: null becomes 0 and prints as a
-  // free product, undefined prints as NaN. Neither belongs on a shop page, and
-  // both mean the catalog skipped the validation this package documents as a
-  // precondition. Failing here is a bug report; rendering it is an incident.
   if (!Number.isFinite(product.price)) {
     throw new TypeError(
       `price for SKU ${product.sku} is ${String(product.price)}, not a finite number — ` +
@@ -55,17 +50,10 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
 
   let formatter: Intl.NumberFormat;
   try {
-    // Only the constructor is guarded. Wrapping format() as well would swallow
-    // a throwing getter on a host's own Product object and render the resulting
-    // mess as a price.
+    // Only the constructor: guarding format() too would swallow a throwing
+    // getter on a host's own Product and render the mess as a price.
     formatter = new Intl.NumberFormat(locale, { style: 'currency', currency: product.currency });
   } catch {
-    // Two things reach this. A malformed `locale`, which is a host prop nothing
-    // validates. And a malformed `currency` — which productSchema would have
-    // rejected, but this package takes a catalog directly, so a hand-built
-    // object can carry one. Intl accepts any three-letter code it does not
-    // know, so 'ZZZ' formats; 'us$' and '' do not. A price nobody can
-    // punctuate is still a price worth showing.
     return `${product.currency} ${product.price}`;
   }
 
@@ -90,8 +78,6 @@ export function defaultFormatBundlePrice(bundle: Bundle, locale?: string): strin
   try {
     formatter = new Intl.NumberFormat(locale, { style: 'currency', currency: bundle.currency });
   } catch {
-    // A bad locale, or a currency code Intl rejects on a hand-built bundle,
-    // should not crash the page. A price nobody can punctuate is still a price.
     return `${bundle.currency} ${bundle.price}`;
   }
 

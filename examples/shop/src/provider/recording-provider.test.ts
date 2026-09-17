@@ -110,7 +110,7 @@ describe('replaying a provider', () => {
     const recorded = inner();
     await createRecordingProvider(recorded, directory).generate(request());
 
-    const replay = createReplayProvider({ directory, model: 'test-model', onMiss: 'throw' });
+    const replay = createReplayProvider({ directory, model: 'test-model' });
 
     await expect(replay.generate(request())).resolves.toMatchObject({
       spec,
@@ -119,29 +119,8 @@ describe('replaying a provider', () => {
     expect(recorded.calls).toBe(1);
   });
 
-  it('throws on a miss when asked to, so a run cannot silently measure the fallback', async () => {
-    // A run that quietly falls back to a live call measures one configuration
-    // while reporting another's label. A CI miss must stay silent, unlike the
-    // 'fallback' mode below — a warning here would be as easy to miss in CI
-    // output as no signal at all.
-    const replay = createReplayProvider({
-      directory: scratch(),
-      model: 'test-model',
-      onMiss: 'throw',
-    });
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    await expect(replay.generate(request())).rejects.toThrow(/no recording/i);
-    expect(warn).not.toHaveBeenCalled();
-    warn.mockRestore();
-  });
-
-  it('reports a miss as a provider failure when asked to fall back', async () => {
-    const replay = createReplayProvider({
-      directory: scratch(),
-      model: 'test-model',
-      onMiss: 'fallback',
-    });
+  it('warns and then rejects on a miss, so a run cannot silently measure the fallback', async () => {
+    const replay = createReplayProvider({ directory: scratch(), model: 'test-model' });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await expect(replay.generate(request())).rejects.toThrow(/no recording/i);
@@ -156,7 +135,7 @@ describe('replaying a provider', () => {
     const [file] = readdirSync(directory);
     writeFileSync(join(directory, file!), 'not valid json');
 
-    const replay = createReplayProvider({ directory, model: 'test-model', onMiss: 'throw' });
+    const replay = createReplayProvider({ directory, model: 'test-model' });
 
     await expect(replay.generate(request())).rejects.toThrow(/recording is not valid json/i);
   });

@@ -216,12 +216,3 @@ export function spansIn(indexed: Indexed, phrase: string): Span[] {
     from = at + 1;
   }
 }
-
-/** Both arguments must already be normalised. Spans index the text passed in. */
-export function phraseSpans(text: string, phrase: string): Span[] {
-  return spansIn(indexPhrasing(text), phrase);
-}
-
-export function phraseIn(text: string, phrase: string): boolean {
-  return phraseSpans(text, phrase).length > 0;
-}

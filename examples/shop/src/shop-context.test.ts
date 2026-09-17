@@ -14,12 +14,10 @@ const KEY = 'ANTHROPIC_API_KEY';
 const REPLAY_ONLY = 'RUDRA_REPLAY_ONLY';
 const MODE = 'RUDRA_SHOP_MODE';
 const WORKSPACE = 'ANTHROPIC_WORKSPACE_ID';
-const CI = 'CI';
 const RECORDINGS = 'RUDRA_SHOP_RECORDINGS';
 
 // So afterEach can put this back instead of erasing it - a pool sharing one process across files needs that.
 const AMBIENT_REPLAY_ONLY = process.env[REPLAY_ONLY];
-const AMBIENT_CI = process.env[CI];
 const AMBIENT_RECORDINGS = process.env[RECORDINGS];
 
 const restore = (name: string, value: string | undefined) => {
@@ -44,7 +42,6 @@ afterEach(() => {
   delete process.env[MODE];
   delete process.env[WORKSPACE];
   restore(REPLAY_ONLY, AMBIENT_REPLAY_ONLY);
-  restore(CI, AMBIENT_CI);
   restore(RECORDINGS, AMBIENT_RECORDINGS);
   vi.clearAllMocks();
   // The module reads the environment once, so each case needs a fresh copy.
@@ -111,8 +108,6 @@ describe('the replay-only switch', () => {
 
     const { chooseProvider } = await import('./shop-context');
     const provider = chooseProvider();
-    // A miss under 'fallback' also rejects, but warns first — 'throw' does
-    // not. This is the only observable difference, so it is what pins the mode.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await expect(
@@ -123,7 +118,6 @@ describe('the replay-only switch', () => {
         signal: AbortSignal.timeout(1000),
       }),
     ).rejects.toThrow(/no recording/i);
-    expect(warn).not.toHaveBeenCalled();
 
     warn.mockRestore();
   });
@@ -270,22 +264,8 @@ describe('the mode switch', () => {
 });
 
 describe('a replay miss outside replay-only', () => {
-  it('rejects without a warning in CI', async () => {
+  it('warns, then rejects', async () => {
     delete process.env[REPLAY_ONLY];
-    process.env[CI] = '1';
-
-    const { chooseProvider } = await import('./shop-context');
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    await expect(chooseProvider().generate(missingRequest())).rejects.toThrow(/no recording/i);
-    expect(warn).not.toHaveBeenCalled();
-
-    warn.mockRestore();
-  });
-
-  it('warns, then rejects, outside CI', async () => {
-    delete process.env[REPLAY_ONLY];
-    delete process.env[CI];
 
     const { chooseProvider } = await import('./shop-context');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

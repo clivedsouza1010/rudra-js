@@ -75,12 +75,8 @@ export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): Spe
   const ttlMs = options.ttlMs ?? 60_000;
   const maxEntries = options.maxEntries ?? 10_000;
 
-  // Checked rather than trusted, because the way these are usually supplied is
-  // `Number(process.env.SOMETHING)`, and an unset or misspelled variable makes
-  // that NaN. Every comparison against NaN is false, so the cache would then
-  // never expire an entry and never evict one — it would grow forever while
-  // serving a shopper the component they were given last week, and nothing
-  // would report it. Failing at construction is the only loud option.
+  // Usually `Number(process.env.X)`: an unset variable makes these NaN, and every
+  // comparison against NaN is false, so nothing would ever expire or be evicted.
   assertFiniteAtLeastZero('ttlMs', ttlMs);
   assertFiniteAtLeastZero('maxEntries', maxEntries);
   if (!Number.isSafeInteger(maxEntries)) {
@@ -100,8 +96,8 @@ export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): Spe
         return undefined;
       }
 
-      // Re-insert so insertion order tracks recency of use, which is what makes
-      // the eviction below least-recently-used rather than oldest-written.
+      // Re-insert so insertion order tracks recency, which makes the eviction below
+      // least-recently-used rather than oldest-written.
       entries.delete(key);
       entries.set(key, entry);
       return entry.cached;
@@ -187,8 +183,8 @@ export function specCacheKey(
   providerId: string,
 ): string {
   const material = canonicalise({
-    // The spec's own version, so a shape change cannot read entries written by
-    // the previous shape out of a shared store that outlives a deploy.
+    // So a shape change cannot read entries written by the previous shape out of
+    // a shared store that outlives a deploy.
     specVersion: SPEC_VERSION,
     prompt: PROMPT_FINGERPRINT,
     provider: providerId,
@@ -199,8 +195,7 @@ export function specCacheKey(
   return createHash('sha256').update(material).digest('hex').slice(0, 32);
 }
 
-// Leaves out the fields that make a key personal: who the shopper is, what they
-// liked, viewed or searched for.
+// Leaves out the personal fields: who the shopper is, what they liked, viewed or searched.
 export function cohortCacheKey(
   digest: SignalDigest,
   candidateSkus: readonly string[],
@@ -216,8 +211,7 @@ export function cohortCacheKey(
     locale: digest.locale,
     maxItems: digest.maxItems,
     isColdStart: digest.isColdStart,
-    // The page being looked at, so copy written for a backpack page is not
-    // served on a tent page.
+    // So copy written for a backpack page is not served on a tent page.
     currentCategory: digest.currentCategory ?? null,
     topCategory: digest.categoryAffinity[0]?.category ?? null,
     candidates: candidateSkus.toSorted(),
