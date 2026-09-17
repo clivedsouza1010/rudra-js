@@ -139,18 +139,10 @@ export class TimeoutError extends Error {
 }
 
 /**
- * Races a promise against a deadline.
- *
- * The deadline is enforced here rather than trusted to the thing being waited
- * on. A provider that ignores its abort signal, or a store that never settles,
- * must still not hold a page open.
- *
- * Once the deadline has fired the caller is told so, whatever the race
- * actually settled with. Aborting is what makes that necessary: a provider
- * honouring its half of the contract rejects from inside the `abort()` below,
- * so its rejection reaches the race first and the deadline's own never wins.
- * Reporting the error that happened to arrive would blame the vendor for the
- * caller's deadline — and blame it most often on the best-behaved adapters.
+ * Once the deadline has fired the caller is told so, whatever the race actually
+ * settled with: a provider honouring its half of the contract rejects from
+ * inside the `abort()` below, so its rejection reaches the race first and the
+ * deadline's own never wins.
  */
 async function withinBudget<T>(
   label: string,
@@ -178,14 +170,6 @@ async function withinBudget<T>(
   }
 }
 
-/**
- * Collapses concurrent work for the same key into one execution.
- *
- * Without this, a key that is not yet cached fans out into one model call per
- * concurrent request — the same answer, bought many times over. The entry is
- * removed as soon as it settles, so one failure does not poison the next
- * attempt.
- */
 function createSingleFlight<T>() {
   const inFlight = new Map<string, Promise<T>>();
 
@@ -214,37 +198,23 @@ interface CacheRead {
   entry?: CachedSpec;
 }
 
-/**
- * What one call to the model produced.
- *
- * `spec` is null when the answer did not satisfy the schema. `usage` is carried
- * either way: the request went out and was paid for whether or not anything
- * usable came back, and those are the calls most worth seeing.
- */
+/** `spec` is null when the answer did not satisfy the schema. `usage` is carried either way: the call was still billed. */
 interface ModelCall {
   spec: GeneratedSpec | null;
   usage?: TokenUsage;
 }
 
-/** A model call whose answer can be reconciled and served. */
 interface ModelAnswer extends ModelCall {
   spec: GeneratedSpec;
 }
 
 /**
- * Fills a cohort spec with this shopper's products, keeping room for a set.
- *
- * The grid used to take the whole item budget, so a bundle block later in the
- * spec found nothing left and was dropped. The set is chosen first, its
- * products are held back from the grid, and the grid's limit drops by what the
- * set and the heroes have already spoken for.
- *
  * The arithmetic has to hold whatever order the model put the blocks in, so it
  * is written as one sum over the whole spec rather than as a running budget:
  * the grid gets `maxItems` minus every distinct product the set and the heroes
- * will place. Nothing is then dropped for want of budget, and reconciliation
- * reaches the same set this did — it can only ever have more placed than the
- * pre-choice assumed, and never one of the set's own products.
+ * will place. Reconciliation then reaches the same set this did — it can only
+ * ever have more placed than the pre-choice assumed, and never one of the set's
+ * own products.
  */
 function fitCohortSpec(
   spec: GeneratedSpec,
@@ -288,7 +258,6 @@ function fitCohortSpec(
   return fitToShopper(spec, forGrid, roomLeft, ourReasons);
 }
 
-/** Attaches the provenance the server owns. The model never supplies any of it. */
 function withProvenance(
   spec: GeneratedSpec,
   provenance: Omit<ComponentSpec, keyof GeneratedSpec | 'specVersion'>,
@@ -322,12 +291,6 @@ export function createComponentGenerator(
     startedAt: number,
     key: string | null,
     degradedReason: DegradedReason,
-    /**
-     * What the model call cost, when there was one. A generation that is
-     * unusable for this shopper was still asked for and still billed, so
-     * omitting it here would hide the calls that produce nothing — exactly the
-     * ones worth knowing about.
-     */
     modelCall: Pick<GenerationEvent, 'calledModel' | 'usage' | 'violations' | 'cache' | 'error'> = {
       calledModel: false,
     },
@@ -352,36 +315,18 @@ export function createComponentGenerator(
     });
   };
 
-  /**
-   * Reads the cache, treating anything unexpected as a miss.
-   *
-   * The value is re-validated because a store is a port a host implements, and
-   * what comes back is no more trustworthy than what a model returns — a shared
-   * store outlives a deploy, so it can hold entries written by an older shape of
-   * the spec. Generating again is always safe; handing an unvalidated object to
-   * reconciliation is not.
-   */
   const readCache = async (key: string): Promise<CacheRead> => {
     try {
       const stored = await withinBudget('cache read', cacheTimeoutMs, () => cache.get(key));
       const parsed = cachedSpecSchema.safeParse(stored);
       return parsed.success ? { outcome: 'hit', entry: parsed.data } : { outcome: 'miss' };
     } catch (error) {
-      // A store that is down or slow degrades to generating, not to an error
-      // page. Nothing here is worth failing a render over.
+      // A store that is down or slow degrades to generating, not to an error page.
       return { outcome: error instanceof TimeoutError ? 'timeout' : 'error' };
     }
   };
 
-  /**
-   * Writes to the cache without the render waiting for it.
-   *
-   * The spec is already in hand; nothing downstream needs the write to finish.
-   * Awaiting it put a second unbounded call to a host-implemented store on the
-   * render path, which is the failure this module exists to prevent arriving
-   * through the other door. The `Promise.resolve` wrapper is what catches a
-   * store that throws synchronously rather than rejecting.
-   */
+  /** The `Promise.resolve` wrapper catches a store that throws synchronously rather than rejecting. */
   const storeInBackground = (key: string, cached: CachedSpec): void => {
     void Promise.resolve()
       .then(() => cache.set(key, cached))
@@ -391,15 +336,10 @@ export function createComponentGenerator(
   };
 
   /**
-   * Asks the model.
-   *
    * Deliberately does not decide whether the answer is usable. That depends on
    * the asking shopper's live facts — stock, dislikes, what is in their basket
    * — and none of those are in the cache key, so a verdict reached here would
-   * be handed to every request that joined this one. A null `spec` in the
-   * result means the answer did not satisfy the schema, which is a fault of the
-   * adapter rather than a judgement about any shopper — and is still a call
-   * that happened, so its usage comes back with it.
+   * be handed to every request that joined this one.
    */
   const askModel = async (
     active: ComponentProvider,
@@ -450,9 +390,7 @@ export function createComponentGenerator(
       const cached = read.entry;
       let calledModel = false;
       let answer: ModelAnswer;
-      // When the model produced this, not when it was served. A cached
-      // component is not newly generated, and pretending otherwise makes any
-      // measure of how stale a page is showing read as zero.
+      // When the model produced this, not when it was served.
       let generatedAt: number;
 
       if (cached) {
@@ -460,8 +398,7 @@ export function createComponentGenerator(
         generatedAt = cached.generatedAt;
       } else {
         // Asked before joining, because by the time the shared promise settles
-        // the entry is gone and there is no way to tell a leader from a
-        // follower — and they must not both be counted as a model call.
+        // the entry is gone and there is no way to tell a leader from a follower.
         calledModel = !singleFlight.isRunning(key);
 
         let call: ModelCall;
@@ -471,9 +408,6 @@ export function createComponentGenerator(
           );
         } catch (error) {
           const reason = error instanceof TimeoutError ? 'timeout' : 'provider-error';
-          // The request went out. Leaving `calledModel` to default here reported
-          // every failed call as no call at all, so the calls that cost money
-          // and produced nothing were the only ones missing from the count.
           return buildDeterministic(input, digest, startedAt, key, reason, {
             calledModel,
             cache: read.outcome,
@@ -495,18 +429,13 @@ export function createComponentGenerator(
         // Stored unreconciled on purpose, and stored even when it is unusable
         // for this shopper. Reconciliation narrows a spec to one shopper's live
         // facts, and those move independently of the key — a product can sell
-        // out and come back without the candidate list changing. Keeping what
-        // the model said means the restock is picked up from cache rather than
-        // paid for again.
+        // out and come back without the candidate list changing.
         if (calledModel) storeInBackground(key, { spec: answer.spec, generatedAt });
       }
 
-      // One place where anything is served, whichever side of the cache it came
-      // from, and always against the facts of the shopper asking now.
       // A cohort spec names products chosen for whoever asked first, and every
-      // reason under one of them is written here rather than by the model. Only
-      // the cohort path does that, so in per-shopper mode this stays empty and
-      // every reason is screened.
+      // reason under one of them is written here rather than by the model. In
+      // per-shopper mode this stays empty and every reason is screened.
       const ourReasons = new Map<string, string>();
       const served =
         generation === 'cohort'
