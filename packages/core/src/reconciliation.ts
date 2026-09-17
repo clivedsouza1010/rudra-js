@@ -15,7 +15,7 @@ import type { Bundle, Product, TrackingInput } from './tracking-input.js';
  * fails outright.
  */
 
-/** Truncation ceilings. Not in the schema — it doubles as a structured-output schema, which bans length bounds. */
+/** Truncation ceilings. Not in the schema — a provider's strict mode rejects length bounds. See `component-spec.ts`. */
 const CLAMP = {
   headline: 90,
   subheadline: 140,
@@ -244,7 +244,8 @@ const CONFUSABLES: Record<string, string> = {
 };
 
 /**
- * Renders as nothing. Cf and Default_Ignorable each hold characters the other does not.
+ * Characters that render as nothing: format characters, default-ignorable code points and the
+ * controls. Cf and Default_Ignorable each hold characters the other does not.
  * A second copy of the class in attested's `hidden.ts`, pinned to it by a test.
  */
 const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
@@ -253,6 +254,7 @@ const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
 const SPACING = /[\t\n\v\f\r\u0085]/;
 
 /**
+ * Marks that hang on the character before them instead of taking a column of their own.
  * Dropped after composition, so an accented e keeps its accent while an overline,
  * which composes with nothing, cannot hide a word from its own rule.
  */
@@ -403,7 +405,8 @@ function screenClaim(
     return null;
   }
 
-  // Nothing for the quantity layer to weigh without a numeral, whatever the facts say.
+  // Nothing for the quantity layer to weigh without a numeral, whatever the facts say,
+  // and reading the fact list to prove that again per field is most of what this costs.
   const weighed = NUMERAL.test(value) ? facts : NO_FACTS;
 
   const result = verify(value, { values: weighed, allowedPhrases: ALLOWED_PHRASES });
