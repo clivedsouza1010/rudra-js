@@ -14,9 +14,7 @@ export function BundleRenderer({
   const products: Product[] = [];
   for (const sku of bundle.skus) {
     const product = context.products.get(sku);
-    // A set missing one of its parts is not that set.
-    if (!product) return null;
-    products.push(product);
+    if (product) products.push(product);
   }
 
   return (
