@@ -56,9 +56,23 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
   gap: 1.25rem;
-  list-style: none;
   padding: 0;
   margin: 0;
+}
+
+/* Honoured where even four cards clear the 13rem above; narrower, auto-fill decides. */
+@media (min-width: 64rem) {
+  .rudra-grid[data-rudra-columns='2'] .rudra-grid__items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rudra-grid[data-rudra-columns='3'] .rudra-grid__items {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rudra-grid[data-rudra-columns='4'] .rudra-grid__items {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /* Nothing here scrolls it with JavaScript, so the track has to scroll itself. */
@@ -146,9 +160,7 @@
   font-weight: 600;
 }
 
-.rudra-hero__cta,
-.rudra-bundle__cta,
-.rudra-banner__cta {
+.rudra-hero__cta {
   display: inline-block;
   margin-top: 0.75rem;
   border: 1px solid var(--demo-accent);
@@ -158,16 +170,19 @@
   font-size: 0.875rem;
 }
 
+/* Text, not a control: neither of these has a destination to send anyone to. */
+.rudra-bundle__cta,
+.rudra-banner__cta {
+  font-weight: 600;
+  color: var(--demo-accent);
+}
+
 .rudra-banner {
   border: 1px solid var(--demo-line);
   border-radius: 0.5rem;
   padding: 0.875rem 1rem;
   margin-bottom: 1.5rem;
   background: #f7f7f9;
-}
-
-.rudra-banner__text {
-  margin: 0;
 }
 
 .rudra-copy {
