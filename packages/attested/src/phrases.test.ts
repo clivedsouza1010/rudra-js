@@ -1,13 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import {
-  BANNED_PHRASES,
-  indexPhrasing,
-  normalisePhrasing,
-  phraseIn,
-  phraseSpans,
-  spansIn,
-} from './phrases.js';
+import { BANNED_PHRASES, indexPhrasing, normalisePhrasing, spansIn } from './phrases.js';
+
+// Both arguments must already be normalised. Spans index the text passed in.
+function phraseSpans(text: string, phrase: string) {
+  return spansIn(indexPhrasing(text), phrase);
+}
+
+function phraseIn(text: string, phrase: string) {
+  return phraseSpans(text, phrase).length > 0;
+}
 
 describe('normalisePhrasing', () => {
   it('lowercases', () => {
