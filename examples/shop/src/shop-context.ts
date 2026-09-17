@@ -2,9 +2,7 @@ import { join } from 'node:path';
 import {
   createComponentGenerator,
   createMemorySpecCache,
-  type Bundle,
   type ComponentProvider,
-  type Product,
 } from '@rudra-js/core';
 import { createAnthropicProvider } from '@rudra-js/anthropic';
 import { generateBundles } from './fixtures/bundles';
@@ -24,10 +22,25 @@ export const RECORDINGS_DIRECTORY =
 // Core defaults to 1500ms, which is under this model's thinking time.
 const MODEL_TIMEOUT_MS = 60_000;
 
-const catalog = generateCatalog(CATALOG_SEED);
-const bundles = generateBundles(catalog);
-const shoppers = generateShoppers(SHOPPER_SEED, catalog);
+export const catalog = generateCatalog(CATALOG_SEED);
+export const bundles = generateBundles(catalog);
+export const shoppers = generateShoppers(SHOPPER_SEED, catalog);
+
 const byId = new Map(shoppers.map((shopper) => [shopper.id, shopper]));
+
+const ANONYMOUS_SHOPPER: Shopper = {
+  id: 'anonymous',
+  segment: 'new',
+  isReturning: false,
+  likedSkus: [],
+  viewedSkus: [],
+  cartSkus: [],
+  searches: [],
+};
+
+export function findShopper(id: string | undefined): Shopper {
+  return byId.get(id ?? '') ?? ANONYMOUS_SHOPPER;
+}
 
 // The adapter keeps the vendor's message out of its error on purpose, so log it here.
 function withVisibleFailures(provider: ComponentProvider): ComponentProvider {
@@ -98,7 +111,7 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export const specCache = createMemorySpecCache({ ttlMs: CACHE_TTL_MS });
 
-const generator = createComponentGenerator({
+export const generator = createComponentGenerator({
   provider: chooseProvider(),
   cache: specCache,
   onEvent: (event) => {
@@ -107,28 +120,3 @@ const generator = createComponentGenerator({
   },
   modelTimeoutMs: MODEL_TIMEOUT_MS,
 });
-
-export function getShopContext(): {
-  catalog: readonly Product[];
-  bundles: readonly Bundle[];
-  shoppers: readonly Shopper[];
-  findShopper: (id: string | undefined) => Shopper;
-  generator: ReturnType<typeof createComponentGenerator>;
-} {
-  return {
-    catalog,
-    bundles,
-    shoppers,
-    findShopper: (id) =>
-      byId.get(id ?? '') ?? {
-        id: 'anonymous',
-        segment: 'new',
-        isReturning: false,
-        likedSkus: [],
-        viewedSkus: [],
-        cartSkus: [],
-        searches: [],
-      },
-    generator,
-  };
-}
