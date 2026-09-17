@@ -22,8 +22,7 @@ jobs:
 
       - run: npm ci --ignore-scripts
       - run: npm run build
-      # No ANTHROPIC_API_KEY here: the shop replays, and a replay miss is an
-      # error in CI rather than a quiet fallback.
+      # No ANTHROPIC_API_KEY here: the shop replays, and a replay miss is an error.
       - run: npm run build --workspace @rudra-js/example-shop
 
       - run: npm run matrix:crawler | tee "$RUNNER_TEMP/matrix.txt"
