@@ -42,10 +42,8 @@ const SCORE_WEIGHTS = {
 /** Beyond this many shared tags, more overlap says nothing new. */
 const MAX_TAG_OVERLAP = 3;
 
-/** Assumed rating for a product the catalog does not rate. */
 const UNRATED = 3.5;
 
-/** Tags on the products this shopper has actually engaged with. */
 function engagedTags(input: TrackingInput, digest: SignalDigest): Set<string> {
   const engagedSkus = new Set([
     ...digest.likedSkus,
