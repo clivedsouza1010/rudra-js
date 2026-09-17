@@ -1655,6 +1655,22 @@ describe('the two passes attested adds', () => {
     expect(kindFor(digits)).toBe('quantity');
   });
 
+  // Which characters come out before a claim is read decides what the claim
+  // says. One that takes no room on the page is removed, so the pattern sees the
+  // number a shopper sees; one that leaves a gap stays, so two numbers are two
+  // numbers. Measured in a browser rather than assumed: against a bare "50" at
+  // 19.34px, a zero-width space and a soft hyphen are also 19.34, a space is
+  // 23.53, and U+0085 is 35.34 — it draws a box, so nobody reads it as "23".
+  it('does not read through a character that leaves a gap on the page', () => {
+    // The pair either side of the line in `SPACING`. A backspace takes no room,
+    // so the patterns are shown "in stock" and catch it; U+0085 draws a box —
+    // measured in a browser at 35.34px against 19.34px for the two characters
+    // alone — so nobody reads "in st<U+0085>ock" as a stock claim and neither
+    // does the screen. Drop U+0085 from `SPACING` and this becomes `stock`.
+    expect(kindFor('in stock in your size')).toBe('stock');
+    expect(kindFor('in stock in your size')).toBeNull();
+  });
+
   // The screen hands attested no facts at all for a sentence with no numeral in
   // it, because there is nothing there to weigh and reading the fact list again
   // for every field is most of what this costs. That is attested's promise rather
