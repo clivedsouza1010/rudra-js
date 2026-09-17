@@ -78,11 +78,7 @@ export const DIGEST_LIMITS = {
   interactionTypes: 8,
 } as const;
 
-/**
- * How much intent each kind of signal implies. A purchase says more about a
- * shopper than a view; an explicit dislike says the most, and says it in the
- * opposite direction.
- */
+/** How much intent each kind of signal implies. */
 const SIGNAL_WEIGHTS = {
   purchase: 5,
   like: 4,
@@ -107,7 +103,6 @@ function byMostRecent(
   return (right.at ?? 0) - (left.at ?? 0);
 }
 
-/** The most recent `limit` SKUs, each appearing once. */
 function recentUniqueSkus(signals: SkuSignal[], limit: number): string[] {
   const skus: string[] = [];
   const alreadySeen = new Set<string>();
@@ -122,11 +117,6 @@ function recentUniqueSkus(signals: SkuSignal[], limit: number): string[] {
   return skus;
 }
 
-/**
- * A signal may name its own category; otherwise we look the SKU up in the
- * candidate set. A signal for a product that is not a candidate today and
- * carries no category simply contributes nothing.
- */
 function categoryOf(
   signal: { sku: string; category?: string | undefined },
   candidatesBySku: Map<string, Product>,
@@ -188,7 +178,6 @@ function computeCategoryAffinity(
 
 interface MergedView extends ViewedProduct {
   category?: string;
-  /** Always resolved, so no consumer has to re-apply the default. */
   weight: number;
 }
 
@@ -201,8 +190,6 @@ interface MergedView extends ViewedProduct {
  * over, defeating the sub-linear scaling in `computeCategoryAffinity` entirely.
  * Merging first makes the score depend on how much someone looked, not on how
  * their tracking pipeline happens to batch.
- *
- * Where records disagree on `weight`, the strongest wins.
  */
 function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
   const totalsBySku = new Map<string, MergedView>();
@@ -228,7 +215,6 @@ function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
   return [...totalsBySku.values()];
 }
 
-/** The most-viewed few, as the digest reports them. */
 function mostViewedProducts(views: ViewSignal[]): ViewedProduct[] {
   const top = mergeViewsBySku(views)
     .toSorted((left, right) => right.views - left.views)
@@ -243,7 +229,6 @@ function mostViewedProducts(views: ViewSignal[]): ViewedProduct[] {
   return products;
 }
 
-/** The open-vocabulary long tail, reduced to "which kinds, and how often". */
 function countByInteractionType(interactions: Interaction[]): InteractionCount[] {
   const countByType = new Map<string, number>();
 
