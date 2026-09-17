@@ -98,12 +98,6 @@ function basisFor(
   return { basis: 'popular', reason: `Popular in ${product.category}` };
 }
 
-/**
- * Scores every eligible candidate and returns them best first.
- *
- * Ties break on SKU so the order is total: two runs over the same payload
- * produce the same list, which is what makes the control arm reproducible.
- */
 /** How the picks are ordered once the unplaceable ones are gone. */
 export type RankOrder = 'signals' | 'given';
 

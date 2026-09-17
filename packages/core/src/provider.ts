@@ -74,14 +74,7 @@ export interface ComponentProvider {
   generate(request: ProviderRequest): Promise<ProviderResult>;
 }
 
-/**
- * A provider that returns a fixed spec and never touches the network.
- *
- * This is the benchmark's control: it isolates the cost of the framework from
- * the latency of a model, which is the only way to report what server-side
- * rendering itself costs. It is also what the generator's tests run against,
- * since a test that needs an API key is a test nobody runs.
- */
+/** A provider that returns a fixed spec and never touches the network. */
 export function createFixedSpecProvider(spec: GeneratedSpec): ComponentProvider {
   return {
     name: 'fixed',

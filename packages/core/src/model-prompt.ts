@@ -207,7 +207,7 @@ function describeShopper(digest: SignalDigest): string {
   return lines.filter((line): line is string => line !== null).join('\n');
 }
 
-/** One candidate per line. Facts the model must not restate are left out. */
+/** One candidate per line. */
 function describeCandidate(product: Product): string {
   const parts = [quote(product.sku), quote(product.title), quote(product.category)];
   if (product.rating !== undefined) parts.push(`rated ${product.rating}`);

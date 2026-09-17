@@ -309,13 +309,7 @@ const CONFUSABLES: Record<string, string> = {
  */
 const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
 
-/**
- * The controls that do take room. Deleting these would read `Only 2\n3 left` as 23.
- *
- * No test pins this line, and none can: clamping collapses every run of whitespace
- * before a claim is screened, so nothing here ever sees one. It is kept so the class
- * reads the same in both copies.
- */
+/** The controls that do take room. Deleting these would read `Only 2\n3 left` as 23. */
 const SPACING = /[\t\n\v\f\r\u0085]/;
 
 /**
@@ -567,22 +561,21 @@ function reconcileItems(
     const isOurs = item.reason !== null && ourReasons.get(item.sku) === item.reason;
 
     const own = tracker.factsFor(item.sku);
+    const clampedReason = clampNullable(item.reason, CLAMP.reason);
+
+    // The prose exists to state the basis. If the basis did not hold, the prose
+    // is a claim we just decided is untrue.
+    let reason: string | null = null;
+    if (hasSupportedBasis) {
+      reason = isOurs
+        ? clampedReason
+        : screenClaim(clampedReason, `reason:${item.sku}`, tracker, own);
+    }
 
     kept.push({
       sku: item.sku,
       basis: hasSupportedBasis ? item.basis : 'popular',
-      // The prose exists to state the basis. If the basis did not hold, the
-      // prose is a claim we just decided is untrue.
-      reason: hasSupportedBasis
-        ? isOurs
-          ? clampNullable(item.reason, CLAMP.reason)
-          : screenClaim(
-              clampNullable(item.reason, CLAMP.reason),
-              `reason:${item.sku}`,
-              tracker,
-              own,
-            )
-        : null,
+      reason,
       // A badge is the shortest, loudest text on the card, and the schema's own
       // example for it was "Back in stock" — a stock claim. It renders, so it is
       // read for claims like every other sentence the model writes.

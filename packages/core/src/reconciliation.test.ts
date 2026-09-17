@@ -1655,6 +1655,14 @@ describe('the two passes attested adds', () => {
     expect(kindFor(digits)).toBe('quantity');
   });
 
+  const TAKES_NO_ROOM = '';
+  const DRAWS_A_BOX = '';
+
+  it('reads through a character that takes no room, and not through one that does', () => {
+    expect(kindFor(`in st${TAKES_NO_ROOM}ock in your size`)).toBe('stock');
+    expect(kindFor(`in st${DRAWS_A_BOX}ock in your size`)).toBeNull();
+  });
+
   // The screen hands attested no facts at all for a sentence with no numeral in
   // it, because there is nothing there to weigh and reading the fact list again
   // for every field is most of what this costs. That is attested's promise rather
