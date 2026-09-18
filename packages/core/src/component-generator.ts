@@ -11,12 +11,7 @@ import {
 import { buildFallbackSpec } from './fallback-component.js';
 import { buildPrompt } from './model-prompt.js';
 import type { ComponentProvider, TokenUsage } from './provider.js';
-import {
-  MAX_BLOCKS,
-  bundleForShopper,
-  placeableHeroSkus,
-  reconcileSpec,
-} from './reconciliation.js';
+import { bundleForShopper, capBlocks, placeableHeroSkus, reconcileSpec } from './reconciliation.js';
 import { selectProducts, type RankOrder, type ProductPick } from './product-selection.js';
 import { fitToShopper, type FittedSpec } from './fit-to-shopper.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
@@ -223,8 +218,7 @@ function fitCohortSpec(
   rank: RankOrder,
 ): FittedSpec {
   const picks = selectProducts(input, digest, { rank });
-  // Blocks past the cap never render, so a set is not worth reserving for one.
-  const blocks = spec.blocks.slice(0, MAX_BLOCKS);
+  const blocks = capBlocks(spec.blocks);
 
   let hasBundleBlock = false;
   const aboveBundle: Block[] = [];

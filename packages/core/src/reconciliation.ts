@@ -30,13 +30,13 @@ const CLAMP = {
   violationSku: 32,
 } as const;
 
-/**
- * More than this and the component stops being a component.
- *
- * Exported because the fill pass has to read the same blocks this module will:
- * one past the cap never renders, so nothing is worth reserving for it.
- */
+/** More than this and the component stops being a component. */
 export const MAX_BLOCKS = 4;
+
+/** The fill pass calls this too: one past the cap never renders, so nothing is worth reserving for it. */
+export function capBlocks(blocks: Block[]): Block[] {
+  return blocks.slice(0, MAX_BLOCKS);
+}
 
 export interface ReconcileResult {
   spec: GeneratedSpec;
@@ -540,7 +540,7 @@ export function reconcileSpec(
   }
 
   const blocks: Block[] = [];
-  for (const block of generated.blocks.slice(0, MAX_BLOCKS)) {
+  for (const block of capBlocks(generated.blocks)) {
     const reconciled = reconcileBlock(
       block,
       allowlist,
