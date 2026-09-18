@@ -140,14 +140,6 @@ on.`;
  * text exactly the same way, and it missed U+0085, U+061C and U+00AD as well.
  * Properties cover the ones nobody has thought of yet.
  *
- *  - Cc, control. Includes U+0085, a mandatory line break that is not U+000A.
- *  - Cf, format. Zero-width characters, the bidirectional overrides and
- *    isolates, and the tag block, which mirrors all of ASCII invisibly.
- *  - Zl and Zp, the line and paragraph separators.
- *  - Cn and Co, unassigned and private use — undefined rendering by definition.
- *  - The variation selectors supplement, which is assigned and therefore not
- *    caught by Cn, and is invisible.
- *
  * The zero-width joiner is the one exception. It is a format character, but it
  * is also how a family emoji is spelled, so escaping it mangles ordinary
  * product titles. Emoji presentation selectors (U+FE00-U+FE0F) are excluded for
