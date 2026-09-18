@@ -165,13 +165,13 @@ async function withinBudget<T>(
   }
 }
 
-function createSingleFlight<T>() {
-  const inFlight = new Map<string, Promise<T>>();
+function createSingleFlight() {
+  const inFlight = new Map<string, Promise<ModelCall>>();
 
   return {
     isRunning: (key: string) => inFlight.has(key),
 
-    run(key: string, task: () => Promise<T>): Promise<T> {
+    run(key: string, task: () => Promise<ModelCall>): Promise<ModelCall> {
       const existing = inFlight.get(key);
       if (existing) return existing;
 
@@ -267,7 +267,7 @@ export function createComponentGenerator(
   const rank = options.rank ?? 'signals';
   const modelTimeoutMs = options.modelTimeoutMs ?? 1_500;
   const cacheTimeoutMs = options.cacheTimeoutMs ?? 50;
-  const singleFlight = createSingleFlight<ModelCall>();
+  const singleFlight = createSingleFlight();
 
   const report = (event: GenerationEvent): void => {
     if (!options.onEvent) return;
