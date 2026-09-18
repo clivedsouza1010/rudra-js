@@ -70,8 +70,6 @@ describe('a product page', () => {
     );
   });
 
-  // Whether the slot ships client JavaScript is checked by `npm run verify:crawlable`,
-  // which reads a page off a running server. Nothing here can see it.
   it('renders for a cold-start shopper as well as a rich one', async () => {
     // Different digests, different cache keys, different code paths through
     // selection. A page that only works for one is not working.
