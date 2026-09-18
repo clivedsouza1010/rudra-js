@@ -11,13 +11,8 @@ import {
 } from './component-spec.js';
 import { selectProducts } from './product-selection.js';
 import { buildDigest } from './signal-digest.js';
-import {
-  ALLOWED_PHRASES,
-  MAX_BLOCKS,
-  productFacts,
-  reconcileSpec,
-  type ReconcileResult,
-} from './reconciliation.js';
+import { ALLOWED_PHRASES, productFacts } from './claim-screening.js';
+import { MAX_BLOCKS, reconcileSpec, type ReconcileResult } from './reconciliation.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
@@ -1708,7 +1703,7 @@ describe('the two passes attested adds', () => {
       ['MARKS', '../../attested/src/hidden.ts'],
       ['CONFUSABLES', '../../attested/src/phrases.ts'],
     ] as const) {
-      expect(declarationOf('./reconciliation.ts', name), `${name} has drifted`).toBe(
+      expect(declarationOf('./claim-screening.ts', name), `${name} has drifted`).toBe(
         declarationOf(attestedPath, name),
       );
     }
