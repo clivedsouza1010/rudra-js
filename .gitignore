@@ -9,5 +9,5 @@ dist/
 .next/
 next-env.d.ts
 
-# Benchmark output. Numbers reach the repo through the paper, not as files.
+# Benchmark output. Every run writes a new timestamped file.
 bench/results/
