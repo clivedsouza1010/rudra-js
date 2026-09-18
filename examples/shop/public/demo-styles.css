@@ -56,8 +56,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
   gap: 1.25rem;
-  padding: 0;
-  margin: 0;
 }
 
 /* Nothing here scrolls it with JavaScript, so the track has to scroll itself. */
