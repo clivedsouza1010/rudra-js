@@ -8,9 +8,9 @@ const SLOT = 'data-rudra-slot';
 const HIDDEN_HOLDER = '<div hidden id="S:';
 const SWAP_SCRIPT = '$RC(';
 
-export const NO_SLOT = 'the page has no recommendation slot at all';
-export const NO_MAIN = 'the page has no </main>, so the slot position cannot be checked';
-export const AFTER_MAIN = 'the slot is after </main>, so it is not in position';
+const NO_SLOT = 'the page has no recommendation slot at all';
+const NO_MAIN = 'the page has no </main>, so the slot position cannot be checked';
+const AFTER_MAIN = 'the slot is after </main>, so it is not in position';
 export const HIDDEN_DIV = 'the page holds content in a hidden div for a script to move';
 export const SWAP = 'the page uses a script to move content into place';
 
