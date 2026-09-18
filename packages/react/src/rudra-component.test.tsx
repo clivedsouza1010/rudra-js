@@ -408,6 +408,20 @@ describe('the component as a whole', () => {
 
     expect(render(gridSpec(), { registry })).toContain('rudra-grid');
   });
+
+  // The wrapper decision needs every block answered, and a host renderer runs too late.
+  it('drops an emptied block before a host renderer sees it', () => {
+    let calls = 0;
+    const registry = extendRegistry({
+      grid: () => {
+        calls += 1;
+        return <div className="my-own-grid" />;
+      },
+    });
+
+    expect(render(gridSpec([reference('GHOST-1')]), { registry })).toBe('');
+    expect(calls).toBe(0);
+  });
 });
 
 /**
