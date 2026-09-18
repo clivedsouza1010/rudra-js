@@ -44,7 +44,12 @@ export function loadColdUsage(directory: string = RECORDINGS_DIRECTORY): TokenUs
   };
 }
 
-const COLD_USAGE = loadColdUsage();
+let cachedColdUsage: TokenUsage | null = null;
+
+function coldUsage(): TokenUsage {
+  if (cachedColdUsage === null) cachedColdUsage = loadColdUsage();
+  return cachedColdUsage;
+}
 
 // A run with hundreds of model calls can take longer than core's default, and
 // an entry expiring mid-run would fail an arm for a reason unrelated to
@@ -79,7 +84,7 @@ export function buildArm(name: ArmName): ArmSpec {
         name,
         mode: 'stub',
         options: {
-          provider: createStubProvider(COLD_USAGE),
+          provider: createStubProvider(coldUsage()),
           generation: 'cohort',
           cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
         },
@@ -93,7 +98,7 @@ export function buildArm(name: ArmName): ArmSpec {
         name,
         mode: 'stub',
         options: {
-          provider: createStubProvider(COLD_USAGE),
+          provider: createStubProvider(coldUsage()),
           generation: 'per-shopper',
           cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
         },
