@@ -4,7 +4,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { buildTrackingInput } from '../../../fixtures/tracking-input';
 import { transcriptPath } from '../../../provider/recording-provider';
-import { MODEL_ID, RECORDINGS_DIRECTORY, getShopContext } from '../../../shop-context';
+import {
+  MODEL_ID,
+  RECORDINGS_DIRECTORY,
+  bundles,
+  catalog,
+  findShopper,
+} from '../../../shop-context';
 import ProductPage from './page';
 
 const SKU = 'RJ-00001';
@@ -16,7 +22,6 @@ const SHOPPER = 'S-0001';
  * effect instead — once a transcript exists for this page, the page must be
  * served from it. Armed on this page's own transcript, not on any JSON.
  */
-const { catalog, bundles, findShopper } = getShopContext();
 const input = parseTrackingInput(buildTrackingInput(findShopper(SHOPPER), SKU, catalog, bundles));
 const transcript = transcriptPath(
   RECORDINGS_DIRECTORY,

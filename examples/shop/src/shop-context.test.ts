@@ -140,9 +140,8 @@ describe('the replay-only switch', () => {
   });
 
   it('gives the generator that cache, not a copy of it', async () => {
-    const { getShopContext, specCache } = await import('./shop-context');
+    const { bundles, catalog, findShopper, generator, specCache } = await import('./shop-context');
     const { buildTrackingInput } = await import('./fixtures/tracking-input');
-    const { catalog, bundles, findShopper, generator } = getShopContext();
     const get = vi.spyOn(specCache, 'get');
 
     await generator.generate(

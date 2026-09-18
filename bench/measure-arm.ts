@@ -246,7 +246,7 @@ export function skuFor(
   return inStock[index % pages]!.sku;
 }
 
-export function buildStubSpec(skus: readonly string[]): GeneratedSpec {
+function buildStubSpec(skus: readonly string[]): GeneratedSpec {
   const items: ProductReference[] = [];
   for (const sku of skus) {
     items.push({ sku, basis: 'popular', reason: null, badge: null, emphasis: 'normal' });

@@ -41,7 +41,7 @@ const grid = (count: number): GeneratedSpec['blocks'] => [
 
 describe('fitting a shared component to one shopper', () => {
   it('takes the product and the claim from the pick, not from the model', () => {
-    const fitted = fitToShopper(spec(grid(1)), [pick('PICK-1', 'liked_category')], 4);
+    const { spec: fitted } = fitToShopper(spec(grid(1)), [pick('PICK-1', 'liked_category')], 4);
 
     const block = fitted.blocks[0]!;
     if (block.kind !== 'grid') throw new Error('expected a grid');
@@ -55,7 +55,7 @@ describe('fitting a shared component to one shopper', () => {
   });
 
   it('keeps the layout the model chose', () => {
-    const fitted = fitToShopper(spec(grid(1)), [pick('PICK-1')], 4);
+    const { spec: fitted } = fitToShopper(spec(grid(1)), [pick('PICK-1')], 4);
 
     const block = fitted.blocks[0]!;
     if (block.kind !== 'grid') throw new Error('expected a grid');
@@ -64,7 +64,7 @@ describe('fitting a shared component to one shopper', () => {
   });
 
   it('shrinks a block rather than padding it', () => {
-    const fitted = fitToShopper(spec(grid(3)), [pick('PICK-1')], 4);
+    const { spec: fitted } = fitToShopper(spec(grid(3)), [pick('PICK-1')], 4);
 
     const block = fitted.blocks[0]!;
     if (block.kind !== 'grid') throw new Error('expected a grid');
@@ -72,7 +72,7 @@ describe('fitting a shared component to one shopper', () => {
   });
 
   it('gives each slot a different product, in order', () => {
-    const fitted = fitToShopper(
+    const { spec: fitted } = fitToShopper(
       spec([...grid(2), { kind: 'carousel', title: null, items: [modelItem()] }]),
       [pick('PICK-1'), pick('PICK-2'), pick('PICK-3')],
       4,
@@ -86,7 +86,7 @@ describe('fitting a shared component to one shopper', () => {
   });
 
   it('stops at maxItems', () => {
-    const fitted = fitToShopper(spec(grid(3)), [pick('P1'), pick('P2'), pick('P3')], 2);
+    const { spec: fitted } = fitToShopper(spec(grid(3)), [pick('P1'), pick('P2'), pick('P3')], 2);
 
     const block = fitted.blocks[0]!;
     if (block.kind !== 'grid') throw new Error('expected a grid');
@@ -106,13 +106,13 @@ describe('fitting a shared component to one shopper', () => {
       ctaLabel: 'Shop',
     };
 
-    const fitted = fitToShopper(spec([hero]), [pick('PICK-1')], 4);
+    const { spec: fitted } = fitToShopper(spec([hero]), [pick('PICK-1')], 4);
 
     expect(fitted.blocks[0]).toEqual(hero);
   });
 
   it('spends no pick on a hero, so the grid still gets the best one', () => {
-    const fitted = fitToShopper(
+    const { spec: fitted } = fitToShopper(
       spec([
         { kind: 'hero', headline: 'Trail season', body: null, sku: 'MODEL-1', ctaLabel: null },
         ...grid(1),
@@ -132,11 +132,11 @@ describe('fitting a shared component to one shopper', () => {
       { kind: 'copy', title: 'Why these', body: 'Built for wet rock.' },
     ];
 
-    expect(fitToShopper(spec(blocks), [], 4).blocks).toEqual(blocks);
+    expect(fitToShopper(spec(blocks), [], 4).spec.blocks).toEqual(blocks);
   });
 
   it('keeps the headline and tone the model wrote', () => {
-    const fitted = fitToShopper(spec(grid(1)), [pick('PICK-1')], 4);
+    const { spec: fitted } = fitToShopper(spec(grid(1)), [pick('PICK-1')], 4);
 
     expect(fitted.headline).toBe('Picked for you');
     expect(fitted.tone).toBe('neutral');
@@ -148,7 +148,6 @@ describe('reporting which reasons this library wrote', () => {
   // so none of them is the model's and none of them wants screening. Reporting
   // only the shop's half left the screen reading core's own copy.
   it('names every reason it placed, with the words it placed', () => {
-    const ourReasons = new Map<string, string>();
     const picks: ProductPick[] = [
       { ...pick('HOST-1'), reason: 'Bought together with your boots' },
       pick('DERIVED-1'),
@@ -168,7 +167,7 @@ describe('reporting which reasons this library wrote', () => {
       ],
     };
 
-    fitToShopper(cohortSpec, picks, 4, ourReasons);
+    const { ourReasons } = fitToShopper(cohortSpec, picks, 4);
 
     expect([...ourReasons]).toEqual([
       ['HOST-1', 'Bought together with your boots'],

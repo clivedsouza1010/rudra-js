@@ -1,5 +1,5 @@
 import { RudraComponent } from '@rudra-js/react';
-import { getShopContext } from './shop-context';
+import { bundles, catalog, findShopper, generator } from './shop-context';
 import { buildTrackingInput } from './fixtures/tracking-input';
 
 /**
@@ -13,7 +13,6 @@ export async function ProductPageContent({
   sku: string;
   shopperId: string | undefined;
 }) {
-  const { catalog, bundles, findShopper, generator } = getShopContext();
   const product = catalog.find((candidate) => candidate.sku === sku);
   if (!product) return null;
 

@@ -1,18 +1,23 @@
 import type { Block, GeneratedSpec, ProductReference } from './component-spec.js';
 import type { ProductPick } from './product-selection.js';
 
+export interface FittedSpec {
+  spec: GeneratedSpec;
+  ourReasons: Map<string, string>;
+}
+
 // The model picks the shape. Selection picks the grid and carousel products and
 // what may be said about them, so a shared component still fits one shopper.
 export function fitToShopper(
   spec: GeneratedSpec,
   picks: readonly ProductPick[],
   maxItems: number,
-  ourReasons?: Map<string, string>,
-): GeneratedSpec {
+): FittedSpec {
   // Picks are ordered best first. Every slot takes the next one.
   let next = 0;
   const limit = Math.min(picks.length, maxItems);
 
+  const ourReasons = new Map<string, string>();
   const blocks: Block[] = [];
   for (const block of spec.blocks) {
     // A hero is left alone. Its headline and body were written about the
@@ -27,7 +32,7 @@ export function fitToShopper(
         const chosen = picks[next]!;
         // Every reason here is written by this library or handed to it by the
         // shop. None of them is the model's, whatever the model wrote in this slot.
-        ourReasons?.set(chosen.product.sku, chosen.reason);
+        ourReasons.set(chosen.product.sku, chosen.reason);
         items.push({
           sku: chosen.product.sku,
           basis: chosen.basis,
@@ -45,5 +50,5 @@ export function fitToShopper(
     blocks.push(block);
   }
 
-  return { ...spec, blocks };
+  return { spec: { ...spec, blocks }, ourReasons };
 }

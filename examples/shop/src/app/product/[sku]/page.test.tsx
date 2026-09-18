@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { generateCatalog } from '../../../fixtures/catalog';
 import type { Shopper } from '../../../fixtures/shoppers';
-import { getShopContext } from '../../../shop-context';
+import { shoppers } from '../../../shop-context';
 import ProductPage from './page';
 import { ProductPageContent } from '../../../product-page';
 
@@ -16,8 +16,6 @@ const render = async (sku: string, shopper: string) =>
  * a test to one seed, and the case named for the cold-start path once took it
  * only by luck.
  */
-const { shoppers } = getShopContext();
-
 function shopperWho(description: string, matches: (shopper: Shopper) => boolean): Shopper {
   const shopper = shoppers.find(matches);
   if (!shopper) throw new Error(`the shopper population has nobody who ${description}`);

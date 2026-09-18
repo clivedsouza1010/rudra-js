@@ -18,7 +18,7 @@ import {
   reconcileSpec,
 } from './reconciliation.js';
 import { selectProducts, type RankOrder, type ProductPick } from './product-selection.js';
-import { fitToShopper } from './fit-to-shopper.js';
+import { fitToShopper, type FittedSpec } from './fit-to-shopper.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import {
   createMemorySpecCache,
@@ -221,8 +221,7 @@ function fitCohortSpec(
   input: TrackingInput,
   digest: SignalDigest,
   rank: RankOrder,
-  ourReasons: Map<string, string>,
-): GeneratedSpec {
+): FittedSpec {
   const picks = selectProducts(input, digest, { rank });
   // Blocks past the cap never render, so a set is not worth reserving for one.
   const blocks = spec.blocks.slice(0, MAX_BLOCKS);
@@ -236,26 +235,26 @@ function fitCohortSpec(
     }
     aboveBundle.push(block);
   }
-  if (!hasBundleBlock) return fitToShopper(spec, picks, digest.maxItems, ourReasons);
+  if (!hasBundleBlock) return fitToShopper(spec, picks, digest.maxItems);
 
   // Only the heroes above the bundle block are placed when it is reached, so
   // they are all the choice may account for.
   const chosen = bundleForShopper(input, digest, placeableHeroSkus(aboveBundle, input, digest));
-  if (!chosen) return fitToShopper(spec, picks, digest.maxItems, ourReasons);
+  if (!chosen) return fitToShopper(spec, picks, digest.maxItems);
 
   const spokenFor = new Set<string>(chosen.skus);
   for (const sku of placeableHeroSkus(blocks, input, digest)) spokenFor.add(sku);
 
   const roomLeft = digest.maxItems - spokenFor.size;
   // A set is worth showing, but not at the cost of an empty grid.
-  if (roomLeft <= 0) return fitToShopper(spec, picks, digest.maxItems, ourReasons);
+  if (roomLeft <= 0) return fitToShopper(spec, picks, digest.maxItems);
 
   const forGrid: ProductPick[] = [];
   for (const pick of picks) {
     if (!spokenFor.has(pick.product.sku)) forGrid.push(pick);
   }
 
-  return fitToShopper(spec, forGrid, roomLeft, ourReasons);
+  return fitToShopper(spec, forGrid, roomLeft);
 }
 
 function withProvenance(
@@ -436,11 +435,10 @@ export function createComponentGenerator(
       // A cohort spec names products chosen for whoever asked first, and every
       // reason under one of them is written here rather than by the model. In
       // per-shopper mode this stays empty and every reason is screened.
-      const ourReasons = new Map<string, string>();
-      const served =
+      const { spec: served, ourReasons } =
         generation === 'cohort'
-          ? fitCohortSpec(answer.spec, input, digest, rank, ourReasons)
-          : answer.spec;
+          ? fitCohortSpec(answer.spec, input, digest, rank)
+          : { spec: answer.spec, ourReasons: new Map<string, string>() };
 
       const reconciled = reconcileSpec(served, input, digest, ourReasons);
       if (!reconciled.isUsable) {
