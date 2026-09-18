@@ -1,7 +1,6 @@
 import type {
   Interaction,
   Product,
-  PurchaseSignal,
   SkuSignal,
   TrackingInput,
   ViewSignal,
@@ -244,17 +243,13 @@ function countByInteractionType(interactions: Interaction[]): InteractionCount[]
     .slice(0, DIGEST_LIMITS.interactionTypes);
 }
 
-function recentPurchasedSkus(purchases: PurchaseSignal[]): string[] {
-  return recentUniqueSkus(purchases, DIGEST_LIMITS.purchased);
-}
-
 export function buildDigest(input: TrackingInput): SignalDigest {
   const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
   const { signals, context, user } = input;
 
   const likedSkus = recentUniqueSkus(signals.likes, DIGEST_LIMITS.liked);
   const dislikedSkus = recentUniqueSkus(signals.dislikes, DIGEST_LIMITS.disliked);
-  const purchasedSkus = recentPurchasedSkus(signals.lastPurchased);
+  const purchasedSkus = recentUniqueSkus(signals.lastPurchased, DIGEST_LIMITS.purchased);
   const cartSkus = recentUniqueSkus(signals.cart, DIGEST_LIMITS.cart);
   const topViewed = mostViewedProducts(signals.mostViewed);
 
