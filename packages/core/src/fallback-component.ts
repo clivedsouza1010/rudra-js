@@ -3,15 +3,6 @@ import type { SignalDigest } from './signal-digest.js';
 import { selectProducts, type SelectOptions, type ProductPick } from './product-selection.js';
 import type { TrackingInput } from './tracking-input.js';
 
-/**
- * The deterministic component — what renders when no model does.
- *
- * Pure and synchronous, so the server always has something to render whether the
- * model is slow, erroring, rate-limited or not configured. It reads the same
- * digest and selector the model path does, so a degraded render is a weaker
- * version of the same decision rather than an unrelated one.
- */
-
 /** A featured lead only reads as deliberate when something follows it. */
 const MIN_PICKS_FOR_A_FEATURED_LEAD = 3;
 
@@ -51,6 +42,9 @@ function toProductReference(pick: ProductPick, index: number, total: number): Pr
  * no blocks only when there is genuinely nothing in stock left to show, which
  * the renderer treats as "render nothing" — an empty recommendation region is
  * worse than none.
+ *
+ * Reads the same digest and selector the model path does, so a degraded render is
+ * a weaker version of the same decision rather than an unrelated one.
  */
 export function buildFallbackSpec(
   input: TrackingInput,
