@@ -493,6 +493,32 @@ describe('concurrent requests for the same shopper', () => {
   });
 });
 
+describe('concurrent requests for two different shoppers', () => {
+  it('ask the model once each, not once between them', async () => {
+    let calls = 0;
+    const provider: ComponentProvider = {
+      name: 'slow',
+      model: 'slow-model',
+      generate: async ({ user }) => {
+        calls += 1;
+        const category = user.includes('"Tents"') ? 'Tents' : 'Backpacks';
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        return { spec: { ...modelSpec(['TR-101']), headline: `Made for ${category}` } };
+      },
+    };
+    const generator = createComponentGenerator({ provider, cache: createMemorySpecCache() });
+
+    const [tents, backpacks] = await Promise.all([
+      generator.generate(payload({ context: { surface: 'pdp', currentCategory: 'Tents' } })),
+      generator.generate(payload({ context: { surface: 'pdp', currentCategory: 'Backpacks' } })),
+    ]);
+
+    expect(calls).toBe(2);
+    expect(tents.headline).toBe('Made for Tents');
+    expect(backpacks.headline).toBe('Made for Backpacks');
+  });
+});
+
 describe('provenance', () => {
   it('records which model answered', async () => {
     const spec = await generatorWith({ provider: countingProvider().provider }).generate(payload());
