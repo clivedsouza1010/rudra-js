@@ -85,6 +85,10 @@ describe('numeralsIn', () => {
     expect(formsOf('२,९९,९९९')).toEqual(['299999']);
   });
 
+  it('stops at the two digits the Indian grouping allows above the last three', () => {
+    expect(formsOf('123,45,678')).toEqual(['123,45,678']);
+  });
+
   it('reads a space or an apostrophe as a thousands mark', () => {
     // French, Swiss and Swedish price formatting, and the narrow space CLDR emits.
     expect(formsOf('1 299')).toEqual(['1299']);
@@ -92,6 +96,9 @@ describe('numeralsIn', () => {
     expect(formsOf('1\u202f299')).toEqual(['1299']);
     expect(formsOf("1'299")).toEqual(['1299']);
     expect(formsOf('1 299,00')).toEqual(['1299']);
+    for (const mark of [' ', '\u00a0', '\u2007', '\u2008', '\u2009', '\u202f', "'", '\u2019']) {
+      expect(formsOf(`1${mark}299`), `U+${mark.codePointAt(0)?.toString(16)}`).toEqual(['1299']);
+    }
   });
 
   it('will not read a loose thousands mark as a decimal point', () => {
@@ -178,6 +185,10 @@ describe('numeralsIn', () => {
     expect(kindsOf('12万点')).toEqual(['magnitude']);
     expect(kindsOf('4.8k reviews')).toEqual(['magnitude']);
     expect(kindsOf('12M sold')).toEqual(['magnitude']);
+    expect(kindsOf('12B sold')).toEqual(['magnitude']);
+    for (const mark of '十百千万萬億亿兆kKMB') {
+      expect(kindsOf(`12${mark}`), mark).toEqual(['magnitude']);
+    }
   });
 
   it('leaves a unit that is a letter alone, because a unit is not a multiplier', () => {
