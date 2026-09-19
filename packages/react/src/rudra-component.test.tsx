@@ -5,8 +5,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { ComponentSpec, GeneratedSpec, Product } from '@rudra-js/core';
 import { RudraComponent } from './rudra-component.js';
-import { defaultFormatBundlePrice } from './render-context.js';
-import { extendRegistry, type BlockRegistry } from './registry.js';
+import {
+  defaultFormatBundlePrice,
+  defaultHrefForSku,
+  type BlockRenderContext,
+} from './render-context.js';
+import { defaultRegistry, extendRegistry, type BlockRegistry } from './registry.js';
 
 const product = (sku: string, overrides: Partial<Product> = {}): Product => ({
   sku,
@@ -147,6 +151,10 @@ describe('where product facts come from', () => {
     expect(markup).toContain('/shop/TR-101?ref=rudra');
   });
 
+  it('links to the documented default path when the host supplies no function', () => {
+    expect(render(gridSpec())).toContain('href="/product/TR-101"');
+  });
+
   it('formats the price using the function the host supplied', () => {
     const markup = render(gridSpec(), { formatPrice: () => 'FROM £99' });
 
@@ -162,6 +170,8 @@ describe('where product facts come from', () => {
     // protocol-relative or `data:` URL on the way in, and nothing in the spec
     // can reach this attribute at all.
     expect(markup).toContain('src="https://cdn.example.com/tr-101.png"');
+    // Empty on purpose: the title beside it is the real text.
+    expect(markup).toContain('alt=""');
   });
 
   it('renders no image element when the catalog has no image', () => {
@@ -420,6 +430,18 @@ describe('the component as a whole', () => {
     });
 
     expect(render(gridSpec([reference('GHOST-1')]), { registry })).toBe('');
+
+    // A second block keeps the wrapper alive, so the filter is the only difference.
+    const markup = render(
+      spec([
+        { kind: 'grid', title: 'For you', columns: 2, items: [reference('GHOST-1')] },
+        { kind: 'copy', title: null, body: 'Still here.' },
+      ]),
+      { registry },
+    );
+
+    expect(markup).toContain('Still here.');
+    expect(markup).not.toContain('my-own-grid');
     expect(calls).toBe(0);
   });
 });
@@ -508,7 +530,8 @@ describe('a few behaviours the code asserts', () => {
   it('marks a featured product differently from an ordinary one', () => {
     const featured = render(gridSpec([reference('TR-101', { emphasis: 'featured' })]));
 
-    expect(featured).toContain('rudra-card--featured');
+    // The modifier layers on top of the base class rather than replacing it.
+    expect(featured).toContain('class="rudra-card rudra-card--featured"');
     expect(render(gridSpec())).not.toContain('rudra-card--featured');
   });
 
@@ -533,6 +556,30 @@ describe('a few behaviours the code asserts', () => {
   it('names the vendor only under diagnostics', () => {
     expect(render(gridSpec(), { hasDiagnostics: true })).toContain(
       'data-rudra-provider="anthropic"',
+    );
+  });
+
+  it('reads a spec no model produced as none, rather than leaving the attribute out', () => {
+    const markup = render(
+      gridSpec([reference('TR-101')], { source: 'fallback', provider: null, model: null }),
+      { hasDiagnostics: true },
+    );
+
+    expect(markup).toContain('data-rudra-provider="none"');
+    expect(markup).toContain('data-rudra-model="none"');
+  });
+
+  it('keeps the hero call to action inside the link it belongs to', () => {
+    const markup = render(
+      spec([
+        { kind: 'hero', headline: 'Trail season', body: null, sku: 'TR-101', ctaLabel: 'Shop' },
+      ]),
+      { locale: 'en-US' },
+    );
+
+    expect(markup).toContain(
+      '<span class="rudra-hero__price">$174.00</span>' +
+        '<span class="rudra-hero__cta">Shop</span></a>',
     );
   });
 
@@ -634,6 +681,38 @@ describe('the styling contract', () => {
     for (const attribute of emitted) {
       expect(readme, `${attribute} is emitted but not documented`).toContain(`\`${attribute}\``);
     }
+  });
+
+  it('puts each part of a card on the class a stylesheet targets', () => {
+    const markup = render(gridSpec([reference('TR-101', { badge: 'New' })]), { locale: 'en-US' });
+
+    expect(markup).toContain('<span class="rudra-card__badge">New</span>');
+    expect(markup).toContain('<span class="rudra-card__title">Product TR-101</span>');
+    expect(markup).toContain('<span class="rudra-card__price">$174.00</span>');
+    expect(markup).toContain('<span class="rudra-card__reason">A dependable pick</span>');
+  });
+
+  it('puts a banner call to action on its own class, not the body text one', () => {
+    const markup = everything();
+
+    expect(markup).toContain('<span class="rudra-banner__text">Back in stock</span>');
+    expect(markup).toContain('<span class="rudra-banner__cta">See more</span>');
+  });
+
+  it('puts a block title before the products it introduces', () => {
+    const markup = everything();
+
+    expect(markup.indexOf('rudra-grid__title')).toBeLessThan(markup.indexOf('rudra-grid__items'));
+    expect(markup.indexOf('rudra-carousel__title')).toBeLessThan(
+      markup.indexOf('rudra-carousel__track'),
+    );
+  });
+
+  it('heads the component one level above the titles inside it', () => {
+    const markup = everything();
+
+    expect(markup).toContain('<h2 class="rudra__headline">');
+    expect(markup).toContain('<h3 class="rudra-grid__title">');
   });
 });
 
@@ -754,6 +833,22 @@ describe('a bundle', () => {
     expect(markup).toContain('Product TR-102');
   });
 
+  it('marks each member of the set with its SKU, so a click can be attributed to it', () => {
+    const markup = render(bundleSpec(), { bundles: BUNDLES });
+
+    expect(markup).toContain('<li class="rudra-bundle__item" data-rudra-sku="TR-101">');
+    expect(markup).toContain('<li class="rudra-bundle__item" data-rudra-sku="TR-102">');
+  });
+
+  it('punctuates the set price in the locale the host asked for', () => {
+    const markup = render(bundleSpec(), {
+      bundles: [{ ...BUNDLES[0]!, currency: 'EUR' }],
+      locale: 'de-DE',
+    });
+
+    expect(markup).toContain('300,00');
+  });
+
   it('prices the set in the currency the shop gave the set, not a member currency', () => {
     // A member may be priced in another currency. The set says what its own
     // price is in, so nothing has to read that off a part.
@@ -813,6 +908,32 @@ describe('a bundle', () => {
         bundles: BUNDLES,
         products: [product('TR-101')],
       }),
+    ).toBe('');
+  });
+
+  it('renders nothing on its own either, for a host composing the renderer directly', () => {
+    const Bundle = defaultRegistry.bundle;
+    const context: BlockRenderContext = {
+      products: new Map([['TR-101', product('TR-101')]]),
+      bundles: new Map(BUNDLES.map((entry) => [entry.id, entry])),
+      hrefForSku: defaultHrefForSku,
+      formatPrice: (entry) => String(entry.price),
+      formatBundlePrice: (entry) => String(entry.price),
+    };
+
+    expect(
+      html(
+        <Bundle
+          block={{
+            kind: 'bundle',
+            title: 'Get set up in one go',
+            body: null,
+            ctaLabel: null,
+            bundleId: 'BUN-1',
+          }}
+          context={context}
+        />,
+      ),
     ).toBe('');
   });
 });
