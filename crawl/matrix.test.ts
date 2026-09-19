@@ -193,6 +193,26 @@ describe('reporting placement in the table', () => {
     expect(renderTable(classes).split('\n')[2]).toContain('| yes | no |');
   });
 
+  it('does not call a page whose slot arrives after </main> well placed', () => {
+    const late = '<main><h1>Shoe</h1></main><section data-rudra-slot="x"></section>';
+    const classes = classify([
+      response('googlebot', { body: late }),
+      response('bingbot', { body: OTHER }),
+    ]);
+
+    expect(renderTable(classes).split('\n')[2]).toContain('| no |');
+  });
+
+  it('does not call a page whose only deferral signal is the swap script clean', () => {
+    const swapped = `<main><section data-rudra-slot="x"></section></main><script>$RC("B:0","S:0")</script>`;
+    const classes = classify([
+      response('googlebot', { body: swapped }),
+      response('bingbot', { body: OTHER }),
+    ]);
+
+    expect(renderTable(classes).split('\n')[2]).toContain('| yes | no |');
+  });
+
   it('calls a good page well placed', () => {
     expect(renderTable(classify([response('googlebot')])).split('\n')[2]).toContain(
       '| yes | yes |',
