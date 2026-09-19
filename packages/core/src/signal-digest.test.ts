@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIGEST_LIMITS, buildDigest } from './signal-digest.js';
+import { buildDigest } from './signal-digest.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, category = 'Trail Running') => ({
@@ -111,27 +111,33 @@ describe('signal ordering and de-duplication', () => {
   });
 
   it.each([
-    ['likes', 'liked', 'likedSkus'],
-    ['dislikes', 'disliked', 'dislikedSkus'],
-    ['cart', 'cart', 'cartSkus'],
-    ['lastPurchased', 'purchased', 'purchasedSkus'],
-  ] as const)('caps %s at DIGEST_LIMITS.%s', (signalName, limitName, digestKey) => {
-    const limit = DIGEST_LIMITS[limitName];
-    const many = Array.from({ length: limit + 5 }, (_unused, index) => ({
+    ['likes', 12, 'likedSkus'],
+    ['dislikes', 12, 'dislikedSkus'],
+    ['cart', 8, 'cartSkus'],
+    ['lastPurchased', 8, 'purchasedSkus'],
+  ] as const)('caps %s at %i, dropping the oldest', (signalName, limit, digestKey) => {
+    const many = Array.from({ length: limit + 1 }, (_unused, index) => ({
       sku: `SKU-${index}`,
+      at: index + 1,
     }));
 
     const digest = digestOf({ signals: { [signalName]: many } });
 
     expect(digest[digestKey]).toHaveLength(limit);
+    expect(digest[digestKey]).toContain('SKU-1');
+    expect(digest[digestKey]).not.toContain('SKU-0');
   });
 
-  it('caps recent searches', () => {
-    const many = Array.from({ length: DIGEST_LIMITS.searches + 3 }, (_u, i) => `search ${i}`);
+  it('caps recent searches at 5, keeping the most recent', () => {
+    const many = Array.from({ length: 8 }, (_u, i) => `search ${i}`);
 
-    expect(digestOf({ signals: { recentSearches: many } }).recentSearches).toHaveLength(
-      DIGEST_LIMITS.searches,
-    );
+    expect(digestOf({ signals: { recentSearches: many } }).recentSearches).toEqual([
+      'search 0',
+      'search 1',
+      'search 2',
+      'search 3',
+      'search 4',
+    ]);
   });
 });
 
@@ -240,15 +246,14 @@ describe('most viewed', () => {
     expect(digest.topViewed.map((viewed) => viewed.sku)).toEqual(['TR-102', 'TR-101']);
   });
 
-  it('caps the list', () => {
-    const many = Array.from({ length: DIGEST_LIMITS.viewed + 4 }, (_u, i) => ({
-      sku: `SKU-${i}`,
-      views: i + 1,
-    }));
+  it('caps the list at 10, keeping the most viewed', () => {
+    const many = Array.from({ length: 14 }, (_u, i) => ({ sku: `SKU-${i}`, views: i + 1 }));
 
-    expect(digestOf({ signals: { mostViewed: many } }).topViewed).toHaveLength(
-      DIGEST_LIMITS.viewed,
-    );
+    const viewed = digestOf({ signals: { mostViewed: many } }).topViewed.map((v) => v.sku);
+
+    expect(viewed).toHaveLength(10);
+    expect(viewed).toContain('SKU-4');
+    expect(viewed).not.toContain('SKU-3');
   });
 });
 
@@ -334,6 +339,39 @@ describe('category affinity', () => {
     ]);
   });
 
+  it('scores a single unweighted like at the like weight', () => {
+    expect(digestOf({ signals: { likes: [{ sku: 'TR-101' }] } }).categoryAffinity).toEqual([
+      { category: 'Trail Running', score: 4 },
+    ]);
+  });
+
+  it('scores a single cart signal at the cart weight', () => {
+    expect(digestOf({ signals: { cart: [{ sku: 'TR-101' }] } }).categoryAffinity).toEqual([
+      { category: 'Trail Running', score: 3 },
+    ]);
+  });
+
+  it('ranks a liked category above one that is only in the cart', () => {
+    expect(
+      categoriesOf({ signals: { likes: [{ sku: 'NU-201' }], cart: [{ sku: 'TR-101' }] } }),
+    ).toEqual(['Nutrition', 'Trail Running']);
+  });
+
+  it('ranks the category being browsed above one backed only by views', () => {
+    expect(
+      categoriesOf({
+        context: { surface: 'pdp', currentCategory: 'Climbing' },
+        signals: { mostViewed: [{ sku: 'TR-101', views: 3 }] },
+      }),
+    ).toEqual(['Climbing', 'Trail Running']);
+  });
+
+  it('drops a category whose weighted score rounds to zero', () => {
+    const digest = digestOf({ signals: { likes: [{ sku: 'TR-101', weight: 0.001 }] } });
+
+    expect(digest.categoryAffinity).toEqual([]);
+  });
+
   it('honours a caller-supplied weight', () => {
     const full = digestOf({ signals: { likes: [{ sku: 'TR-101' }] } }).categoryAffinity[0]?.score;
     const halved = digestOf({
@@ -343,15 +381,18 @@ describe('category affinity', () => {
     expect(halved).toBeLessThan(full ?? 0);
   });
 
-  it('caps the list', () => {
-    const many = Array.from({ length: DIGEST_LIMITS.affinity + 4 }, (_u, i) => ({
+  it('caps the list at 6, keeping the strongest', () => {
+    const many = Array.from({ length: 10 }, (_u, i) => ({
       sku: `SKU-${i}`,
       category: `Category ${i}`,
+      weight: 1 - i / 10,
     }));
 
-    expect(digestOf({ signals: { likes: many } }).categoryAffinity).toHaveLength(
-      DIGEST_LIMITS.affinity,
-    );
+    const categories = categoriesOf({ signals: { likes: many } });
+
+    expect(categories).toHaveLength(6);
+    expect(categories).toContain('Category 5');
+    expect(categories).not.toContain('Category 6');
   });
 });
 
@@ -373,13 +414,17 @@ describe('interaction counts', () => {
     ]);
   });
 
-  it('caps the number of types', () => {
-    const many = Array.from({ length: DIGEST_LIMITS.interactionTypes + 3 }, (_u, i) => ({
-      type: `type_${i}`,
-    }));
-
-    expect(digestOf({ signals: { interactions: many } }).interactionCounts).toHaveLength(
-      DIGEST_LIMITS.interactionTypes,
+  it('caps the number of types at 8, keeping the most frequent', () => {
+    const many = Array.from({ length: 11 }, (_u, i) => i).flatMap((i) =>
+      Array.from({ length: 11 - i }, () => ({ type: `type_${i}` })),
     );
+
+    const types = digestOf({ signals: { interactions: many } }).interactionCounts.map(
+      (c) => c.type,
+    );
+
+    expect(types).toHaveLength(8);
+    expect(types).toContain('type_7');
+    expect(types).not.toContain('type_8');
   });
 });

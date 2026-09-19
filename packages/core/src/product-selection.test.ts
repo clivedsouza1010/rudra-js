@@ -81,6 +81,97 @@ describe('ordering', () => {
 
     expect(skus(picks)[0]).toBe('BB-2');
   });
+
+  it('sorts an unrated product between one rated 4 and one rated 3', () => {
+    const picks = pickFor({
+      candidates: [product('AA-1', { rating: 4 }), product('BB-2'), product('CC-3', { rating: 3 })],
+    });
+
+    expect(skus(picks)).toEqual(['AA-1', 'BB-2', 'CC-3']);
+  });
+
+  it('lets shared tags outrank a better rating', () => {
+    const picks = pickFor({
+      candidates: [
+        product('OWNED-1', { tags: ['grip', 'trail', 'cushion'] }),
+        product('TAGGED-1', { tags: ['grip', 'trail', 'cushion'] }),
+        product('RATED-5', { rating: 5 }),
+      ],
+      signals: { lastPurchased: [{ sku: 'OWNED-1' }] },
+    });
+
+    expect(skus(picks)).toEqual(['TAGGED-1', 'RATED-5']);
+  });
+
+  it('ranks three shared tags above two', () => {
+    const picks = pickFor({
+      candidates: [
+        product('OWNED-1', { tags: ['grip', 'trail', 'cushion'] }),
+        product('SHARES-3', { tags: ['grip', 'trail', 'cushion'] }),
+        product('SHARES-2', { tags: ['grip', 'trail'] }),
+      ],
+      signals: { lastPurchased: [{ sku: 'OWNED-1' }] },
+    });
+
+    expect(skus(picks)).toEqual(['SHARES-3', 'SHARES-2']);
+  });
+
+  it('lets a better rating outweigh a single shared tag', () => {
+    const picks = pickFor({
+      candidates: [
+        product('OWNED-1', { tags: ['grip'] }),
+        product('AA-5', { rating: 5 }),
+        product('BB-2', { rating: 2, tags: ['grip'] }),
+      ],
+      signals: { lastPurchased: [{ sku: 'OWNED-1' }] },
+    });
+
+    expect(skus(picks)).toEqual(['AA-5', 'BB-2']);
+  });
+
+  it('keeps a liked category above a heavily revisited product elsewhere', () => {
+    const picks = pickFor({
+      candidates: [product('TR-102'), product('NU-201', { category: 'Nutrition' })],
+      signals: {
+        likes: [{ sku: 'TR-101', category: 'Trail Running' }],
+        mostViewed: [{ sku: 'NU-201', views: 8, weight: 0.2 }],
+      },
+    });
+
+    expect(skus(picks)[0]).toBe('TR-102');
+  });
+
+  it('puts a revisited product above a better-rated one in a stronger category', () => {
+    const picks = pickFor({
+      candidates: [product('TR-102'), product('NU-201', { category: 'Nutrition', rating: 5 })],
+      signals: { likes: [{ sku: 'NU-201' }], mostViewed: [{ sku: 'TR-102', views: 8 }] },
+    });
+
+    expect(skus(picks)[0]).toBe('TR-102');
+  });
+
+  it('stops counting views once the revisit boost saturates', () => {
+    const picks = pickFor({
+      candidates: [product('AA-1'), product('BB-2')],
+      signals: {
+        mostViewed: [
+          { sku: 'AA-1', views: 7 },
+          { sku: 'BB-2', views: 30 },
+        ],
+      },
+    });
+
+    // Both score the same, so the tie-break on SKU is what puts AA-1 first.
+    expect(skus(picks)).toEqual(['AA-1', 'BB-2']);
+  });
+});
+
+describe('the score', () => {
+  it('maps a rating of 5 onto the full rating term and no further', () => {
+    const picks = pickFor({ candidates: [product('AA-1', { rating: 5 })] });
+
+    expect(picks[0]?.score).toBe(1.2);
+  });
 });
 
 /**
@@ -111,6 +202,29 @@ describe('the stated basis', () => {
 
   it('claims complements_cart only when something is in the cart', () => {
     expect(basisOf('NU-201', { signals: { cart: [{ sku: 'TR-101' }] } })).toBe('complements_cart');
+  });
+
+  it('prefers most_viewed over similar_to_current when both hold', () => {
+    expect(
+      basisOf('TR-102', {
+        context: { surface: 'pdp', currentCategory: 'Trail Running' },
+        signals: { mostViewed: [{ sku: 'TR-102', views: 4 }] },
+      }),
+    ).toBe('most_viewed');
+  });
+
+  it('prefers liked_category over complements_cart when both hold', () => {
+    expect(
+      basisOf('TR-102', { signals: { likes: [{ sku: 'TR-101' }], cart: [{ sku: 'TR-101' }] } }),
+    ).toBe('liked_category');
+  });
+
+  it('claims popular for a category the shopper barely engaged with', () => {
+    expect(
+      basisOf('TR-102', {
+        signals: { likes: [{ sku: 'NU-201' }, { sku: 'TR-101', weight: 0.2 }] },
+      }),
+    ).toBe('popular');
   });
 
   it('claims nothing about a shopper it knows nothing about', () => {
