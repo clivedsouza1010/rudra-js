@@ -25,14 +25,11 @@ export function buildTrackingInput(
   bundles: readonly Bundle[],
 ): TrackingInputDraft {
   const current = catalog.find((product) => product.sku === currentSku);
-  const candidates = catalog
-    .filter((product) => product.isInStock && product.sku !== currentSku)
-    .filter((product) => !current || product.category === current.category)
-    .slice(0, 24);
-  const finalCandidates =
-    candidates.length > 0
-      ? candidates
-      : catalog.filter((product) => product.isInStock && product.sku !== currentSku).slice(0, 24);
+  const offerable = catalog.filter((product) => product.isInStock && product.sku !== currentSku);
+  const inCategory = offerable.filter(
+    (product) => !current || product.category === current.category,
+  );
+  const finalCandidates = (inCategory.length > 0 ? inCategory : offerable).slice(0, 24);
 
   // A bundle with a member outside the candidates would fail the tracking
   // input contract, so only pass along the ones that fit.

@@ -38,12 +38,12 @@ break them.
   reading `5-pocket` keeps the first of those as surely as `-5C comfort` does.
   Those are the strings the prompt hands the model and lets it repeat; a `title`
   and a `rating` it is shown but told never to restate, so neither stands behind
-  a number. This reverses a documented judgement in `reconciliation.ts` and it
-  reclassifies 15 strings the test suite used to assert were kept. Put your spec
-  sheet in `tags` and the model can quote it. On a catalogue with no digit in any
-  tag or category — the example shop is one — the rule becomes "no digit may
-  appear", and an emptied headline makes the whole generation unusable, so one
-  digit there costs the model call.
+  a number. This reverses a documented judgement in `reconciliation.ts` (since
+  moved to `claim-screening.ts`) and it reclassifies 15 strings the test suite
+  used to assert were kept. Put your spec sheet in `tags` and the model can
+  quote it. On a catalogue with no digit in any tag or category — the example
+  shop is one — the rule becomes "no digit may appear", and an emptied headline
+  makes the whole generation unusable, so one digit there costs the model call.
 - The numbers that stand behind a sentence are narrower than the request. Only
   candidates the prompt actually showed the model count: a product that is out
   of stock or past the 60-candidate cap stands behind nothing. `currentCategory`

@@ -214,6 +214,8 @@ export function cohortCacheKey(
     // So copy written for a backpack page is not served on a tent page.
     currentCategory: digest.currentCategory ?? null,
     topCategory: digest.categoryAffinity[0]?.category ?? null,
+    // The model is shown products drawn from this list, so a different list must not reuse the
+    // copy. A shop that picks candidates per shopper gets smaller cohorts, not a wrong answer.
     candidates: candidateSkus.toSorted(),
   });
 

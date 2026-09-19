@@ -1,7 +1,6 @@
 import type {
   Interaction,
   Product,
-  PurchaseSignal,
   SkuSignal,
   TrackingInput,
   ViewSignal,
@@ -166,12 +165,13 @@ function computeCategoryAffinity(
   // The category the shopper is standing in right now is itself evidence.
   addScore(input.context.currentCategory, SIGNAL_WEIGHTS.like);
 
-  return [...scoreByCategory.entries()]
-    .map(([category, score]) => ({
-      category,
-      score: Math.round(score * 100) / 100,
-    }))
-    .filter((affinity) => affinity.score > 0)
+  const affinities: CategoryAffinity[] = [];
+  for (const [category, score] of scoreByCategory) {
+    const rounded = Math.round(score * 100) / 100;
+    if (rounded > 0) affinities.push({ category, score: rounded });
+  }
+
+  return affinities
     .toSorted((left, right) => right.score - left.score)
     .slice(0, DIGEST_LIMITS.affinity);
 }
@@ -236,14 +236,11 @@ function countByInteractionType(interactions: Interaction[]): InteractionCount[]
     countByType.set(interaction.type, (countByType.get(interaction.type) ?? 0) + 1);
   }
 
-  return [...countByType.entries()]
-    .map(([type, count]) => ({ type, count }))
+  const counts = [...countByType.entries()].map(([type, count]) => ({ type, count }));
+
+  return counts
     .toSorted((left, right) => right.count - left.count)
     .slice(0, DIGEST_LIMITS.interactionTypes);
-}
-
-function recentPurchasedSkus(purchases: PurchaseSignal[]): string[] {
-  return recentUniqueSkus(purchases, DIGEST_LIMITS.purchased);
 }
 
 export function buildDigest(input: TrackingInput): SignalDigest {
@@ -252,7 +249,7 @@ export function buildDigest(input: TrackingInput): SignalDigest {
 
   const likedSkus = recentUniqueSkus(signals.likes, DIGEST_LIMITS.liked);
   const dislikedSkus = recentUniqueSkus(signals.dislikes, DIGEST_LIMITS.disliked);
-  const purchasedSkus = recentPurchasedSkus(signals.lastPurchased);
+  const purchasedSkus = recentUniqueSkus(signals.lastPurchased, DIGEST_LIMITS.purchased);
   const cartSkus = recentUniqueSkus(signals.cart, DIGEST_LIMITS.cart);
   const topViewed = mostViewedProducts(signals.mostViewed);
 

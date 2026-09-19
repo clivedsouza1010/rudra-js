@@ -127,6 +127,11 @@ const registry = extendRegistry({
 <RudraComponent spec={spec} products={catalog} registry={registry} />;
 ```
 
+A grid, carousel or bundle block with nothing left in your catalog is dropped before any renderer
+runs — yours as well as ours. The component has to decide whether to draw the wrapper and its
+headline at all, and the only way to decide is to ask each block first. Hero, banner and copy always
+reach the renderer, since they don't depend on the catalog.
+
 ## Props
 
 | Prop                | Notes                                                                                                                                                                                         |
@@ -157,9 +162,10 @@ That's a `Set` of products, a plain object, or a `Map` that has been through JSO
 error than a quietly empty recommendation area.
 
 When there's nothing left to show, the component renders nothing at all. That covers a spec with no
-blocks, and one whose every product has left your catalog since it was generated. An empty
-recommendation area, or a headline over an empty box, takes up space and tells the shopper the page
-is broken.
+blocks, and one whose every product has left your catalog since it was generated. A single block
+goes the same way on its own: it drops out and the rest of the component carries on without it. An
+empty recommendation area, or a headline over an empty box, takes up space and tells the shopper the
+page is broken.
 
 ### What `bundles` is
 
