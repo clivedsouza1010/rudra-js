@@ -12,7 +12,12 @@ import {
 import { selectProducts } from './product-selection.js';
 import { buildDigest } from './signal-digest.js';
 import { ALLOWED_PHRASES, productFacts } from './claim-screening.js';
-import { MAX_BLOCKS, reconcileSpec, type ReconcileResult } from './reconciliation.js';
+import {
+  MAX_BLOCKS,
+  placeableHeroSkus,
+  reconcileSpec,
+  type ReconcileResult,
+} from './reconciliation.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
@@ -113,6 +118,18 @@ describe("a reason the shop supplied is the shop's own words", () => {
     const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
 
     expect(items[0]?.reason).toBeNull();
+  });
+
+  it('screens a sentence the model wrote for a product the shop wrote one for', () => {
+    const result = reconcile(
+      grid([ref('TR-101', { reason: 'Only 2 left at this price, save 30%' })]),
+      { candidates },
+      new Map([['TR-101', CLAIM]]),
+    );
+    const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
+
+    expect(items[0]?.reason).toBeNull();
+    expect(result.violations.join()).toMatch(/^unverifiable-claim:[a-z]+:reason:TR-101$/);
   });
 });
 
@@ -340,6 +357,20 @@ describe('the item budget', () => {
   });
 });
 
+describe('the hero products a spec reserves room for', () => {
+  // The generator spends one budget slot per SKU on this list, and a slot held for a
+  // product reconciliation will drop as a duplicate is a bundle the shopper loses.
+  it('reserves one slot for a product two heroes both name', () => {
+    const input = inputFor();
+    const heroes: Block[] = [
+      { kind: 'hero', headline: 'Back in the range', body: null, sku: 'TR-101', ctaLabel: null },
+      { kind: 'hero', headline: 'Out again', body: null, sku: 'TR-101', ctaLabel: null },
+    ];
+
+    expect(placeableHeroSkus(heroes, input, buildDigest(input))).toEqual(['TR-101']);
+  });
+});
+
 /**
  * `basis` is a factual claim about the shopper. The model has every incentive to
  * reach for the most flattering one, so each is checked against the digest.
@@ -444,6 +475,13 @@ describe('text repair', () => {
     // The cap is a cap: the ellipsis is inside it, not added on top.
     expect(result.spec.headline).toHaveLength(90);
     expect(result.spec.headline.endsWith('…')).toBe(true);
+  });
+
+  it('truncates an over-long reason', () => {
+    const result = reconcile(grid([ref('TR-101', { reason: 'a'.repeat(130) })]));
+
+    expect(basisOf(result)?.reason).toHaveLength(120);
+    expect(basisOf(result)?.reason?.endsWith('…')).toBe(true);
   });
 
   it('collapses runs of whitespace', () => {
@@ -612,6 +650,16 @@ describe('attributing a rejection to its real cause', () => {
     expect(result.violations).toEqual(['budget:dropped:TR-102']);
   });
 
+  // Shops keep the cart out of the candidate list, so this SKU is both at once.
+  it('reports a cart SKU the host never offered as unknown, not blocked', () => {
+    const result = reconcile(grid([ref('TR-101'), ref('TR-999')]), {
+      signals: { cart: [{ sku: 'TR-999' }] },
+    });
+
+    expect(result.violations).toContain('unknown-sku:TR-999');
+    expect(result.violations).not.toContain('blocked-sku:TR-999');
+  });
+
   it('names a missing headline as such, not as a missing product', () => {
     const result = reconcile({ ...grid([ref('TR-101')]), headline: '   ' });
 
@@ -705,6 +753,19 @@ describe('choosing a bundle', () => {
     });
 
     expect(result.spec.blocks).toHaveLength(0);
+  });
+
+  // No cart, no views, no affinity: the shop's own order is the only tie-break left.
+  it('keeps the first of two sets the signals cannot separate', () => {
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B'), product('C'), product('D')],
+      bundles: [
+        { id: 'FIRST', skus: ['A', 'B'], price: 30 },
+        { id: 'SECOND', skus: ['C', 'D'], price: 30 },
+      ],
+    });
+
+    expect(result.spec.blocks[0]).toMatchObject({ bundleId: 'FIRST' });
   });
 
   it('prefers a bundle holding something already in the cart', () => {
@@ -1472,6 +1533,11 @@ describe('the two passes attested adds', () => {
       expect(kindFor(reason)).toBe('quantity');
     });
   }
+
+  // Fails both passes. quantity is the proof of the two, so it answers first.
+  it('names a sentence both passes reject by its quantity', () => {
+    expect(kindFor('rated highest by other hikers, 4.8 overall')).toBe('quantity');
+  });
 
   // A category name is the shop's own string, so the digit in it is the shop's
   // own number and the model may write it back. This is the sentence the selector
