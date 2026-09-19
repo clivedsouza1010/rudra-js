@@ -10,6 +10,65 @@ break them.
 
 ## [Unreleased]
 
+### Added
+
+- `@rudra-js/core` exports `GeneratedSpecResult`, a name for what
+  `safeParseGeneratedSpec` returns. It is `z.ZodSafeParseResult<GeneratedSpec>`,
+  the type the function already returned at 0.5.0 — nothing changed but the
+  signature, which says it now instead of leaving it to inference. What is new
+  is being able to write the type down: annotating a variable, a helper's
+  parameter or a wrapper's return used to mean
+  `ReturnType<typeof safeParseGeneratedSpec>`, or spelling zod's generic out by
+  hand. The emitted declaration shortens with it — at 0.5.0
+  `safeParseGeneratedSpec` unfolded the whole spec across 49 lines, every block
+  kind and every nullable field inline, and it is one line now. Nothing new is
+  asked of zod: `ZodSafeParseResult` is zod's own name for what `safeParse`
+  returns, it is there at the peer floor, and the range is unchanged at
+  `^4.5.0`.
+- The react README states what a custom renderer is never called for. A grid,
+  carousel or bundle block with nothing left in the catalog is dropped before
+  any renderer runs — a host's own, registered through `extendRegistry`, as
+  much as the package's. Hero, banner and copy always reach their renderer,
+  because none of them reads the catalog. The behaviour is the one 0.5.0
+  shipped; what was missing was saying so, and an empty-state branch inside a
+  custom grid or carousel renderer is dead code. A test pins it now.
+
+### Changed
+
+- The example shop stops drawing two of its three call-to-action labels as
+  buttons. `.rudra-bundle__cta` and `.rudra-banner__cta` came out of the rule
+  they shared with `.rudra-hero__cta` in
+  `examples/shop/public/demo-styles.css`, and render as bold accent text rather
+  than a bordered inline-block box. Neither has anywhere to send anyone:
+  `BundleRenderer` and `BannerRenderer` each draw their label as a bare
+  `<span>` with no href, so the stylesheet had them looking like controls that
+  did nothing. The hero's label keeps the button rule, because it became a real
+  link in the same release. The react README says to copy this stylesheet as a
+  starting point, so a copy taken since 0.5.0 differs here.
+
+### Fixed
+
+- `@rudra-js/react` drew the hero's call to action as a label no one could
+  click. It was a bare `<span class="rudra-hero__cta">` next to
+  `<a class="rudra-hero__link">` inside `<section class="rudra-hero">`, while
+  the demo stylesheet drew it as a button, so a pointer landing on it hit
+  nothing. The span is now the last child of that anchor, after
+  `<span class="rudra-hero__price">`: a click or a tap on the label follows the
+  link, and the link's accessible name runs through the label rather than
+  stopping at the price. Keyboard access is where it was — the anchor has
+  always been focusable and the label still is not. Nothing else about the
+  markup moved, and the condition for drawing the label is the one it was: a
+  hero whose `sku` is `null`, or whose SKU has left the catalog, still renders
+  no anchor and no label. What this does break is hero CSS that reaches the
+  class from above it. `.rudra-hero > .rudra-hero__cta`,
+  `.rudra-hero__link + .rudra-hero__cta` and
+  `.rudra-hero__link ~ .rudra-hero__cta` each matched at 0.5.0 and none matches
+  now, so a label that took its border and padding from one of those renders as
+  bare text. `.rudra-hero .rudra-hero__cta` and a plain `.rudra-hero__cta` both
+  still match, and `examples/shop/public/demo-styles.css` uses the plain form.
+  Two things follow from the new parent: the label inherits the anchor's
+  `color` unless it sets its own, and `.rudra-hero__link:hover` covers it now.
+
 ## [0.5.0] - 2026-09-14
 
 ### Changed
