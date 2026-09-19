@@ -59,13 +59,54 @@ describe('normalisePhrasing', () => {
     expect(normalisePhrasing('Frеe delivery')).toBe('free delivery');
   });
 
+  it('folds every letter on the look-alike table, not just the two above', () => {
+    // U+03F2 is left out: NFKC rewrites it to a final sigma before the fold sees it.
+    const lookAlikes: [string, string][] = [
+      ['\u0430', 'a'],
+      ['\u0432', 'b'],
+      ['\u0435', 'e'],
+      ['\u043a', 'k'],
+      ['\u043c', 'm'],
+      ['\u043d', 'h'],
+      ['\u043e', 'o'],
+      ['\u0440', 'p'],
+      ['\u0441', 'c'],
+      ['\u0442', 't'],
+      ['\u0443', 'y'],
+      ['\u0445', 'x'],
+      ['\u0455', 's'],
+      ['\u0456', 'i'],
+      ['\u0458', 'j'],
+      ['\u0501', 'd'],
+      ['\u04bb', 'h'],
+      ['\u04cf', 'l'],
+      ['\u03b1', 'a'],
+      ['\u03b5', 'e'],
+      ['\u03b9', 'i'],
+      ['\u03ba', 'k'],
+      ['\u03bd', 'v'],
+      ['\u03bf', 'o'],
+      ['\u03c1', 'p'],
+      ['\u03c4', 't'],
+      ['\u03c5', 'u'],
+      ['\u03c7', 'x'],
+    ];
+    for (const [written, latin] of lookAlikes) {
+      expect(normalisePhrasing(written), `U+${written.codePointAt(0)?.toString(16)}`).toBe(latin);
+    }
+  });
+
   it('folds fullwidth and ligature forms', () => {
     expect(normalisePhrasing('ＦＲＥＥ ＳＨＩＰＰＩＮＧ')).toBe('free shipping');
   });
 
-  it('turns a hyphen into a space, so best-selling and best selling are one phrase', () => {
+  it('turns a hyphen or an underscore into a space, so best-selling is best selling', () => {
     expect(normalisePhrasing('best-selling')).toBe('best selling');
     expect(normalisePhrasing('next\u2013day')).toBe('next day');
+    expect(normalisePhrasing('free_shipping')).toBe('free shipping');
+    for (const dash of '-_\u2010\u2011\u2012\u2013\u2014\u2015') {
+      expect(normalisePhrasing(`best${dash}selling`), dash).toBe('best selling');
+    }
   });
 
   it('keeps a line break as a line break, because an allowance may not cross one', () => {
@@ -73,6 +114,8 @@ describe('normalisePhrasing', () => {
     // survives normalisation only so an allowance can refuse to bridge a paragraph.
     expect(normalisePhrasing('selling\n  fast')).toBe('selling\nfast');
     expect(normalisePhrasing('not\n\n---\n\nin stock')).toBe('not\nin stock');
+    expect(normalisePhrasing('selling\u2028fast')).toBe('selling\nfast');
+    expect(normalisePhrasing('selling\u2029fast')).toBe('selling\nfast');
   });
 
   it('drops a combining mark that composes with nothing', () => {
@@ -110,9 +153,11 @@ describe('phraseIn', () => {
     expect(phraseIn('built for long days', 'selling fast')).toBe(false);
   });
 
-  it('will not match an English phrase glued inside a longer word', () => {
+  it('will not match an English phrase glued inside a longer word or a part number', () => {
     expect(phraseIn('a cheapskate buy', 'cheap')).toBe(false);
     expect(phraseIn('wholesale only', 'sale')).toBe(false);
+    expect(phraseIn('sku sale2 in the list', 'sale')).toBe(false);
+    expect(phraseIn('tr101cheap', 'cheap')).toBe(false);
   });
 
   it('matches the plural of a listed phrase', () => {
@@ -175,6 +220,13 @@ describe('phraseSpans', () => {
     expect(phraseSpans('a cheapskate, but cheap', 'cheap')).toEqual([{ start: 18, end: 22 }]);
   });
 
+  it('collects a hit that overlaps the one before it, because each is its own claim', () => {
+    expect(phraseSpans('在庫在庫在庫', '在庫在庫')).toEqual([
+      { start: 0, end: 3 },
+      { start: 2, end: 5 },
+    ]);
+  });
+
   it('finds nothing for an empty phrase', () => {
     expect(phraseSpans('anything at all', '')).toEqual([]);
   });
@@ -191,6 +243,92 @@ describe('indexPhrasing', () => {
 });
 
 describe('BANNED_PHRASES', () => {
+  it('holds exactly these phrases, because a typo in one matches nothing and says nothing', () => {
+    expect(BANNED_PHRASES).toEqual([
+      'cheap',
+      'cheaper',
+      'cheapest',
+      'affordable',
+      'bargain',
+      'great value',
+      'best value',
+      'low price',
+      'lower price',
+      'lowest price',
+      'best price',
+      'price drop',
+      'price dropped',
+      'just dropped',
+      'price cut',
+      'reduced price',
+      'sale',
+      'marked down',
+      'half price',
+      'half off',
+      'discount',
+      'discounted',
+      'clearance',
+      'free delivery',
+      'free shipping',
+      'free postage',
+      'free returns',
+      'ships free',
+      'fast delivery',
+      'next day',
+      'same day',
+      'overnight delivery',
+      'arrives tomorrow',
+      'delivered tomorrow',
+      'by tomorrow',
+      'in stock',
+      'out of stock',
+      'low stock',
+      'limited stock',
+      'running low',
+      'running out',
+      'back in stock',
+      'restocked',
+      'sold out',
+      'selling out',
+      'almost sold out',
+      'nearly sold out',
+      'selling fast',
+      'going fast',
+      'going quick',
+      'flying off',
+      'while stocks last',
+      'almost gone',
+      'nearly gone',
+      'few left',
+      'last few',
+      'last chance',
+      'limited time',
+      'today only',
+      'ends soon',
+      'hurry',
+      'act fast',
+      'do not miss',
+      "don't miss",
+      'best seller',
+      'best selling',
+      'bestseller',
+      'bestselling',
+      'most popular',
+      'popular pick',
+      'top pick',
+      'top rated',
+      'highly rated',
+      'highest rated',
+      'rated highest',
+      'best rated',
+      'five star',
+      'star rating',
+      'customer favourite',
+      'customer favorite',
+      'money back',
+    ]);
+  });
+
   it('holds no phrase with a digit in it, because layer one owns those', () => {
     for (const phrase of BANNED_PHRASES) {
       expect(/\d/.test(phrase), `${phrase} carries a digit`).toBe(false);
