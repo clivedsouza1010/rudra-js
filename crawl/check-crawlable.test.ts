@@ -121,6 +121,24 @@ describe('checking a page a crawler will read', () => {
     expect(checkCrawlable(empty)).toEqual(['the page has no recommendation slot at all']);
   });
 
+  it('says only that the slot is missing, on a page that is also deferred and has no </main>', () => {
+    const gone = `<!DOCTYPE html><html><body><div hidden id="S:0"><h1>Trail Shoe</h1></div>
+<script>$RC("B:0","S:0")</script></body></html>`;
+
+    expect(checkCrawlable(gone)).toEqual(['the page has no recommendation slot at all']);
+  });
+
+  it('catches a hidden holder on its own, without the script that moves it', () => {
+    // identifierPrefix moves the S: prefix, and then only one of the two fires.
+    const holder = `<!DOCTYPE html><html><body><main>
+<section class="rudra" data-rudra-slot="recommendations"></section>
+</main><div hidden id="S:0"><p>Picked for you</p></div></body></html>`;
+
+    expect(checkCrawlable(holder)).toEqual([
+      'the page holds content in a hidden div for a script to move',
+    ]);
+  });
+
   it('says so when the page has no </main> at all, so position cannot be judged', () => {
     const noMain = `<!DOCTYPE html><html><body>
 <h1>Trail Shoe</h1>

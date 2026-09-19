@@ -158,6 +158,20 @@ describe('summarising a run', () => {
     expect(result.elapsedMs?.p99).toBe(33);
   });
 
+  it('times every view, not just the ones that reached the model', () => {
+    const result = summarise(
+      identity('c', { mode: 'replay', providerName: 'recording', providerModel: 'claude-opus-5' }),
+      [
+        event({ elapsedMs: 1, source: 'cache', calledModel: false }),
+        event({ elapsedMs: 1, source: 'cache', calledModel: false }),
+        event({ elapsedMs: 900 }),
+      ],
+      PRICES,
+    );
+
+    expect(result.elapsedMs?.median).toBe(1);
+  });
+
   it('reports no timings at all for a stub run', () => {
     // The stub answers far below a millisecond, so Date.now() reads 0 or 1 for
     // every view. Writing that down as a median is writing down a result the
@@ -181,6 +195,24 @@ describe('summarising a run', () => {
     );
 
     expect(result.violations).toEqual({ 'unknown-sku': 2, 'empty-block': 1, 'no-bundle': 1 });
+  });
+
+  it('groups a violation that carries more than one colon by its first word', () => {
+    // Core emits `unverifiable-claim:<kind>:<field>` and `unsupported-basis:<basis>:<sku>`.
+    const result = summarise(
+      identity('c'),
+      [
+        event({
+          violations: [
+            'unverifiable-claim:quantity:headline',
+            'unverifiable-claim:wording:subheadline',
+          ],
+        }),
+      ],
+      PRICES,
+    );
+
+    expect(result.violations).toEqual({ 'unverifiable-claim': 2 });
   });
 
   it('reports zeroes for a run that called no model', () => {
@@ -234,6 +266,12 @@ describe('refusing a mislabelled arm', () => {
   it('refuses a cohort run that was really the deterministic arm', () => {
     // The whole point: this is arm (b) wearing arm (c)'s label.
     expect(() => assertSourceMix(resultWith({ llm: 0, cache: 0, fallback: 100 }), cohort)).toThrow(
+      /fell back/,
+    );
+  });
+
+  it('refuses a cohort run where a single view fell back', () => {
+    expect(() => assertSourceMix(resultWith({ llm: 40, cache: 59, fallback: 1 }), cohort)).toThrow(
       /fell back/,
     );
   });
@@ -322,6 +360,14 @@ describe('refusing a mislabelled arm', () => {
       /called a model/,
     );
   });
+
+  it('refuses a no-model run that made a single billed call', () => {
+    const result: ArmResult = { ...resultWith({ llm: 0, cache: 0, fallback: 100 }), modelCalls: 1 };
+
+    expect(() => assertSourceMix(result, { fallback: 'all', modelCalls: 'none' })).toThrow(
+      /called a model/,
+    );
+  });
 });
 
 const catalog = generateCatalog(7, 40);
@@ -352,6 +398,17 @@ describe('choosing which page a shopper looks at', () => {
 
   it('puts ten shoppers on a page when nobody says otherwise', () => {
     const shopperCount = 20;
+
+    const skus = new Set<string>();
+    for (let index = 0; index < shopperCount; index += 1) {
+      skus.add(skuFor(index, shopperCount, catalog));
+    }
+
+    expect(skus.size).toBe(2);
+  });
+
+  it('drops a part page rather than opening one for the remainder', () => {
+    const shopperCount = 25;
 
     const skus = new Set<string>();
     for (let index = 0; index < shopperCount; index += 1) {

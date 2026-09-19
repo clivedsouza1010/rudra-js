@@ -113,6 +113,10 @@ describe('the cache key covers the whole digest', () => {
   it('gives the same key for the same shopper twice', () => {
     expect(keyFor(richDigest())).toBe(keyFor(richDigest()));
   });
+
+  it('hashes down to 32 hex characters', () => {
+    expect(keyFor(richDigest())).toMatch(/^[0-9a-f]{32}$/);
+  });
 });
 
 /**
@@ -189,6 +193,29 @@ describe('the in-memory cache', () => {
     expect(await cache.get('key')).toBeUndefined();
   });
 
+  it('holds an entry for a minute by default', async () => {
+    let clock = 0;
+    const cache = createMemorySpecCache({ now: () => clock });
+    await cache.set('key', SPEC);
+
+    clock = 59_999;
+    expect(await cache.get('key')).toEqual(SPEC);
+
+    clock = 60_000;
+    expect(await cache.get('key')).toBeUndefined();
+  });
+
+  it('holds ten thousand entries by default', async () => {
+    const cache = createMemorySpecCache();
+    await Promise.all(
+      Array.from({ length: 10_000 }, (_unused, index) => cache.set(`key-${index}`, SPEC)),
+    );
+    await cache.set('one-too-many', SPEC);
+
+    expect(await cache.get('key-0')).toBeUndefined();
+    expect(await cache.get('key-1')).toEqual(SPEC);
+  });
+
   it('evicts the least recently read entry when full', async () => {
     const cache = createMemorySpecCache({ maxEntries: 2 });
     await cache.set('a', SPEC);
@@ -196,6 +223,18 @@ describe('the in-memory cache', () => {
 
     // Reading 'a' makes 'b' the least recently used, so 'b' goes.
     await cache.get('a');
+    await cache.set('c', SPEC);
+
+    expect(await cache.get('a')).toEqual(SPEC);
+    expect(await cache.get('b')).toBeUndefined();
+    expect(await cache.get('c')).toEqual(SPEC);
+  });
+
+  it('does not evict an entry that was just rewritten', async () => {
+    const cache = createMemorySpecCache({ maxEntries: 2 });
+    await cache.set('a', SPEC);
+    await cache.set('b', SPEC);
+    await cache.set('a', SPEC);
     await cache.set('c', SPEC);
 
     expect(await cache.get('a')).toEqual(SPEC);
@@ -340,10 +379,16 @@ function cohortDigest(shopper: Shopper = {}): SignalDigest {
 
 const CANDIDATES = ['TR-101', 'TR-102'];
 
+// Every field the cohort key drops is set here, so a loop over them cannot pass on empty values.
 function deeperInput(shopper: { id: string; second: string; views: number }): TrackingInput {
   return parseTrackingInput({
     user: { id: shopper.id, segment: 'loyalty' },
-    context: { surface: 'pdp', currentCategory: 'Trail Running' },
+    context: {
+      surface: 'pdp',
+      currentCategory: 'Trail Running',
+      currentSku: 'TR-101',
+      searchQuery: 'hydration vest',
+    },
     candidates: [
       { sku: 'TR-101', title: 'Shoe', category: 'Trail Running', price: 100 },
       { sku: 'TN-200', title: 'Tent', category: 'Tents', price: 400 },
@@ -351,6 +396,11 @@ function deeperInput(shopper: { id: string; second: string; views: number }): Tr
     ],
     signals: {
       lastPurchased: [{ sku: 'TR-101', at: 1_700_000_000_000 }],
+      likes: [{ sku: 'TR-101', at: 1_700_000_000_000 }],
+      dislikes: [{ sku: 'OW-303', at: 1_700_000_000_000 }],
+      cart: [{ sku: 'BP-300', at: 1_700_000_000_000 }],
+      recentSearches: ['hydration vest'],
+      interactions: [{ type: 'size_guide_opened' }],
       mostViewed: [
         { sku: 'TR-101', at: 1_700_000_000_000, views: shopper.views },
         { sku: shopper.second, at: 1_700_000_000_000, views: shopper.views },
@@ -445,6 +495,13 @@ describe('a cohort key', () => {
     );
   });
 
+  it.each(SCRUBBED)('changing %s leaves the cohort key alone', (field) => {
+    const original = buildDigest(deeperInput({ id: 'S-0001', second: 'TN-200', views: 3 }));
+    const changed = { ...original, [field]: somethingElse(original[field]) } as SignalDigest;
+
+    expect(cohortKeyFor(changed)).toBe(cohortKeyFor(original));
+  });
+
   it('sends the same prompt when history differs below the top category', () => {
     const first = deeperInput({ id: 'S-0001', second: 'TN-200', views: 40 });
     const second = deeperInput({ id: 'S-0002', second: 'BP-300', views: 2 });
@@ -473,6 +530,12 @@ describe('a cohort key', () => {
     // different products must not share the copy.
     expect(cohortCacheKey(cohortDigest(), ['TR-101'], 'p:m')).not.toBe(
       cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m'),
+    );
+  });
+
+  it('changes when the model is shown as many products but different ones', () => {
+    expect(cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m')).not.toBe(
+      cohortCacheKey(cohortDigest(), ['TN-200', 'TN-201'], 'p:m'),
     );
   });
 
@@ -518,6 +581,38 @@ describe('the prompt is in both keys', () => {
 
   it('changes the cohort key when the system prompt changes', async () => {
     const changed = await keysUnderChangedPrompt();
+
+    expect(changed.cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m')).not.toBe(
+      cohortKeyFor(cohortDigest(), 'p:m'),
+    );
+  });
+});
+
+async function keysUnderChangedSpecVersion() {
+  vi.resetModules();
+  vi.doMock('./component-spec.js', async (importOriginal) => {
+    const original = await importOriginal<typeof import('./component-spec.js')>();
+    return { ...original, SPEC_VERSION: `${original.SPEC_VERSION}-next` };
+  });
+  try {
+    return await import('./spec-cache.js');
+  } finally {
+    vi.doUnmock('./component-spec.js');
+    vi.resetModules();
+  }
+}
+
+describe('the spec version is in both keys', () => {
+  it('changes the per-shopper key when the spec shape changes', async () => {
+    const changed = await keysUnderChangedSpecVersion();
+
+    expect(changed.specCacheKey(richDigest(), SKUS, 'p:m')).not.toBe(
+      keyFor(richDigest(), SKUS, 'p:m'),
+    );
+  });
+
+  it('changes the cohort key when the spec shape changes', async () => {
+    const changed = await keysUnderChangedSpecVersion();
 
     expect(changed.cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m')).not.toBe(
       cohortKeyFor(cohortDigest(), 'p:m'),

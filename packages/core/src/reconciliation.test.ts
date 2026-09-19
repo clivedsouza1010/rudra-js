@@ -12,7 +12,12 @@ import {
 import { selectProducts } from './product-selection.js';
 import { buildDigest } from './signal-digest.js';
 import { ALLOWED_PHRASES, productFacts } from './claim-screening.js';
-import { MAX_BLOCKS, reconcileSpec, type ReconcileResult } from './reconciliation.js';
+import {
+  MAX_BLOCKS,
+  placeableHeroSkus,
+  reconcileSpec,
+  type ReconcileResult,
+} from './reconciliation.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
@@ -113,6 +118,18 @@ describe("a reason the shop supplied is the shop's own words", () => {
     const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
 
     expect(items[0]?.reason).toBeNull();
+  });
+
+  it('screens a sentence the model wrote for a product the shop wrote one for', () => {
+    const result = reconcile(
+      grid([ref('TR-101', { reason: 'Only 2 left at this price, save 30%' })]),
+      { candidates },
+      new Map([['TR-101', CLAIM]]),
+    );
+    const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
+
+    expect(items[0]?.reason).toBeNull();
+    expect(result.violations.join()).toMatch(/^unverifiable-claim:[a-z]+:reason:TR-101$/);
   });
 });
 
@@ -340,6 +357,19 @@ describe('the item budget', () => {
   });
 });
 
+describe('the hero products a spec reserves room for', () => {
+  // Two heroes naming one SKU must not burn two budget slots; the wasted slot costs a bundle.
+  it('reserves one slot for a product two heroes both name', () => {
+    const input = inputFor();
+    const heroes: Block[] = [
+      { kind: 'hero', headline: 'Back in the range', body: null, sku: 'TR-101', ctaLabel: null },
+      { kind: 'hero', headline: 'Out again', body: null, sku: 'TR-101', ctaLabel: null },
+    ];
+
+    expect(placeableHeroSkus(heroes, input, buildDigest(input))).toEqual(['TR-101']);
+  });
+});
+
 /**
  * `basis` is a factual claim about the shopper. The model has every incentive to
  * reach for the most flattering one, so each is checked against the digest.
@@ -444,6 +474,13 @@ describe('text repair', () => {
     // The cap is a cap: the ellipsis is inside it, not added on top.
     expect(result.spec.headline).toHaveLength(90);
     expect(result.spec.headline.endsWith('…')).toBe(true);
+  });
+
+  it('truncates an over-long reason', () => {
+    const result = reconcile(grid([ref('TR-101', { reason: 'a'.repeat(130) })]));
+
+    expect(basisOf(result)?.reason).toHaveLength(120);
+    expect(basisOf(result)?.reason?.endsWith('…')).toBe(true);
   });
 
   it('collapses runs of whitespace', () => {
@@ -612,6 +649,16 @@ describe('attributing a rejection to its real cause', () => {
     expect(result.violations).toEqual(['budget:dropped:TR-102']);
   });
 
+  // Shops keep the cart out of the candidate list, so this SKU is both at once.
+  it('reports a cart SKU the host never offered as unknown, not blocked', () => {
+    const result = reconcile(grid([ref('TR-101'), ref('TR-999')]), {
+      signals: { cart: [{ sku: 'TR-999' }] },
+    });
+
+    expect(result.violations).toContain('unknown-sku:TR-999');
+    expect(result.violations).not.toContain('blocked-sku:TR-999');
+  });
+
   it('names a missing headline as such, not as a missing product', () => {
     const result = reconcile({ ...grid([ref('TR-101')]), headline: '   ' });
 
@@ -705,6 +752,19 @@ describe('choosing a bundle', () => {
     });
 
     expect(result.spec.blocks).toHaveLength(0);
+  });
+
+  // No cart, no views, no affinity: the shop's own order is the only tie-break left.
+  it('keeps the first of two sets the signals cannot separate', () => {
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B'), product('C'), product('D')],
+      bundles: [
+        { id: 'FIRST', skus: ['A', 'B'], price: 30 },
+        { id: 'SECOND', skus: ['C', 'D'], price: 30 },
+      ],
+    });
+
+    expect(result.spec.blocks[0]).toMatchObject({ bundleId: 'FIRST' });
   });
 
   it('prefers a bundle holding something already in the cart', () => {
@@ -1187,7 +1247,7 @@ describe('claims the renderer cannot check', () => {
   // A pattern spelling the same claim more than one way gets a row per spelling. The
   // table above takes one row per pattern, and the row it took was a spelling that
   // already worked while `#1` matched nothing at all.
-  const EVERY_SPELLING: { kind: string; catches: string }[] = [
+  const EVERY_SPELLING: { kind: string; catches: string; supports?: string[] }[] = [
     { kind: 'rating', catches: 'our number one seller last winter' },
     { kind: 'rating', catches: 'our no.1 seller last winter' },
     { kind: 'rating', catches: 'our no. 1 seller last winter' },
@@ -1195,13 +1255,28 @@ describe('claims the renderer cannot check', () => {
     { kind: 'rating', catches: 'our #1 seller last winter' },
     { kind: 'rating', catches: 'our # 1 seller last winter' },
     { kind: 'rating', catches: 'the #1 selling pack' },
+    { kind: 'rating', catches: 'it scores 4.8 out of five with other hikers', supports: ['4.8'] },
+    { kind: 'rating', catches: 'a rating of 5.0 from other hikers', supports: ['5.0'] },
+    { kind: 'rating', catches: 'the best-rated pack we carry' },
     { kind: 'price', catches: 'yours today for thirty-nine dollars' },
     { kind: 'price', catches: 'thirty-nine euros and it is yours' },
+    { kind: 'price', catches: 'our pricing on this one just changed' },
+    { kind: 'discount', catches: 'a 20% reduction this week', supports: ['20'] },
+    { kind: 'delivery', catches: 'order now and get it by saturday' },
+    { kind: 'stock', catches: 'low on stock in your size' },
+    { kind: 'stock', catches: 'out of stock in your size' },
+    { kind: 'stock', catches: 'a couple left in your size' },
+    { kind: 'stock', catches: 'a handful left in your size' },
   ];
 
   for (const row of EVERY_SPELLING) {
     it(`reads "${row.catches}" as a ${row.kind} claim`, () => {
-      const result = reconcile(grid([ref('TR-101', { reason: row.catches })]));
+      const overrides =
+        row.supports === undefined
+          ? {}
+          : { candidates: [product('TR-101', { tags: row.supports }), product('TR-102')] };
+
+      const result = reconcile(grid([ref('TR-101', { reason: row.catches })]), overrides);
 
       expect(result.violations).toContain(`unverifiable-claim:${row.kind}:reason:TR-101`);
     });
@@ -1301,6 +1376,13 @@ describe('a claim spelled in characters the patterns do not expect', () => {
   const reasonFor = (text: string): string | null | undefined =>
     basisOf(reconcile(grid([ref('TR-101', { reason: text })])))?.reason;
 
+  // The kind, not just the drop: attested backstops some of these characters itself.
+  const disguisedKindFor = (text: string): string | null => {
+    const result = reconcile(grid([ref('TR-101', { reason: text })]));
+    const violation = result.violations.find((entry) => entry.startsWith('unverifiable-claim:'));
+    return violation ? (violation.split(':')[1] ?? null) : null;
+  };
+
   const DISGUISED_STOCK: { hidden: string; reason: string }[] = [
     { hidden: 'a zero-width space', reason: 'in st\u200Bock in your size' },
     { hidden: 'a variation selector', reason: 'in st\uFE0Fock in your size' },
@@ -1318,12 +1400,29 @@ describe('a claim spelled in characters the patterns do not expect', () => {
 
   for (const row of DISGUISED_STOCK) {
     it(`drops a stock claim hidden behind ${row.hidden}`, () => {
-      expect(reasonFor(row.reason)).toBeNull();
+      expect(disguisedKindFor(row.reason)).toBe('stock');
     });
   }
 
   it('drops a discount claim hidden behind a Greek look-alike', () => {
     expect(reasonFor('20% \u03BFff for the rest of the week')).toBeNull();
+  });
+
+  it('drops a price claim hidden behind a Cyrillic er', () => {
+    expect(disguisedKindFor('a great \u0440rice for the pair')).toBe('price');
+  });
+
+  it('drops a delivery claim hidden behind a Cyrillic o', () => {
+    expect(disguisedKindFor('in your hands \u043Evernight')).toBe('delivery');
+  });
+
+  // Both need NFKC to run before the lowercase, so the capital it introduces is folded.
+  it('drops a price claim hidden behind a double-struck capital', () => {
+    expect(disguisedKindFor('\u2119RICED to move')).toBe('price');
+  });
+
+  it('drops a rating claim hidden behind a numero sign', () => {
+    expect(disguisedKindFor('\u21161 seller in your size')).toBe('rating');
   });
 
   // Lowercasing without a locale turns the Turkish capital into i plus a
@@ -1433,6 +1532,11 @@ describe('the two passes attested adds', () => {
       expect(kindFor(reason)).toBe('quantity');
     });
   }
+
+  // Fails both passes. quantity is the proof of the two, so it answers first.
+  it('names a sentence both passes reject by its quantity', () => {
+    expect(kindFor('rated highest by other hikers, 4.8 overall')).toBe('quantity');
+  });
 
   // A category name is the shop's own string, so the digit in it is the shop's
   // own number and the model may write it back. This is the sentence the selector
@@ -1574,17 +1678,32 @@ describe('the two passes attested adds', () => {
   // older, where `1e2000000000` threw and `-2.5e400000000` took the process with it.
   const ABSURD = '1e2000000000';
 
-  it('keeps a fact nothing could lay out off the list, tag or category', () => {
-    const input = inputFor({
-      candidates: [
-        product('TR-101', { category: ABSURD, tags: [ABSURD, '3 season'] }),
-        product('TR-102'),
-      ],
-    });
+  const factsFor = (overrides: Record<string, unknown>): string[] => {
+    const input = inputFor({ candidates: [product('TR-101', overrides), product('TR-102')] });
     const [first] = input.candidates;
     if (!first) throw new Error('expected a candidate');
 
-    expect(productFacts(first)).toEqual(['3 season']);
+    return productFacts(first);
+  };
+
+  it('keeps a fact nothing could lay out off the list, tag or category', () => {
+    expect(factsFor({ category: ABSURD, tags: [ABSURD, '3 season'] })).toEqual(['3 season']);
+  });
+
+  it('keeps one off the list with spaces around it', () => {
+    expect(factsFor({ tags: [` ${ABSURD} `] })).toEqual([]);
+  });
+
+  it('keeps one off the list for an exponent that far negative', () => {
+    expect(factsFor({ tags: ['1e-2000000000'] })).toEqual([]);
+  });
+
+  it('keeps the fact at the cap and drops the one past it', () => {
+    expect(factsFor({ tags: ['1e1000', '1e1001'] })).toEqual(['1e1000']);
+  });
+
+  it('keeps a fact that only ends in an exponent', () => {
+    expect(factsFor({ tags: [`model ${ABSURD}`] })).toEqual([`model ${ABSURD}`]);
   });
 
   it('renders the rest of that candidate normally', () => {
@@ -1667,6 +1786,10 @@ describe('the two passes attested adds', () => {
   it('reads through a character that takes no room, and not through one that does', () => {
     expect(kindFor(`in st${TAKES_NO_ROOM}ock in your size`)).toBe('stock');
     expect(kindFor(`in st${DRAWS_A_BOX}ock in your size`)).toBeNull();
+  });
+
+  it('reads through a zero-width space inside a claim word', () => {
+    expect(kindFor('20% o\u200Bff this week')).toBe('discount');
   });
 
   // The screen hands attested no facts at all for a sentence with no numeral in

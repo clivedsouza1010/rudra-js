@@ -193,13 +193,17 @@ describe.each(PACKAGES)('the @rudra-js/%s tarball', (packageName) => {
 
     const directory = join(REPO_ROOT, 'packages', packageName, 'src');
     const imported = new Set<string>();
+    let scanned = 0;
     for (const file of readdirSync(directory, { recursive: true, withFileTypes: true })) {
       if (!file.isFile()) continue;
       if (IS_TEST_FILE.test(file.name)) continue;
       const source = readFileSync(join(file.parentPath, file.name), 'utf8');
+      scanned += 1;
       for (const match of source.matchAll(SIBLING_IMPORT)) imported.add(match[1]!);
     }
 
+    // Nothing found is how this guard passes, so it has to have read something.
+    expect(scanned, `nothing was read under packages/${packageName}/src`).toBeGreaterThan(0);
     for (const name of imported) expect([...declared], name).toContain(name);
   });
 
@@ -227,18 +231,61 @@ describe('the sibling-import matcher', () => {
     expect(found("const m = require('@rudra-js/attested');")).toEqual(['@rudra-js/attested']);
   });
 
+  it('reads a sibling whose name carries a hyphen', () => {
+    expect(found("import { shop } from '@rudra-js/example-shop';")).toEqual([
+      '@rudra-js/example-shop',
+    ]);
+  });
+
   it('leaves a package named in prose alone, including the file its own package owns', () => {
     // `packages/core/src/index.ts` opens by naming @rudra-js/core, and core does
     // not declare itself. Matching prose would fail this suite on that line.
     expect(found(' * @rudra-js/core — the contracts and logic for one payload')).toEqual([]);
     expect(found(' * The same class @rudra-js/attested strips in its own hidden.ts.')).toEqual([]);
+    expect(found(" * mirrors '@rudra-js/attested' for the stripper")).toEqual([]);
     expect(
       found("throw new Error('objects must satisfy productSchema from @rudra-js/core');"),
     ).toEqual([]);
   });
 });
 
+describe('the tarball allow-list', () => {
+  it('takes sources from src and nothing else that sits there', () => {
+    expect(ALLOWED.test('src/index.ts')).toBe(true);
+    expect(ALLOWED.test('src/client/provider.tsx')).toBe(true);
+    expect(ALLOWED.test('src/.env')).toBe(false);
+    expect(ALLOWED.test('src/fixtures/order.json')).toBe(false);
+  });
+});
+
+describe('the workflow scrapers', () => {
+  const workflow = `name: release
+on:
+  push:
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - run: npm test
+        if: \${{ github.event_name == 'push' }}
+`;
+
+  it('reads every key a step carries, not just the first', () => {
+    expect(stepsOf(workflow, 'publish')).toEqual([{ keys: ['run', 'if'], run: 'npm test' }]);
+  });
+
+  it('reads the keys the job itself carries, not its steps', () => {
+    expect(jobKeysOf(workflow, 'publish')).toEqual(['runs-on', 'continue-on-error', 'steps']);
+  });
+});
+
 describe('the published packages', () => {
+  it('are the four this file is meant to be checking', () => {
+    // Everything above runs per package, so one the scrape loses takes its checks with it.
+    expect(PACKAGES).toEqual(['anthropic', 'attested', 'core', 'react']);
+  });
+
   it('all carry one version, because one tag publishes every one', () => {
     const versions = PACKAGES.map((packageName) => readManifest(packageName).version);
     const listed = PACKAGES.map(
