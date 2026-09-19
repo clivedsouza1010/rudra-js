@@ -56,9 +56,9 @@
   },
   "devDependencies": {
     "@rudra-js/core": "0.5.0",
-    "@types/react": "^19.2.18",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^19.2.7",
-    "react": "^19.2.8",
+    "react": "^19.3.0",
     "react-dom": "^19.2.8"
   }
 }
