@@ -114,7 +114,7 @@ describe('the cache key covers the whole digest', () => {
     expect(keyFor(richDigest())).toBe(keyFor(richDigest()));
   });
 
-  it('is 32 hex characters', () => {
+  it('hashes down to 32 hex characters', () => {
     expect(keyFor(richDigest())).toMatch(/^[0-9a-f]{32}$/);
   });
 });

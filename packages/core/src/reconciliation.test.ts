@@ -358,8 +358,7 @@ describe('the item budget', () => {
 });
 
 describe('the hero products a spec reserves room for', () => {
-  // The generator spends one budget slot per SKU on this list, and a slot held for a
-  // product reconciliation will drop as a duplicate is a bundle the shopper loses.
+  // Two heroes naming one SKU must not burn two budget slots; the wasted slot costs a bundle.
   it('reserves one slot for a product two heroes both name', () => {
     const input = inputFor();
     const heroes: Block[] = [
@@ -1378,7 +1377,7 @@ describe('a claim spelled in characters the patterns do not expect', () => {
     basisOf(reconcile(grid([ref('TR-101', { reason: text })])))?.reason;
 
   // The kind, not just the drop: attested backstops some of these characters itself.
-  const kindFor = (text: string): string | null => {
+  const disguisedKindFor = (text: string): string | null => {
     const result = reconcile(grid([ref('TR-101', { reason: text })]));
     const violation = result.violations.find((entry) => entry.startsWith('unverifiable-claim:'));
     return violation ? (violation.split(':')[1] ?? null) : null;
@@ -1401,7 +1400,7 @@ describe('a claim spelled in characters the patterns do not expect', () => {
 
   for (const row of DISGUISED_STOCK) {
     it(`drops a stock claim hidden behind ${row.hidden}`, () => {
-      expect(kindFor(row.reason)).toBe('stock');
+      expect(disguisedKindFor(row.reason)).toBe('stock');
     });
   }
 
@@ -1410,20 +1409,20 @@ describe('a claim spelled in characters the patterns do not expect', () => {
   });
 
   it('drops a price claim hidden behind a Cyrillic er', () => {
-    expect(kindFor('a great \u0440rice for the pair')).toBe('price');
+    expect(disguisedKindFor('a great \u0440rice for the pair')).toBe('price');
   });
 
   it('drops a delivery claim hidden behind a Cyrillic o', () => {
-    expect(kindFor('in your hands \u043Evernight')).toBe('delivery');
+    expect(disguisedKindFor('in your hands \u043Evernight')).toBe('delivery');
   });
 
   // Both need NFKC to run before the lowercase, so the capital it introduces is folded.
   it('drops a price claim hidden behind a double-struck capital', () => {
-    expect(kindFor('\u2119RICED to move')).toBe('price');
+    expect(disguisedKindFor('\u2119RICED to move')).toBe('price');
   });
 
   it('drops a rating claim hidden behind a numero sign', () => {
-    expect(kindFor('\u21161 seller in your size')).toBe('rating');
+    expect(disguisedKindFor('\u21161 seller in your size')).toBe('rating');
   });
 
   // Lowercasing without a locale turns the Turkish capital into i plus a

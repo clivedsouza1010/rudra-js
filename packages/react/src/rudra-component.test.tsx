@@ -702,6 +702,9 @@ describe('the styling contract', () => {
   it('puts a block title before the products it introduces', () => {
     const markup = everything();
 
+    // indexOf gives -1 for a missing class, which sorts before every real index.
+    expect(markup).toContain('rudra-grid__title');
+    expect(markup).toContain('rudra-carousel__title');
     expect(markup.indexOf('rudra-grid__title')).toBeLessThan(markup.indexOf('rudra-grid__items'));
     expect(markup.indexOf('rudra-carousel__title')).toBeLessThan(
       markup.indexOf('rudra-carousel__track'),
