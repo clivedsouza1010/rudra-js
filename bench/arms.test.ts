@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { generatedSpecSchema, type TokenUsage } from '@rudra-js/core';
-import { buildArm, loadColdUsage, type ArmName } from './arms.js';
+import { buildArm, loadColdUsage, PRICES, type ArmName } from './arms.js';
 
 const RECORDINGS = fileURLToPath(new URL('../examples/shop/recordings/', import.meta.url));
 
@@ -49,6 +49,41 @@ describe('what the stub bills', () => {
       });
     });
   }
+});
+
+describe('how each arm is set up', () => {
+  it('b deterministic runs without a provider and must not call a model', () => {
+    const arm = buildArm('b deterministic');
+
+    expect(arm.mode).toBe('stub');
+    expect(arm.options.provider).toBe(null);
+    expect(arm.rule).toEqual({ fallback: 'all', modelCalls: 'none' });
+  });
+
+  it('c cohort generates per cohort and pins the hit rate from both sides', () => {
+    const arm = buildArm('c cohort');
+
+    expect(arm.options.generation).toBe('cohort');
+    expect(arm.rule).toEqual({ fallback: 'none', minCacheHitRate: 0.45, maxCacheHitRate: 0.65 });
+  });
+
+  it('d per-shopper generates per shopper and caps the hit rate', () => {
+    const arm = buildArm('d per-shopper');
+
+    expect(arm.options.generation).toBe('per-shopper');
+    expect(arm.rule).toEqual({ fallback: 'none', maxCacheHitRate: 0.1 });
+  });
+});
+
+describe('the price table the run bills at', () => {
+  it('bills at the list price it says it checked', () => {
+    expect(PRICES).toEqual({
+      inputPerMillion: 5,
+      outputPerMillion: 25,
+      cacheWritePerMillion: 6.25,
+      cacheReadPerMillion: 0.5,
+    });
+  });
 });
 
 describe('reading the committed transcript', () => {

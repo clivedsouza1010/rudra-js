@@ -95,6 +95,10 @@ describe('the caveats a stub run needs', () => {
     expect(hasLine(caveatsFor('stub'), 'ceiling')).toBe(true);
   });
 
+  it('names the shoppers per page it was actually given', () => {
+    expect(hasLine(buildCaveats([armResult()], 5), '5 shoppers to a page')).toBe(true);
+  });
+
   it('says the hit rate is one cold pass and not a steady state', () => {
     // 54% can be quoted as a ceiling or as a floor by anyone who does not
     // know the run was a single cold pass at ten views per page.
@@ -113,6 +117,18 @@ describe('the printed table', () => {
     const table = formatTable([armResult({ arm: 'c cohort', mode: 'stub' })]);
 
     expect(table).toContain('| c cohort | stub |');
+  });
+
+  it('prints the mix in the order the heading names', () => {
+    const table = formatTable([armResult({ sources: { llm: 230, cache: 270, fallback: 0 } })]);
+
+    expect(table).toContain('| 230/270/0 |');
+  });
+
+  it('prints the hit rate to a tenth of a percent', () => {
+    const table = formatTable([armResult({ cacheHitRate: 0.545 })]);
+
+    expect(table).toContain('| 54.5% |');
   });
 
   it('prints n/a where a stub run has no timings', () => {
