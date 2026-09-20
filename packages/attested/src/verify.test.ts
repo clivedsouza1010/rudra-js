@@ -293,6 +293,12 @@ describe('verify — the wording layer', () => {
     expect(verify('selling\nfast', NOTHING).wording.supported).toBe(false);
   });
 
+  it('catches a phrase off the built-in list written into ordinary copy', () => {
+    expect(tokensOf(verify('Sorry, this one is out of stock.', NOTHING).wording.findings)).toEqual([
+      'out of stock',
+    ]);
+  });
+
   it('catches the near-misses a reworded denylist entry used to walk past', () => {
     const rewordings = [
       'Ships free.',
@@ -530,6 +536,11 @@ describe('verify — allowedPhrases', () => {
       [
         'Free shipping\n\n---\n\nover $75 we add a gift box.',
         'free shipping over $75',
+        'free shipping',
+      ],
+      [
+        'We do not offer\u2028Free shipping on every order.',
+        'we do not offer free shipping',
         'free shipping',
       ],
     ];
