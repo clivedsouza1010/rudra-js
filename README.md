@@ -199,6 +199,18 @@ holds to, and its naming and testing conventions. Everyone taking part is expect
 
 Changes are recorded in the [changelog](./CHANGELOG.md).
 
+## Patent
+
+Patent pending in the US. A provisional application for the cohort caching
+design — the coupled cache key and prompt projection in
+[`spec-cache.ts`](packages/core/src/spec-cache.ts) — was filed on 20 September
+2026, application 64/158,649.
+
+This doesn't change how you can use rudra-js. The code is MIT and stays MIT. The
+application was filed defensively, so that nobody else patents the design and
+comes after the people using it. A provisional isn't examined and may never
+become a granted patent.
+
 ## Licence
 
 [MIT](./LICENSE) © Clive Dsouza
