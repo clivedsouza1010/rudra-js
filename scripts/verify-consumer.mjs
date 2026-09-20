@@ -56,6 +56,7 @@ const SUCCESS = '  render + isolation: ok';
 const PLANTED = 'RudraNotDeclaredAnywhere';
 
 const TSC = join(REPO_ROOT, 'node_modules/.bin/tsc');
+const tscArgs = (config) => ['-p', config];
 
 const run = (command, args, cwd) => {
   try {
@@ -186,8 +187,7 @@ try {
 
   // Check what tsc resolves for the exact arguments it is run on, not the object
   // above: `--showConfig` also sees an `extends` base and a command-line flag.
-  const tscArgs = ['-p', tsconfig];
-  const resolved = JSON.parse(run(TSC, ['--showConfig', ...tscArgs])).compilerOptions;
+  const resolved = JSON.parse(run(TSC, ['--showConfig', ...tscArgs(tsconfig)])).compilerOptions;
   for (const [option, expected] of Object.entries(REQUIRED_OPTIONS)) {
     if (JSON.stringify(resolved?.[option]) !== JSON.stringify(expected)) {
       throw new Error(
@@ -209,41 +209,84 @@ try {
 
   // One set of arguments for the control and for the run, so a weaker config or an
   // extra flag put in the way of one is put in the way of the other.
-  const typecheck = () => spawnSync(TSC, tscArgs, { cwd: consumer, encoding: 'utf8' });
+  const typecheck = (config) =>
+    spawnSync(TSC, tscArgs(config), { cwd: consumer, encoding: 'utf8' });
 
-  // A pass is a claim about nothing unless tsc could have failed. Plant the exact
-  // defect this script exists to catch — a published type leaning on a name nothing
-  // declares — in every package, and require every one to come back reported. A
-  // package missing from the report was never read: tsc only opens a package's
-  // types when something imports them.
+  // Every .d.ts in the tarball ships, but the consumer only ever reaches each
+  // package's entry, so the rest are never opened by the run above.
   const published = new Map();
   for (const packageName of PACKAGES) {
-    const file = join(modules, '@rudra-js', packageName, manifestOf(packageName).types);
-    published.set(file, readFileSync(file, 'utf8'));
-  }
-  for (const [file, declarations] of published) {
-    writeFileSync(file, `${declarations}\nexport declare const planted: ${PLANTED};\n`);
-  }
-  const reported = (typecheck().stdout ?? '').split('\n');
-  for (const [file, declarations] of published) writeFileSync(file, declarations);
-
-  for (const file of published.keys()) {
-    const path = relative(consumer, file);
-    if (!reported.some((line) => line.startsWith(path) && line.includes(PLANTED))) {
-      throw new Error(`control: a defect planted in ${path} went unreported`);
+    const root = join(modules, '@rudra-js', packageName);
+    for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.d.ts')) continue;
+      const file = join(entry.parentPath, entry.name);
+      published.set(file, readFileSync(file, 'utf8'));
     }
   }
 
-  const checked = typecheck();
-  if (checked.status !== 0) {
-    // tsc writes its diagnostics to stdout, which is captured here rather than inherited.
-    process.stdout.write(checked.stdout ?? '');
-    process.stderr.write(checked.stderr ?? '');
-    throw new Error('the consumer did not typecheck against the packed packages');
+  // The consumer's own options, so the two passes cannot drift apart.
+  const declarationsConfig = join(consumer, 'tsconfig.declarations.json');
+  writeFileSync(
+    declarationsConfig,
+    JSON.stringify(
+      { compilerOptions, files: [...published.keys()].map((file) => relative(consumer, file)) },
+      null,
+      2,
+    ),
+  );
+
+  // A pass is a claim about nothing unless tsc could have failed. Plant the exact
+  // defect this script exists to catch — a published type leaning on a name nothing
+  // declares — in every published declaration, and require every one to come back
+  // reported. A file missing from the report was never read.
+  for (const [file, original] of published) {
+    writeFileSync(file, `${original}\nexport declare const planted: ${PLANTED};\n`);
+  }
+  const byConsumer = typecheck(tsconfig);
+  const byDeclarations = typecheck(declarationsConfig);
+  for (const [file, original] of published) {
+    writeFileSync(file, original);
+    if (readFileSync(file, 'utf8') !== original) {
+      throw new Error(`control: ${relative(consumer, file)} was not restored`);
+    }
+  }
+
+  const plantReported = (result, file) => {
+    const path = relative(consumer, file);
+    return (result.stdout ?? '')
+      .split('\n')
+      .some((line) => line.startsWith(path) && line.includes(PLANTED));
+  };
+
+  for (const file of published.keys()) {
+    if (!plantReported(byDeclarations, file)) {
+      throw new Error(`control: a defect planted in ${relative(consumer, file)} went unreported`);
+    }
+  }
+
+  // tsc only opens a package's types when something imports them, so the consumer
+  // run reporting each entry is what proves it resolved to the packed types.
+  for (const packageName of PACKAGES) {
+    const entry = join(modules, '@rudra-js', packageName, manifestOf(packageName).types);
+    if (!plantReported(byConsumer, entry)) {
+      throw new Error(`control: the consumer never read ${relative(consumer, entry)}`);
+    }
+  }
+
+  for (const [failure, result] of [
+    ['the consumer did not typecheck against the packed packages', typecheck(tsconfig)],
+    ['a published declaration did not typecheck', typecheck(declarationsConfig)],
+  ]) {
+    if (result.status !== 0) {
+      // tsc writes its diagnostics to stdout, which is captured here rather than inherited.
+      process.stdout.write(result.stdout ?? '');
+      process.stderr.write(result.stderr ?? '');
+      throw new Error(failure);
+    }
   }
 
   console.log(
-    `  typecheck (${resolved.moduleResolution}, skipLibCheck ${resolved.skipLibCheck ? 'on' : 'off'}): ok`,
+    `  typecheck (${resolved.moduleResolution}, skipLibCheck ${resolved.skipLibCheck ? 'on' : 'off'}, ${published.size} declarations): ok`,
   );
 
   const rendered = runConsumer('consumer.ts');
