@@ -151,12 +151,39 @@ same order.
 
 ## Releasing
 
-Bump the version on a pull request of its own, and merge it. Then push a signed tag `vX.Y.Z` at the
-merge commit:
+Bump the version on a pull request of its own, and merge it. A bump is more than the `version`
+fields. One version has to reach every place that names it, or `npm ci` inside the release job
+stops the release on a tag you can't take back:
+
+- `version` in the root manifest, in all four `packages/*/package.json`, and in
+  `examples/shop/package.json`.
+- The peer range each package declares on a sibling — `^0.5.0` becomes `^0.6.0` in
+  `packages/core`, `packages/react` and `packages/anthropic`. Caret on a `0.x` version is
+  patch-only, so leaving one behind publishes four packages that can't be installed together.
+- The exact sibling pin those three carry in `devDependencies`, and the two in
+  `examples/shop`.
+- `package-lock.json`, regenerated with the npm the release installs:
+
+  ```sh
+  npm install -g npm@11.19.1
+  npm install --package-lock-only --ignore-scripts
+  ```
+
+  The npm bundled with Node 22.21.1 is 10.9.4, and it drops the 12 `libc` fields the lockfile
+  carries without saying so. Those fields pick the glibc or musl lightningcss binary on the runner.
+
+`tests/packaging.test.ts` checks all of it, so a bump that misses a spot fails on the pull request
+instead of on the tag.
+
+Nothing automates the paperwork either. `release.yml` publishes to npm and stops — no GitHub
+release, no CHANGELOG edit. Move the `## [Unreleased]` heading and the `[unreleased]:` compare link
+at the bottom of `CHANGELOG.md` in the same pull request, because nothing fails if you don't.
+
+Then push a signed tag `vX.Y.Z` at the merge commit, while it's still the tip of `main`:
 
 ```sh
-git tag -s v0.2.0 -m 'v0.2.0'
-git push origin v0.2.0
+git tag -s v0.5.1 -m 'v0.5.1'
+git push origin v0.5.1
 ```
 
 A `v*` tag starts [`.github/workflows/release.yml`](.github/workflows/release.yml). It runs the
@@ -164,17 +191,21 @@ same six checks a pull request runs, build included, and then publishes `@rudra-
 `@rudra-js/core`, `@rudra-js/react` and `@rudra-js/anthropic` in that order with
 `npm publish --provenance`.
 
-The order is by what's most likely to fail, not by what depends on what. npm can't publish over a
-half-finished release, so anything that goes out before a failure is public and stuck at a version
-the next tag can't reuse. A name npm hasn't seen is the riskiest step — a trusted publisher is
-configured from a package's settings page, so a brand new name has nothing to read and fails auth —
-and it goes first, where failing costs nothing. Core leads the rest, because react and anthropic
-both declare it as a peer.
+The order is what an install can satisfy. `@rudra-js/attested` depends on nothing and core declares
+it as a peer, so attested goes first; react and anthropic both declare core as a peer, so core
+leads them. npm can't publish over a half-finished release, so anything that goes out before a
+failure is public and stuck at a version the next tag can't reuse.
 
-The first two steps run before anything is installed, and they stop the release if either fails:
-the tagged commit has to be on `main`, and the tag has to equal the `version` in
-`packages/core/package.json`. All four manifests carry the same version and a test enforces that,
-because one tag publishes all four.
+Three steps run before anything is installed, and any one of them stops the release: the tagged
+commit has to be on `main`, it has to be the tip of `main`, and the tag has to equal the `version`
+in `packages/core/package.json`. All four manifests carry the same version and a test enforces
+that, because one tag publishes all four.
+
+The tip check is the strict one, and it's strict on purpose. Being on `main` isn't enough: every
+commit after the bump reads the bumped version too, so a tag a few commits back clears the other
+two and publishes a tree missing whatever landed since — irreversibly, with provenance pointing at
+a real `main` commit. The price is that if `main` moves between your tag push and the job starting,
+the tag is spent.
 
 A quick heads-up on tags. Anything matching `v*` can't be moved or deleted once you've pushed it,
 so a tag that fails a check is spent, and the fix is to bump the version and tag again. It's the
@@ -198,9 +229,15 @@ We pin npm to one version rather than a range because npm is the thing doing the
 publisher that changes under you between two releases is not something you want to find out about
 during one.
 
-Nothing watches this pin, so bump it by hand. Run `rehearsal.yml` once you have. It installs the
-same npm and does a `--dry-run` publish of all four packages, so a broken npm shows up there
-instead of halfway through a release.
+Nothing watches this pin against what npm releases, so bump it by hand — in both files. A test
+holds the two equal, so you can't move one and leave the other. Bumping it usually drags `.nvmrc`
+along: npm 12 declares `^22.22.2 || ^24.15.0 || >=26.0.0`, `.nvmrc` is 22.21.1, and `.npmrc` sets
+`engine-strict=true`, so installing npm 12 on today's Node is a hard refusal.
+
+Run `rehearsal.yml` once you have. It installs the same npm and does a `--dry-run` publish of all
+four packages, so a broken npm shows up there instead of halfway through a release. It doesn't go
+near OIDC, though — no `npm` environment, no `id-token: write`, no `--provenance` — so a green
+rehearsal says packing and the checks are fine, not that the publish will authenticate.
 
 ### What publishing is bound to
 
@@ -216,11 +253,14 @@ doesn't match a configured publisher. It won't tell you which of the three is wr
 Adding a package means two edits, not one: a trusted publisher for its name on npmjs.com, and a
 `npm publish --provenance --access public` step in `release.yml` with its `working-directory`. The
 publisher can't be created until the package exists, so publish a placeholder version by hand first,
-then configure it. Put the new step first, ahead of the packages that already publish, so an auth
-failure costs nothing.
+then configure it. Put the new step as early as its own peers allow — ahead of everything, if
+nothing it declares as a peer has to land before it — so an auth failure costs as little as
+possible.
 
 If a publish does half-finish — attested published, core failed — there's nothing to publish by hand
-with. Bump the patch version on all four, merge, and tag again.
+with. Bump the patch version on all four, merge, and tag again. Don't go hunting for a token to
+finish the run: a package whose npmjs.com settings don't require trusted publishing will accept a
+granular one, and you'd end up with a version where some tarballs are attested and some aren't.
 
 ## When the tool-schema golden fails
 
