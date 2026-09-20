@@ -8,9 +8,9 @@
  * repository and making it resolve, typecheck against, and render the packed
  * packages.
  *
- * It lives outside the vitest suite on purpose. It packs, extracts and runs
- * `tsc` twice, which is slower than the entire unit suite; folding it in would
- * make `vitest --watch` re-run all of that on every keystroke.
+ * It lives outside the vitest suite on purpose. It packs, extracts and typechecks
+ * the result twice over, which is slower than the entire unit suite; folding it in
+ * would make `vitest --watch` re-run all of that on every keystroke.
  *
  * The consumer MUST sit outside the repository. Built inside it — even under
  * `node_modules/` — Node and tsc walk up to the repo's own `node_modules`, and
@@ -25,12 +25,13 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -51,13 +52,47 @@ const MUST_NOT_RESOLVE = 'prettier';
 const FORBIDDEN_PLACEHOLDER = '__FORBIDDEN_PACKAGE__';
 const SUCCESS = '  render + isolation: ok';
 
-const run = (command, args, cwd) =>
-  execFileSync(command, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+/** Planted in each published .d.ts by the control below. Nothing anywhere declares it. */
+const PLANTED = 'RudraNotDeclaredAnywhere';
+
+const TSC = join(REPO_ROOT, 'node_modules/.bin/tsc');
+
+const run = (command, args, cwd) => {
+  try {
+    return execFileSync(command, args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+  } catch (error) {
+    // The output is captured here rather than inherited, so a failure shows nothing without this.
+    process.stdout.write(error.stdout ?? '');
+    throw error;
+  }
+};
+
+/**
+ * Written apart from the config below so the two have to agree. Weaken any of
+ * these and the typecheck still exits 0 while a real defect in a published
+ * .d.ts goes unseen. Values are spelled the way `tsc --showConfig` reports them.
+ */
+const REQUIRED_OPTIONS = {
+  skipLibCheck: false,
+  module: 'nodenext',
+  moduleResolution: 'nodenext',
+  strict: true,
+  types: [],
+  lib: ['es2022', 'dom'],
+  verbatimModuleSyntax: true,
+  exactOptionalPropertyTypes: true,
+};
 
 const manifestOf = (packageName) =>
   JSON.parse(readFileSync(join(REPO_ROOT, 'packages', packageName, 'package.json'), 'utf8'));
 
-const workspace = mkdtempSync(join(tmpdir(), 'rudra-consumer-'));
+// Realpathed so our paths and tsc's spell the same directory: on macOS the temp
+// directory sits behind a symlink.
+const workspace = realpathSync(mkdtempSync(join(tmpdir(), 'rudra-consumer-')));
 const consumer = join(workspace, 'app');
 const modules = join(consumer, 'node_modules');
 
@@ -130,35 +165,86 @@ try {
   // NodeNext only. Under `bundler` resolution every one of these checks passes
   // whatever the package does, because bundler resolution is strictly more
   // permissive — it cannot fail on a specifier Node would reject.
-  writeFileSync(
-    join(consumer, 'tsconfig.json'),
-    JSON.stringify(
-      {
-        compilerOptions: {
-          strict: true,
-          noEmit: true,
-          // Off is the point: this is the only place the published .d.ts files
-          // are checked, and a public type leaning on an ambient global or an
-          // undeclared package only shows up here.
-          skipLibCheck: false,
-          target: 'ES2022',
-          lib: ['ES2022', 'DOM'],
-          module: 'nodenext',
-          moduleResolution: 'nodenext',
-          verbatimModuleSyntax: true,
-          exactOptionalPropertyTypes: true,
-          types: [],
-        },
-        include: ['consumer.ts'],
-      },
-      null,
-      2,
-    ),
+  const compilerOptions = {
+    strict: true,
+    noEmit: true,
+    // Off is the point: this is the only place the published .d.ts files
+    // are checked, and a public type leaning on an ambient global or an
+    // undeclared package only shows up here.
+    skipLibCheck: false,
+    target: 'es2022',
+    lib: ['es2022', 'dom'],
+    module: 'nodenext',
+    moduleResolution: 'nodenext',
+    verbatimModuleSyntax: true,
+    exactOptionalPropertyTypes: true,
+    types: [],
+  };
+
+  const tsconfig = join(consumer, 'tsconfig.json');
+  writeFileSync(tsconfig, JSON.stringify({ compilerOptions, include: ['consumer.ts'] }, null, 2));
+
+  // Check what tsc resolves for the exact arguments it is run on, not the object
+  // above: `--showConfig` also sees an `extends` base and a command-line flag.
+  const tscArgs = ['-p', tsconfig];
+  const resolved = JSON.parse(run(TSC, ['--showConfig', ...tscArgs])).compilerOptions;
+  for (const [option, expected] of Object.entries(REQUIRED_OPTIONS)) {
+    if (JSON.stringify(resolved?.[option]) !== JSON.stringify(expected)) {
+      throw new Error(
+        `tsc ${option} is ${JSON.stringify(resolved?.[option])}, must be ${JSON.stringify(expected)}`,
+      );
+    }
+  }
+
+  // `strict` is an umbrella and every flag under it can still be switched off by
+  // name. skipLibCheck is the only thing here meant to be off.
+  const softened = Object.keys(resolved).filter(
+    (option) => resolved[option] === false && REQUIRED_OPTIONS[option] !== false,
   );
+  if (softened.length > 0) {
+    throw new Error(`tsc has ${softened.join(', ')} switched off`);
+  }
 
   console.log(`  consumer: ${consumer}`);
-  run(join(REPO_ROOT, 'node_modules/.bin/tsc'), ['-p', join(consumer, 'tsconfig.json')]);
-  console.log('  typecheck (nodenext, skipLibCheck off): ok');
+
+  // One set of arguments for the control and for the run, so a weaker config or an
+  // extra flag put in the way of one is put in the way of the other.
+  const typecheck = () => spawnSync(TSC, tscArgs, { cwd: consumer, encoding: 'utf8' });
+
+  // A pass is a claim about nothing unless tsc could have failed. Plant the exact
+  // defect this script exists to catch — a published type leaning on a name nothing
+  // declares — in every package, and require every one to come back reported. A
+  // package missing from the report was never read: tsc only opens a package's
+  // types when something imports them.
+  const published = new Map();
+  for (const packageName of PACKAGES) {
+    const file = join(modules, '@rudra-js', packageName, manifestOf(packageName).types);
+    published.set(file, readFileSync(file, 'utf8'));
+  }
+  for (const [file, declarations] of published) {
+    writeFileSync(file, `${declarations}\nexport declare const planted: ${PLANTED};\n`);
+  }
+  const reported = (typecheck().stdout ?? '').split('\n');
+  for (const [file, declarations] of published) writeFileSync(file, declarations);
+
+  for (const file of published.keys()) {
+    const path = relative(consumer, file);
+    if (!reported.some((line) => line.startsWith(path) && line.includes(PLANTED))) {
+      throw new Error(`control: a defect planted in ${path} went unreported`);
+    }
+  }
+
+  const checked = typecheck();
+  if (checked.status !== 0) {
+    // tsc writes its diagnostics to stdout, which is captured here rather than inherited.
+    process.stdout.write(checked.stdout ?? '');
+    process.stderr.write(checked.stderr ?? '');
+    throw new Error('the consumer did not typecheck against the packed packages');
+  }
+
+  console.log(
+    `  typecheck (${resolved.moduleResolution}, skipLibCheck ${resolved.skipLibCheck ? 'on' : 'off'}): ok`,
+  );
 
   const rendered = runConsumer('consumer.ts');
   process.stdout.write(rendered.stdout);
