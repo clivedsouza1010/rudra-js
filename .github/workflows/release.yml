@@ -23,9 +23,13 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      # A tag on any branch would otherwise publish with valid provenance. It has
-      # to sit on main and name the version in package.json.
+      # A tag on any branch would otherwise publish with valid provenance, so it
+      # has to sit on main, be main's tip, and name the version in package.json.
+      # Ancestry alone is not enough: every commit after the bump reads the
+      # bumped version too, so a tag a few commits back clears the other two and
+      # publishes a tree missing whatever landed since.
       - run: git fetch --no-tags origin main && git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - run: test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
       - run: test "v$(node -p "require('./packages/core/package.json').version")" = "$GITHUB_REF_NAME"
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -59,22 +63,18 @@ jobs:
       # npm publish with from a laptop. Recover by bumping the version and
       # tagging a new patch release.
       #
-      # So the order is by how likely a step is to fail, not by dependency.
-      # Anything published before the failure is already public and stuck at a
-      # version the next tag cannot reuse.
+      # So the order is what an install can satisfy. @rudra-js/attested depends
+      # on nothing and core peers it, so attested goes first; react and
+      # anthropic both peer core, so core leads them. Anything published before
+      # a failure is already public and stuck at a version the next tag cannot
+      # reuse.
       #
-      # The riskiest step is a package npm has not seen before: a trusted
-      # publisher is configured from a package's settings page, which needs the
-      # package to already exist, so a brand new name has no configuration to
-      # read and fails auth. It goes first, where a failure costs nothing.
-      # @rudra-js/attested depends on nothing, and core now declares it as a
-      # peer, so it has to land before core either way. Going first is both the
-      # cheap place for an auth failure and the only order an install can
-      # satisfy.
-      #
-      # Core leads the rest: @rudra-js/react and @rudra-js/anthropic both declare
-      # it as a peer, so a registry that has either without core cannot satisfy
-      # an install.
+      # Adding a package is the case that needs thought. A name npm has not seen
+      # has no trusted publisher, because one is configured from a package's
+      # settings page and that needs the package to exist, so its first publish
+      # fails auth. Put its step as early as its own peers allow, where that
+      # failure costs least. All four names exist now, so none of them carries
+      # that risk any more.
 
       # Node 22 ships npm 10. Trusted publishing needs 11.5, which reads the
       # OIDC token itself - no registry-url, no NODE_AUTH_TOKEN.

@@ -296,6 +296,70 @@ describe('the published packages', () => {
   });
 });
 
+describe('a version bump', () => {
+  // One tag publishes all four, so a release carries one version through every
+  // manifest in the workspace and through the lockfile. The ranges a consumer
+  // sees are checked above. These are the specs nothing reads today: a missed
+  // pin stops `npm ci` inside the release job, on a tag already spent, and a
+  // lockfile left behind does not stop anything at all.
+  const lockfile = JSON.parse(readFileSync(join(REPO_ROOT, 'package-lock.json'), 'utf8')) as {
+    version: string;
+    packages: Record<string, { version?: string; link?: boolean; resolved?: string }>;
+  };
+
+  // The lockfile's own idea of a workspace, so a new one counts here the day it
+  // is added rather than the day someone remembers this file.
+  const workspaces = Object.values(lockfile.packages)
+    .filter((entry) => entry.link === true && entry.resolved !== undefined)
+    .map((entry) => entry.resolved!)
+    .toSorted();
+
+  const manifestAt = (workspace: string) =>
+    JSON.parse(readFileSync(join(REPO_ROOT, workspace, 'package.json'), 'utf8')) as {
+      version: string;
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    };
+
+  it('reaches past packages/, because the example pins two of them too', () => {
+    expect(workspaces).toEqual(expect.arrayContaining(PACKAGES.map((name) => `packages/${name}`)));
+    expect(workspaces).toContain('examples/shop');
+  });
+
+  it('names a version that exists in every sibling spec, wherever it sits', () => {
+    // A bump that misses one of these does not fail loudly: npm stops linking
+    // the workspace and resolves the published sibling from the registry
+    // instead, so the release builds and tests core against the old one.
+    for (const workspace of workspaces) {
+      const manifest = manifestAt(workspace);
+
+      for (const field of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
+        for (const [name, spec] of Object.entries(manifest[field] ?? {})) {
+          if (!name.startsWith('@rudra-js/')) continue;
+          const version = readManifest(name.slice('@rudra-js/'.length)).version;
+          expect([version, `^${version}`], `${workspace} ${field} ${name}`).toContain(spec);
+        }
+      }
+    }
+  });
+
+  it('moves the lockfile too, because that is what `npm ci` reads', () => {
+    const root = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as {
+      version: string;
+    };
+
+    expect(lockfile.version, 'package-lock.json').toBe(root.version);
+    expect(lockfile.packages['']?.version, 'the package-lock.json root entry').toBe(root.version);
+
+    for (const workspace of workspaces) {
+      expect(lockfile.packages[workspace]?.version, `package-lock.json ${workspace}`).toBe(
+        manifestAt(workspace).version,
+      );
+    }
+  });
+});
+
 function collectExportTargets(exports: Record<string, unknown>): string[] {
   return Object.values(exports).flatMap((value) =>
     typeof value === 'string'
@@ -402,6 +466,43 @@ describe('the release workflow', () => {
         'node-version-file: .nvmrc',
       );
     }
+  });
+
+  it('refuses a tag that is not main tip, not only one that is not on main', () => {
+    // Ancestry passes for any commit on main, and every commit after the bump
+    // reads the bumped version, so those two alone accept a stale tree and
+    // publish it with provenance that points at a real main commit.
+    expect(releaseWorkflow).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
+    expect(releaseWorkflow).toContain('test "$(git rev-parse origin/main)" = "$GITHUB_SHA"');
+    expect(releaseWorkflow).toContain(
+      `test "v$(node -p "require('./packages/core/package.json').version")" = "$GITHUB_REF_NAME"`,
+    );
+  });
+
+  it('carries the two keys a publish authenticates with', () => {
+    // npm checks the OIDC token against this repo, this workflow file and the
+    // `npm` environment. Drop either key and all four publishes fail auth —
+    // fail-closed, but only after the tag is spent.
+    expect(releaseWorkflow, 'the publish job left the npm environment').toContain(
+      'environment: npm',
+    );
+    expect(releaseWorkflow, '--provenance has no token to mint').toContain('id-token: write');
+  });
+
+  it('installs the npm the rehearsal installs', () => {
+    // Two copies of one pin, bumped by hand. Move one and the rehearsal quietly
+    // stops rehearsing the publisher the release will use.
+    const pin = /npm install -g (npm@\S+)/;
+    const rehearsalWorkflow = readFileSync(
+      join(REPO_ROOT, '.github/workflows/rehearsal.yml'),
+      'utf8',
+    );
+    const released = pin.exec(releaseWorkflow)?.[1];
+
+    expect(released, 'release.yml pins no npm').toBeDefined();
+    expect(pin.exec(rehearsalWorkflow)?.[1], 'rehearsal.yml installs a different npm').toBe(
+      released,
+    );
   });
 
   it.each(PACKAGES)('publishes @rudra-js/%s with provenance', (packageName) => {
