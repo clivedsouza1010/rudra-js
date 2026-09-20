@@ -137,7 +137,13 @@ const forbidden: string = '__FORBIDDEN_PACKAGE__';
 let leaked = true;
 try {
   await import(forbidden);
-} catch {
+} catch (error) {
+  // Only a resolution miss on this specifier means isolated. Any other failure is a real
+  // one, and reading it as success is how this check goes green while testing nothing.
+  const failure = error as { code?: unknown; message?: unknown };
+  if (failure.code !== 'ERR_MODULE_NOT_FOUND' || !String(failure.message).includes(forbidden)) {
+    throw error;
+  }
   leaked = false;
 }
 if (leaked) {

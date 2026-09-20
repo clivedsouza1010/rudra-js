@@ -49,7 +49,8 @@ const RENDERER = ['react-dom'];
 /** Resolvable from the repo root and from nowhere the consumer can legally reach. */
 const MUST_NOT_RESOLVE = 'prettier';
 const FORBIDDEN_PLACEHOLDER = '__FORBIDDEN_PACKAGE__';
-const FORBIDDEN_DECLARATION = `const forbidden: string = '${FORBIDDEN_PLACEHOLDER}';`;
+/** What the generated consumer must end up declaring once the placeholder is substituted. */
+const FORBIDDEN_DECLARATION = `const forbidden: string = '${MUST_NOT_RESOLVE}';`;
 
 const run = (command, args, cwd) =>
   execFileSync(command, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
@@ -102,16 +103,17 @@ try {
   );
 
   const fixture = readFileSync(join(REPO_ROOT, 'scripts/consumer-fixture.ts'), 'utf8');
-  // The isolation check passes when the import fails, so a fixture the script stops
-  // substituting checks nothing. Match the declaration; a bare name match is weaker.
-  if (!fixture.includes(FORBIDDEN_DECLARATION)) {
-    throw new Error(`consumer-fixture.ts no longer declares: ${FORBIDDEN_DECLARATION}`);
+  const generated = fixture.replaceAll(FORBIDDEN_PLACEHOLDER, MUST_NOT_RESOLVE);
+  // Check what gets written, not the template it came from: the placeholder resolves
+  // nowhere, so a substitution that quietly stopped would look like perfect isolation.
+  if (generated.includes(FORBIDDEN_PLACEHOLDER)) {
+    throw new Error(`consumer.ts still holds ${FORBIDDEN_PLACEHOLDER}: nothing was substituted`);
+  }
+  if (!generated.includes(FORBIDDEN_DECLARATION)) {
+    throw new Error(`consumer.ts does not declare: ${FORBIDDEN_DECLARATION}`);
   }
 
-  writeFileSync(
-    join(consumer, 'consumer.ts'),
-    fixture.replaceAll(FORBIDDEN_PLACEHOLDER, MUST_NOT_RESOLVE),
-  );
+  writeFileSync(join(consumer, 'consumer.ts'), generated);
 
   // NodeNext only. Under `bundler` resolution every one of these checks passes
   // whatever the package does, because bundler resolution is strictly more
