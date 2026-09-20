@@ -233,11 +233,11 @@ function fitCohortSpec(
 
   // Only the heroes above the bundle block are placed when it is reached, so
   // they are all the choice may account for.
-  const chosen = bundleForShopper(input, digest, placeableHeroSkus(aboveBundle, input, digest));
+  const chosen = bundleForShopper(input, digest, placeableHeroSkus(aboveBundle, input));
   if (!chosen) return fitToShopper(spec, picks, digest.maxItems);
 
   const spokenFor = new Set<string>(chosen.skus);
-  for (const sku of placeableHeroSkus(blocks, input, digest)) spokenFor.add(sku);
+  for (const sku of placeableHeroSkus(blocks, input)) spokenFor.add(sku);
 
   const roomLeft = digest.maxItems - spokenFor.size;
   // A set is worth showing, but not at the cost of an empty grid.
@@ -372,12 +372,12 @@ export function createComponentGenerator(
         return buildDeterministic(input, digest, startedAt, null, 'no-provider');
       }
 
-      const providerId = `${provider.name}:${provider.model}`;
+      const identity = { name: provider.name, model: provider.model };
       const candidateSkus = input.candidates.map((product) => product.sku);
       const key =
         generation === 'cohort'
-          ? cohortCacheKey(digest, candidateSkus, providerId)
-          : specCacheKey(digest, candidateSkus, providerId);
+          ? cohortCacheKey(digest, candidateSkus, identity)
+          : specCacheKey(digest, candidateSkus, identity);
 
       const read = await readCache(key);
       const cached = read.entry;

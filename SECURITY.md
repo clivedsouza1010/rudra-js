@@ -33,6 +33,14 @@ If you can show any of the following, that's a vulnerability:
 - Model output influencing anything other than presentation: a URL, a price, a product title, an
   image source, or an attribute value outside the schema's enums.
 
+One exception to the second bullet, and it is deliberate rather than an oversight. A bundle is a set
+_you_ defined and it is placed whole, so a set may hold something the shopper already bought or has
+in their basket. A thumbs-down on any member still blocks the whole set, and so does a member that
+is out of stock or already on the page. If you sell a set as one "add all" offer, that is worth
+knowing: a shopper can be shown a set holding the thing already in their basket. Everywhere else —
+grid, carousel, hero — bought, in-basket, disliked and currently-viewed products are all dropped,
+and from your whole payload rather than the trimmed history the model was shown.
+
 **Host payloads are untrusted too, and we validate them at the boundary.** Same deal, any of these is
 a vulnerability:
 
@@ -135,6 +143,38 @@ primary model can act. Ours can't.
   And anything outside those kinds — a competitor's product name, say — we don't look for at all.
   Host text is never screened, since it's the shop's own words.
 
+- **Claims about a shopper in prose that carries no basis.** Every product carries a `basis`, and
+  that is checked against the signals before it renders — if it does not hold, the basis drops to
+  `popular` and the sentence and badge stating it are both dropped. Block prose has no basis to
+  check. A headline, a subheadline, a hero's headline and body, a banner, a copy block and a
+  bundle's title and body all go through the three passes above, so a price, a discount or a stock
+  level in them is dropped, but "back because you loved the last one" to a first-time visitor is
+  not. In the default cohort mode every product's own reason and badge are ours rather than the
+  model's; the block prose is the model's in both modes.
+
+- **What two of the six bases actually prove.** `complements_cart` and `complements_purchase` check
+  only that the basket, or the purchase history, is not empty. Nothing here can know that one
+  product goes with another, so a sentence under those two can name something the shopper does not
+  have. The other four are checked against the thing they claim: `most_viewed` against the viewed
+  SKUs, `similar_to_current` against the category being browsed, `liked_category` against the
+  categories the shopper actually bought, liked, carted or viewed in, and `popular` claims nothing.
+
+- **A bundle's copy is written about a set the model never saw.** The shop picks which set fills a
+  bundle block, per request, after the words were written — the model's `bundleId` is ignored. So
+  its title, body and call to action can sit above a different set. The prompt tells the model to
+  write about the offer rather than the products in it, and a `label` you pass renders above the
+  model's words. Neither is enforcement.
+
+- **Cohort cost, if a visitor can choose a cohort.** The cohort key is built from `segment`,
+  `surface`, `slot`, `locale`, `maxItems`, whether the shopper is new, the category being browsed
+  and the top category their signals favour. Draw any of those from something a visitor controls —
+  a `locale` copied out of `Accept-Language`, a category read off a URL slug — and one visitor can
+  mint as many cohorts as they have patience for. Each new value is a fresh model call, and the
+  shipped in-memory cache holds 10,000 entries and evicts the oldest, so enough of them also push
+  out the cohorts real shoppers were being served from. Nothing leaks: a cohort prompt carries no
+  shopper text at all. The bill and the latency are the damage. Take those fields from sets you
+  control, and put a rate limit in front of the page.
+
 - **Instruction disclosure.** A determined injection could get fragments of the instruction half
   echoed back inside a text field. Those instructions are open source and sitting in this repository,
   so the loss is small. It isn't zero.
@@ -143,10 +183,14 @@ primary model can act. Ours can't.
   took, whether a model was called, what it cost and what reconciliation removed. Wiring that to a
   log or a rate limiter is your job.
 
-- **Invisible characters.** The escaping covers every character category that can carry hidden text.
-  A few individual code points that render blank are _letters_ rather than format characters, U+3164
-  Hangul filler among them, and those are left alone: they're legitimate in Korean text and can't
-  encode an instruction on their own. They can pad a value. They can't smuggle one.
+- **Invisible characters.** The escaping covers every character category that can carry hidden text,
+  and `Default_Ignorable_Code_Point` on top of them. That last one is what catches the ones that are
+  _marks_ or _letters_ rather than format characters — the Hangul fillers, the Mongolian selectors,
+  the variation selectors at U+FE00 — which the categories alone walk straight past. Three are left
+  through, because emoji are spelled with them: the zero-width joiner and the two emoji presentation
+  selectors, U+FE0E and U+FE0F. Escaping those would mangle ordinary product titles. Model output is
+  screened harder than input on this point: the claim screen deletes all three before reading a
+  sentence, so a phrase broken up with them is still caught.
 
 If you find a way past the structural controls, that's a vulnerability. Output reaching the page as
 anything but escaped text, a product named from outside the shop's list, a claim about a shopper

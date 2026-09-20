@@ -1,5 +1,5 @@
 import type { BundleBlock, Product } from '@rudra-js/core';
-import type { BlockRenderContext } from '../render-context.js';
+import { sellableProduct, type BlockRenderContext } from '../render-context.js';
 
 export function BundleRenderer({
   block,
@@ -13,7 +13,7 @@ export function BundleRenderer({
 
   const products: Product[] = [];
   for (const sku of bundle.skus) {
-    const product = context.products.get(sku);
+    const product = sellableProduct(context.products, sku);
     // A set missing one of its parts is not that set.
     if (!product) return null;
     products.push(product);

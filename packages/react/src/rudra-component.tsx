@@ -3,6 +3,7 @@ import {
   defaultFormatBundlePrice,
   defaultFormatPrice,
   defaultHrefForSku,
+  sellableProduct,
   type BlockRenderContext,
 } from './render-context.js';
 import { defaultRegistry, type BlockRegistry } from './registry.js';
@@ -75,8 +76,9 @@ function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
 }
 
 // Whether a block still has anything to say once the catalog is applied. A SKU
-// can sell out between generating a spec and rendering it: grid and carousel
-// lose the products that did, a bundle loses itself if any one member did.
+// can sell out between generating a spec and rendering it — the row goes, or it
+// is flagged out of stock, and both read the same here: grid and carousel lose
+// the products that did, a bundle loses itself if any one member did.
 function hasContent(
   block: Block,
   products: ReadonlyMap<string, Product>,
@@ -85,7 +87,9 @@ function hasContent(
   switch (block.kind) {
     case 'grid':
     case 'carousel':
-      return block.items.some((reference) => products.has(reference.sku));
+      return block.items.some(
+        (reference) => sellableProduct(products, reference.sku) !== undefined,
+      );
     case 'hero':
     case 'banner':
     case 'copy':
@@ -93,7 +97,10 @@ function hasContent(
     case 'bundle': {
       if (block.bundleId === null) return false;
       const bundle = bundles.get(block.bundleId);
-      return bundle !== undefined && bundle.skus.every((sku) => products.has(sku));
+      return (
+        bundle !== undefined &&
+        bundle.skus.every((sku) => sellableProduct(products, sku) !== undefined)
+      );
     }
     default:
       block satisfies never;

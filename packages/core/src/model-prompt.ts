@@ -1,6 +1,6 @@
 import { BANNER_TONES, EMPHASIS, RECOMMENDATION_BASES, TONES } from './component-spec.js';
 import type { SignalDigest } from './signal-digest.js';
-import type { Product, TrackingInput } from './tracking-input.js';
+import { FIELD_LIMITS, type Product, type TrackingInput } from './tracking-input.js';
 
 /**
  * What actually reaches the model.
@@ -140,19 +140,56 @@ on.`;
  * text exactly the same way, and it missed U+0085, U+061C and U+00AD as well.
  * Properties cover the ones nobody has thought of yet.
  *
- * The zero-width joiner is the one exception. It is a format character, but it
- * is also how a family emoji is spelled, so escaping it mangles ordinary
- * product titles. Emoji presentation selectors (U+FE00-U+FE0F) are excluded for
- * the same reason.
+ * The general categories alone do not, though. Half of what renders as nothing
+ * is a mark or a letter rather than a format character \u2014 the Mongolian free
+ * variation selectors, U+034F, the Hangul fillers, and the sixteen variation
+ * selectors at U+FE00 \u2014 so `Default_Ignorable_Code_Point` is in the class too.
+ * It is the property that means "takes up no room", which is the thing that
+ * makes a character able to carry text nobody sees.
+ *
+ * Three are left out. The zero-width joiner is a format character, but it is
+ * also how a family emoji is spelled, and U+FE0E and U+FE0F are what make a
+ * character render as an emoji rather than as text. Escaping those mangles
+ * ordinary product titles. The other thirteen selectors at U+FE00 spell
+ * nothing and are escaped like the rest.
  */
-const UNPRINTABLE = /(?!\u200D)[\p{Cc}\p{Cf}\p{Cn}\p{Co}\p{Zl}\p{Zp}\u{E0100}-\u{E01EF}]/gu;
+const UNPRINTABLE =
+  /(?!\u{200D}|\u{FE0E}|\u{FE0F})[\p{Cc}\p{Cf}\p{Cn}\p{Co}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/gu;
 
-/** Host-supplied text, written so it cannot introduce structure of its own. */
-const quote = (value: string) =>
-  JSON.stringify(value).replace(UNPRINTABLE, (character) => {
+/**
+ * How long one quoted value may be once escaped.
+ *
+ * The contract caps the string a host may send, and this caps what that string
+ * turns into. They are not the same number: an escape writes up to eight
+ * characters for one, so a field on its cap can still buy eight times the
+ * prompt \u2014 and the bill \u2014 that the cap implies. Ordinary text escapes nothing
+ * and never comes near this.
+ */
+const MAX_QUOTED = FIELD_LIMITS.shortText * 2;
+
+const escapeUnprintable = (text: string) =>
+  text.replace(UNPRINTABLE, (character) => {
     const codePoint = character.codePointAt(0)!;
     return `\\u{${codePoint.toString(16).toUpperCase()}}`;
   });
+
+/** Host-supplied text, written so it cannot introduce structure of its own. */
+const quote = (value: string) => {
+  const escaped = escapeUnprintable(JSON.stringify(value));
+  if (escaped.length <= MAX_QUOTED) return escaped;
+
+  // Cut whole characters, so the result cannot end inside an escape sequence.
+  let length = 2;
+  let kept = '';
+  for (const character of value) {
+    const cost = escapeUnprintable(JSON.stringify(character)).length - 2;
+    if (length + cost > MAX_QUOTED) break;
+    length += cost;
+    kept += character;
+  }
+
+  return escapeUnprintable(JSON.stringify(kept));
+};
 
 function section(heading: string, body: string | undefined): string | null {
   if (!body || body.length === 0) return null;

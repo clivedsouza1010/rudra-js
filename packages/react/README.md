@@ -51,8 +51,15 @@ resolved at render time from `products`, keyed by a SKU reconciliation has alrea
 **Validate `products` with `productSchema` from `@rudra-js/core`**, the same schema your candidates
 already passed. This prop is a second door into the framework. `imageUrl` lands in an `<img src>`,
 and `productSchema` is what rejects a protocol-relative `//evil.example/pixel.png` or a `data:` URL.
-React neutralises a `javascript:` URL by itself, but not those two. And if a price isn't a finite
+It reads a path the way a browser does, so `/\evil.example/pixel.png` and the same trick written
+with a tab or a newline in it are rejected too — each one resolves to someone else's host. React
+neutralises a `javascript:` URL by itself, but not any of those. And if a price isn't a finite
 number, it throws. A product that looks free is worse than a stack trace.
+
+A row flagged `isInStock: false` counts as a row that isn't there. Cards for it are dropped, a hero
+loses its link, and a bundle with one sold-out member disappears — the same as if you'd left the
+row out. Core only ever names a product that was in stock in the payload, but this catalog is read
+later and may be the fresher of the two.
 
 ## Styling
 

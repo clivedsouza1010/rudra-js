@@ -56,7 +56,9 @@ function richDigest(): SignalDigest {
 }
 
 const SKUS = ['TR-102', 'TR-104'];
-const keyFor = (digest: SignalDigest, skus = SKUS, provider = 'anthropic:claude-opus-5') =>
+const ANTHROPIC = { name: 'anthropic', model: 'claude-opus-5' };
+const A_PROVIDER = { name: 'p', model: 'm' };
+const keyFor = (digest: SignalDigest, skus = SKUS, provider = ANTHROPIC) =>
   specCacheKey(digest, skus, provider);
 
 /**
@@ -151,8 +153,8 @@ describe('what else the key depends on', () => {
   it('separates one model from another', () => {
     const digest = richDigest();
 
-    expect(keyFor(digest, SKUS, 'anthropic:claude-opus-5')).not.toBe(
-      keyFor(digest, SKUS, 'openai:gpt-4.1'),
+    expect(keyFor(digest, SKUS, ANTHROPIC)).not.toBe(
+      keyFor(digest, SKUS, { name: 'openai', model: 'gpt-4.1' }),
     );
   });
 
@@ -410,13 +412,13 @@ function deeperInput(shopper: { id: string; second: string; views: number }): Tr
 }
 
 // the two candidates every cohortDigest() shopper is offered
-const cohortKeyFor = (digest: SignalDigest, provider = 'p:m') =>
+const cohortKeyFor = (digest: SignalDigest, provider = A_PROVIDER) =>
   cohortCacheKey(digest, ['TR-101', 'TR-999'], provider);
 
 describe('a cohort key', () => {
   it('is the same for two shoppers who differ only as individuals', () => {
-    const first = cohortKeyFor(cohortDigest({ id: 'S-0001', likedSku: 'TR-101' }), 'p:m');
-    const second = cohortKeyFor(cohortDigest({ id: 'S-0999', likedSku: 'TR-101' }), 'p:m');
+    const first = cohortKeyFor(cohortDigest({ id: 'S-0001', likedSku: 'TR-101' }), A_PROVIDER);
+    const second = cohortKeyFor(cohortDigest({ id: 'S-0999', likedSku: 'TR-101' }), A_PROVIDER);
 
     expect(first).toBe(second);
   });
@@ -429,15 +431,15 @@ describe('a cohort key', () => {
     ['maxItems', { maxItems: 2 }],
     ['top category', { likedCategory: 'Tents' }],
   ])('changes with %s', (_label, shopper) => {
-    expect(cohortKeyFor(cohortDigest(shopper), 'p:m')).not.toBe(
-      cohortKeyFor(cohortDigest(), 'p:m'),
+    expect(cohortKeyFor(cohortDigest(shopper), A_PROVIDER)).not.toBe(
+      cohortKeyFor(cohortDigest(), A_PROVIDER),
     );
   });
 
   it('separates a first-time visitor from someone with history we cannot use', () => {
     // Both end up with no top category, so this only passes if cold start is in
     // the key on its own. Liking a product that is not on this page is normal.
-    const firstTime = cohortKeyFor(cohortDigest({ hasSignals: false }), 'p:m');
+    const firstTime = cohortKeyFor(cohortDigest({ hasSignals: false }), A_PROVIDER);
     const likedElsewhere = cohortKeyFor(cohortDigest({ likesSomethingNotOnThisPage: true }));
 
     expect(likedElsewhere).not.toBe(firstTime);
@@ -445,8 +447,8 @@ describe('a cohort key', () => {
 
   it('changes with the page the shopper is on', () => {
     // Copy written for a backpack page must not be served on a tent page.
-    expect(cohortKeyFor(cohortDigest({ page: 'Tents' }), 'p:m')).not.toBe(
-      cohortKeyFor(cohortDigest({ page: 'Backpacks' }), 'p:m'),
+    expect(cohortKeyFor(cohortDigest({ page: 'Tents' }), A_PROVIDER)).not.toBe(
+      cohortKeyFor(cohortDigest({ page: 'Backpacks' }), A_PROVIDER),
     );
   });
 
@@ -456,8 +458,8 @@ describe('a cohort key', () => {
     const first = cohortInput({ id: 'S-0001', search: 'maternity leggings', sku: 'TR-101' });
     const second = cohortInput({ id: 'S-0002', search: 'hiking poles', sku: 'TR-102' });
 
-    expect(cohortCacheKey(buildDigest(first), CANDIDATES, 'p:m')).toBe(
-      cohortCacheKey(buildDigest(second), CANDIDATES, 'p:m'),
+    expect(cohortCacheKey(buildDigest(first), CANDIDATES, A_PROVIDER)).toBe(
+      cohortCacheKey(buildDigest(second), CANDIDATES, A_PROVIDER),
     );
     expect(buildPrompt(first, toCohortDigest(buildDigest(first))).user).toBe(
       buildPrompt(second, toCohortDigest(buildDigest(second))).user,
@@ -507,8 +509,8 @@ describe('a cohort key', () => {
     const second = deeperInput({ id: 'S-0002', second: 'BP-300', views: 2 });
     const candidates = ['TR-101', 'TN-200', 'BP-300'];
 
-    expect(cohortCacheKey(buildDigest(first), candidates, 'p:m')).toBe(
-      cohortCacheKey(buildDigest(second), candidates, 'p:m'),
+    expect(cohortCacheKey(buildDigest(first), candidates, A_PROVIDER)).toBe(
+      cohortCacheKey(buildDigest(second), candidates, A_PROVIDER),
     );
     expect(buildPrompt(first, toCohortDigest(buildDigest(first))).user).toBe(
       buildPrompt(second, toCohortDigest(buildDigest(second))).user,
@@ -528,31 +530,39 @@ describe('a cohort key', () => {
   it('changes when the model is shown different products', () => {
     // The model writes copy about these, so two shoppers who were offered
     // different products must not share the copy.
-    expect(cohortCacheKey(cohortDigest(), ['TR-101'], 'p:m')).not.toBe(
-      cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m'),
+    expect(cohortCacheKey(cohortDigest(), ['TR-101'], A_PROVIDER)).not.toBe(
+      cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER),
     );
   });
 
   it('changes when the model is shown as many products but different ones', () => {
-    expect(cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m')).not.toBe(
-      cohortCacheKey(cohortDigest(), ['TN-200', 'TN-201'], 'p:m'),
+    expect(cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER)).not.toBe(
+      cohortCacheKey(cohortDigest(), ['TN-200', 'TN-201'], A_PROVIDER),
     );
   });
 
   it('does not care what order the products arrive in', () => {
-    expect(cohortCacheKey(cohortDigest(), ['TR-999', 'TR-101'], 'p:m')).toBe(
-      cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m'),
+    expect(cohortCacheKey(cohortDigest(), ['TR-999', 'TR-101'], A_PROVIDER)).toBe(
+      cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER),
     );
   });
 
   it('changes with the provider', () => {
-    expect(cohortKeyFor(cohortDigest(), 'other:model')).not.toBe(
-      cohortKeyFor(cohortDigest(), 'p:m'),
+    expect(cohortKeyFor(cohortDigest(), { name: 'other', model: 'model' })).not.toBe(
+      cohortKeyFor(cohortDigest(), A_PROVIDER),
+    );
+  });
+
+  // Model ids carry colons, so joining the pair with one made two different
+  // providers read the same entries out of a store they share.
+  it('tells two providers apart however their names punctuate', () => {
+    expect(cohortKeyFor(cohortDigest(), { name: 'bedrock', model: 'claude-v1:0' })).not.toBe(
+      cohortKeyFor(cohortDigest(), { name: 'bedrock:claude-v1', model: '0' }),
     );
   });
 
   it('is 32 hex characters', () => {
-    expect(cohortKeyFor(cohortDigest(), 'p:m')).toMatch(/^[0-9a-f]{32}$/);
+    expect(cohortKeyFor(cohortDigest(), A_PROVIDER)).toMatch(/^[0-9a-f]{32}$/);
   });
 });
 
@@ -574,16 +584,16 @@ describe('the prompt is in both keys', () => {
   it('changes the per-shopper key when the system prompt changes', async () => {
     const changed = await keysUnderChangedPrompt();
 
-    expect(changed.specCacheKey(richDigest(), SKUS, 'p:m')).not.toBe(
-      keyFor(richDigest(), SKUS, 'p:m'),
+    expect(changed.specCacheKey(richDigest(), SKUS, A_PROVIDER)).not.toBe(
+      keyFor(richDigest(), SKUS, A_PROVIDER),
     );
   });
 
   it('changes the cohort key when the system prompt changes', async () => {
     const changed = await keysUnderChangedPrompt();
 
-    expect(changed.cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m')).not.toBe(
-      cohortKeyFor(cohortDigest(), 'p:m'),
+    expect(changed.cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER)).not.toBe(
+      cohortKeyFor(cohortDigest(), A_PROVIDER),
     );
   });
 });
@@ -606,16 +616,16 @@ describe('the spec version is in both keys', () => {
   it('changes the per-shopper key when the spec shape changes', async () => {
     const changed = await keysUnderChangedSpecVersion();
 
-    expect(changed.specCacheKey(richDigest(), SKUS, 'p:m')).not.toBe(
-      keyFor(richDigest(), SKUS, 'p:m'),
+    expect(changed.specCacheKey(richDigest(), SKUS, A_PROVIDER)).not.toBe(
+      keyFor(richDigest(), SKUS, A_PROVIDER),
     );
   });
 
   it('changes the cohort key when the spec shape changes', async () => {
     const changed = await keysUnderChangedSpecVersion();
 
-    expect(changed.cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], 'p:m')).not.toBe(
-      cohortKeyFor(cohortDigest(), 'p:m'),
+    expect(changed.cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER)).not.toBe(
+      cohortKeyFor(cohortDigest(), A_PROVIDER),
     );
   });
 });

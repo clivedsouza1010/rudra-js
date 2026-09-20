@@ -9,6 +9,7 @@ import {
 import { SYSTEM_PROMPT, UNTRUSTED_BEGIN, UNTRUSTED_END, buildPrompt } from './model-prompt.js';
 import { buildDigest } from './signal-digest.js';
 import {
+  FIELD_LIMITS,
   parseTrackingInput,
   type TrackingInput,
   type TrackingInputDraft,
@@ -292,6 +293,27 @@ describe('invisible and direction-changing characters', () => {
   });
 
   /**
+   * These render as nothing and are marks or letters rather than format
+   * characters, so the general categories walk straight past them. Twenty of
+   * them left is an alphabet: two per byte, and a search term that reads
+   * `trail shoes` in the shop's own logs arrives carrying a sentence.
+   */
+  it.each([
+    ['U+FE00, a variation selector that spells no emoji', 0xfe00],
+    ['U+180B, a Mongolian free variation selector', 0x180b],
+    ['U+180F, the Mongolian vowel separator', 0x180f],
+    ['U+034F, a combining grapheme joiner', 0x34f],
+    ['U+3164, the Hangul filler', 0x3164],
+    ['U+115F, the Hangul choseong filler', 0x115f],
+    ['U+17B4, a Khmer inherent vowel', 0x17b4],
+    ['U+FFA0, the halfwidth Hangul filler', 0xffa0],
+  ])('escapes %s, which takes up no room either', (_label, codePoint) => {
+    const character = String.fromCodePoint(codePoint);
+
+    expect(withSearch(`trail shoes${character}`)).not.toContain(character);
+  });
+
+  /**
    * The zero-width joiner is a format character, so a rule written by category
    * catches it — but it is also how a family emoji is spelled. Escaping it
    * would garble ordinary product titles to defend against a channel that
@@ -315,6 +337,19 @@ describe('invisible and direction-changing characters', () => {
 
   it('leaves accented and non-Latin text alone', () => {
     expect(withSearch('chaussures de trail 山')).toContain('chaussures de trail 山');
+  });
+
+  /**
+   * The contract caps the string; this caps what the string turns into. An
+   * escape is eight characters for one, so a field sitting on its cap was
+   * worth eight times its length in prompt, and in bill.
+   */
+  it('caps how much prompt one escaped value can buy', () => {
+    const plain = withSearch('a'.repeat(FIELD_LIMITS.searchQuery));
+    const escaping = withSearch('\u{10C6}'.repeat(FIELD_LIMITS.searchQuery));
+
+    expect(escaping.length).toBeLessThan(plain.length * 1.5);
+    expect(plain).toContain('a'.repeat(FIELD_LIMITS.searchQuery));
   });
 });
 

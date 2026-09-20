@@ -121,7 +121,7 @@ export function selectProducts(
   // same thing whether a shopper has two signals or two hundred.
   const strongestAffinity = Math.max(1, ...affinityByCategory.values());
   const tags = engagedTags(input, digest);
-  const excluded = neverRecommend(digest);
+  const excluded = neverRecommend(input);
   const viewsBySku = new Map(digest.topViewed.map((viewed) => [viewed.sku, viewed.views]));
 
   const picks: ProductPick[] = [];

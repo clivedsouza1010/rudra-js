@@ -6,7 +6,7 @@ import type {
   ProductReference,
   RecommendationBasis,
 } from './component-spec.js';
-import type { SignalDigest } from './signal-digest.js';
+import { engagedCategories, type SignalDigest } from './signal-digest.js';
 import type { Bundle, Product, TrackingInput } from './tracking-input.js';
 
 /**
@@ -71,31 +71,43 @@ interface Allowlist {
 /**
  * SKUs that must never be recommended, whatever chose them.
  *
+ * Read from the payload rather than the digest on purpose. `DIGEST_LIMITS`
+ * trims each history to what fits in a prompt, and a shopper with nine
+ * purchases would otherwise be sold the ninth back. The cap exists to bound
+ * what the model is told, not what the shopper may be shown.
+ *
  * Exported because the deterministic selector applies the same rule when it
  * picks. Two copies of "never recommend these" would drift, and the pair that
  * drifted would be the model path and the fallback path — the two whose
  * comparability the whole evaluation depends on.
  */
-export function neverRecommend(digest: SignalDigest): Set<string> {
-  const blocked = new Set<string>([
-    ...digest.dislikedSkus,
-    ...digest.purchasedSkus,
-    ...digest.cartSkus,
-  ]);
-  if (digest.currentSku) blocked.add(digest.currentSku);
+export function neverRecommend(input: TrackingInput): Set<string> {
+  const { signals, context } = input;
+
+  const blocked = new Set<string>();
+  for (const signal of [...signals.dislikes, ...signals.lastPurchased, ...signals.cart]) {
+    blocked.add(signal.sku);
+  }
+  if (context.currentSku) blocked.add(context.currentSku);
+
   return blocked;
 }
 
-function buildAllowlist(input: TrackingInput, digest: SignalDigest): Allowlist {
+function buildAllowlist(input: TrackingInput): Allowlist {
   const allowed = new Set<string>();
   for (const product of input.candidates) {
     if (product.isInStock) allowed.add(product.sku);
   }
 
-  return { allowed, blocked: neverRecommend(digest) };
+  return { allowed, blocked: neverRecommend(input) };
 }
 
-function verifyBasis(basis: RecommendationBasis, product: Product, digest: SignalDigest): boolean {
+function verifyBasis(
+  basis: RecommendationBasis,
+  product: Product,
+  digest: SignalDigest,
+  engaged: ReadonlySet<string>,
+): boolean {
   switch (basis) {
     case 'most_viewed':
       return digest.topViewed.some((viewed) => viewed.sku === product.sku);
@@ -104,7 +116,13 @@ function verifyBasis(basis: RecommendationBasis, product: Product, digest: Signa
     case 'complements_purchase':
       return digest.purchasedSkus.length > 0;
     case 'liked_category':
-      return digest.categoryAffinity.some((affinity) => affinity.category === product.category);
+      // Affinity alone is not enough: it scores the category the shopper is
+      // standing in, and standing somewhere is not liking it. That claim is
+      // `similar_to_current`, which says so honestly.
+      return (
+        engaged.has(product.category) &&
+        digest.categoryAffinity.some((affinity) => affinity.category === product.category)
+      );
     case 'similar_to_current':
       return digest.currentCategory === product.category;
     case 'popular':
@@ -215,6 +233,7 @@ function reconcileItems(
   allowlist: Allowlist,
   candidatesBySku: Map<string, Product>,
   digest: SignalDigest,
+  engaged: ReadonlySet<string>,
   tracker: PlacementTracker,
   ourReasons: ReadonlyMap<string, string>,
 ): ProductReference[] {
@@ -233,7 +252,7 @@ function reconcileItems(
 
     tracker.place(item.sku);
 
-    const hasSupportedBasis = verifyBasis(item.basis, product, digest);
+    const hasSupportedBasis = verifyBasis(item.basis, product, digest, engaged);
     if (!hasSupportedBasis) tracker.record(`unsupported-basis:${item.basis}:${item.sku}`);
 
     // Our sentence, not the model's. It has to match, so a lookalike is still screened.
@@ -242,20 +261,29 @@ function reconcileItems(
     const own = tracker.factsFor(item.sku);
     const clampedReason = clampNullable(item.reason, CLAMP.reason);
 
-    // The prose exists to state the basis. If the basis did not hold, the prose is untrue.
+    // The prose exists to state the basis. If the basis did not hold, the prose
+    // is untrue — and the badge is prose too. "You viewed this" beside a
+    // downgraded pick says the same thing the dropped sentence did.
     let reason: string | null = null;
+    let badge: string | null = null;
     if (hasSupportedBasis) {
       reason = isOurs
         ? clampedReason
         : screenClaim(clampedReason, `reason:${item.sku}`, tracker, own);
+      // The schema's own example badge was "Back in stock" — a stock claim, and it renders.
+      badge = screenClaim(
+        clampNullable(item.badge, CLAMP.badge),
+        `badge:${item.sku}`,
+        tracker,
+        own,
+      );
     }
 
     kept.push({
       sku: item.sku,
       basis: hasSupportedBasis ? item.basis : 'popular',
       reason,
-      // The schema's own example badge was "Back in stock" — a stock claim, and it renders.
-      badge: screenClaim(clampNullable(item.badge, CLAMP.badge), `badge:${item.sku}`, tracker, own),
+      badge,
       emphasis: item.emphasis,
     });
   }
@@ -340,7 +368,7 @@ export function bundleForShopper(
   digest: SignalDigest,
   spokenFor: readonly string[],
 ): Bundle | undefined {
-  const allowlist = buildAllowlist(input, digest);
+  const allowlist = buildAllowlist(input);
   const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
   const tracker = createPlacementTracker(digest.maxItems, hostFacts(input));
 
@@ -357,12 +385,8 @@ export function bundleForShopper(
  * One this shopper cannot see is dropped below and spends nothing, so it is not
  * counted here either.
  */
-export function placeableHeroSkus(
-  blocks: readonly Block[],
-  input: TrackingInput,
-  digest: SignalDigest,
-): string[] {
-  const allowlist = buildAllowlist(input, digest);
+export function placeableHeroSkus(blocks: readonly Block[], input: TrackingInput): string[] {
+  const allowlist = buildAllowlist(input);
 
   const skus: string[] = [];
   for (const block of blocks) {
@@ -381,6 +405,7 @@ function reconcileBlock(
   allowlist: Allowlist,
   candidatesBySku: Map<string, Product>,
   digest: SignalDigest,
+  engaged: ReadonlySet<string>,
   bundles: readonly Bundle[],
   tracker: PlacementTracker,
   ourReasons: ReadonlyMap<string, string>,
@@ -423,6 +448,7 @@ function reconcileBlock(
         allowlist,
         candidatesBySku,
         digest,
+        engaged,
         tracker,
         ourReasons,
       );
@@ -445,6 +471,7 @@ function reconcileBlock(
         allowlist,
         candidatesBySku,
         digest,
+        engaged,
         tracker,
         ourReasons,
       );
@@ -531,7 +558,7 @@ export function reconcileSpec(
    */
   ourReasons: ReadonlyMap<string, string> = new Map(),
 ): ReconcileResult {
-  const allowlist = buildAllowlist(input, digest);
+  const allowlist = buildAllowlist(input);
   const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
   const tracker = createPlacementTracker(digest.maxItems, hostFacts(input));
 
@@ -546,6 +573,7 @@ export function reconcileSpec(
       allowlist,
       candidatesBySku,
       digest,
+      engagedCategories(input),
       input.bundles,
       tracker,
       ourReasons,

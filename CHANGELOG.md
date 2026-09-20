@@ -69,6 +69,82 @@ break them.
   Two things follow from the new parent: the label inherits the anchor's
   `color` unless it sets its own, and `.rudra-hero__link:hover` covers it now.
 
+### Security
+
+- Three of the checks that stand between model output and a shopper were
+  narrower than they read, and all three are widened.
+
+  The set of products that must never be recommended is now read from the
+  payload instead of from the digest. The digest keeps the eight most recent
+  purchases and eight most recent basket entries because that is what a prompt
+  can afford; the blocklist was reading the same shortened lists, so a shopper
+  with a longer order book could be recommended something they already own, or
+  have in the basket, with nothing recorded in `violations`. Bundles are
+  unchanged and still allow a set holding a bought or in-basket product, which
+  `SECURITY.md` now says out loud.
+
+  A product's badge is now dropped along with its reason when the stated basis
+  does not hold. The reason was already dropped, the basis already downgraded
+  to `popular` and the downgrade already recorded — and then a badge saying the
+  same thing in three words rendered underneath. Twenty-four characters is
+  enough for "You viewed this".
+
+  `liked_category` no longer accepts the category a shopper is merely standing
+  in. Category affinity scores the current page on purpose, because it is good
+  evidence for ranking, but it is not evidence that anyone likes anything: a
+  first-time visitor on a tent page had a tent affinity and a clean bill for
+  "because you keep coming back to tents". It is now checked against the
+  categories the shopper bought, liked, carted or viewed in. `similar_to_current`
+  is the basis for standing on a page, and it says so honestly.
+
+- The prompt escapes invisible characters the general Unicode categories miss.
+  `Default_Ignorable_Code_Point` is in the class now, which covers the ones that
+  are marks or letters rather than format characters — the Hangul fillers, the
+  Mongolian selectors and the thirteen variation selectors at U+FE00 that spell
+  no emoji. Twenty-eight such code points used to reach the model as themselves,
+  which is an alphabet: enough to carry a sentence inside a search term that
+  reads as ordinary text in a shop's own logs. Three are still let through, the
+  zero-width joiner and U+FE0E and U+FE0F, because emoji are spelled with them.
+  Ordinary text, accented text, non-Latin text and emoji are untouched.
+
+- What a host value turns into is capped, not just the value itself. An escape
+  writes up to eight characters for one, applied after the contract's length
+  caps, so a field sitting on its cap could buy eight times the prompt — and the
+  bill — that the cap implies. A quoted value is now cut at twice
+  `FIELD_LIMITS.shortText`, on a character boundary. Real text escapes nothing
+  and never reaches it.
+
+- `productSchema` reads an `imageUrl` path the way a browser does. A browser
+  drops tab, carriage return and newline from a URL before parsing it and reads
+  a backslash as a slash, so a handful of root-relative-looking paths actually
+  named another host — and both this package's own comment and the react README
+  said those were what `productSchema` rejected. It does now. Ordinary paths,
+  including one with a stray tab in the middle, are accepted as before.
+
+- `@rudra-js/react` treats a catalog row flagged `isInStock: false` as a row
+  that is not there. Cards for it are dropped, a hero loses its link, and a
+  bundle with a sold-out member disappears — the same as a row you leave out,
+  which was already the documented behaviour. Core only ever names a product
+  that was in stock in the payload, but the `products` prop is read later and
+  can be the fresher of the two. A catalog that omits the field renders as it
+  did.
+
+- The cache key holds the provider name and the model id as two fields rather
+  than as one joined string. Joined with a colon they were ambiguous, and hosted
+  model ids carry colons, so two different provider configurations sharing one
+  store could read each other's entries. **Every cache key changes with this**,
+  so a shared persistent store misses once per key after the upgrade and then
+  settles. An in-process cache notices nothing.
+
+- `SECURITY.md` and the package READMEs now state four limits that were true
+  before and unwritten: block prose carries no basis and so nothing checks it
+  against a shopper's history; `complements_cart` and `complements_purchase`
+  check only that a basket or an order history exists; a bundle's copy is
+  written before the shop picks which set fills the block; and a cohort key made
+  from anything a visitor can choose — a `locale` taken from `Accept-Language`,
+  a category read off a URL slug — lets one visitor mint cohorts, pay for a
+  model call each and evict the entries real shoppers were being served from.
+
 ## [0.5.0] - 2026-09-14
 
 ### Changed

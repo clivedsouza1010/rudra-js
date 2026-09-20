@@ -162,7 +162,8 @@ function computeCategoryAffinity(
     );
   }
 
-  // The category the shopper is standing in right now is itself evidence.
+  // The category the shopper is standing in right now is itself evidence — for
+  // ranking. It is not evidence that they like it: see `engagedCategories`.
   addScore(input.context.currentCategory, SIGNAL_WEIGHTS.like);
 
   const affinities: CategoryAffinity[] = [];
@@ -174,6 +175,33 @@ function computeCategoryAffinity(
   return affinities
     .toSorted((left, right) => right.score - left.score)
     .slice(0, DIGEST_LIMITS.affinity);
+}
+
+/**
+ * Categories this shopper did something in — bought, liked, carted or viewed.
+ *
+ * Not the same thing as `categoryAffinity`, which also scores the category the
+ * page itself is in. That scoring is right for ranking and wrong as evidence:
+ * a first-time visitor standing on a tent page has a tent affinity and has
+ * never touched a tent, so a sentence claiming they keep coming back to tents
+ * is checked against this instead.
+ */
+export function engagedCategories(input: TrackingInput): Set<string> {
+  const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
+  const { signals } = input;
+  const categories = new Set<string>();
+
+  for (const signal of [
+    ...signals.lastPurchased,
+    ...signals.likes,
+    ...signals.cart,
+    ...signals.mostViewed,
+  ]) {
+    const category = categoryOf(signal, candidatesBySku);
+    if (category) categories.add(category);
+  }
+
+  return categories;
 }
 
 interface MergedView extends ViewedProduct {

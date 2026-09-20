@@ -9,7 +9,7 @@
  */
 
 import type { BannerBlock, CarouselBlock, CopyBlock, GridBlock, HeroBlock } from '@rudra-js/core';
-import type { BlockRenderContext } from '../render-context.js';
+import { sellableProduct, type BlockRenderContext } from '../render-context.js';
 import { ProductCard } from './product-card.js';
 
 export function HeroRenderer({
@@ -19,7 +19,7 @@ export function HeroRenderer({
   block: HeroBlock;
   context: BlockRenderContext;
 }) {
-  const product = block.sku ? context.products.get(block.sku) : undefined;
+  const product = block.sku ? sellableProduct(context.products, block.sku) : undefined;
 
   return (
     <section className="rudra-hero">

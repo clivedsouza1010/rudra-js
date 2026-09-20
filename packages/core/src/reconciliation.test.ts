@@ -155,6 +155,31 @@ describe('a badge is screened like any other sentence', () => {
     expect(items[0]?.badge).toBe('Worth a look');
     expect(result.violations).toEqual([]);
   });
+
+  /**
+   * A badge is prose too, and 24 characters is plenty to restate the basis the
+   * reason beside it just lost. Dropping the sentence and printing "You viewed
+   * this" underneath it says the same untrue thing, more convincingly.
+   */
+  it('drops a badge along with the basis it was stating', () => {
+    const result = reconcile(
+      grid([ref('TR-101', { basis: 'most_viewed', badge: 'You viewed this' })]),
+    );
+
+    expect(basisOf(result)?.basis).toBe('popular');
+    expect(basisOf(result)?.badge).toBeNull();
+  });
+
+  it('keeps the badge when the basis holds', () => {
+    const result = reconcile(
+      grid([ref('TR-101', { basis: 'most_viewed', badge: 'Seen before' })]),
+      {
+        signals: { mostViewed: [{ sku: 'TR-101', views: 3 }] },
+      },
+    );
+
+    expect(basisOf(result)?.badge).toBe('Seen before');
+  });
 });
 describe('the selector writes reasons its own screen accepts', () => {
   // Every branch of basisFor, driven through selectProducts so the reasons are
@@ -278,6 +303,26 @@ describe('product truth', () => {
     expect(result.violations).toContain('blocked-sku:TR-102');
   });
 
+  /**
+   * The digest keeps the eight most recent purchases, because that is what a
+   * prompt can afford. The ninth is still something the shopper owns, and the
+   * blocklist reads the payload rather than the digest for exactly that reason.
+   */
+  it('drops a purchase older than the digest keeps', () => {
+    const bought = Array.from({ length: 9 }, (_, index) => ({
+      sku: `BUY-${index + 1}`,
+      at: 1_700_000_000_000 + index,
+    }));
+
+    const result = reconcile(grid([ref('BUY-1'), ref('TR-101')]), {
+      candidates: [...bought.map((purchase) => product(purchase.sku)), product('TR-101')],
+      signals: { lastPurchased: bought },
+    });
+
+    expect(placedSkus(result.spec.blocks)).toEqual(['TR-101']);
+    expect(result.violations).toContain('blocked-sku:BUY-1');
+  });
+
   it('places a product once, however often the model names it', () => {
     const result = reconcile(grid([ref('TR-101'), ref('TR-101'), ref('TR-102')]));
 
@@ -366,7 +411,7 @@ describe('the hero products a spec reserves room for', () => {
       { kind: 'hero', headline: 'Out again', body: null, sku: 'TR-101', ctaLabel: null },
     ];
 
-    expect(placeableHeroSkus(heroes, input, buildDigest(input))).toEqual(['TR-101']);
+    expect(placeableHeroSkus(heroes, input)).toEqual(['TR-101']);
   });
 });
 
@@ -417,6 +462,32 @@ describe('verifying the stated reason for a pick', () => {
 
     expect(basisOf(matching)?.basis).toBe('similar_to_current');
     expect(basisOf(mismatched)?.basis).toBe('popular');
+  });
+
+  /**
+   * Affinity scores the category the page is in, which is right for ranking
+   * and is not evidence about the shopper. Otherwise every first-time visitor
+   * on a tent page is told they keep coming back to tents.
+   */
+  it('will not read standing in a category as liking it', () => {
+    const browsing = { surface: 'pdp', currentCategory: 'Trail Running' };
+    const result = reconcile(
+      grid([ref('TR-101', { basis: 'liked_category', reason: 'You keep coming back to these' })]),
+      { context: browsing },
+    );
+
+    expect(basisOf(result)?.basis).toBe('popular');
+    expect(basisOf(result)?.reason).toBeNull();
+    expect(result.violations).toContain('unsupported-basis:liked_category:TR-101');
+  });
+
+  it('keeps liked_category for a shopper who really did engage there', () => {
+    const result = reconcile(grid([ref('TR-101', { basis: 'liked_category' })]), {
+      context: { surface: 'pdp', currentCategory: 'Trail Running' },
+      signals: { likes: [{ sku: 'TR-102' }] },
+    });
+
+    expect(basisOf(result)?.basis).toBe('liked_category');
   });
 
   it('keeps liked_category only for a category the signals favour', () => {
