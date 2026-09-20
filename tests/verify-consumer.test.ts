@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
@@ -32,10 +33,16 @@ describe('the consumer isolation check', () => {
     expect(generated).toContain(`const forbidden: string = '${forbidden![1]!}';`);
   });
 
-  it('rethrows an import failure that is not a resolution miss', () => {
-    const guard = /\} catch \(error\) \{([\s\S]*?)\n\}/.exec(fixture);
-    expect(guard, 'consumer-fixture.ts no longer catches the forbidden import').not.toBeNull();
-    expect(guard![1]!).toContain('ERR_MODULE_NOT_FOUND');
-    expect(guard![1]!).toContain('throw error');
+  it('keys on the message Node gives for a miss on that exact name', () => {
+    const missing = 'rudra-js-nothing-installs-this';
+    const probe = spawnSync(
+      process.execPath,
+      ['--input-type=module', '--eval', `await import(${JSON.stringify(missing)});`],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+
+    expect(probe.status).not.toBe(0);
+    expect(probe.stderr).toContain(`Cannot find package '${missing}' imported from`);
+    expect(fixture).toContain("`Cannot find package '${forbidden}' imported from`");
   });
 });

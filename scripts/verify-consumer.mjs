@@ -19,7 +19,7 @@
  * to catch.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -49,8 +49,7 @@ const RENDERER = ['react-dom'];
 /** Resolvable from the repo root and from nowhere the consumer can legally reach. */
 const MUST_NOT_RESOLVE = 'prettier';
 const FORBIDDEN_PLACEHOLDER = '__FORBIDDEN_PACKAGE__';
-/** What the generated consumer must end up declaring once the placeholder is substituted. */
-const FORBIDDEN_DECLARATION = `const forbidden: string = '${MUST_NOT_RESOLVE}';`;
+const SUCCESS = '  render + isolation: ok';
 
 const run = (command, args, cwd) =>
   execFileSync(command, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
@@ -61,6 +60,10 @@ const manifestOf = (packageName) =>
 const workspace = mkdtempSync(join(tmpdir(), 'rudra-consumer-'));
 const consumer = join(workspace, 'app');
 const modules = join(consumer, 'node_modules');
+
+// Type-stripping so the fixture can stay one file in both roles.
+const runConsumer = (file) =>
+  spawnSync('node', ['--experimental-strip-types', file], { cwd: consumer, encoding: 'utf8' });
 
 try {
   mkdirSync(join(modules, '@rudra-js'), { recursive: true });
@@ -103,17 +106,26 @@ try {
   );
 
   const fixture = readFileSync(join(REPO_ROOT, 'scripts/consumer-fixture.ts'), 'utf8');
-  const generated = fixture.replaceAll(FORBIDDEN_PLACEHOLDER, MUST_NOT_RESOLVE);
-  // Check what gets written, not the template it came from: the placeholder resolves
-  // nowhere, so a substitution that quietly stopped would look like perfect isolation.
-  if (generated.includes(FORBIDDEN_PLACEHOLDER)) {
-    throw new Error(`consumer.ts still holds ${FORBIDDEN_PLACEHOLDER}: nothing was substituted`);
-  }
-  if (!generated.includes(FORBIDDEN_DECLARATION)) {
-    throw new Error(`consumer.ts does not declare: ${FORBIDDEN_DECLARATION}`);
+  // Checking only the substituted copy passes for free once there is nothing left to substitute.
+  if (!fixture.includes(FORBIDDEN_PLACEHOLDER)) {
+    throw new Error(`consumer-fixture.ts no longer holds ${FORBIDDEN_PLACEHOLDER}`);
   }
 
-  writeFileSync(join(consumer, 'consumer.ts'), generated);
+  // Read the file back and check that, not the string we meant to write.
+  const writeConsumer = (file, specifier) => {
+    const path = join(consumer, file);
+    writeFileSync(path, fixture.replaceAll(FORBIDDEN_PLACEHOLDER, specifier));
+    const written = readFileSync(path, 'utf8');
+    if (written.includes(FORBIDDEN_PLACEHOLDER)) {
+      throw new Error(`${file} still holds ${FORBIDDEN_PLACEHOLDER}: nothing was substituted`);
+    }
+    if (!written.includes(`const forbidden: string = '${specifier}';`)) {
+      throw new Error(`${file} does not declare: const forbidden: string = '${specifier}';`);
+    }
+  };
+
+  writeConsumer('consumer.ts', MUST_NOT_RESOLVE);
+  writeConsumer('malformed.ts', `${MUST_NOT_RESOLVE}%zz`);
 
   // NodeNext only. Under `bundler` resolution every one of these checks passes
   // whatever the package does, because bundler resolution is strictly more
@@ -148,8 +160,37 @@ try {
   run(join(REPO_ROOT, 'node_modules/.bin/tsc'), ['-p', join(consumer, 'tsconfig.json')]);
   console.log('  typecheck (nodenext, skipLibCheck off): ok');
 
-  // Type-stripping so the fixture can stay one file in both roles.
-  process.stdout.write(run('node', ['--experimental-strip-types', 'consumer.ts'], consumer));
+  const rendered = runConsumer('consumer.ts');
+  process.stdout.write(rendered.stdout);
+  if (rendered.status !== 0 || !rendered.stdout.includes(SUCCESS)) {
+    process.stderr.write(rendered.stderr);
+    throw new Error('the consumer did not render and report isolation');
+  }
+
+  // The line above is a claim about nothing unless the consumer also fails when it should.
+  const mustFail = (label, file) => {
+    const result = runConsumer(file);
+    if (result.status === 0 || result.stdout.includes(SUCCESS)) {
+      throw new Error(`control '${label}': the consumer reported isolation anyway`);
+    }
+  };
+
+  mustFail('an import failure that is not a resolution miss', 'malformed.ts');
+
+  const planted = join(modules, MUST_NOT_RESOLVE);
+  symlinkSync(join(REPO_ROOT, 'node_modules', MUST_NOT_RESOLVE), planted, 'dir');
+  mustFail(`${MUST_NOT_RESOLVE} resolves`, 'consumer.ts');
+  rmSync(planted);
+
+  // Resolving and then missing an import of its own: the error names the leaked package in
+  // the importer path, so an unanchored message test reads that leak as isolation.
+  mkdirSync(planted);
+  writeFileSync(
+    join(planted, 'package.json'),
+    JSON.stringify({ name: MUST_NOT_RESOLVE, version: '1.0.0', type: 'module', main: 'index.js' }),
+  );
+  writeFileSync(join(planted, 'index.js'), "import 'rudra-js-not-installed';\n");
+  mustFail(`${MUST_NOT_RESOLVE} resolves but cannot load`, 'consumer.ts');
 } finally {
   rmSync(workspace, { recursive: true, force: true });
 }
