@@ -315,6 +315,13 @@ describe('host-supplied values that are not merely bounded', () => {
     ['a root-relative path', '/images/tr-102.png', true],
     ['a protocol-relative url', '//cdn.example.com/tr-102.png', false],
     ['a bare word', 'tr-102.png', false],
+    // A browser reads a backslash as a slash and drops tab and newline before
+    // it parses, so each of these names a host the shop never chose.
+    ['a backslash authority', '/\\evil.example/x.png', false],
+    ['a tab hiding a second slash', '/\t/evil.example/x.png', false],
+    ['a newline hiding two', '/\r\n//evil.example/x.png', false],
+    ['a tab hiding a backslash', '/\t\\evil.example/x.png', false],
+    ['a tab that stays on the origin', '/images/a\tb.png', true],
   ])('imageUrl: %s', (_label, imageUrl, accepted) => {
     expect(withProduct({ imageUrl }).success).toBe(accepted);
   });

@@ -153,6 +153,19 @@ function canonicalise(value: unknown): string {
 const PROMPT_FINGERPRINT = createHash('sha256').update(SYSTEM_PROMPT).digest('hex').slice(0, 16);
 
 /**
+ * Who answered, as two named fields rather than one joined string.
+ *
+ * Joining them with a colon is ambiguous, and model ids carry colons — an
+ * `anthropic` / `claude:1` pair and an `anthropic:claude` / `1` pair flatten to
+ * the same text and read each other's entries out of a shared store. The
+ * provider is in the key precisely so that cannot happen.
+ */
+export interface ProviderIdentity {
+  name: string;
+  model: string;
+}
+
+/**
  * Derives the cache key.
  *
  * The digest goes in **whole**, rather than as a hand-picked list of fields.
@@ -180,14 +193,14 @@ const PROMPT_FINGERPRINT = createHash('sha256').update(SYSTEM_PROMPT).digest('he
 export function specCacheKey(
   digest: SignalDigest,
   candidateSkus: readonly string[],
-  providerId: string,
+  provider: ProviderIdentity,
 ): string {
   const material = canonicalise({
     // So a shape change cannot read entries written by the previous shape out of
     // a shared store that outlives a deploy.
     specVersion: SPEC_VERSION,
     prompt: PROMPT_FINGERPRINT,
-    provider: providerId,
+    provider,
     digest,
     candidates: candidateSkus.toSorted(),
   });
@@ -199,12 +212,12 @@ export function specCacheKey(
 export function cohortCacheKey(
   digest: SignalDigest,
   candidateSkus: readonly string[],
-  providerId: string,
+  provider: ProviderIdentity,
 ): string {
   const material = canonicalise({
     specVersion: SPEC_VERSION,
     prompt: PROMPT_FINGERPRINT,
-    provider: providerId,
+    provider,
     segment: digest.segment ?? null,
     surface: digest.surface,
     slot: digest.slot,

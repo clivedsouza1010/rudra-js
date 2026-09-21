@@ -1,5 +1,5 @@
 import type { ProductReference } from '@rudra-js/core';
-import type { BlockRenderContext } from '../render-context.js';
+import { sellableProduct, type BlockRenderContext } from '../render-context.js';
 
 /**
  * One product.
@@ -16,7 +16,7 @@ export function ProductCard({
   reference: ProductReference;
   context: BlockRenderContext;
 }) {
-  const product = context.products.get(reference.sku);
+  const product = sellableProduct(context.products, reference.sku);
   // Reconciliation drops a SKU the catalog does not have, so this should be
   // unreachable. Rendering nothing beats rendering a card with holes in it.
   if (!product) return null;

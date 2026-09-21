@@ -178,6 +178,26 @@ describe('where product facts come from', () => {
     expect(render(gridSpec())).not.toContain('<img');
   });
 
+  /**
+   * The catalog read here is read after the spec was reconciled, so it can be
+   * the fresher of the two. A row flagged out of stock reads the same as a row
+   * that is gone: a card the shopper cannot buy is worse than one card fewer.
+   */
+  it('drops a product the catalog flags out of stock', () => {
+    const markup = render(gridSpec([reference('TR-101'), reference('TR-102')]), {
+      products: [product('TR-101', { isInStock: false }), product('TR-102')],
+    });
+
+    expect(markup).not.toContain('data-rudra-sku="TR-101"');
+    expect(markup).toContain('data-rudra-sku="TR-102"');
+  });
+
+  it('renders nothing at all when every product sold out', () => {
+    const markup = render(gridSpec(), { products: [product('TR-101', { isInStock: false })] });
+
+    expect(markup).toBe('');
+  });
+
   it('ignores product facts carried on the spec itself', () => {
     // Nothing in the schema allows these, so a spec carrying them is either a
     // newer core or a tampered cache entry. Either way the catalog wins: this
@@ -834,6 +854,17 @@ describe('a bundle', () => {
 
     expect(markup).toContain('Product TR-101');
     expect(markup).toContain('Product TR-102');
+  });
+
+  it('disappears when one member sold out', () => {
+    // A set missing one of its parts is not that set, and the price is for all
+    // of them.
+    const markup = render(bundleSpec(), {
+      bundles: BUNDLES,
+      products: [product('TR-101'), product('TR-102', { isInStock: false })],
+    });
+
+    expect(markup).toBe('');
   });
 
   it('marks each member of the set with its SKU, so a click can be attributed to it', () => {

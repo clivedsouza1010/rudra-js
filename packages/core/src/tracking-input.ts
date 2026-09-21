@@ -65,6 +65,20 @@ const optionalIdentifier = () => z.string().min(1).max(FIELD_LIMITS.identifier).
 const epochMs = () => z.number().int().min(0).max(MAX_EPOCH_MS).optional();
 
 /**
+ * Whether a path stays on the page's own origin.
+ *
+ * Read the way a browser reads it, not the way it looks. A browser drops tab,
+ * carriage return and newline from a URL before parsing it, and treats a
+ * backslash as a slash, so `/\evil.example/x.png` and `/<tab>//evil.example/x.png`
+ * both point at someone else's host while passing a plain "starts with one
+ * slash" test.
+ */
+const isRootRelative = (value: string) => {
+  const asParsed = value.replace(/[\t\n\r]/g, '');
+  return value.startsWith('/') && /^\/(?![/\\])/.test(asParsed);
+};
+
+/**
  * An absolute http(s) URL, or a root-relative path such as `/images/tr-102.png`.
  * Anything else — a bare word, a `javascript:` URI, a protocol-relative `//host`
  * — is rejected before it can reach an `<img src>`.
@@ -75,9 +89,7 @@ const imageReference = () =>
     .max(FIELD_LIMITS.shortText)
     .refine(
       (value) =>
-        value.startsWith('/') && !value.startsWith('//')
-          ? true
-          : z.url({ protocol: /^https?$/ }).safeParse(value).success,
+        isRootRelative(value) ? true : z.url({ protocol: /^https?$/ }).safeParse(value).success,
       { message: 'expected an http(s) URL or a root-relative path' },
     );
 

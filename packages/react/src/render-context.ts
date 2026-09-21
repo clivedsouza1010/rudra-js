@@ -28,6 +28,23 @@ export function defaultHrefForSku(sku: string): string {
 }
 
 /**
+ * The product to draw for a SKU, or nothing.
+ *
+ * A row the catalog flags out of stock counts as absent. Core only ever names
+ * an in-stock candidate, but the catalog passed here is read later and can be
+ * the fresher of the two — and a card that prices and links something the shop
+ * cannot sell is worse than one card fewer. A catalog that leaves the field
+ * off renders as it always did.
+ */
+export function sellableProduct(
+  products: ReadonlyMap<string, Product>,
+  sku: string,
+): Product | undefined {
+  const product = products.get(sku);
+  return product?.isInStock === false ? undefined : product;
+}
+
+/**
  * Formats a price the way the currency itself is written.
  *
  * No digit count is specified on purpose. Two decimal places is a dollar-and-

@@ -120,9 +120,15 @@ before anything renders. A product you left out doesn't reach the page.
 `bundles` is optional. These are the sets you sell together, each with your own
 price for the set, the currency that price is in, and, if you want one, your own
 name for it. Every product in a set has to be a candidate as well. That's what
-lets the same checks that pass a single product pass a whole set, and what lets
+lets the checks that pass a single product run over a whole set, and what lets
 the renderer look the members up in the catalog it already has. Ids must be
 unique, and one set must not name the same product twice.
+
+A set is placed whole, so one check runs differently: a set may hold something
+the shopper already bought or has in the basket, where a grid or a carousel
+would drop it. A thumbs-down on a member still blocks the whole set, and so does
+a member that is out of stock, already on the page, or the product being looked
+at right now.
 
 The model _never_ picks a set and is never told a price. All it does is ask for a
 bundle block and write the words around it. We pick which set when the page is
@@ -244,6 +250,30 @@ everyone looking at it shares them. If you pick candidates per shopper you'll ge
 smaller cohorts. That's the honest outcome, because your prompt really is
 personal.
 
+What goes in the key is the _set_ of candidate SKUs. Not the order you sent them
+in, not which ones were in stock, and not where the 60-product cut fell. So two
+requests carrying the same SKUs in a different order share one component, and the
+one generated first is the one both get. If your ranking is personal, order your
+candidates and the products in the copy won't be the ones you put at the top.
+Prices, titles and stock are always read from your catalog at render time, so
+nothing stale is ever shown — a product that sold out is dropped as the page is
+served, and any sentence written about it stays.
+
+#### Who can create a cohort
+
+Every field above is one you supply, and each distinct value is a cohort of its
+own — a fresh model call, and a slot in the cache. If a visitor can choose one of
+them, a visitor can choose how many calls you pay for. A `locale` copied straight
+out of `Accept-Language`, a `currentCategory` read off a URL slug and a `segment`
+built from a query parameter are the three that go wrong. The shipped cache holds
+10,000 entries and drops the oldest, so enough made-up values also evict the
+cohorts your real shoppers were being served from.
+
+Draw those fields from sets you control: your own locale list, your own category
+ids, your own segment labels. Nothing leaks either way — a cohort prompt carries
+no shopper text at all — the cost is the bill and the model round trip on a page
+that was being served from cache.
+
 Pass `generation: 'per-shopper'` to generate for the individual instead. The
 model then chooses the products too, and every shopper pays for their own call.
 
@@ -311,9 +341,19 @@ const generator = createComponentGenerator({ provider, rank: 'given' });
 
 You keep the rest either way. We still drop anything the shopper shouldn't be
 shown, whether it's out of stock, already bought, in the basket, disliked, or
-the product they're looking at right now. Every product still carries a basis
-we check against their real signals, and everything the model writes is still
-screened.
+the product they're looking at right now — read from the payload you sent, not
+from the shortened history the model was shown, so a shopper with a long order
+book is covered too. Every product still carries a basis we check against their
+real signals, and everything the model writes is still screened.
+
+How much each basis proves is worth knowing, because two of the six prove less
+than they read. `most_viewed` is checked against the SKUs they viewed,
+`similar_to_current` against the category being browsed, `liked_category`
+against the categories they bought, liked, carted or viewed in — standing on a
+category page is not one of those — and `popular` claims nothing.
+`complements_cart` and `complements_purchase` check only that the basket, or the
+order history, isn't empty: nothing here can know that one product goes with
+another. A basis that fails takes the sentence and the badge stating it with it.
 
 Each candidate can carry its own `reason`, the phrase shown under the product.
 Reach for it when your ranking knows something the signals don't:
