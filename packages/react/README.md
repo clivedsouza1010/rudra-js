@@ -187,9 +187,10 @@ in, and your name for it, so the component has something to draw.
 
 **Validate `bundles` with `bundleSchema` from `@rudra-js/core`, and pass the same list you sent to
 `parseTrackingInput`.** Core already checked that list — every member in stock, none of them
-disliked, no repeats, and the whole set inside the item budget — and then hands the renderer nothing
-but the id it chose. Pass a stale or different list here and you'll draw a set none of those checks
-ever saw, under an id that was proved against another one.
+disliked, none of them the product being looked at, no repeats, and the whole set inside the item
+budget — and then hands the renderer nothing but the id it chose. Pass a stale or different list
+here and you'll draw a set none of those checks ever saw, under an id that was proved against
+another one.
 
 ## Licence
 

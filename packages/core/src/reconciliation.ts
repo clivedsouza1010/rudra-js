@@ -66,15 +66,32 @@ function clampNullable(value: string | null, limit: number): string | null {
 interface Allowlist {
   allowed: Set<string>;
   blocked: Set<string>;
+  /** A bundle is placed whole, so it checks this narrower set. See `refusedEverywhere`. */
+  blockedInBundle: Set<string>;
+}
+
+/**
+ * A thumbs-down, and the product on the screen right now. No block may hold one
+ * of these, a bundle included.
+ *
+ * Read from the payload rather than the digest on purpose. `DIGEST_LIMITS`
+ * trims each history to what fits in a prompt, and a shopper with thirteen
+ * dislikes would otherwise be shown the thirteenth. The cap exists to bound
+ * what the model is told, not what the shopper may be shown.
+ */
+function refusedEverywhere(input: TrackingInput): Set<string> {
+  const refused = new Set<string>();
+  for (const signal of input.signals.dislikes) refused.add(signal.sku);
+  if (input.context.currentSku) refused.add(input.context.currentSku);
+
+  return refused;
 }
 
 /**
  * SKUs that must never be recommended, whatever chose them.
  *
- * Read from the payload rather than the digest on purpose. `DIGEST_LIMITS`
- * trims each history to what fits in a prompt, and a shopper with nine
- * purchases would otherwise be sold the ninth back. The cap exists to bound
- * what the model is told, not what the shopper may be shown.
+ * Everything above plus what the shopper already has, read from the payload for
+ * the same reason: a shopper with nine purchases must not be sold the ninth back.
  *
  * Exported because the deterministic selector applies the same rule when it
  * picks. Two copies of "never recommend these" would drift, and the pair that
@@ -82,13 +99,12 @@ interface Allowlist {
  * comparability the whole evaluation depends on.
  */
 export function neverRecommend(input: TrackingInput): Set<string> {
-  const { signals, context } = input;
+  const { signals } = input;
 
-  const blocked = new Set<string>();
-  for (const signal of [...signals.dislikes, ...signals.lastPurchased, ...signals.cart]) {
+  const blocked = refusedEverywhere(input);
+  for (const signal of [...signals.lastPurchased, ...signals.cart]) {
     blocked.add(signal.sku);
   }
-  if (context.currentSku) blocked.add(context.currentSku);
 
   return blocked;
 }
@@ -99,7 +115,11 @@ function buildAllowlist(input: TrackingInput): Allowlist {
     if (product.isInStock) allowed.add(product.sku);
   }
 
-  return { allowed, blocked: neverRecommend(input) };
+  return {
+    allowed,
+    blocked: neverRecommend(input),
+    blockedInBundle: refusedEverywhere(input),
+  };
 }
 
 function verifyBasis(
@@ -337,7 +357,7 @@ function chooseBundle(
     let isPlaceable = true;
     for (const sku of bundle.skus) {
       if (!allowlist.allowed.has(sku)) isPlaceable = false;
-      if (digest.dislikedSkus.includes(sku)) isPlaceable = false;
+      if (allowlist.blockedInBundle.has(sku)) isPlaceable = false;
       if (tracker.hasPlaced(sku)) isPlaceable = false;
     }
     if (!isPlaceable) continue;

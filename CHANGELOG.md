@@ -79,8 +79,8 @@ break them.
   purchases and eight most recent basket entries because that is what a prompt
   can afford; the blocklist was reading the same shortened lists, so a shopper
   with a longer order book could be recommended something they already own, or
-  have in the basket, with nothing recorded in `violations`. Bundles are
-  unchanged and still allow a set holding a bought or in-basket product, which
+  have in the basket, with nothing recorded in `violations`. A bundle keeps its
+  exception and still allows a set holding a bought or in-basket product, which
   `SECURITY.md` now says out loud.
 
   A product's badge is now dropped along with its reason when the stated basis
@@ -96,6 +96,16 @@ break them.
   "because you keep coming back to tents". It is now checked against the
   categories the shopper bought, liked, carted or viewed in. `similar_to_current`
   is the basis for standing on a page, and it says so honestly.
+
+- A bundle now refuses a member the shopper thumbed down or is looking at. The
+  bundle path skips the never-recommend set on purpose, because a set is placed
+  whole and may hold something already bought or in the basket — but it was
+  reading dislikes from the digest, which keeps only the twelve most recent, and
+  it never looked at `context.currentSku` at all. So a thirteenth thumbs-down
+  could come back inside a set, and so could the product on the page the shopper
+  was standing on. Both are read from the payload now, the same source every
+  other block reads. The purchase-and-basket exception is untouched, and
+  `SECURITY.md` claimed both of these already.
 
 - The prompt escapes invisible characters the general Unicode categories miss.
   `Default_Ignorable_Code_Point` is in the class now, which covers the ones that

@@ -120,9 +120,15 @@ before anything renders. A product you left out doesn't reach the page.
 `bundles` is optional. These are the sets you sell together, each with your own
 price for the set, the currency that price is in, and, if you want one, your own
 name for it. Every product in a set has to be a candidate as well. That's what
-lets the same checks that pass a single product pass a whole set, and what lets
+lets the checks that pass a single product run over a whole set, and what lets
 the renderer look the members up in the catalog it already has. Ids must be
 unique, and one set must not name the same product twice.
+
+A set is placed whole, so one check runs differently: a set may hold something
+the shopper already bought or has in the basket, where a grid or a carousel
+would drop it. A thumbs-down on a member still blocks the whole set, and so does
+a member that is out of stock, already on the page, or the product being looked
+at right now.
 
 The model _never_ picks a set and is never told a price. All it does is ask for a
 bundle block and write the words around it. We pick which set when the page is

@@ -36,10 +36,11 @@ If you can show any of the following, that's a vulnerability:
 One exception to the second bullet, and it is deliberate rather than an oversight. A bundle is a set
 _you_ defined and it is placed whole, so a set may hold something the shopper already bought or has
 in their basket. A thumbs-down on any member still blocks the whole set, and so does a member that
-is out of stock or already on the page. If you sell a set as one "add all" offer, that is worth
-knowing: a shopper can be shown a set holding the thing already in their basket. Everywhere else —
-grid, carousel, hero — bought, in-basket, disliked and currently-viewed products are all dropped,
-and from your whole payload rather than the trimmed history the model was shown.
+is out of stock, already on the page, or the product being looked at right now. If you sell a set as
+one "add all" offer, that is worth knowing: a shopper can be shown a set holding the thing already
+in their basket. Everywhere else — grid, carousel, hero — bought, in-basket, disliked and
+currently-viewed products are all dropped. Every one of these checks reads your whole payload, a
+set's members included, rather than the trimmed history the model was shown.
 
 **Host payloads are untrusted too, and we validate them at the boundary.** Same deal, any of these is
 a vulnerability:

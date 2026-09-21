@@ -10,7 +10,7 @@ import {
   type RecommendationBasis,
 } from './component-spec.js';
 import { selectProducts } from './product-selection.js';
-import { buildDigest } from './signal-digest.js';
+import { buildDigest, DIGEST_LIMITS } from './signal-digest.js';
 import { ALLOWED_PHRASES, productFacts } from './claim-screening.js';
 import {
   MAX_BLOCKS,
@@ -799,6 +799,56 @@ describe('choosing a bundle', () => {
     });
 
     expect(result.spec.blocks).toHaveLength(0);
+  });
+
+  it('will not show a bundle holding a dislike the digest had no room for', () => {
+    // 'B' is the oldest, so it is the one the digest drops. The cap bounds what
+    // the model is told, not what the shopper may be shown.
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B')],
+      bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+      signals: {
+        dislikes: [
+          { sku: 'B', at: 1_000 },
+          ...Array.from({ length: DIGEST_LIMITS.disliked }, (_, i) => ({
+            sku: `OTHER-${i}`,
+            at: 2_000 + i,
+          })),
+        ],
+      },
+    });
+
+    expect(result.spec.blocks).toHaveLength(0);
+  });
+
+  it('will not show a bundle holding the product being looked at', () => {
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B')],
+      bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+      context: { surface: 'pdp', currentSku: 'B' },
+    });
+
+    expect(result.spec.blocks).toHaveLength(0);
+  });
+
+  it('still shows a bundle holding something the shopper already bought', () => {
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B')],
+      bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+      signals: { lastPurchased: [{ sku: 'B' }] },
+    });
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'bundle', bundleId: 'BUN-1' });
+  });
+
+  it('still shows a bundle holding something in the basket', () => {
+    const result = reconcile(specWith([block]), {
+      candidates: [product('A'), product('B')],
+      bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+      signals: { cart: [{ sku: 'B' }] },
+    });
+
+    expect(result.spec.blocks[0]).toMatchObject({ kind: 'bundle', bundleId: 'BUN-1' });
   });
 
   it('will not show a bundle whose product is already on the page', () => {
