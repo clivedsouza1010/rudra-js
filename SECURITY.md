@@ -39,8 +39,9 @@ in their basket. A thumbs-down on any member still blocks the whole set, and so 
 is out of stock, already on the page, or the product being looked at right now. If you sell a set as
 one "add all" offer, that is worth knowing: a shopper can be shown a set holding the thing already
 in their basket. Everywhere else — grid, carousel, hero — bought, in-basket, disliked and
-currently-viewed products are all dropped. Every one of these checks reads your whole payload, a
-set's members included, rather than the trimmed history the model was shown.
+currently-viewed products are all dropped. No cap applies to any of those refusals: we match against
+every signal in your payload, a set's members included, not the trimmed history the model was shown.
+That trimmed history still decides which set wins when more than one is clean.
 
 **Host payloads are untrusted too, and we validate them at the boundary.** Same deal, any of these is
 a vulnerability:
