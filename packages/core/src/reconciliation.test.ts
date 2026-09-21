@@ -14,6 +14,7 @@ import { buildDigest, DIGEST_LIMITS } from './signal-digest.js';
 import { ALLOWED_PHRASES, productFacts } from './claim-screening.js';
 import {
   MAX_BLOCKS,
+  bundleForShopper,
   placeableHeroSkus,
   reconcileSpec,
   type ReconcileResult,
@@ -939,6 +940,68 @@ describe('choosing a bundle', () => {
     });
 
     expect(result.spec.blocks[0]).toMatchObject({ bundleId: 'VIEWED' });
+  });
+});
+
+// bundleForShopper and reconcileSpec each pick the set. These pin them to agree.
+describe('the set the generator reserves room for', () => {
+  const BUNDLE_BLOCK: Block = {
+    kind: 'bundle',
+    title: null,
+    body: null,
+    ctaLabel: null,
+    bundleId: null,
+  };
+
+  function bothPaths(overrides: Partial<TrackingInputDraft>) {
+    const input = inputFor(overrides);
+    const digest = buildDigest(input);
+
+    return {
+      reserved: bundleForShopper(input, digest, [])?.id ?? null,
+      placed: reconcileSpec(specWith([BUNDLE_BLOCK]), input, digest).spec.blocks[0] ?? null,
+    };
+  }
+
+  const PAIR = {
+    candidates: [product('A'), product('B')],
+    bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
+  };
+
+  it('reserves nothing for a set holding a dislike the digest had no room for', () => {
+    // 'B' is the oldest thumbs-down, so it is the one the digest drops.
+    const { reserved, placed } = bothPaths({
+      ...PAIR,
+      signals: {
+        dislikes: [
+          { sku: 'B', at: 1_000 },
+          ...Array.from({ length: DIGEST_LIMITS.disliked }, (_, i) => ({
+            sku: `OTHER-${i}`,
+            at: 2_000 + i,
+          })),
+        ],
+      },
+    });
+
+    expect(reserved).toBeNull();
+    expect(placed).toBeNull();
+  });
+
+  it('reserves nothing for a set holding the product being looked at', () => {
+    const { reserved, placed } = bothPaths({
+      ...PAIR,
+      context: { surface: 'pdp', currentSku: 'B' },
+    });
+
+    expect(reserved).toBeNull();
+    expect(placed).toBeNull();
+  });
+
+  it('reserves the set both paths can still place', () => {
+    const { reserved, placed } = bothPaths(PAIR);
+
+    expect(reserved).toBe('BUN-1');
+    expect(placed).toMatchObject({ kind: 'bundle', bundleId: 'BUN-1' });
   });
 });
 
@@ -2264,6 +2327,65 @@ describe('the words the model really wrote', () => {
 
     expect(result.spec.blocks[0]).toMatchObject({ kind: 'grid', title: null });
     expect(result.violations).toContain('unverifiable-claim:rating:grid-title');
+  });
+});
+
+describe('a claim the cap cuts in half', () => {
+  const TAGGED = {
+    candidates: [product('TR-101', { tags: ['2 person', '3 season'] }), product('TR-102')],
+  };
+
+  // 25 characters against a badge cap of 24. Renders as "Ridge picks, only 2…".
+  it('drops a badge whose "left" fell outside the cap', () => {
+    const result = reconcile(grid([ref('TR-101', { badge: 'Ridge picks, only 2 left!' })]), TAGGED);
+
+    expect(basisOf(result)?.badge).toBeNull();
+    expect(result.violations).toContain('unverifiable-claim:stock:badge:TR-101');
+  });
+
+  it('drops a reason whose discount fell outside the cap', () => {
+    const result = reconcile(
+      grid([
+        ref('TR-101', { reason: `${'a steady pick for damp nights '.repeat(4)}and it is 30% off` }),
+      ]),
+      TAGGED,
+    );
+
+    expect(basisOf(result)?.reason).toBeNull();
+    expect(result.violations).toContain('unverifiable-claim:discount:reason:TR-101');
+  });
+
+  it('drops a headline whose price fell outside the cap', () => {
+    const result = reconcile(
+      {
+        ...specWith([PRODUCT_GRID]),
+        headline: `${'ready for the shoulder season '.repeat(3)}and it was 50 now 30`,
+      },
+      TAGGED,
+    );
+
+    expect(result.spec.headline).toBe('');
+    expect(result.violations).toContain('unverifiable-claim:price:headline');
+  });
+
+  it('drops a banner whose claim only appears once the spaces are collapsed', () => {
+    const result = reconcile(
+      specWith([{ kind: 'banner', tone: 'info', text: 'Back  in   stock', ctaLabel: null }]),
+      TAGGED,
+    );
+
+    expect(result.spec.blocks).toHaveLength(0);
+    expect(result.violations).toContain('unverifiable-claim:stock:banner-text');
+  });
+
+  it('still truncates honest copy rather than dropping it', () => {
+    const honest = `${'a steady pick for damp nights '.repeat(4)}and it packs down small`;
+    const result = reconcile(grid([ref('TR-101', { reason: honest })]), TAGGED);
+
+    const kept = basisOf(result)?.reason ?? '';
+    expect(kept.endsWith('…')).toBe(true);
+    expect(honest.startsWith(kept.slice(0, -1))).toBe(true);
+    expect(result.violations).toEqual([]);
   });
 });
 

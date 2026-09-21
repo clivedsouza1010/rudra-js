@@ -130,6 +130,13 @@ would drop it. A thumbs-down on a member still blocks the whole set, and so does
 a member that is out of stock, already on the page, or the product being looked
 at right now.
 
+That last one has a cost. A "frequently bought together, including this item"
+set names the product whose page it sits on, so it is refused on exactly the
+page you wrote it for. Leave the item out and sell the companions as the set —
+those place as normal. And when a bundle block is the only block the model asked
+for, refusing the set leaves nothing to render, so the deterministic component
+takes over.
+
 The model _never_ picks a set and is never told a price. All it does is ask for a
 bundle block and write the words around it. We pick which set when the page is
 served, going on what the shopper has in their basket, has looked at, or is
