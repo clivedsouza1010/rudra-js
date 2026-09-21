@@ -10,6 +10,8 @@ break them.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-20
+
 ### Added
 
 - `@rudra-js/core` exports `GeneratedSpecResult`, a name for what
@@ -579,7 +581,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.5.0...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.2.0...v0.3.1
