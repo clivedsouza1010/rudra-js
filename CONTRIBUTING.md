@@ -177,7 +177,9 @@ instead of on the tag.
 
 Nothing automates the paperwork either. `release.yml` publishes to npm and stops — no GitHub
 release, no CHANGELOG edit. Move the `## [Unreleased]` heading and the `[unreleased]:` compare link
-at the bottom of `CHANGELOG.md` in the same pull request, because nothing fails if you don't.
+at the bottom of `CHANGELOG.md` in the same pull request, because nothing fails if you don't. The
+same goes for the `Status:` line at the top of `README.md`, which names the version and sat two
+releases behind before anyone noticed — no test reads it, and it is the first thing on the npm page.
 
 Then push a signed tag `vX.Y.Z` at the merge commit, while it's still the tip of `main`:
 
