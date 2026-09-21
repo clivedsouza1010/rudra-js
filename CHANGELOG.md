@@ -32,6 +32,14 @@ break them.
   because none of them reads the catalog. The behaviour is the one 0.5.0
   shipped; what was missing was saying so, and an empty-state branch inside a
   custom grid or carousel renderer is dead code. A test pins it now.
+- `SECURITY.md` and the core README say what the currently-viewed rule costs. A
+  set is refused when it holds the product whose page it is on, which they both
+  stated — what neither said is that this rules out the common "frequently
+  bought together, including this item" set on exactly the page it was written
+  for, and that a bundle block with no other block beside it hands the whole
+  component to the deterministic fallback when the set is refused. Sell the
+  companions without the item and the set places if it passes the rest. The behaviour is
+  the one the last release shipped; the consequence is new in writing only.
 
 ### Changed
 
@@ -106,6 +114,19 @@ break them.
   was standing on. Both are read from the payload now, the same source every
   other block reads. The purchase-and-basket exception is untouched, and
   `SECURITY.md` claimed both of these already.
+
+- A claim the length cap cut in half is now caught. Every piece of model copy is
+  truncated to what its field can show and then read for price, discount, stock,
+  rating and delivery claims — but the read ran after the cut, so a badge
+  reading "Ridge picks, only 2 left!" lost the word "left" at twenty-four
+  characters, rendered as "Ridge picks, only 2…" and matched no stock pattern.
+  The same sentence two characters shorter was dropped. It leaked on every capped
+  field, it needed no adversary — ordinary copy running a couple
+  of characters long is enough — and it recorded no violation, so an evaluation
+  counted it as clean. The patterns now read what the model wrote as well as
+  what will render, and the field goes if either flags. The numeral and wording
+  passes still read only what renders: a number the cap threw away cannot
+  mislead anybody.
 
 - The prompt escapes invisible characters the general Unicode categories miss.
   `Default_Ignorable_Code_Point` is in the class now, which covers the ones that

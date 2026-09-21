@@ -183,7 +183,8 @@ function createPlacementTracker(maxItems: number, facts: HostFacts) {
 type PlacementTracker = ReturnType<typeof createPlacementTracker>;
 
 /**
- * Runs after clamping, so what is screened is exactly what would have rendered.
+ * Clamps, then screens. The cap has to happen here: clamping first can cut the word that
+ * makes a claim a claim, so "Ridge picks, only 2 left!" renders past the stock pattern.
  *
  * Three passes, most specific first. Core's patterns name one of the five kinds; `quantity`
  * is the only proof in the stack, every numeral having to be one the shop supplied; `wording`
@@ -191,13 +192,18 @@ type PlacementTracker = ReturnType<typeof createPlacementTracker>;
  */
 function screenClaim(
   value: string | null,
+  limit: number,
   field: string,
   tracker: PlacementTracker,
   facts: readonly string[] = tracker.facts,
 ): string | null {
   if (value === null) return null;
 
-  const kind = claimIn(value);
+  const clamped = clamp(value, limit);
+  if (clamped.length === 0) return null;
+
+  // Both ways round: clamping collapses whitespace, so "in  stock" only reads as a claim after.
+  const kind = claimIn(value) ?? claimIn(clamped);
   if (kind !== null) {
     tracker.record(`unverifiable-claim:${kind}:${field}`);
     return null;
@@ -205,9 +211,9 @@ function screenClaim(
 
   // Nothing for the quantity layer to weigh without a numeral, whatever the facts say,
   // and reading the fact list to prove that again per field is most of what this costs.
-  const weighed = NUMERAL.test(value) ? facts : NO_FACTS;
+  const weighed = NUMERAL.test(clamped) ? facts : NO_FACTS;
 
-  const result = verify(value, { values: weighed, allowedPhrases: ALLOWED_PHRASES });
+  const result = verify(clamped, { values: weighed, allowedPhrases: ALLOWED_PHRASES });
   if (!result.quantity.supported) {
     tracker.record(`unverifiable-claim:quantity:${field}`);
     return null;
@@ -217,7 +223,7 @@ function screenClaim(
     return null;
   }
 
-  return value;
+  return clamped;
 }
 
 /**
@@ -225,8 +231,13 @@ function screenClaim(
  * or a whole generation, whose text clamps to nothing — so a banner reading "20% off"
  * disappears rather than rendering blank.
  */
-function screenRequired(value: string, field: string, tracker: PlacementTracker): string {
-  return screenClaim(value, field, tracker) ?? '';
+function screenRequired(
+  value: string,
+  limit: number,
+  field: string,
+  tracker: PlacementTracker,
+): string {
+  return screenClaim(value, limit, field, tracker) ?? '';
 }
 
 /**
@@ -289,14 +300,9 @@ function reconcileItems(
     if (hasSupportedBasis) {
       reason = isOurs
         ? clampedReason
-        : screenClaim(clampedReason, `reason:${item.sku}`, tracker, own);
+        : screenClaim(item.reason, CLAMP.reason, `reason:${item.sku}`, tracker, own);
       // The schema's own example badge was "Back in stock" — a stock claim, and it renders.
-      badge = screenClaim(
-        clampNullable(item.badge, CLAMP.badge),
-        `badge:${item.sku}`,
-        tracker,
-        own,
-      );
+      badge = screenClaim(item.badge, CLAMP.badge, `badge:${item.sku}`, tracker, own);
     }
 
     kept.push({
@@ -444,11 +450,7 @@ function reconcileBlock(
         }
       }
       // A hero with no headline and no product is the empty region every other kind drops for.
-      const headline = screenRequired(
-        clamp(block.headline, CLAMP.headline),
-        'hero-headline',
-        tracker,
-      );
+      const headline = screenRequired(block.headline, CLAMP.headline, 'hero-headline', tracker);
       if (headline.length === 0 && sku === null) {
         tracker.record('empty-block:hero');
         return null;
@@ -456,9 +458,9 @@ function reconcileBlock(
       return {
         kind: 'hero',
         headline,
-        body: screenClaim(clampNullable(block.body, CLAMP.subheadline), 'hero-body', tracker),
+        body: screenClaim(block.body, CLAMP.subheadline, 'hero-body', tracker),
         sku,
-        ctaLabel: screenClaim(clampNullable(block.ctaLabel, CLAMP.ctaLabel), 'hero-cta', tracker),
+        ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'hero-cta', tracker),
       };
     }
 
@@ -478,7 +480,7 @@ function reconcileBlock(
       }
       return {
         kind: 'grid',
-        title: screenClaim(clampNullable(block.title, CLAMP.blockTitle), 'grid-title', tracker),
+        title: screenClaim(block.title, CLAMP.blockTitle, 'grid-title', tracker),
         // Never leave a grid wider than it has items to fill.
         columns: Math.min(block.columns, Math.max(2, items.length)) as 2 | 3 | 4,
         items,
@@ -501,13 +503,13 @@ function reconcileBlock(
       }
       return {
         kind: 'carousel',
-        title: screenClaim(clampNullable(block.title, CLAMP.blockTitle), 'carousel-title', tracker),
+        title: screenClaim(block.title, CLAMP.blockTitle, 'carousel-title', tracker),
         items,
       };
     }
 
     case 'banner': {
-      const text = screenRequired(clamp(block.text, CLAMP.bannerText), 'banner-text', tracker);
+      const text = screenRequired(block.text, CLAMP.bannerText, 'banner-text', tracker);
       if (text.length === 0) {
         tracker.record('empty-block:banner');
         return null;
@@ -516,19 +518,19 @@ function reconcileBlock(
         kind: 'banner',
         tone: block.tone,
         text,
-        ctaLabel: screenClaim(clampNullable(block.ctaLabel, CLAMP.ctaLabel), 'banner-cta', tracker),
+        ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'banner-cta', tracker),
       };
     }
 
     case 'copy': {
-      const body = screenRequired(clamp(block.body, CLAMP.copyBody), 'copy-body', tracker);
+      const body = screenRequired(block.body, CLAMP.copyBody, 'copy-body', tracker);
       if (body.length === 0) {
         tracker.record('empty-block:copy');
         return null;
       }
       return {
         kind: 'copy',
-        title: screenClaim(clampNullable(block.title, CLAMP.blockTitle), 'copy-title', tracker),
+        title: screenClaim(block.title, CLAMP.blockTitle, 'copy-title', tracker),
         body,
       };
     }
@@ -544,9 +546,9 @@ function reconcileBlock(
 
       return {
         kind: 'bundle',
-        title: screenClaim(clampNullable(block.title, CLAMP.blockTitle), 'bundle-title', tracker),
-        body: screenClaim(clampNullable(block.body, CLAMP.subheadline), 'bundle-body', tracker),
-        ctaLabel: screenClaim(clampNullable(block.ctaLabel, CLAMP.ctaLabel), 'bundle-cta', tracker),
+        title: screenClaim(block.title, CLAMP.blockTitle, 'bundle-title', tracker),
+        body: screenClaim(block.body, CLAMP.subheadline, 'bundle-body', tracker),
+        ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'bundle-cta', tracker),
         // The model's bundleId is ignored on purpose.
         bundleId: chosen.id,
       };
@@ -580,6 +582,7 @@ export function reconcileSpec(
 ): ReconcileResult {
   const allowlist = buildAllowlist(input);
   const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
+  const engaged = engagedCategories(input);
   const tracker = createPlacementTracker(digest.maxItems, hostFacts(input));
 
   if (generated.blocks.length > MAX_BLOCKS) {
@@ -593,7 +596,7 @@ export function reconcileSpec(
       allowlist,
       candidatesBySku,
       digest,
-      engagedCategories(input),
+      engaged,
       input.bundles,
       tracker,
       ourReasons,
@@ -603,14 +606,10 @@ export function reconcileSpec(
 
   const spec: GeneratedSpec = {
     tone: generated.tone,
-    headline: screenRequired(clamp(generated.headline, CLAMP.headline), 'headline', tracker),
-    subheadline: screenClaim(
-      clampNullable(generated.subheadline, CLAMP.subheadline),
-      'subheadline',
-      tracker,
-    ),
+    headline: screenRequired(generated.headline, CLAMP.headline, 'headline', tracker),
+    subheadline: screenClaim(generated.subheadline, CLAMP.subheadline, 'subheadline', tracker),
     blocks,
-    rationale: screenRequired(clamp(generated.rationale, CLAMP.rationale), 'rationale', tracker),
+    rationale: screenRequired(generated.rationale, CLAMP.rationale, 'rationale', tracker),
   };
 
   // Recorded separately: no products and no headline are different failures.
