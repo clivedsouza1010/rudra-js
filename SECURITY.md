@@ -42,9 +42,12 @@ in their basket.
 
 The currently-viewed half of that rule costs you a placement, so it is worth knowing too. A
 "frequently bought together, including this item" set names the product whose page it is on, so it
-is refused on the one page it was written for — build those sets from the companions alone and they
-place normally. And if a bundle block is the only block the model asked for, refusing the set leaves
-the component with nothing to show: the deterministic component renders in its place. Everywhere else — grid, carousel, hero — bought, in-basket, disliked and
+is refused on the one page it was written for — build those sets from the companions alone and that
+rejection goes away, leaving them to pass or fail the other checks like any set. And if a
+bundle block is the only block the model asked for, refusing the set leaves the component
+with nothing to show: the deterministic component renders in its place.
+
+Everywhere else — grid, carousel, hero — bought, in-basket, disliked and
 currently-viewed products are all dropped. No cap applies to any of those refusals: we match against
 every signal in your payload, a set's members included, not the trimmed history the model was shown.
 That trimmed history still decides which set wins when more than one is clean.

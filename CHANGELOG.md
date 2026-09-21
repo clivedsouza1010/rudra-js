@@ -38,7 +38,7 @@ break them.
   bought together, including this item" set on exactly the page it was written
   for, and that a bundle block with no other block beside it hands the whole
   component to the deterministic fallback when the set is refused. Sell the
-  companions without the item and the set places as normal. The behaviour is
+  companions without the item and the set places if it passes the rest. The behaviour is
   the one the last release shipped; the consequence is new in writing only.
 
 ### Changed
@@ -120,8 +120,8 @@ break them.
   rating and delivery claims — but the read ran after the cut, so a badge
   reading "Ridge picks, only 2 left!" lost the word "left" at twenty-four
   characters, rendered as "Ridge picks, only 2…" and matched no stock pattern.
-  The same sentence two characters shorter was dropped. It leaked on all five
-  shopper-facing caps, it needed no adversary — ordinary copy running a couple
+  The same sentence two characters shorter was dropped. It leaked on every capped
+  field, it needed no adversary — ordinary copy running a couple
   of characters long is enough — and it recorded no violation, so an evaluation
   counted it as clean. The patterns now read what the model wrote as well as
   what will render, and the field goes if either flags. The numeral and wording
