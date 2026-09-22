@@ -108,17 +108,11 @@ export type GeneratedSpecResult = z.ZodSafeParseResult<GeneratedSpec>;
 export type SpecSource = 'llm' | 'cache' | 'fallback';
 
 export type DegradedReason =
-
   | 'no-provider'
-
   | 'provider-error'
-
   | 'timeout'
-
   | 'invalid-generation'
-
   | 'unusable-on-serve'
-
   | 'requested';
 
 export const SPEC_VERSION = '1' as const;

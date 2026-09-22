@@ -183,8 +183,7 @@ export function createComponentGenerator(
     if (!options.onEvent) return;
     try {
       options.onEvent(event);
-    } catch {
-    }
+    } catch {}
   };
 
   const buildDeterministic = (
@@ -232,8 +231,7 @@ export function createComponentGenerator(
   const storeInBackground = (key: string, cached: CachedSpec): void => {
     void Promise.resolve()
       .then(() => cache.set(key, cached))
-      .catch(() => {
-      });
+      .catch(() => {});
   };
 
   const askModel = async (

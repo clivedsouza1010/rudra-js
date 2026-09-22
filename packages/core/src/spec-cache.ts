@@ -87,8 +87,7 @@ export function createNullSpecCache(): SpecCache {
     async get() {
       return undefined;
     },
-    async set() {
-    },
+    async set() {},
   };
 }
 

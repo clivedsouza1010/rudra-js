@@ -100,7 +100,6 @@ function verifyBasis(
     case 'complements_purchase':
       return digest.purchasedSkus.length > 0;
     case 'liked_category':
-
       return (
         engaged.has(product.category) &&
         digest.categoryAffinity.some((affinity) => affinity.category === product.category)
@@ -108,7 +107,6 @@ function verifyBasis(
     case 'similar_to_current':
       return digest.currentCategory === product.category;
     case 'popular':
-
       return true;
   }
 }
