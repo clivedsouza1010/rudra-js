@@ -3,35 +3,16 @@ import type { SignalDigest } from './signal-digest.js';
 import { neverRecommend } from './reconciliation.js';
 import type { Product, TrackingInput } from './tracking-input.js';
 
-/**
- * The deterministic selector — which products to show, in what order, and why.
- *
- * This is the half of the problem a language model is not needed for. Given the
- * same digest, it always returns the same picks, it cannot fail, and it costs
- * nothing. It exists for three reasons, in ascending order of importance:
- *
- *  1. It is what renders when the model is slow, erroring, or not configured.
- *  2. It supplies the candidate ordering the model is asked to work from.
- *  3. It is the control arm. If a generated component cannot be told apart from
- *     this, the model has not earned its place, and the evaluation has to be
- *     able to ask that question honestly.
- */
-
 export interface ProductPick {
   product: Product;
-  /** Why this product, stated so reconciliation can check it. */
+
   basis: RecommendationBasis;
-  /** How the basis reads to a shopper. The host's own sentence when it wrote one. */
+
   reason: string;
-  /** Unnormalised. Only the ordering is meaningful. */
+
   score: number;
 }
 
-/**
- * How much each factor moves a product up the list. Relative sizes are what
- * matter: category affinity dominates, a revisit is nearly as strong, and
- * rating only separates products the signals cannot.
- */
 const SCORE_WEIGHTS = {
   category: 3,
   revisit: 1.5,
@@ -39,7 +20,6 @@ const SCORE_WEIGHTS = {
   tagOverlap: 0.6,
 } as const;
 
-/** Beyond this many shared tags, more overlap says nothing new. */
 const MAX_TAG_OVERLAP = 3;
 
 const UNRATED = 3.5;
@@ -67,15 +47,6 @@ interface Evidence {
   hasCart: boolean;
 }
 
-/**
- * States why a product was picked, choosing the most specific claim the signals
- * actually support.
- *
- * Every branch has to be one reconciliation can verify — the selector is held to
- * the same standard as the model, and a basis it cannot support would be
- * downgraded there just the same. `popular` asserts nothing and is the honest
- * answer when nothing else holds.
- */
 function basisFor(
   product: Product,
   digest: SignalDigest,
@@ -96,16 +67,9 @@ function basisFor(
   return { basis: 'popular', reason: `Popular in ${product.category}` };
 }
 
-/** How the picks are ordered once the unplaceable ones are gone. */
 export type RankOrder = 'signals' | 'given';
 
 export interface SelectOptions {
-  /**
-   * `signals` scores each candidate and orders by that score. `given` keeps the
-   * order you sent, for a shop whose own ranking is better than four weights.
-   * Either way the exclusions and the stock check still apply, and every pick
-   * still carries a basis reconciliation can verify.
-   */
   rank?: RankOrder;
 }
 
@@ -117,8 +81,7 @@ export function selectProducts(
   const affinityByCategory = new Map(
     digest.categoryAffinity.map((affinity) => [affinity.category, affinity.score]),
   );
-  // Normalised against the strongest affinity so the weights below mean the
-  // same thing whether a shopper has two signals or two hundred.
+
   const strongestAffinity = Math.max(1, ...affinityByCategory.values());
   const tags = engagedTags(input, digest);
   const excluded = neverRecommend(input);
@@ -132,8 +95,7 @@ export function selectProducts(
     const categoryScore = (affinityByCategory.get(product.category) ?? 0) / strongestAffinity;
     const tagOverlap = product.tags.filter((tag) => tags.has(tag)).length;
     const ratingScore = (product.rating ?? UNRATED) / 5;
-    // Something viewed and not bought is a strong re-surface signal, but it
-    // saturates: the twentieth view means little more than the fifth.
+
     const revisitScore = Math.min(1, Math.log2(1 + (viewsBySku.get(product.sku) ?? 0)) / 3);
 
     const score =

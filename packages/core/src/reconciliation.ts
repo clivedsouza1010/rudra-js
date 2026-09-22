@@ -9,13 +9,6 @@ import type {
 import { engagedCategories, type SignalDigest } from './signal-digest.js';
 import type { Bundle, Product, TrackingInput } from './tracking-input.js';
 
-/**
- * Nothing here trusts the model. Repair, not rejection, is the default: text is
- * truncated and unverifiable claims are downgraded, and only an empty result
- * fails outright.
- */
-
-/** Truncation ceilings. Not in the schema — a provider's strict mode rejects length bounds. See `component-spec.ts`. */
 const CLAMP = {
   headline: 90,
   subheadline: 140,
@@ -26,23 +19,21 @@ const CLAMP = {
   bannerText: 160,
   copyBody: 420,
   rationale: 300,
-  // Not rendered anywhere — this is the SKU as it reads back in a violation.
+
   violationSku: 32,
 } as const;
 
-/** More than this and the component stops being a component. */
 export const MAX_BLOCKS = 4;
 
-/** The fill pass calls this too: one past the cap never renders, so nothing is worth reserving for it. */
 export function capBlocks(blocks: Block[]): Block[] {
   return blocks.slice(0, MAX_BLOCKS);
 }
 
 export interface ReconcileResult {
   spec: GeneratedSpec;
-  /** True when something survived that is worth rendering. */
+
   isUsable: boolean;
-  /** Machine-readable notes on what was removed or changed, for evaluation. */
+
   violations: string[];
 }
 
@@ -50,35 +41,19 @@ function clamp(value: string, limit: number): string {
   const collapsed = value.trim().replace(/\s+/g, ' ');
   if (collapsed.length <= limit) return collapsed;
 
-  // The ellipsis counts against the limit, so leave room for it.
   const cut = collapsed.slice(0, limit - 1);
   const lastSpace = cut.lastIndexOf(' ');
   const base = lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut;
   return `${base.replace(/[.,;:!?-]+$/, '')}…`;
 }
 
-function clampNullable(value: string | null, limit: number): string | null {
-  if (value === null) return null;
-  const clamped = clamp(value, limit);
-  return clamped.length === 0 ? null : clamped;
-}
-
 interface Allowlist {
   allowed: Set<string>;
   blocked: Set<string>;
-  /** A bundle is placed whole, so it checks this narrower set. See `refusedEverywhere`. */
+
   blockedInBundle: Set<string>;
 }
 
-/**
- * A thumbs-down, and the product on the screen right now. No block may hold one
- * of these, a bundle included.
- *
- * Read from the payload rather than the digest on purpose. `DIGEST_LIMITS`
- * trims each history to what fits in a prompt, and a shopper with thirteen
- * dislikes would otherwise be shown the thirteenth. The cap exists to bound
- * what the model is told, not what the shopper may be shown.
- */
 function refusedEverywhere(input: TrackingInput): Set<string> {
   const refused = new Set<string>();
   for (const signal of input.signals.dislikes) refused.add(signal.sku);
@@ -87,17 +62,6 @@ function refusedEverywhere(input: TrackingInput): Set<string> {
   return refused;
 }
 
-/**
- * SKUs that must never be recommended, whatever chose them.
- *
- * Everything above plus what the shopper already has, read from the payload for
- * the same reason: a shopper with nine purchases must not be sold the ninth back.
- *
- * Exported because the deterministic selector applies the same rule when it
- * picks. Two copies of "never recommend these" would drift, and the pair that
- * drifted would be the model path and the fallback path — the two whose
- * comparability the whole evaluation depends on.
- */
 export function neverRecommend(input: TrackingInput): Set<string> {
   const { signals } = input;
 
@@ -136,9 +100,6 @@ function verifyBasis(
     case 'complements_purchase':
       return digest.purchasedSkus.length > 0;
     case 'liked_category':
-      // Affinity alone is not enough: it scores the category the shopper is
-      // standing in, and standing somewhere is not liking it. That claim is
-      // `similar_to_current`, which says so honestly.
       return (
         engaged.has(product.category) &&
         digest.categoryAffinity.some((affinity) => affinity.category === product.category)
@@ -146,17 +107,14 @@ function verifyBasis(
     case 'similar_to_current':
       return digest.currentCategory === product.category;
     case 'popular':
-      // Makes no claim about this shopper, so there is nothing to check.
       return true;
   }
 }
 
-/** Anything attested reads as a numeral — ½ ² Ⅲ included, which it reports rather than ignores. */
 const NUMERAL = /[\p{Nd}\p{No}\p{Nl}]/u;
 
 const NO_FACTS: readonly string[] = [];
 
-/** The budget and the de-duplication set are global to a spec, not to a block. */
 function createPlacementTracker(maxItems: number, facts: HostFacts) {
   const placedSkus = new Set<string>();
   const violations: string[] = [];
@@ -182,14 +140,6 @@ function createPlacementTracker(maxItems: number, facts: HostFacts) {
 
 type PlacementTracker = ReturnType<typeof createPlacementTracker>;
 
-/**
- * Clamps, then screens. The cap has to happen here: clamping first can cut the word that
- * makes a claim a claim, so "Ridge picks, only 2 left!" renders past the stock pattern.
- *
- * Three passes, most specific first. Core's patterns name one of the five kinds; `quantity`
- * is the only proof in the stack, every numeral having to be one the shop supplied; `wording`
- * is a second denylist and the weakest, so it answers last.
- */
 function screenClaim(
   value: string | null,
   limit: number,
@@ -202,15 +152,12 @@ function screenClaim(
   const clamped = clamp(value, limit);
   if (clamped.length === 0) return null;
 
-  // Both ways round: clamping collapses whitespace, so "in  stock" only reads as a claim after.
   const kind = claimIn(value) ?? claimIn(clamped);
   if (kind !== null) {
     tracker.record(`unverifiable-claim:${kind}:${field}`);
     return null;
   }
 
-  // Nothing for the quantity layer to weigh without a numeral, whatever the facts say,
-  // and reading the fact list to prove that again per field is most of what this costs.
   const weighed = NUMERAL.test(clamped) ? facts : NO_FACTS;
 
   const result = verify(clamped, { values: weighed, allowedPhrases: ALLOWED_PHRASES });
@@ -226,11 +173,6 @@ function screenClaim(
   return clamped;
 }
 
-/**
- * Emptying a field that cannot be null hands it to the rule that already drops a block,
- * or a whole generation, whose text clamps to nothing — so a banner reading "20% off"
- * disappears rather than rendering blank.
- */
 function screenRequired(
   value: string,
   limit: number,
@@ -240,18 +182,9 @@ function screenRequired(
   return screenClaim(value, limit, field, tracker) ?? '';
 }
 
-/**
- * Does not consume budget — the caller does that once it commits.
- *
- * Order matters. The budget is checked last because it is the least specific cause:
- * these strings are the evaluation signal, and reporting a hallucinated SKU as
- * `budget:dropped` would understate how often the model invents products.
- */
 function rejectionFor(sku: string, allowlist: Allowlist, tracker: PlacementTracker): string | null {
-  // A rejected SKU is whatever the model wrote, and the schema cannot bound it.
   const named = clamp(sku, CLAMP.violationSku);
 
-  // Either hallucinated or out of stock. Either way it cannot render.
   if (!allowlist.allowed.has(sku)) return `unknown-sku:${named}`;
   if (allowlist.blocked.has(sku)) return `blocked-sku:${named}`;
   if (tracker.hasPlaced(sku)) return `duplicate-sku:${named}`;
@@ -278,7 +211,7 @@ function reconcileItems(
     }
 
     const product = candidatesBySku.get(item.sku);
-    // rejectionFor already proved the SKU is an in-stock candidate.
+
     if (!product) continue;
 
     tracker.place(item.sku);
@@ -286,22 +219,17 @@ function reconcileItems(
     const hasSupportedBasis = verifyBasis(item.basis, product, digest, engaged);
     if (!hasSupportedBasis) tracker.record(`unsupported-basis:${item.basis}:${item.sku}`);
 
-    // Our sentence, not the model's. It has to match, so a lookalike is still screened.
     const isOurs = item.reason !== null && ourReasons.get(item.sku) === item.reason;
 
     const own = tracker.factsFor(item.sku);
-    const clampedReason = clampNullable(item.reason, CLAMP.reason);
 
-    // The prose exists to state the basis. If the basis did not hold, the prose
-    // is untrue — and the badge is prose too. "You viewed this" beside a
-    // downgraded pick says the same thing the dropped sentence did.
     let reason: string | null = null;
     let badge: string | null = null;
     if (hasSupportedBasis) {
       reason = isOurs
-        ? clampedReason
+        ? clamp(item.reason ?? '', CLAMP.reason) || null
         : screenClaim(item.reason, CLAMP.reason, `reason:${item.sku}`, tracker, own);
-      // The schema's own example badge was "Back in stock" — a stock claim, and it renders.
+
       badge = screenClaim(item.badge, CLAMP.badge, `badge:${item.sku}`, tracker, own);
     }
 
@@ -317,7 +245,6 @@ function reconcileItems(
   return kept;
 }
 
-// Cart beats views beats category however the counts compare, so they can't be summed.
 interface BundleFit {
   cartHits: number;
   viewedHits: number;
@@ -378,17 +305,6 @@ function chooseBundle(
   return best;
 }
 
-/**
- * The set this shopper should get, decided before anything is placed.
- *
- * The generator needs the answer early, so it can keep the set's products out
- * of the grid and keep room for them. `chooseBundle` stays private: this hands
- * out the choice, not the machinery behind it.
- *
- * `spokenFor` is what the blocks above the bundle block will have placed by the
- * time it is reached. Placing it here first is what makes the two choices agree:
- * a set is only pre-chosen if reconciliation could still reach for it.
- */
 export function bundleForShopper(
   input: TrackingInput,
   digest: SignalDigest,
@@ -403,14 +319,6 @@ export function bundleForShopper(
   return chooseBundle(input.bundles, allowlist, digest, candidatesBySku, tracker);
 }
 
-/**
- * The hero products these blocks will really place.
- *
- * A hero keeps the product the model named — its headline was written about
- * that product — so it spends a slot of the item budget the grid cannot have.
- * One this shopper cannot see is dropped below and spends nothing, so it is not
- * counted here either.
- */
 export function placeableHeroSkus(blocks: readonly Block[], input: TrackingInput): string[] {
   const allowlist = buildAllowlist(input);
 
@@ -443,13 +351,13 @@ function reconcileBlock(
         const rejection = rejectionFor(sku, allowlist, tracker);
         if (rejection) {
           tracker.record(rejection);
-          // A hero without its product is still a legitimate headline.
+
           sku = null;
         } else {
           tracker.place(sku);
         }
       }
-      // A hero with no headline and no product is the empty region every other kind drops for.
+
       const headline = screenRequired(block.headline, CLAMP.headline, 'hero-headline', tracker);
       if (headline.length === 0 && sku === null) {
         tracker.record('empty-block:hero');
@@ -481,7 +389,7 @@ function reconcileBlock(
       return {
         kind: 'grid',
         title: screenClaim(block.title, CLAMP.blockTitle, 'grid-title', tracker),
-        // Never leave a grid wider than it has items to fill.
+
         columns: Math.min(block.columns, Math.max(2, items.length)) as 2 | 3 | 4,
         items,
       };
@@ -549,7 +457,7 @@ function reconcileBlock(
         title: screenClaim(block.title, CLAMP.blockTitle, 'bundle-title', tracker),
         body: screenClaim(block.body, CLAMP.subheadline, 'bundle-body', tracker),
         ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'bundle-cta', tracker),
-        // The model's bundleId is ignored on purpose.
+
         bundleId: chosen.id,
       };
     }
@@ -570,14 +478,7 @@ export function reconcileSpec(
   generated: GeneratedSpec,
   input: TrackingInput,
   digest: SignalDigest,
-  /**
-   * The reason this request wrote itself, by SKU: the host's own `reason` on a
-   * candidate, or the sentence the selector wrote when there was none. Neither is the
-   * model's words, and the deterministic component renders the same sentence unscreened.
-   *
-   * Only `fitToShopper` fills it, so in `per-shopper` mode it is empty and every
-   * reason is the model's, including one that happens to read the same.
-   */
+
   ourReasons: ReadonlyMap<string, string> = new Map(),
 ): ReconcileResult {
   const allowlist = buildAllowlist(input);
@@ -612,7 +513,6 @@ export function reconcileSpec(
     rationale: screenRequired(generated.rationale, CLAMP.rationale, 'rationale', tracker),
   };
 
-  // Recorded separately: no products and no headline are different failures.
   if (!showsAnyProduct(blocks)) tracker.record('unusable:no-products');
   if (spec.headline.length === 0) tracker.record('unusable:no-headline');
   const isUsable = showsAnyProduct(blocks) && spec.headline.length > 0;

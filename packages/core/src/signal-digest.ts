@@ -6,22 +6,9 @@ import type {
   ViewSignal,
 } from './tracking-input.js';
 
-/**
- * Reduces a validated tracking payload to the compact, ordered, bounded view
- * that everything downstream reads.
- *
- * Two jobs:
- *  1. Keep the volatile part of a prompt small and stable. The contract lets a
- *     host send 500 signals per category; a prompt cannot afford them, and the
- *     long tail is noise anyway.
- *  2. Give the deterministic path the same evidence the model gets, so a
- *     degraded render is a weaker version of the same decision rather than an
- *     unrelated one.
- */
-
 export interface CategoryAffinity {
   category: string;
-  /** Unnormalised. Only the ordering is meaningful — do not show this to anyone. */
+
   score: number;
 }
 
@@ -58,14 +45,9 @@ export interface SignalDigest {
   categoryAffinity: CategoryAffinity[];
   interactionCounts: InteractionCount[];
 
-  /** True when there is no behavioural evidence to personalise on. */
   isColdStart: boolean;
 }
 
-/**
- * How much of each signal category survives into the digest. Chosen to keep the
- * per-shopper part of a prompt in the low hundreds of tokens.
- */
 export const DIGEST_LIMITS = {
   liked: 12,
   disliked: 12,
@@ -77,7 +59,6 @@ export const DIGEST_LIMITS = {
   interactionTypes: 8,
 } as const;
 
-/** How much intent each kind of signal implies. */
 const SIGNAL_WEIGHTS = {
   purchase: 5,
   like: 4,
@@ -86,15 +67,8 @@ const SIGNAL_WEIGHTS = {
   dislike: -6,
 } as const;
 
-/**
- * A signal that does not state a weight counts at full strength. This lives in
- * one place on purpose: when the default was written out at each call site, the
- * merge step defaulted to 0 while scoring defaulted to 1, and an unweighted view
- * merged with a `weight: 0.2` view scored as though both were 0.2.
- */
 const effectiveWeight = (signal: { weight?: number | undefined }): number => signal.weight ?? 1;
 
-/** Most recent first. A signal with no timestamp sorts last. */
 function byMostRecent(
   left: { at?: number | undefined },
   right: { at?: number | undefined },
@@ -148,9 +122,7 @@ function computeCategoryAffinity(
   for (const inCart of signals.cart) {
     addScore(categoryOf(inCart, candidatesBySku), SIGNAL_WEIGHTS.cart * effectiveWeight(inCart));
   }
-  // Merged first, deliberately — see `mergeViewsBySku`. Views are noisy and
-  // repeat cheaply, so the tenth view counts for far less than the second, and
-  // log scaling keeps a single obsessive session from drowning out a purchase.
+
   for (const view of mergeViewsBySku(signals.mostViewed)) {
     const scaledViews = Math.log2(1 + view.views);
     addScore(categoryOf(view, candidatesBySku), SIGNAL_WEIGHTS.view * scaledViews * view.weight);
@@ -162,8 +134,6 @@ function computeCategoryAffinity(
     );
   }
 
-  // The category the shopper is standing in right now is itself evidence — for
-  // ranking. It is not evidence that they like it: see `engagedCategories`.
   addScore(input.context.currentCategory, SIGNAL_WEIGHTS.like);
 
   const affinities: CategoryAffinity[] = [];
@@ -177,15 +147,6 @@ function computeCategoryAffinity(
     .slice(0, DIGEST_LIMITS.affinity);
 }
 
-/**
- * Categories this shopper did something in — bought, liked, carted or viewed.
- *
- * Not the same thing as `categoryAffinity`, which also scores the category the
- * page itself is in. That scoring is right for ranking and wrong as evidence:
- * a first-time visitor standing on a tent page has a tent affinity and has
- * never touched a tent, so a sentence claiming they keep coming back to tents
- * is checked against this instead.
- */
 export function engagedCategories(input: TrackingInput): Set<string> {
   const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
   const { signals } = input;
@@ -209,16 +170,6 @@ interface MergedView extends ViewedProduct {
   weight: number;
 }
 
-/**
- * Collapses every view record for one SKU into a single running total.
- *
- * This has to happen before any scoring. A host is free to emit one record per
- * page view rather than a running count, and scoring each record separately
- * would let thirty `views: 1` records outweigh one `views: 30` record six times
- * over, defeating the sub-linear scaling in `computeCategoryAffinity` entirely.
- * Merging first makes the score depend on how much someone looked, not on how
- * their tracking pipeline happens to batch.
- */
 function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
   const totalsBySku = new Map<string, MergedView>();
 
@@ -248,13 +199,9 @@ function mostViewedProducts(views: ViewSignal[]): ViewedProduct[] {
     .toSorted((left, right) => right.views - left.views)
     .slice(0, DIGEST_LIMITS.viewed);
 
-  const products: ViewedProduct[] = [];
-  for (const merged of top) {
-    const product: ViewedProduct = { sku: merged.sku, views: merged.views };
-    if (merged.dwellMs !== undefined) product.dwellMs = merged.dwellMs;
-    products.push(product);
-  }
-  return products;
+  return top.map(({ sku, views: count, dwellMs }) =>
+    dwellMs === undefined ? { sku, views: count } : { sku, views: count, dwellMs },
+  );
 }
 
 function countByInteractionType(interactions: Interaction[]): InteractionCount[] {
@@ -281,8 +228,6 @@ export function buildDigest(input: TrackingInput): SignalDigest {
   const cartSkus = recentUniqueSkus(signals.cart, DIGEST_LIMITS.cart);
   const topViewed = mostViewedProducts(signals.mostViewed);
 
-  // Searches say what a shopper wants; they do not say they engaged with any
-  // product, so they do not lift a shopper out of cold start on their own.
   const evidenceCount =
     likedSkus.length +
     dislikedSkus.length +
@@ -316,13 +261,9 @@ export function buildDigest(input: TrackingInput): SignalDigest {
   };
 }
 
-// Everything the cohort key leaves out has to leave the prompt too, or the
-// first shopper's searches and history end up shaping copy that is cached and
-// served to everyone else in their cohort.
 export function toCohortDigest(digest: SignalDigest): SignalDigest {
   const top = digest.categoryAffinity[0];
 
-  // Listed rather than spread, so what survives is the thing you read.
   const cohort: SignalDigest = {
     userId: 'cohort',
     isReturning: false,

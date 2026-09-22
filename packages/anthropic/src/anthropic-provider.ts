@@ -8,35 +8,20 @@ import type {
 
 export interface AnthropicProviderOptions {
   apiKey: string;
-  /** Defaults to the current Claude model this package was written against. */
+
   model?: string;
   maxTokens?: number;
   baseUrl?: string;
-  /**
-   * Required when the key is identity-linked rather than workspace-scoped —
-   * such a key belongs to a person across several workspaces, so the API cannot
-   * infer which one a request acts in and rejects it with a 400.
-   */
+
   workspaceId?: string;
-  /**
-   * Sent as the request's `thinking`. Defaults to `{ type: 'disabled' }`,
-   * because core budgets 1500ms for the whole call and a model that reasons
-   * before answering does not finish inside it. Pass `null` to send nothing,
-   * which is what a model that rejects an explicit `disabled` needs, and raise
-   * `modelTimeoutMs` to match when you do.
-   */
+
   thinking?: { type: 'adaptive' | 'disabled' } | null;
-  /** Injected so the adapter is testable without a network or an SDK. */
+
   fetch?: typeof globalThis.fetch;
 }
 
 const TOOL_NAME = 'emit_component_spec';
 
-/**
- * A model that reasons before answering draws on the same output budget as the
- * tool call, and a cap close to what a spec needs leaves no room for it. The
- * default is well above a typical spec's size rather than tuned to it.
- */
 const DEFAULT_MAX_TOKENS = 8192;
 
 interface ToolUseBlock {
@@ -69,23 +54,12 @@ function isToolUseBlock(candidate: unknown): candidate is ToolUseBlock {
   );
 }
 
-/**
- * Adapts the Anthropic Messages API to `ComponentProvider`.
- *
- * The tool schema is derived from the schema core exports rather than restated
- * here: a second copy is a second vocabulary, and the drift would throw below
- * and reach the generator as `provider-error` events.
- */
 export function createAnthropicProvider(options: AnthropicProviderOptions): ComponentProvider {
   const model = options.model ?? 'claude-sonnet-5';
   const thinking =
     options.thinking === undefined ? { type: 'disabled' as const } : options.thinking;
   const call = options.fetch ?? globalThis.fetch;
-  // Trimmed so a caller-supplied `baseUrl` ending in `/` cannot turn into
-  // `//v1/messages`. Done with a loop rather than `/\/+$/`: that pattern
-  // backtracks on a string of many trailing slashes, which is a denial of
-  // service in a published package even though the value comes from the caller
-  // rather than from a request.
+
   let baseUrl = options.baseUrl ?? 'https://api.anthropic.com';
   while (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
@@ -95,10 +69,6 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
     model,
 
     async generate(request: ProviderRequest): Promise<ProviderResult> {
-      // The half of obligation three that `fetch` does not cover. The real
-      // `fetch` rejects an already-aborted signal on its own, but `fetch` is an
-      // injected seam here, and a caller's own transport has no such duty — so
-      // without this, a call the caller has already given up on goes out.
       request.signal.throwIfAborted();
 
       const response = await send(call, `${baseUrl}/v1/messages`, {
@@ -109,26 +79,20 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
           'anthropic-version': '2023-06-01',
           ...(options.workspaceId ? { 'anthropic-workspace-id': options.workspaceId } : {}),
         },
-        // The caller's deadline, handed straight to the transport: the contract
-        // asks an adapter to stop, not merely to stop caring about the answer.
+
         signal: request.signal,
         body: JSON.stringify({
           model,
           max_tokens: maxTokens,
           ...(thinking ? { thinking } : {}),
-          // Marked as the cached prefix. Anything per-shopper interpolated here
-          // would destroy the prompt cache hit rate.
+
           system: [{ type: 'text', text: request.system, cache_control: { type: 'ephemeral' } }],
           messages: [{ role: 'user', content: request.user }],
           tools: [
             {
               name: TOOL_NAME,
               description: 'Return the component specification.',
-              // "input" — a tool's input_schema describes what the model must
-              // produce as the tool call's argument, not core's own output. The
-              // two are not the same: "output" carries additionalProperties:
-              // false on every block and "input" does not. Pinned in
-              // tests/tool-schema.test.ts.
+
               input_schema: z.toJSONSchema(request.schema, { io: 'input' }),
             },
           ],
@@ -137,9 +101,6 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       });
 
       if (!response.ok) {
-        // Status and the vendor's error category only. Its message quotes the
-        // request back, and for this framework that can be a shopper's own search
-        // terms — which an adopter's `console.error(err)` would then capture.
         const category = await errorCategory(response);
 
         throw new Error(`anthropic responded ${response.status}${category}`);
@@ -147,9 +108,6 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
 
       const parsed: unknown = await response.json();
 
-      // `response.json()` yields whatever the body held, and `null` is valid
-      // JSON — reading `stop_reason` off it would throw a TypeError naming this
-      // adapter rather than the vendor that sent it.
       if (typeof parsed !== 'object' || parsed === null) {
         throw new Error(
           `anthropic returned ${parsed === null ? 'null' : typeof parsed}, not an object`,
@@ -162,9 +120,6 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
         stop_reason?: string;
       };
 
-      // Before the tool-block lookup: both are ordinary 200s with no tool_use,
-      // and reporting them as "no tool use" blames the model for a budget or a
-      // policy this adapter controls.
       if (body.stop_reason === 'max_tokens') {
         throw new Error(
           `anthropic stopped at the max_tokens budget (${maxTokens}) before returning a tool use`,
@@ -174,9 +129,6 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
         throw new Error('anthropic refused to answer (stop_reason: refusal)');
       }
 
-      // `content` and each of its entries are untrusted shapes from here on:
-      // a malformed response should name the vendor, not crash on the
-      // adapter's own `.find`/`.type` access.
       const blocks = Array.isArray(body.content) ? body.content : [];
       const block = blocks.find(isToolUseBlock);
 
@@ -184,9 +136,6 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
         throw new Error(`anthropic returned no ${TOOL_NAME} tool use`);
       }
 
-      // Parsed against the caller's own schema. generatedSpecSchema has no
-      // refinements, so this catches type and enum violations — a block kind
-      // outside the closed set, a non-string headline — not refinement logic.
       const asSent = request.schema.safeParse(block.input);
       const usable = asSent.success ? asSent : request.schema.safeParse(onlyValue(block.input));
 
@@ -206,20 +155,10 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
   };
 }
 
-/**
- * Calls the transport, and says what went wrong when it never answered.
- *
- * `fetch` reports every transport fault as the same `TypeError: fetch failed`
- * and hides the reason in `cause` — so a refused connection, a DNS failure and
- * a socket reset are indistinguishable in a log. An operator needs to tell
- * those apart, and none of them carries request content.
- */
 async function send(call: typeof globalThis.fetch, url: string, init: RequestInit) {
   try {
     return await call(url, init);
   } catch (error) {
-    // The caller's own deadline. It means something specific upstream, so it
-    // travels unchanged.
     if (init.signal?.aborted) throw error;
 
     const cause = error instanceof Error ? (error.cause ?? error) : error;
@@ -232,15 +171,12 @@ async function send(call: typeof globalThis.fetch, url: string, init: RequestIni
   }
 }
 
-/** The vendor's error category, never its message — the message quotes the request. */
 async function errorCategory(response: Response): Promise<string> {
   try {
     const body: unknown = JSON.parse(await response.text());
     const type = (body as { error?: { type?: unknown } })?.error?.type;
     return typeof type === 'string' ? ` (${type})` : '';
   } catch {
-    // A body that is unreadable or not JSON tells us nothing extra. The status
-    // is still in the message.
     return '';
   }
 }
@@ -248,8 +184,6 @@ async function errorCategory(response: Response): Promise<string> {
 function toUsage(usage: Record<string, unknown> | undefined): TokenUsage | undefined {
   if (!usage) return undefined;
 
-  // A JSON body is untrusted: `"input_tokens": "11"` must not become part of
-  // a cost figure that downstream code adds instead of concatenates.
   const numberAt = (key: string): number | undefined => {
     const value = usage[key];
     return typeof value === 'number' ? value : undefined;

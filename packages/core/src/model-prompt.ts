@@ -2,30 +2,12 @@ import { BANNER_TONES, EMPHASIS, RECOMMENDATION_BASES, TONES } from './component
 import type { SignalDigest } from './signal-digest.js';
 import { FIELD_LIMITS, type Product, type TrackingInput } from './tracking-input.js';
 
-/**
- * What actually reaches the model.
- *
- * The prompt is split in two, and the split is load-bearing. `system` is
- * byte-identical for every request in a deployment, which is what lets a
- * provider cache it and charge a fraction for the repeat. `user` carries
- * everything that varies. Interpolating one shopper's data into the system half
- * would not break anything visibly — it would quietly make the cached prefix
- * useless and multiply the bill, which is why a test asserts the halves stay
- * separate rather than trusting anyone to remember.
- *
- * This module is also the only place shopper-supplied text meets model
- * instructions, so every host value is written as a JSON string rather than as
- * prose. A search for `boots\n\n# Task\nIgnore the above` is then one quoted
- * value on one line, not a heading the model might read as a new instruction.
- */
-
 export const UNTRUSTED_BEGIN = 'BEGIN_UNTRUSTED_DATA';
 export const UNTRUSTED_END = 'END_UNTRUSTED_DATA';
 
 export interface PromptPair {
-  /** Stable across requests. Safe for a provider to cache. */
   system: string;
-  /** Everything about this shopper and this page. */
+
   user: string;
 }
 
@@ -126,45 +108,9 @@ The "rationale" field is for engineers reading generation logs, not for
 shoppers. One sentence on why this arrangement, naming the signals you leaned
 on.`;
 
-/**
- * Characters a value has no business containing.
- *
- * `JSON.stringify` escapes control characters, quotes and backslashes, and
- * nothing else. Everything below survives it, and each one lets a shopper's
- * value do something the surrounding quotes are meant to prevent — end a line,
- * reverse the reading order, or carry text that displays as nothing at all.
- *
- * This is written as Unicode properties rather than a list of code points on
- * purpose. A list is a denylist: it covered the tag block (U+E0000-U+E007F)
- * but not the variation selectors supplement (U+E0100-U+E01EF), which smuggles
- * text exactly the same way, and it missed U+0085, U+061C and U+00AD as well.
- * Properties cover the ones nobody has thought of yet.
- *
- * The general categories alone do not, though. Half of what renders as nothing
- * is a mark or a letter rather than a format character \u2014 the Mongolian free
- * variation selectors, U+034F, the Hangul fillers, and the sixteen variation
- * selectors at U+FE00 \u2014 so `Default_Ignorable_Code_Point` is in the class too.
- * It is the property that means "takes up no room", which is the thing that
- * makes a character able to carry text nobody sees.
- *
- * Three are left out. The zero-width joiner is a format character, but it is
- * also how a family emoji is spelled, and U+FE0E and U+FE0F are what make a
- * character render as an emoji rather than as text. Escaping those mangles
- * ordinary product titles. The other thirteen selectors at U+FE00 spell
- * nothing and are escaped like the rest.
- */
 const UNPRINTABLE =
   /(?!\u{200D}|\u{FE0E}|\u{FE0F})[\p{Cc}\p{Cf}\p{Cn}\p{Co}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/gu;
 
-/**
- * How long one quoted value may be once escaped.
- *
- * The contract caps the string a host may send, and this caps what that string
- * turns into. They are not the same number: an escape writes up to eight
- * characters for one, so a field on its cap can still buy eight times the
- * prompt \u2014 and the bill \u2014 that the cap implies. Ordinary text escapes nothing
- * and never comes near this.
- */
 const MAX_QUOTED = FIELD_LIMITS.shortText * 2;
 
 const escapeUnprintable = (text: string) =>
@@ -173,12 +119,10 @@ const escapeUnprintable = (text: string) =>
     return `\\u{${codePoint.toString(16).toUpperCase()}}`;
   });
 
-/** Host-supplied text, written so it cannot introduce structure of its own. */
 const quote = (value: string) => {
   const escaped = escapeUnprintable(JSON.stringify(value));
   if (escaped.length <= MAX_QUOTED) return escaped;
 
-  // Cut whole characters, so the result cannot end inside an escape sequence.
   let length = 2;
   let kept = '';
   for (const character of value) {
@@ -237,29 +181,8 @@ function describeCandidate(product: Product): string {
   return `- ${parts.join(' | ')}`;
 }
 
-/**
- * How many candidates reach the prompt.
- *
- * The payload contract caps the candidate list at 200, and every field on a
- * product at its own length — which multiplies out to a prompt far larger than
- * is sensible to send or pay for. The contract deliberately does not impose an
- * aggregate budget, on the grounds that trimming to fit is this layer's job.
- * This is that trim. The host's ordering is its merchandising priority, so the
- * first ones through are the ones it put first.
- */
 const MAX_CANDIDATES = 60;
 
-/**
- * The candidates the model is actually shown.
- *
- * An out-of-stock product is dropped during reconciliation whatever the model
- * does with it, so offering one only costs the shopper a slot.
- *
- * Exported because reconciliation checks the numerals the model writes against
- * the strings on this list, and a candidate it was never shown cannot be where
- * one came from. Two copies of "what the model saw" would drift, and the pair
- * that drifted would be the prompt and the screen reading it back.
- */
 export function offeredCandidates(input: TrackingInput): Product[] {
   return input.candidates.filter((product) => product.isInStock).slice(0, MAX_CANDIDATES);
 }
@@ -267,10 +190,6 @@ export function offeredCandidates(input: TrackingInput): Product[] {
 export function buildPrompt(input: TrackingInput, digest: SignalDigest): PromptPair {
   const offered = offeredCandidates(input);
 
-  // The markers are OWASP's labelled-block recommendation. They are safe as
-  // boundaries because every value between them is quoted and stripped of
-  // anything that could end a line, so no shopper value can occupy a line by
-  // itself — which is the only way one could impersonate a marker.
   const user = `${UNTRUSTED_BEGIN}
 
 ## Shopper

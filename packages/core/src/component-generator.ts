@@ -28,52 +28,14 @@ import {
   type TrackingInputDraft,
 } from './tracking-input.js';
 
-/**
- * Turns one tracking payload into one renderable component.
- *
- * Everything else in this package is a piece of that sentence; this module is
- * the order they go in. It is deliberately the only place that knows the whole
- * sequence, and it is written as a straight line so the sequence is readable:
- *
- *   validate → digest → cache → generate → reconcile → render
- *
- * The single promise it makes to a caller is that `generate` always returns
- * something renderable. A model that is slow, refusing, erroring, rate-limited
- * or simply not configured produces the deterministic component instead. The
- * only way it rejects is a malformed payload, which is a caller bug and should
- * be loud.
- */
-
-/**
- * Reported exactly once per call to `generate`, whatever happened.
- *
- * One flat shape rather than a variant per outcome, because the numbers the
- * evaluation needs are ratios over all calls — hit rate, fallback share, model
- * calls and cost per thousand views. A variant that some callers do not emit
- * makes every one of those ratios wrong by however many it skipped, which is
- * what happened when requests that joined an in-flight generation reported
- * nothing at all.
- */
 export interface GenerationEvent {
-  /** Null when no key was computed, which means no provider was configured. */
   key: string | null;
   source: SpecSource;
-  /** Wall-clock milliseconds for the whole call. */
+
   elapsedMs: number;
-  /**
-   * True for the caller that sent the request, on every outcome — including a
-   * call that timed out, errored or came back unparseable. Requests that joined
-   * an in-flight generation share its answer and its usage figures, so cost
-   * must be summed over this flag rather than over every event.
-   *
-   * It counts requests sent, which is an upper bound on requests billed: an
-   * adapter that throws before it reaches the vendor looks the same from here
-   * as one that throws after. An upper bound is the useful direction — the
-   * calls that produce nothing are the ones worth seeing, and reporting them as
-   * no call at all hides them completely.
-   */
+
   calledModel: boolean;
-  /** What reconciliation removed. Absent when no spec was reconciled. */
+
   violations?: string[];
   usage?: TokenUsage;
   degradedReason?: DegradedReason;
@@ -82,47 +44,24 @@ export interface GenerationEvent {
 }
 
 export interface ComponentGeneratorOptions {
-  /**
-   * Omit to run without a model. That is a supported configuration rather than
-   * a stub: it is the control arm of the benchmark, and the right setting for
-   * anyone who has not yet decided on a provider.
-   */
   provider?: ComponentProvider | null;
-  /** Defaults to an in-process cache. Pass `createNullSpecCache()` to disable. */
+
   cache?: SpecCache;
-  /**
-   * How long the model gets. Past this the deterministic component renders and
-   * the request is aborted. Defaults to 1500ms.
-   */
+
   modelTimeoutMs?: number;
-  /**
-   * How long the cache gets. The shipped caches cannot exceed it, but the store
-   * is a port a host implements — a hung Redis read on the render path would
-   * hold the page open, which is exactly what this module exists to prevent.
-   */
+
   cacheTimeoutMs?: number;
-  /**
-   * 'cohort' shares one generated component between shoppers who look alike and
-   * fills in each shopper's own products. 'per-shopper' generates for the
-   * individual, which is what the benchmark compares against. Defaults to
-   * 'cohort'.
-   */
+
   generation?: 'cohort' | 'per-shopper';
-  /**
-   * How the products are ordered. 'signals' scores each candidate from this
-   * shopper's signals. 'given' keeps the order you sent, for a shop whose own
-   * ranking is better than four weights. Either way the exclusions and the
-   * stock check still apply, and each product still carries a basis
-   * reconciliation can verify. Defaults to 'signals'.
-   */
+
   rank?: RankOrder;
-  /** Observability. Never allowed to break a render. */
+
   onEvent?: (event: GenerationEvent) => void;
 }
 
 export interface ComponentGenerator {
   generate(input: TrackingInputDraft): Promise<ComponentSpec>;
-  /** The deterministic component, without consulting a model or a cache. */
+
   generateDeterministic(input: TrackingInputDraft): ComponentSpec;
 }
 
@@ -133,12 +72,6 @@ export class TimeoutError extends Error {
   }
 }
 
-/**
- * Once the deadline has fired the caller is told so, whatever the race actually
- * settled with: a provider honouring its half of the contract rejects from
- * inside the `abort()` below, so its rejection reaches the race first and the
- * deadline's own never wins.
- */
 async function withinBudget<T>(
   label: string,
   milliseconds: number,
@@ -182,7 +115,6 @@ function createSingleFlight() {
   };
 }
 
-/** A cache entry is no more trustworthy than model output, so it is parsed too. */
 const cachedSpecSchema = z.object({
   spec: generatedSpecSchema,
   generatedAt: z.number(),
@@ -193,24 +125,11 @@ interface CacheRead {
   entry?: CachedSpec;
 }
 
-/** `spec` is null when the answer did not satisfy the schema. `usage` is carried either way: the call was still billed. */
 interface ModelCall {
   spec: GeneratedSpec | null;
   usage?: TokenUsage;
 }
 
-interface ModelAnswer extends ModelCall {
-  spec: GeneratedSpec;
-}
-
-/**
- * The arithmetic has to hold whatever order the model put the blocks in, so it
- * is written as one sum over the whole spec rather than as a running budget:
- * the grid gets `maxItems` minus every distinct product the set and the heroes
- * will place. Reconciliation then reaches the same set this did — it can only
- * ever have more placed than the pre-choice assumed, and never one of the set's
- * own products.
- */
 function fitCohortSpec(
   spec: GeneratedSpec,
   input: TrackingInput,
@@ -231,8 +150,6 @@ function fitCohortSpec(
   }
   if (!hasBundleBlock) return fitToShopper(spec, picks, digest.maxItems);
 
-  // Only the heroes above the bundle block are placed when it is reached, so
-  // they are all the choice may account for.
   const chosen = bundleForShopper(input, digest, placeableHeroSkus(aboveBundle, input));
   if (!chosen) return fitToShopper(spec, picks, digest.maxItems);
 
@@ -240,7 +157,7 @@ function fitCohortSpec(
   for (const sku of placeableHeroSkus(blocks, input)) spokenFor.add(sku);
 
   const roomLeft = digest.maxItems - spokenFor.size;
-  // A set is worth showing, but not at the cost of an empty grid.
+
   if (roomLeft <= 0) return fitToShopper(spec, picks, digest.maxItems);
 
   const forGrid: ProductPick[] = [];
@@ -249,13 +166,6 @@ function fitCohortSpec(
   }
 
   return fitToShopper(spec, forGrid, roomLeft);
-}
-
-function withProvenance(
-  spec: GeneratedSpec,
-  provenance: Omit<ComponentSpec, keyof GeneratedSpec | 'specVersion'>,
-): ComponentSpec {
-  return { ...spec, specVersion: SPEC_VERSION, ...provenance };
 }
 
 export function createComponentGenerator(
@@ -273,9 +183,7 @@ export function createComponentGenerator(
     if (!options.onEvent) return;
     try {
       options.onEvent(event);
-    } catch {
-      // A broken metrics hook must not take down a page.
-    }
+    } catch {}
   };
 
   const buildDeterministic = (
@@ -297,7 +205,9 @@ export function createComponentGenerator(
       degradedReason,
     });
 
-    return withProvenance(buildFallbackSpec(input, digest, { rank }), {
+    return {
+      ...buildFallbackSpec(input, digest, { rank }),
+      specVersion: SPEC_VERSION,
       slot: digest.slot,
       source: 'fallback',
       generatedAt: finishedAt,
@@ -305,7 +215,7 @@ export function createComponentGenerator(
       provider: null,
       model: null,
       degradedReason,
-    });
+    };
   };
 
   const readCache = async (key: string): Promise<CacheRead> => {
@@ -314,26 +224,16 @@ export function createComponentGenerator(
       const parsed = cachedSpecSchema.safeParse(stored);
       return parsed.success ? { outcome: 'hit', entry: parsed.data } : { outcome: 'miss' };
     } catch (error) {
-      // A store that is down or slow degrades to generating, not to an error page.
       return { outcome: error instanceof TimeoutError ? 'timeout' : 'error' };
     }
   };
 
-  /** The `Promise.resolve` wrapper catches a store that throws synchronously rather than rejecting. */
   const storeInBackground = (key: string, cached: CachedSpec): void => {
     void Promise.resolve()
       .then(() => cache.set(key, cached))
-      .catch(() => {
-        // A store that cannot be written is not a reason to fail a render.
-      });
+      .catch(() => {});
   };
 
-  /**
-   * Deliberately does not decide whether the answer is usable. That depends on
-   * the asking shopper's live facts — stock, dislikes, what is in their basket
-   * — and none of those are in the cache key, so a verdict reached here would
-   * be handed to every request that joined this one.
-   */
   const askModel = async (
     active: ComponentProvider,
     input: TrackingInput,
@@ -345,7 +245,6 @@ export function createComponentGenerator(
       active.generate({ system, user, schema: generatedSpecSchema, signal }),
     );
 
-    // Providers return parsed objects, but the shape is still model output.
     const parsed = generatedSpecSchema.safeParse(result.spec);
 
     return {
@@ -363,8 +262,7 @@ export function createComponentGenerator(
 
     async generate(draft) {
       const startedAt = Date.now();
-      // Deliberately unguarded: an invalid payload is a caller bug, not a
-      // degraded render.
+
       const input = parseTrackingInput(draft);
       const digest = buildDigest(input);
 
@@ -382,16 +280,14 @@ export function createComponentGenerator(
       const read = await readCache(key);
       const cached = read.entry;
       let calledModel = false;
-      let answer: ModelAnswer;
-      // When the model produced this, not when it was served.
+      let answer: { spec: GeneratedSpec; usage?: TokenUsage };
+
       let generatedAt: number;
 
       if (cached) {
         answer = { spec: cached.spec };
         generatedAt = cached.generatedAt;
       } else {
-        // Asked before joining, because by the time the shared promise settles
-        // the entry is gone and there is no way to tell a leader from a follower.
         calledModel = !singleFlight.isRunning(key);
 
         let call: ModelCall;
@@ -419,16 +315,9 @@ export function createComponentGenerator(
         answer = { spec: call.spec, ...(call.usage ? { usage: call.usage } : {}) };
         generatedAt = Date.now();
 
-        // Stored unreconciled on purpose, and stored even when it is unusable
-        // for this shopper. Reconciliation narrows a spec to one shopper's live
-        // facts, and those move independently of the key — a product can sell
-        // out and come back without the candidate list changing.
         if (calledModel) storeInBackground(key, { spec: answer.spec, generatedAt });
       }
 
-      // A cohort spec names products chosen for whoever asked first, and every
-      // reason under one of them is written here rather than by the model. In
-      // per-shopper mode this stays empty and every reason is screened.
       const { spec: served, ourReasons } =
         generation === 'cohort'
           ? fitCohortSpec(answer.spec, input, digest, rank)
@@ -456,14 +345,16 @@ export function createComponentGenerator(
         ...(answer.usage ? { usage: answer.usage } : {}),
       });
 
-      return withProvenance(reconciled.spec, {
+      return {
+        ...reconciled.spec,
+        specVersion: SPEC_VERSION,
         slot: digest.slot,
         source,
         generatedAt,
         latencyMs: finishedAt - startedAt,
         provider: provider.name,
         model: provider.model,
-      });
+      };
     },
   };
 }
