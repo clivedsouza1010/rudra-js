@@ -1,11 +1,3 @@
-/**
- * @rudra-js/core — the contracts and logic that turn one tracking payload into one
- * renderable component specification.
- *
- * Carries no React and no model-vendor SDK, so it can be unit tested in
- * isolation and imported from any server runtime.
- */
-
 export {
   FIELD_LIMITS,
   productSchema,

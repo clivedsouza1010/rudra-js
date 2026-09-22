@@ -10,6 +10,13 @@ break them.
 
 ## [Unreleased]
 
+### Deprecated
+
+- `@rudra-js/core`'s `parseGeneratedSpec` is slated for removal. It is a
+  throwing wrapper that forwards straight to `generatedSpecSchema.parse`, and
+  nothing in the repo calls it. Use the exported `generatedSpecSchema` directly
+  if you want throwing behaviour, or `safeParseGeneratedSpec` if you do not.
+
 ## [0.6.0] - 2026-09-20
 
 ### Added

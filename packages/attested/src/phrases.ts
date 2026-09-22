@@ -1,6 +1,5 @@
 import { stripInvisible, stripMarks } from './hidden.js';
 
-/** Claims with no value behind them. Stored in the form `normalisePhrasing` produces. */
 export const BANNED_PHRASES: readonly string[] = [
   'cheap',
   'cheaper',
@@ -85,11 +84,6 @@ export const BANNED_PHRASES: readonly string[] = [
   'money back',
 ];
 
-/**
- * Letters that render as a Latin letter but are not one. Folded so a Cyrillic о in
- * "in stоck" cannot walk a claim past its own entry on the list. Both the text and
- * the phrase are folded, so a genuine Cyrillic phrase still matches itself.
- */
 const CONFUSABLES: Record<string, string> = {
   а: 'a',
   в: 'b',
@@ -122,20 +116,14 @@ const CONFUSABLES: Record<string, string> = {
   ϲ: 'c',
 };
 
-/** A run of whitespace holding one of these is a break the shopper sees. */
 const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
 
-/** One shape for text and phrases, so a hyphen or a stray mark cannot hide a claim. */
 export function normalisePhrasing(text: string): string {
-  // Marks come off after composition, so an accented e keeps its accent while an
-  // overline, which composes with nothing, does not hide `free` from its own entry.
   const lowered = stripMarks(stripInvisible(text).normalize('NFKC').toLowerCase().normalize('NFC'));
 
   let folded = '';
   for (const char of lowered) folded += CONFUSABLES[char] ?? char;
 
-  // A line break survives as itself. Matching reads straight through it, and only
-  // the allowance in verify.ts cares, because it will not forgive across a break.
   return folded
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[-_\u2010-\u2015]+/g, ' ')
@@ -151,32 +139,24 @@ function isGlued(char: string | undefined): boolean {
 
 export interface Span {
   start: number;
-  /** The last character of the match, not one past it. */
+
   end: number;
 }
 
 export interface Indexed {
-  /** The text as it was handed in, which is what spans index and the word gap reads. */
   text: string;
-  /** The same characters with the gaps dropped, which is what matching runs against. */
+
   haystack: string;
-  /** Where each character of `haystack` really sat in `text`. */
+
   spots: number[];
 }
 
-/**
- * Build this once and read every phrase off it. The text must already be normalised.
- *
- * Matching runs with every space dropped, because 送料 無料 is 送料無料 to anyone and a
- * space is free. `spots` carries each character back to where it really sat, so the
- * word-gap guard still reads the neighbours the shopper sees.
- */
 export function indexPhrasing(text: string): Indexed {
   const tight: string[] = [];
   const spots: number[] = [];
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index] ?? '';
-    // A line break reads like a space here, so a claim split over two lines is caught.
+
     if (char === ' ' || char === '\n') continue;
     tight.push(char);
     spots.push(index);
@@ -185,9 +165,6 @@ export function indexPhrasing(text: string): Indexed {
   return { text, haystack: tight.join(''), spots };
 }
 
-/** Spans index the text the index was built from. The phrase must already be normalised. */
-// The word-gap rule only guards an ASCII edge, so `cheap` misses `cheapskate`
-// while a Japanese phrase — which has no word gaps to find — still matches.
 export function spansIn(indexed: Indexed, phrase: string): Span[] {
   const { text, haystack, spots } = indexed;
 
@@ -206,7 +183,7 @@ export function spansIn(indexed: Indexed, phrase: string): Span[] {
     const start = spots[at] ?? 0;
     const end = spots[at + needle.length - 1] ?? 0;
     const next = text[end + 1];
-    // A trailing s is a plural, not a different word: `discount` catches `discounts`.
+
     const plural = next === 's' && !isGlued(text[end + 2]);
 
     const before = guardStart && isGlued(text[start - 1]);

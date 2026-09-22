@@ -3,7 +3,6 @@ import type { SignalDigest } from './signal-digest.js';
 import { selectProducts, type SelectOptions, type ProductPick } from './product-selection.js';
 import type { TrackingInput } from './tracking-input.js';
 
-/** A featured lead only reads as deliberate when something follows it. */
 const MIN_PICKS_FOR_A_FEATURED_LEAD = 3;
 
 function headlineFor(digest: SignalDigest): { headline: string; subheadline: string | null } {
@@ -20,7 +19,6 @@ function headlineFor(digest: SignalDigest): { headline: string; subheadline: str
   return { headline: 'You might also like', subheadline: null };
 }
 
-/** Wide enough to fill, never wider. */
 function columnsFor(itemCount: number): 2 | 3 | 4 {
   if (itemCount >= 4) return 4;
   if (itemCount === 3) return 3;
@@ -37,15 +35,6 @@ function toProductReference(pick: ProductPick, index: number, total: number): Pr
   };
 }
 
-/**
- * Builds a renderable spec from signals alone. Never throws. Returns a spec with
- * no blocks only when there is genuinely nothing in stock left to show, which
- * the renderer treats as "render nothing" — an empty recommendation region is
- * worse than none.
- *
- * Reads the same digest and selector the model path does, so a degraded render is
- * a weaker version of the same decision rather than an unrelated one.
- */
 export function buildFallbackSpec(
   input: TrackingInput,
   digest: SignalDigest,

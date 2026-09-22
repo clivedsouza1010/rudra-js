@@ -1,36 +1,5 @@
 import { z } from 'zod';
 
-/**
- * The tracking-input contract — the boundary between the host application and
- * rudra-js.
- *
- * rudra-js does not collect, store, or aggregate anything. The host owns its
- * tracking pipeline (an event stream, a CDP, a warehouse) and hands the
- * framework one JSON object per render. This module is that contract: one
- * schema, validated at the edge, so a malformed payload fails loudly here
- * rather than quietly producing a bad prompt several layers later.
- *
- * Every fixed-shape object below is a `strictObject`, so an unrecognised field
- * is an error rather than being dropped. That matters more than it looks: with
- * a lenient object, a host that misspells `recentSearches` gets a shopper who
- * silently looks like a first-time visitor, and nothing anywhere reports it.
- * The only dynamic shape is `interaction.meta`, which is a record by design.
- */
-
-/**
- * Every free-text field and every array is length-capped.
- *
- * These caps are not cosmetic. Host-supplied strings end up inside the prompt
- * we send to a language model, and a model is billed per token — so an
- * unbounded string is an unbounded bill, and an unbounded array of candidates
- * is the same problem multiplied.
- *
- * What this buys is that no single field is unbounded. It is deliberately not
- * an aggregate budget: the caps multiply out to far more than any context
- * window, because rejecting a large-but-legitimate payload is the wrong
- * response to one. Fitting a payload into a prompt is `digest`'s job, and it
- * trims rather than throws.
- */
 export const FIELD_LIMITS = {
   identifier: 128,
   shortText: 200,
@@ -44,12 +13,10 @@ export const FIELD_LIMITS = {
   bundles: 20,
   localeTag: 35,
   maxItems: 12,
-  // Matches CLAMP.reason in reconciliation: a host reason is rendered in the
-  // same place a model's is, so the same length has to hold.
+
   reason: 120,
 } as const;
 
-/** Assigning this as an object key mutates the prototype instead of the object. */
 const RESERVED_META_KEY = '__proto__';
 
 const MAX_EPOCH_MS = Date.UTC(2100, 0, 1);
@@ -57,32 +24,13 @@ const MAX_EPOCH_MS = Date.UTC(2100, 0, 1);
 const identifier = () => z.string().min(1).max(FIELD_LIMITS.identifier);
 const optionalIdentifier = () => z.string().min(1).max(FIELD_LIMITS.identifier).optional();
 
-/**
- * Epoch milliseconds, used only for recency ordering. Bounded because a
- * negative or year-3000 timestamp does not fail anywhere downstream — it just
- * sorts to one end and silently reorders the shopper's history.
- */
 const epochMs = () => z.number().int().min(0).max(MAX_EPOCH_MS).optional();
 
-/**
- * Whether a path stays on the page's own origin.
- *
- * Read the way a browser reads it, not the way it looks. A browser drops tab,
- * carriage return and newline from a URL before parsing it, and treats a
- * backslash as a slash, so `/\evil.example/x.png` and `/<tab>//evil.example/x.png`
- * both point at someone else's host while passing a plain "starts with one
- * slash" test.
- */
 const isRootRelative = (value: string) => {
   const asParsed = value.replace(/[\t\n\r]/g, '');
   return value.startsWith('/') && /^\/(?![/\\])/.test(asParsed);
 };
 
-/**
- * An absolute http(s) URL, or a root-relative path such as `/images/tr-102.png`.
- * Anything else — a bare word, a `javascript:` URI, a protocol-relative `//host`
- * — is rejected before it can reach an `<img src>`.
- */
 const imageReference = () =>
   z
     .string()
@@ -93,7 +41,6 @@ const imageReference = () =>
       { message: 'expected an http(s) URL or a root-relative path' },
     );
 
-/** A product the generated component is permitted to place. */
 export const productSchema = z.strictObject({
   sku: identifier(),
   title: z.string().min(1).max(FIELD_LIMITS.shortText),
@@ -103,15 +50,10 @@ export const productSchema = z.strictObject({
     .string()
     .regex(/^[A-Z]{3}$/, 'expected a three-letter ISO 4217 code')
     .default('USD'),
-  // This lands in an `<img src>` the host did not write, so the scheme matters:
-  // a bare capped string would accept '' and 'javascript:'. Root-relative paths
-  // are allowed because most catalogs store images that way, and they carry no
-  // scheme to abuse.
+
   imageUrl: imageReference().optional(),
   rating: z.number().min(0).max(5).optional(),
-  // Your phrase for why this product is here, when your own ranking already has
-  // one. It renders as the item's reason and is not screened: these are your
-  // words about your product, like the title, so you stand behind them.
+
   reason: z.string().min(1).max(FIELD_LIMITS.reason).optional(),
   isInStock: z.boolean().default(true),
   tags: z
@@ -121,12 +63,11 @@ export const productSchema = z.strictObject({
 });
 export type Product = z.infer<typeof productSchema>;
 
-/** Base shape for any signal that points at a single SKU. */
 export const skuSignalSchema = z.strictObject({
   sku: identifier(),
   category: optionalIdentifier(),
   at: epochMs(),
-  /** Caller-supplied strength, 0..1. Defaults to 1 when absent. */
+
   weight: z.number().min(0).max(1).optional(),
 });
 export type SkuSignal = z.infer<typeof skuSignalSchema>;
@@ -143,21 +84,12 @@ export const purchaseSignalSchema = skuSignalSchema.extend({
 });
 export type PurchaseSignal = z.infer<typeof purchaseSignalSchema>;
 
-/**
- * `meta` is the one dynamic shape in the contract, so its key is checked before
- * the record is parsed rather than after. Zod builds its result by assigning
- * each key, and assigning `__proto__` sets the prototype instead of adding a
- * key — so the entry would vanish from the parsed output with no error, which
- * is the silent drop this module exists to prevent.
- */
 const metaKeysAreSafe = z.custom<Record<string, string | number | boolean>>(
   (value) =>
     typeof value === 'object' && value !== null && !Object.hasOwn(value, RESERVED_META_KEY),
   { message: `meta may not use the reserved key ${RESERVED_META_KEY}` },
 );
 
-// `z.record` bounds key and value shape but not how many entries a record may
-// carry, so the count is checked separately.
 const metaSchema = metaKeysAreSafe.pipe(
   z
     .record(
@@ -169,11 +101,6 @@ const metaSchema = metaKeysAreSafe.pipe(
     }),
 );
 
-/**
- * Catch-all for everything else the shopper did. `type` is an open vocabulary
- * on purpose — 'scroll_depth', 'wishlist', 'filter_applied', whatever the host
- * already emits — so hosts do not have to map their events onto ours.
- */
 export const interactionSchema = z.strictObject({
   type: identifier(),
   sku: optionalIdentifier(),
@@ -184,23 +111,20 @@ export const interactionSchema = z.strictObject({
 });
 export type Interaction = z.infer<typeof interactionSchema>;
 
-/** Where on the site this component is being rendered. */
 export const renderContextSchema = z.strictObject({
-  /** 'pdp', 'home', 'cart', 'search', or any host-defined surface. */
   surface: identifier(),
-  /** Named placement, e.g. 'below-fold-recommendations'. */
+
   slot: z.string().min(1).max(FIELD_LIMITS.identifier).default('recommendations'),
   currentSku: optionalIdentifier(),
   currentCategory: optionalIdentifier(),
   searchQuery: z.string().max(FIELD_LIMITS.searchQuery).optional(),
-  // One language tag, not the Accept-Language header it is often copied from:
-  // the locale is part of the cohort cache key, so a list makes its own cohort.
+
   locale: z
     .string()
     .max(FIELD_LIMITS.localeTag)
     .regex(/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/, 'expected one language tag, such as en-US')
     .default('en-US'),
-  /** Upper bound on products across the whole generated component. */
+
   maxItems: z.number().int().min(1).max(FIELD_LIMITS.maxItems).default(4),
 });
 export type RenderContext = z.infer<typeof renderContextSchema>;
@@ -219,7 +143,6 @@ export const trackingSignalsSchema = z.strictObject({
 });
 export type TrackingSignals = z.infer<typeof trackingSignalsSchema>;
 
-/** A set the shop sells together. The model never picks or invents one. */
 export const bundleSchema = z.strictObject({
   id: identifier(),
   skus: z
@@ -229,8 +152,7 @@ export const bundleSchema = z.strictObject({
     .refine((skus) => new Set(skus).size === skus.length, {
       message: 'a bundle must not list the same product twice',
     }),
-  // The shop's price for the set — not derived from the parts, so the set says
-  // which money it is in rather than borrowing it from a member.
+
   price: z.number().nonnegative(),
   currency: z
     .string()
@@ -249,17 +171,9 @@ export const trackingInputSchema = z
       isReturning: z.boolean().optional(),
     }),
     context: renderContextSchema,
-    // A payload with no `signals` block at all is the cold-start case, not an error.
+
     signals: trackingSignalsSchema.prefault({}),
-    /**
-     * The only products the generated component may place. Merchandising rules
-     * belong here: whatever the host leaves out cannot be recommended, which is
-     * what makes it impossible to surface a product that does not exist or is not
-     * merchandised for this shopper.
-     *
-     * SKUs must be unique — a duplicate is a host bug that spends prompt budget
-     * twice and invites the same product in two slots.
-     */
+
     candidates: z
       .array(productSchema)
       .min(1)
@@ -270,8 +184,7 @@ export const trackingInputSchema = z
           message: 'candidates must have unique SKUs',
         },
       ),
-    // Ids must be unique — the renderer looks a bundle up by id alone, so a
-    // duplicate would let it draw the wrong set at the wrong price.
+
     bundles: z
       .array(bundleSchema)
       .max(FIELD_LIMITS.bundles)
@@ -295,24 +208,14 @@ export const trackingInputSchema = z
 
 export type TrackingInput = z.infer<typeof trackingInputSchema>;
 
-/** The shape a caller passes in, before defaults are applied. */
 export type TrackingInputDraft = z.input<typeof trackingInputSchema>;
 
-/**
- * The result of a non-throwing parse. Exported so a consumer can type a
- * validation failure without depending on zod directly.
- */
 export type TrackingInputResult = z.ZodSafeParseResult<TrackingInput>;
 
-/**
- * Validates a payload, throwing a `ZodError` if it does not satisfy the
- * contract. An invalid payload is a caller bug, and it should be loud.
- */
 export function parseTrackingInput(value: unknown): TrackingInput {
   return trackingInputSchema.parse(value);
 }
 
-/** Non-throwing variant, for callers that want to inspect the failure. */
 export function safeParseTrackingInput(value: unknown): TrackingInputResult {
   return trackingInputSchema.safeParse(value);
 }
