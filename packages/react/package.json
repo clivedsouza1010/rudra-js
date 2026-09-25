@@ -1,7 +1,7 @@
 {
   "name": "@rudra-js/react",
   "version": "0.6.0",
-  "description": "Renders a rudra component specification as React Server Components",
+  "description": "Renders a rudra component specification with React 18 or 19, on the server or in the browser",
   "keywords": [
     "react",
     "react-server-components",

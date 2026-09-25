@@ -267,8 +267,9 @@ granular one, and you'd end up with a version where some tarballs are attested a
 ## When the tool-schema golden fails
 
 `tests/golden/tool-input-schema.json` is the schema sent to the model as the tool's `input_schema`,
-so it's part of the prompt. zod writes it, and a zod upgrade has already rewritten it once. When the
-test fails:
+so it's part of the prompt. The repo's own zod writes it, and a zod upgrade has already rewritten it
+once. An app on an older zod 4 sends the same schema in different words, and that's expected. When
+the test fails:
 
 1. Run `npm run build` first. The regeneration command the test prints imports
    `packages/core/dist/index.js`, so a stale or missing build regenerates the old schema, or

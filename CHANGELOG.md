@@ -10,6 +10,18 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- The zod peer range in core and anthropic is `^4.0.0`, down from `^4.5.0`.
+  Nothing in either package uses anything newer than 4.0. The floor only fixed
+  how the tool schema is worded, and it shut out every app on zod 4.0 to 4.4.
+  On those, a nullable field in the tool schema is written as `anyOf` instead of
+  a type array, and before 4.1.13 the block list is `anyOf` instead of `oneOf`.
+  Same schema, different wording.
+- The docs no longer say `@rudra-js/react` needs Server Components. It never
+  did: the components have no hooks, and they render the same with
+  `renderToString` or in a client-rendered React 18 or 19 app.
+
 ### Deprecated
 
 - `@rudra-js/core`'s `parseGeneratedSpec` is slated for removal. It is a
