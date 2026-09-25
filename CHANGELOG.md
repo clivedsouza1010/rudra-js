@@ -12,12 +12,16 @@ break them.
 
 ### Changed
 
-- The zod peer range in core and anthropic is `^4.0.0`, down from `^4.5.0`.
+- The zod range in core and anthropic is `^4.0.0`, down from `^4.5.0`.
   Nothing in either package uses anything newer than 4.0. The floor only fixed
   how the tool schema is worded, and it shut out every app on zod 4.0 to 4.4.
   On those, a nullable field in the tool schema is written as `anyOf` instead of
   a type array, and before 4.1.13 the block list is `anyOf` instead of `oneOf`.
   Same schema, different wording.
+- zod is a dependency of core and anthropic rather than a peer. An app no
+  longer needs zod of its own, and an app on zod 3 installs instead of failing
+  with `ERESOLVE`. An app on zod 4 still shares one copy. On zod 3 there are
+  two, and the app's own zod can't be mixed with the exported schemas.
 - The docs no longer say `@rudra-js/react` needs Server Components. It never
   did: the components have no hooks, and they render the same with
   `renderToString` or in a client-rendered React 18 or 19 app.

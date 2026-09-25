@@ -103,17 +103,18 @@ const manifestOf = (packageName) =>
 const DIRECTORY_OF = new Map(PACKAGES.map((name) => [manifestOf(name).name, name]));
 
 /**
- * Everything someone installing this one package ends up with: its peers, and
- * their peers after that, because npm asks for those too. Anything outside this
- * set is something the package never declared.
+ * Everything someone installing this one package ends up with: its dependencies
+ * and peers, and theirs after that, because npm installs those too. Anything
+ * outside this set is something the package never declared.
  */
 const closureOf = (packageName) => {
   const closure = new Set();
   const walk = (directory) => {
-    for (const peer of Object.keys(manifestOf(directory).peerDependencies ?? {})) {
-      if (closure.has(peer)) continue;
-      closure.add(peer);
-      if (DIRECTORY_OF.has(peer)) walk(DIRECTORY_OF.get(peer));
+    const manifest = manifestOf(directory);
+    for (const name of Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies })) {
+      if (closure.has(name)) continue;
+      closure.add(name);
+      if (DIRECTORY_OF.has(name)) walk(DIRECTORY_OF.get(name));
     }
   };
   walk(packageName);
@@ -175,14 +176,15 @@ try {
     run('tar', ['-xzf', join(workspace, filename), '-C', destination, '--strip-components=1']);
   }
 
-  // Peers are the consumer's job to provide, so provide them the way a consumer
-  // does — and derive them from the manifests, because a hardcoded list stops
-  // being the truth the moment someone adds a peer.
-  const peers = PACKAGES.flatMap((packageName) =>
-    Object.keys(manifestOf(packageName).peerDependencies ?? {}),
-  ).filter((name) => !name.startsWith('@rudra-js/'));
+  // Peers are the consumer's job to provide and dependencies are npm's, so
+  // provide both the way an install does — and derive them from the manifests,
+  // because a hardcoded list stops being the truth the moment someone adds one.
+  const external = PACKAGES.flatMap((packageName) => {
+    const manifest = manifestOf(packageName);
+    return Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies });
+  }).filter((name) => !name.startsWith('@rudra-js/'));
 
-  for (const name of new Set([...peers, ...RENDERER, '@types/react', '@types/react-dom'])) {
+  for (const name of new Set([...external, ...RENDERER, '@types/react', '@types/react-dom'])) {
     link(modules, name, join(REPO_ROOT, 'node_modules', name));
   }
 

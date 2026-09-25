@@ -43,14 +43,15 @@ You don't need an API key to get going. Leave the provider out and you'll get th
 component, which is a fully supported setting and the right one until you've settled on a model.
 
 ```sh
-npm install @rudra-js/core @rudra-js/react @rudra-js/attested zod@^4
+npm install @rudra-js/core @rudra-js/react @rudra-js/attested
 ```
 
 A quick heads-up: every package here lives under the `@rudra-js` scope. The unscoped `rudra-js`
 package on npm belongs to someone else, so make sure you include the `@`.
 
-You'll need zod 4. The public API of `@rudra-js/core` _is_ zod schemas, so your app and the
-package have to resolve the same copy of zod, which means a zod 3 app won't install at all.
+You don't need zod yourself. `@rudra-js/core` brings zod 4 as a dependency, and an app already on
+zod 4 shares that copy. An app on zod 3 gets a second copy, and can't mix its own zod with the
+schemas core exports: `productSchema.array()` works, your `z.array(productSchema)` won't.
 
 You'll need React 18 or 19. You don't need Server Components: `@rudra-js/react` is plain React with
 no hooks, so it works as a Server Component, with `renderToString`, or in a client-rendered app.

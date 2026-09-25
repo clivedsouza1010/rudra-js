@@ -6,21 +6,21 @@ component specification.
 ## Install
 
 ```sh
-npm install @rudra-js/core @rudra-js/attested zod@^4
+npm install @rudra-js/core @rudra-js/attested
 ```
 
-Two peer dependencies, for two different reasons.
+`zod` is a dependency, so you don't need it yourself. The public API of this
+package _is_ zod schemas, and an app on any zod 4 shares one copy with it. An
+app on zod 3 gets its own copy alongside ours, and the two don't mix: build on
+the exported schemas with their own methods (`productSchema.array()`) rather
+than your zod's (`z.array(productSchema)`), and read `error.issues` rather than
+checking `instanceof ZodError`. Whichever copy core ends up with writes the tool
+schema we send the model, so its wording shifts a little between releases:
+before 4.5, a nullable field is written as `anyOf` rather than a type array. It
+means the same thing either way.
 
-`zod` is a peer because the public API of this package _is_ zod schemas, so your
-app and the package have to resolve the same copy of zod. **Any zod 4 works**,
-which is what the peer range asks for. The schemas use zod 4 APIs, and
-installing into a zod 3 app fails with `ERESOLVE`, which isn't the most helpful
-error you'll ever read. Your zod writes the tool schema we send the model, so
-its wording shifts a little between releases: before 4.5, a nullable field is
-written as `anyOf` rather than a type array. It means the same thing either way.
-
-`@rudra-js/attested` is a peer for the opposite reason: none of its types cross
-this package's public surface, and you never have to import it. It's a peer so
+`@rudra-js/attested` is a peer dependency, even though none of its types cross
+this package's public surface and you never have to import it. It's a peer so
 there is exactly one denylist in your tree. As a real dependency, an app that
 pins its own copy gets two — we checked, and npm 10.9.4 installs the app's
 version at the top and quietly nests ours under `@rudra-js/core` — and the two
