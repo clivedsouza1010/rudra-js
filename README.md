@@ -54,7 +54,8 @@ zod 4 shares that copy. An app on zod 3 gets a second copy, and can't mix its ow
 schemas core exports: `productSchema.array()` works, your `z.array(productSchema)` won't.
 
 You'll need React 18 or 19. You don't need Server Components: `@rudra-js/react` is plain React with
-no hooks, so it works as a Server Component, with `renderToString`, or in a client-rendered app.
+no hooks, so it works with `renderToString`, in a client-rendered app, and as a Server Component
+where your framework supports them.
 Rendering it on the server is what puts the block in the first HTML response.
 
 You'll also need Node 22.12 or later. Node 20 is end of life, so we don't build or test on it.
