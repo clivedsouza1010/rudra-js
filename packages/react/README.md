@@ -14,7 +14,7 @@ still reads it.
 ## Install
 
 ```sh
-npm install @rudra-js/react @rudra-js/core react zod@^4
+npm install @rudra-js/react @rudra-js/core react
 ```
 
 Both `@rudra-js/core` and `react` are peer dependencies. The specification you pass in comes from
