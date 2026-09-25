@@ -1,6 +1,6 @@
 {
   "name": "@rudra-js/react",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Renders a rudra component specification with React 18 or 19, on the server or in the browser",
   "keywords": [
     "react",
@@ -51,11 +51,11 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@rudra-js/core": "^0.6.0",
+    "@rudra-js/core": "^0.7.0",
     "react": "^18.2.0 || ^19.0.0"
   },
   "devDependencies": {
-    "@rudra-js/core": "0.6.0",
+    "@rudra-js/core": "0.7.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "react": "^19.3.0",
