@@ -1,12 +1,14 @@
 # @rudra-js/react
 
 Renders a component specification from
-[`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core) as React
-Server Components.
+[`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core) with React
+18 or 19.
 
-No client JavaScript. The recommendation area arrives in the initial HTML response and needs no
-hydration, so it never pops in the way a client-fetched recommendation rail does, and a crawler that
-doesn't run JavaScript still reads it.
+The components are plain functions with no hooks, state or effects, so they work as Server
+Components, with `renderToString`, or in a client-rendered app. Rendered on the server, the
+recommendation area arrives in the initial HTML response and needs no client JavaScript, so it never
+pops in the way a client-fetched recommendation rail does, and a crawler that doesn't run JavaScript
+still reads it.
 
 ## Install
 

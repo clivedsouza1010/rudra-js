@@ -12,8 +12,8 @@ in a grid or carousel are chosen per request from that list, not by the model.
 
 ![The example shop's product page. The heading, the order, the highlighting and the paragraph are the model's. Every title, price and image is the shop's.](docs/demo.png)
 
-React Server Components turn that specification into markup, reading the title, price, image, and
-link from your catalog as the page is served. Whatever the model wrote is rendered as escaped text.
+`@rudra-js/react` turns that specification into markup, reading the title, price, image, and link
+from your catalog as the page is served. Whatever the model wrote is rendered as escaped text.
 
 We also read every word the model writes, in three passes. Patterns for prices, discounts, ratings,
 delivery dates and stock counts. A check that every digit in the sentence is one your own payload
@@ -43,16 +43,18 @@ You don't need an API key to get going. Leave the provider out and you'll get th
 component, which is a fully supported setting and the right one until you've settled on a model.
 
 ```sh
-npm install @rudra-js/core @rudra-js/react @rudra-js/attested zod@^4.5
+npm install @rudra-js/core @rudra-js/react @rudra-js/attested zod@^4
 ```
 
 A quick heads-up: every package here lives under the `@rudra-js` scope. The unscoped `rudra-js`
 package on npm belongs to someone else, so make sure you include the `@`.
 
-You'll need zod 4.5 or later. The public API of `@rudra-js/core` _is_ zod schemas, so your app and
-the package have to resolve the same copy of zod, which means a zod 3 app won't install at all. We
-ask for 4.5 rather than 4.0 because that version changed how nullable fields are written into the
-tool schema we send the model. `tests/tool-schema.test.ts` keeps our golden copy of it.
+You'll need zod 4. The public API of `@rudra-js/core` _is_ zod schemas, so your app and the
+package have to resolve the same copy of zod, which means a zod 3 app won't install at all.
+
+You'll need React 18 or 19. You don't need Server Components: `@rudra-js/react` is plain React with
+no hooks, so it works as a Server Component, with `renderToString`, or in a client-rendered app.
+Rendering it on the server is what puts the block in the first HTML response.
 
 You'll also need Node 22.12 or later. Node 20 is end of life, so we don't build or test on it.
 
@@ -107,7 +109,7 @@ straight away._
 | Package                                     | What it does                                                                                                                           |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | [`@rudra-js/core`](packages/core)           | The contracts and logic that turn one tracking payload into one renderable component specification, screened with `@rudra-js/attested` |
-| [`@rudra-js/react`](packages/react)         | Renders that specification as React Server Components, with no client JavaScript                                                       |
+| [`@rudra-js/react`](packages/react)         | Renders that specification with React, on the server or in the browser                                                                 |
 | [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API, and is the only package that makes a billed call                                                           |
 | [`@rudra-js/attested`](packages/attested)   | Checks model-written copy against the facts a shop stands behind, with no dependencies                                                 |
 

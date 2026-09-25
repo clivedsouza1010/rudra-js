@@ -12,11 +12,12 @@ npm install @rudra-js/core @rudra-js/attested zod@^4
 Two peer dependencies, for two different reasons.
 
 `zod` is a peer because the public API of this package _is_ zod schemas, so your
-app and the package have to resolve the same copy of zod. **zod 4.5 or later is
-required**, which is what the peer range asks for. The schemas use zod 4 APIs,
-and installing into a zod 3 app fails with `ERESOLVE`, which isn't the most
-helpful error you'll ever read. The floor is 4.5 rather than 4.0 because 4.5
-changed how a nullable field is written into the tool schema we send the model.
+app and the package have to resolve the same copy of zod. **Any zod 4 works**,
+which is what the peer range asks for. The schemas use zod 4 APIs, and
+installing into a zod 3 app fails with `ERESOLVE`, which isn't the most helpful
+error you'll ever read. Your zod writes the tool schema we send the model, so
+its wording shifts a little between releases: before 4.5, a nullable field is
+written as `anyOf` rather than a type array. It means the same thing either way.
 
 `@rudra-js/attested` is a peer for the opposite reason: none of its types cross
 this package's public surface, and you never have to import it. It's a peer so
