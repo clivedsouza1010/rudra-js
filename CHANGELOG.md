@@ -10,6 +10,8 @@ break them.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-26
+
 ### Changed
 
 - The npm homepage for all four packages is https://rudrajs.com, not the
@@ -611,7 +613,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.0...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.4.0...v0.5.0
