@@ -10,6 +10,11 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- The npm homepage for all four packages is https://rudrajs.com, not the
+  package folder on GitHub. The repository and issues links still go to GitHub.
+
 ## [0.7.0] - 2026-09-25
 
 ### Changed
