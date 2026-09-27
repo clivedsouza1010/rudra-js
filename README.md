@@ -3,6 +3,9 @@
 rudra-js gives you recommendation blocks designed by a language model and rendered on the server by
 React, while every product fact comes from your own trusted catalog.
 
+Every export is documented at **[rudrajs.com](https://rudrajs.com)**, with signatures and field
+tables generated from the published packages.
+
 If a language model writes raw HTML, it can hallucinate a fake price or a product you don't sell
 onto your page. So rudra-js never lets the model write HTML. Instead it returns a specification
 drawn from a closed vocabulary: it picks a layout, writes a headline, and provides the copy. There
@@ -190,6 +193,7 @@ ever hold demo shoppers and demo catalogs.
 
 ## Getting help
 
+- **The API reference** — every export, at [rudrajs.com](https://rudrajs.com).
 - **Questions and ideas** — come and talk in
   [Discussions](https://github.com/clivedsouza1010/rudra-js/discussions).
 - **Bugs** — open an [issue](https://github.com/clivedsouza1010/rudra-js/issues/new/choose).
