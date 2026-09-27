@@ -4,6 +4,8 @@ An Anthropic adapter for
 [`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core)'s
 `ComponentProvider`.
 
+This adapter is documented at [rudrajs.com](https://rudrajs.com/docs#createAnthropicProvider).
+
 > Anthropic and Claude are trademarks of Anthropic, PBC. This package is an
 > independent adapter and is not affiliated with or endorsed by Anthropic.
 

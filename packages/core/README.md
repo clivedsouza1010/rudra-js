@@ -3,6 +3,8 @@
 The contracts and logic that turn one tracking payload into one renderable
 component specification.
 
+Every export of this package is documented at [rudrajs.com](https://rudrajs.com/docs).
+
 ## Install
 
 ```sh

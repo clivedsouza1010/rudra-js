@@ -2,6 +2,8 @@
 
 Checks model-written product copy against the facts a shop stands behind.
 
+Both entry points are documented at [rudrajs.com](https://rudrajs.com/docs#verify).
+
 Zero dependencies, no node builtins, no I/O. It is one pure function over text
 and facts, so it runs in Node, in an edge runtime and in a browser, and it drops
 in after anything that writes copy — json-render, the Vercel AI SDK, a raw
