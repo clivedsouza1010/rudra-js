@@ -160,7 +160,7 @@ stops the release on a tag you can't take back:
 - The peer range each package declares on a sibling — `^0.5.0` becomes `^0.6.0` in
   `packages/core`, `packages/react` and `packages/anthropic`. Caret on a `0.x` version is
   patch-only, so leaving one behind publishes four packages that can't be installed together.
-- The exact sibling pin those three carry in `devDependencies`, and the two in
+- The exact sibling pin those three carry in `devDependencies`, and the three in
   `examples/shop`.
 - `package-lock.json`, regenerated with the npm the release installs:
 
@@ -170,7 +170,8 @@ stops the release on a tag you can't take back:
   ```
 
   The npm bundled with Node 22.21.1 is 10.9.4, and it drops the 12 `libc` fields the lockfile
-  carries without saying so. Those fields pick the glibc or musl lightningcss binary on the runner.
+  carries without saying so. Those fields pick the glibc or musl build of Next's SWC and oxlint's
+  native binaries on the runner.
 
 `tests/packaging.test.ts` checks all of it, so a bump that misses a spot fails on the pull request
 instead of on the tag.
