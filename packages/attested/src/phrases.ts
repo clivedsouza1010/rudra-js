@@ -113,13 +113,15 @@ const CONFUSABLES: Record<string, string> = {
   τ: 't',
   υ: 'u',
   χ: 'x',
-  ϲ: 'c',
 };
 
 const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
 
 export function normalisePhrasing(text: string): string {
-  const lowered = stripMarks(stripInvisible(text).normalize('NFKC').toLowerCase().normalize('NFC'));
+  // NFKC would turn the lunate sigmas into ς and Σ, which the fold can't read as c.
+  const lowered = stripMarks(
+    stripInvisible(text).replace(/[ϲϹ]/g, 'c').normalize('NFKC').toLowerCase().normalize('NFC'),
+  );
 
   let folded = '';
   for (const char of lowered) folded += CONFUSABLES[char] ?? char;

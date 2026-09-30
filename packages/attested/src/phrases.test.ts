@@ -60,8 +60,9 @@ describe('normalisePhrasing', () => {
   });
 
   it('folds every letter on the look-alike table, not just the two above', () => {
-    // U+03F2 is left out: NFKC rewrites it to a final sigma before the fold sees it.
     const lookAlikes: [string, string][] = [
+      ['\u03f2', 'c'],
+      ['\u03f9', 'c'],
       ['\u0430', 'a'],
       ['\u0432', 'b'],
       ['\u0435', 'e'],
