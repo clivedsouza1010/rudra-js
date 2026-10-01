@@ -39,6 +39,15 @@ explicit `{ type: 'disabled' }` and reason whatever you do. Pass
 example shop pins `claude-opus-5` and gives `modelTimeoutMs` a full 60 seconds,
 which is a demo talking, not a production setting.
 
+The adapter asks the model to answer by calling its tool rather than forcing the
+call, because Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 reject a
+forced tool call. So a model can answer in plain text instead. That reply is
+turned down like any other that doesn't fit, you get the fallback component, and
+the event's `error` in `onEvent` says
+`anthropic returned no emit_component_spec tool use`. Those four models also
+reject `thinking: { type: 'disabled' }`, so pass `thinking: null` with them, and
+raise `modelTimeoutMs`, since they'll reason before they answer.
+
 `maxTokens` and `baseUrl` are optional too.
 
 ### An identity-linked key needs a workspace

@@ -10,6 +10,15 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- `@rudra-js/anthropic` asks the model to call its tool instead of forcing the
+  call (`tool_choice` is `auto`, one call at most), and adds a system line
+  telling the model to put its JSON in that tool. Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 answer
+  a forced tool call with a 400, so with those models every request fell back.
+  The cost is that a model can now reply in plain text; that reply fails the
+  same check as any other bad answer, and the page gets the fallback component.
+
 ### Fixed
 
 - A lunate sigma in place of a "c" got a claim past the screen in both
