@@ -91,9 +91,35 @@ describe('normalisePhrasing', () => {
       ['\u03c4', 't'],
       ['\u03c5', 'u'],
       ['\u03c7', 'x'],
+      ['\u03f3', 'j'],
+      ['\u0475', 'v'],
     ];
     for (const [written, latin] of lookAlikes) {
       expect(normalisePhrasing(written), `U+${written.codePointAt(0)?.toString(16)}`).toBe(latin);
+    }
+  });
+
+  it('reads each look-alike capital as the letter it looks like', () => {
+    const capitals: [string, string][] = [
+      ['\u0392', 'b'],
+      ['\u0396', 'z'],
+      ['\u0397', 'h'],
+      ['\u039C', 'm'],
+      ['\u039D', 'n'],
+      ['\u03A5', 'y'],
+      ['\u04AE', 'y'],
+      ['\u04C0', 'i'],
+      ['\u051A', 'q'],
+      ['\u051C', 'w'],
+      ['\u037F', 'j'],
+      ['\u03DC', 'f'],
+      ['\u03FA', 'm'],
+      ['\u0474', 'v'],
+      ['\u050C', 'g'],
+    ];
+    for (const [written, latin] of capitals) {
+      const label = `U+${written.codePointAt(0)?.toString(16)}`;
+      expect(normalisePhrasing(written, true), label).toBe(latin);
     }
   });
 

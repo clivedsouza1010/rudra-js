@@ -336,6 +336,27 @@ describe('verify — the wording layer', () => {
     expect(verify('fr\u0008ee shipping on all orders', NOTHING).wording.supported).toBe(false);
   });
 
+  it('catches a phrase spelled with Greek capitals that look like Latin ones', () => {
+    for (const text of [
+      'I\u039D STOCK',
+      '\u0397URRY',
+      '\u039CONEY BACK',
+      '\u0392ARGAIN',
+      'I\u039D STO\u03F9K',
+    ]) {
+      expect(verify(text, NOTHING).wording.supported, text).toBe(false);
+    }
+  });
+
+  it('lets an allowed phrase in capitals stand behind the banned one inside it', () => {
+    const facts = {
+      values: [],
+      bannedPhrases: ['жеңілдік'],
+      allowedPhrases: ['жеңілдік түрлері'],
+    };
+    expect(verify('ЖЕҢІЛДІК ТҮРЛЕРІ', facts).wording.supported).toBe(true);
+  });
+
   it('takes a phrase the host added for their own language', () => {
     const facts = { values: [], bannedPhrases: ['nur noch'] };
     expect(verify('Nur noch wenige', facts).wording.supported).toBe(false);
@@ -343,8 +364,8 @@ describe('verify — the wording layer', () => {
   });
 
   it('holds a host phrase against the registers their own language writes it in', () => {
-    // Turkish all-caps, Spanish decomposed accents, Japanese with a space dropped in, and a
-    // Greek case ending.
+    // Turkish and Kazakh all-caps, Spanish decomposed accents, Japanese with a space dropped
+    // in, and a Greek case ending.
     expect(
       verify('ÜCRETSİZ KARGO', { values: [], bannedPhrases: ['ücretsiz kargo'] }).wording.supported,
     ).toBe(false);
@@ -360,6 +381,9 @@ describe('verify — the wording layer', () => {
     ).toBe(false);
     expect(
       verify('Τιμή ευκαιρίας', { values: [], bannedPhrases: ['ευκαιρία'] }).wording.supported,
+    ).toBe(false);
+    expect(
+      verify('БҮГІН ҒАНА', { values: [], bannedPhrases: ['бүгін ғана'] }).wording.supported,
     ).toBe(false);
   });
 
