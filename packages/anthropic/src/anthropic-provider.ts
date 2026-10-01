@@ -86,7 +86,13 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
           max_tokens: maxTokens,
           ...(thinking ? { thinking } : {}),
 
-          system: [{ type: 'text', text: request.system, cache_control: { type: 'ephemeral' } }],
+          system: [
+            { type: 'text', text: request.system, cache_control: { type: 'ephemeral' } },
+            {
+              type: 'text',
+              text: `Return that JSON as the input to the ${TOOL_NAME} tool, not as text. You may say a brief sentence first.`,
+            },
+          ],
           messages: [{ role: 'user', content: request.user }],
           tools: [
             {
@@ -96,7 +102,8 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
               input_schema: z.toJSONSchema(request.schema, { io: 'input' }),
             },
           ],
-          tool_choice: { type: 'tool', name: TOOL_NAME },
+          // Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 reject a forced tool call with a 400.
+          tool_choice: { type: 'auto', disable_parallel_tool_use: true },
         }),
       });
 

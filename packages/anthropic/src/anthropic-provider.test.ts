@@ -53,8 +53,9 @@ const sentBodyOf = (fetch: typeof globalThis.fetch) =>
       (fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]![1].body,
     ),
   ) as {
-    system: { cache_control?: unknown }[];
+    system: { text?: string; cache_control?: unknown }[];
     tools: { input_schema: { type?: string; required?: string[] } }[];
+    tool_choice?: unknown;
     thinking?: { type: string };
   };
 
@@ -153,6 +154,17 @@ describe('the Anthropic adapter', () => {
     await provider.generate(request());
 
     expect(sentBodyOf(fetch).system[0]?.cache_control).toEqual({ type: 'ephemeral' });
+  });
+
+  it('asks for the tool call instead of forcing it', async () => {
+    const fetch = answer(toolAnswer(spec));
+    const provider = createAnthropicProvider({ apiKey: 'k', fetch });
+
+    await provider.generate(request());
+
+    const sent = sentBodyOf(fetch);
+    expect(sent.tool_choice).toEqual({ type: 'auto', disable_parallel_tool_use: true });
+    expect(sent.system[1]?.text).toContain('emit_component_spec');
   });
 
   it('rejects when the vendor errors, rather than returning a broken spec', async () => {

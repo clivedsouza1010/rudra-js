@@ -39,12 +39,14 @@ explicit `{ type: 'disabled' }` and reason whatever you do. Pass
 example shop pins `claude-opus-5` and gives `modelTimeoutMs` a full 60 seconds,
 which is a demo talking, not a production setting.
 
-One limit on which model you pick: the adapter forces its one tool call, so the
-model always fills in the specification. Claude Opus 5.5, Sonnet 5.5, Fable 5.1
-and Mythos 5.1 don't allow a forced tool call and answer every request with a
-400, so you'd get the fallback component every time. In `onEvent`, the event's
-`error` says `anthropic responded 400 (invalid_request_error)`. Sonnet 5, Opus
-5, Fable 5, Mythos 5 and older models accept it.
+The adapter asks the model to answer by calling its tool rather than forcing the
+call, because Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 reject a
+forced tool call. So a model can answer in plain text instead. That reply is
+turned down like any other that doesn't fit, you get the fallback component, and
+the event's `error` in `onEvent` says
+`anthropic returned no emit_component_spec tool use`. Those four models also
+reject `thinking: { type: 'disabled' }`, so pass `thinking: null` with them, and
+raise `modelTimeoutMs`, since they'll reason before they answer.
 
 `maxTokens` and `baseUrl` are optional too.
 

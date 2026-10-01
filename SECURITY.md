@@ -74,9 +74,9 @@ second half matters as much as the first.
 
 The model gets exactly one tool, and it's how it hands back its answer: a schema to fill in. It has
 no tool that fetches anything, writes anything or calls anything, and no network or data access of
-its own. It emits a fixed JSON shape and nothing else, and it cannot **place** a product the shop
-didn't supply, because every SKU is checked against the shop's own list. It can still write a
-product name into prose. Nothing prevents that.
+its own. It answers in a fixed JSON shape, anything else it sends is thrown away, and it cannot
+**place** a product the shop didn't supply, because every SKU is checked against the shop's own
+list. It can still write a product name into prose. Nothing prevents that.
 
 Say an injection succeeds completely, and the model does exactly what the attacker's text tells it
 to. What that buys is the wording and the ordering of a recommendation block. That's the reach it
