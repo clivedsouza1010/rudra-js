@@ -1309,6 +1309,12 @@ describe('claims the renderer cannot check', () => {
     },
     {
       kind: 'price',
+      catches: 'yours for 40 pounds',
+      keeps: 'a 40 litre pack for long days',
+      supports: ['40 litre'],
+    },
+    {
+      kind: 'price',
       catches: 'yours today for thirty-nine dollars',
       keeps: 'two pounds lighter than the old one',
     },
@@ -1572,6 +1578,8 @@ describe('a claim spelled in characters the patterns do not expect', () => {
     { hidden: 'a variation selector', reason: 'in st\uFE0Fock in your size' },
     { hidden: 'a soft hyphen', reason: 'in st\u00ADock in your size' },
     { hidden: 'a Cyrillic look-alike', reason: 'in st\u043Eck in your size' },
+    { hidden: 'a lunate sigma', reason: 'in sto\u03F2k in your size' },
+    { hidden: 'a capital lunate sigma', reason: 'IN STO\u03F9K in your size' },
     { hidden: 'a blank-rendering Hangul letter', reason: 'in st\u3164ock in your size' },
     { hidden: 'a combining mark', reason: 'in sto\u0305ck in your size' },
     { hidden: 'a control character', reason: 'in st\u0008ock in your size' },
@@ -1816,21 +1824,23 @@ describe('the two passes attested adds', () => {
   // one product's tag backs a sentence about the page. The two fields that name a
   // product do not read it. A badge is the sharp case — 24 characters beside the
   // real price, and "Only 2" needs no word core's patterns would catch.
-  it.each(['Only 2', '40 off', 'Just 2 in your size'])(
-    'reads a field about one product against that product: "%s"',
-    (text) => {
-      const elsewhere = reconcile(grid([ref('TR-101', { badge: text })]), {
-        candidates: [product('TR-101'), product('TR-102', { tags: ['2 person', '40 litre'] })],
-      });
-      expect(basisOf(elsewhere)?.badge).toBeNull();
-      expect(elsewhere.violations).toContain('unverifiable-claim:quantity:badge:TR-101');
+  it.each([
+    ['badge', 'Only 2'],
+    ['badge', '40 off'],
+    ['badge', 'Just 2 in your size'],
+    ['reason', 'Sleeps 2 with room to spare'],
+  ] as const)('reads a %s about one product against that product: "%s"', (field, text) => {
+    const elsewhere = reconcile(grid([ref('TR-101', { [field]: text })]), {
+      candidates: [product('TR-101'), product('TR-102', { tags: ['2 person', '40 litre'] })],
+    });
+    expect(basisOf(elsewhere)?.[field]).toBeNull();
+    expect(elsewhere.violations).toContain(`unverifiable-claim:quantity:${field}:TR-101`);
 
-      const own = reconcile(grid([ref('TR-101', { badge: text })]), {
-        candidates: [product('TR-101', { tags: ['2 person', '40 litre'] }), product('TR-102')],
-      });
-      expect(own.violations).toEqual([]);
-    },
-  );
+    const own = reconcile(grid([ref('TR-101', { [field]: text })]), {
+      candidates: [product('TR-101', { tags: ['2 person', '40 litre'] }), product('TR-102')],
+    });
+    expect(own.violations).toEqual([]);
+  });
 
   // The cap holds for those two fields as well. A candidate past it is still placeable —
   // it is in stock, so the allowlist takes it — and its own tag was backing its own reason

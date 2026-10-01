@@ -116,7 +116,6 @@ const CONFUSABLES: Record<string, string> = {
   τ: 't',
   υ: 'u',
   χ: 'x',
-  ϲ: 'c',
 };
 
 const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
@@ -126,8 +125,10 @@ const SPACING = /[\t\n\v\f\r\u0085]/;
 const MARKS = /[\p{Mn}\p{Me}]/gu;
 
 function normaliseForClaims(text: string): string {
+  // NFKC would turn the lunate sigmas into ς and Σ, which the fold can't read as c.
   const lowered = text
     .replace(INVISIBLE, (char) => (SPACING.test(char) ? char : ''))
+    .replace(/[ϲϹ]/g, 'c')
     .normalize('NFKC')
     .toLowerCase()
     .normalize('NFC')

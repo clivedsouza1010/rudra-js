@@ -10,6 +10,16 @@ break them.
 
 ## [Unreleased]
 
+### Fixed
+
+- A lunate sigma in place of a "c" got a claim past the screen in both
+  `@rudra-js/attested` and core: "In stoϲk now" and "ϹHEAP" rendered. The
+  look-alike table had an entry for `ϲ`, but NFKC turns `ϲ` into `ς`, and `Ϲ`
+  into `Σ`, before the table is read, so the entry never matched. Both screens
+  now turn the two lunate sigmas into `c` before NFKC runs. Ordinary Greek sigmas
+  are left alone, so a Greek shop's own banned phrases still match their case
+  endings.
+
 ## [0.7.1] - 2026-09-26
 
 ### Changed
