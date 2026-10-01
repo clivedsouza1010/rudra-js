@@ -10,14 +10,17 @@ break them.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-09-30
+
 ### Changed
 
 - `@rudra-js/anthropic` asks the model to call its tool instead of forcing the
   call (`tool_choice` is `auto`, one call at most), and adds a system line
-  telling the model to put its JSON in that tool. Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 answer
-  a forced tool call with a 400, so with those models every request fell back.
-  The cost is that a model can now reply in plain text; that reply fails the
-  same check as any other bad answer, and the page gets the fallback component.
+  telling the model to put its JSON in that tool. Claude Opus 5.5, Sonnet 5.5,
+  Fable 5.1 and Mythos 5.1 answer a forced tool call with a 400, so with those
+  models every request fell back. The cost is that a model can now reply in
+  plain text; that reply fails the same check as any other bad answer, and the
+  page gets the fallback component.
 
 ### Fixed
 
@@ -632,7 +635,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.1...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.5.0...v0.6.0
