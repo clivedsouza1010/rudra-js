@@ -311,6 +311,7 @@ describe('host-supplied values that are not merely bounded', () => {
     ['an https url', 'https://cdn.example.com/tr-102.png', true],
     ['an http url', 'http://cdn.example.com/tr-102.png', true],
     ['a javascript: url', 'javascript:alert(1)', false],
+    ['a data: url', 'data:image/png;base64,iVBORw0KGgo=', false],
     ['an empty string', '', false],
     ['a root-relative path', '/images/tr-102.png', true],
     ['a protocol-relative url', '//cdn.example.com/tr-102.png', false],
@@ -324,6 +325,10 @@ describe('host-supplied values that are not merely bounded', () => {
     ['a tab that stays on the origin', '/images/a\tb.png', true],
   ])('imageUrl: %s', (_label, imageUrl, accepted) => {
     expect(withProduct({ imageUrl }).success).toBe(accepted);
+  });
+
+  it('refuses a negative price', () => {
+    expect(withProduct({ price: -1 }).success).toBe(false);
   });
 
   it.each([

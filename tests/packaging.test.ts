@@ -304,7 +304,10 @@ describe('a version bump', () => {
   // lockfile left behind does not stop anything at all.
   const lockfile = JSON.parse(readFileSync(join(REPO_ROOT, 'package-lock.json'), 'utf8')) as {
     version: string;
-    packages: Record<string, { version?: string; link?: boolean; resolved?: string }>;
+    packages: Record<
+      string,
+      { version?: string; link?: boolean; resolved?: string; libc?: string[] }
+    >;
   };
 
   // The lockfile's own idea of a workspace, so a new one counts here the day it
@@ -322,7 +325,7 @@ describe('a version bump', () => {
       peerDependencies?: Record<string, string>;
     };
 
-  it('reaches past packages/, because the example pins two of them too', () => {
+  it('reaches past packages/, because the example pins three of them too', () => {
     expect(workspaces).toEqual(expect.arrayContaining(PACKAGES.map((name) => `packages/${name}`)));
     expect(workspaces).toContain('examples/shop');
   });
@@ -357,6 +360,14 @@ describe('a version bump', () => {
         manifestAt(workspace).version,
       );
     }
+  });
+
+  it('keeps the libc fields, which the npm bundled with Node 22 drops', () => {
+    let withLibc = 0;
+    for (const entry of Object.values(lockfile.packages)) {
+      if (entry.libc) withLibc++;
+    }
+    expect(withLibc, 'regenerate package-lock.json with npm 11.19.1').toBeGreaterThan(0);
   });
 });
 

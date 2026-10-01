@@ -343,7 +343,8 @@ describe('verify — the wording layer', () => {
   });
 
   it('holds a host phrase against the registers their own language writes it in', () => {
-    // Turkish all-caps, Spanish decomposed accents, Japanese with a space dropped in.
+    // Turkish all-caps, Spanish decomposed accents, Japanese with a space dropped in, and a
+    // Greek case ending.
     expect(
       verify('ÜCRETSİZ KARGO', { values: [], bannedPhrases: ['ücretsiz kargo'] }).wording.supported,
     ).toBe(false);
@@ -356,6 +357,9 @@ describe('verify — the wording layer', () => {
     );
     expect(
       verify('شحن\u200fمجاني', { values: [], bannedPhrases: ['شحن مجاني'] }).wording.supported,
+    ).toBe(false);
+    expect(
+      verify('Τιμή ευκαιρίας', { values: [], bannedPhrases: ['ευκαιρία'] }).wording.supported,
     ).toBe(false);
   });
 
