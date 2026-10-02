@@ -1,5 +1,12 @@
 import { numeralsIn, supportedValues, type Numeral } from './numerals.js';
-import { BANNED_PHRASES, indexPhrasing, normalisePhrasing, spansIn, type Span } from './phrases.js';
+import {
+  BANNED_PHRASES,
+  indexPhrasing,
+  normalisePhrasing,
+  spansIn,
+  type Indexed,
+  type Span,
+} from './phrases.js';
 
 export type Layer = 'quantity' | 'wording';
 
@@ -131,21 +138,30 @@ function standsBehind(allowed: Span[], hit: Span): boolean {
 }
 
 function checkWording(text: string, phrases: string[], allowed: string[]): LayerReport {
-  const normalised = normalisePhrasing(text);
-  const indexed = indexPhrasing(normalised);
+  // Read twice, since Ν reads as N but ν as v; both readings are the same length, so spans line up.
+  const texts = [normalisePhrasing(text)];
+  const byLook = normalisePhrasing(text, true);
+  if (byLook !== texts[0]) texts.push(byLook);
 
+  const scans: Indexed[] = [];
   const spans: Span[] = [];
-  for (const phrase of allowed) {
-    for (const span of spansIn(indexed, phrase)) {
-      if (!normalised.slice(span.start, span.end + 1).includes('\n')) spans.push(span);
+  for (const normalised of texts) {
+    const indexed = indexPhrasing(normalised);
+    scans.push(indexed);
+    for (const phrase of allowed) {
+      for (const span of spansIn(indexed, phrase)) {
+        if (!normalised.slice(span.start, span.end + 1).includes('\n')) spans.push(span);
+      }
     }
   }
 
   const findings: Finding[] = [];
   for (const phrase of phrases) {
     let caught = false;
-    for (const hit of spansIn(indexed, phrase)) {
-      if (!standsBehind(spans, hit)) caught = true;
+    for (const indexed of scans) {
+      for (const hit of spansIn(indexed, phrase)) {
+        if (!standsBehind(spans, hit)) caught = true;
+      }
     }
     if (!caught) continue;
 

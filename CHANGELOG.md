@@ -10,6 +10,17 @@ break them.
 
 ## [Unreleased]
 
+### Fixed
+
+- Greek and Cyrillic capitals that look like Latin ones got claims past the
+  screen in core and `@rudra-js/attested`: "IΝ STOCK", "ΗURRY", "ΜONEY BACK"
+  and "ΒARGAIN" all rendered. Thirteen capitals lowercase to a letter that
+  looks like something else, or that the look-alike table doesn't have: `Ν`
+  becomes `ν`, which reads as v. Both screens now read the text twice, once as
+  before and once with those capitals taken by how they look, and flag a claim
+  if either reading catches it. So all-caps copy still matches a shop's own
+  lowercase phrases. The table also gains `ϳ` and `ѵ`, which read as j and v.
+
 ## [0.7.2] - 2026-09-30
 
 ### Changed

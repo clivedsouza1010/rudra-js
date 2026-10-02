@@ -113,15 +113,39 @@ const CONFUSABLES: Record<string, string> = {
   τ: 't',
   υ: 'u',
   χ: 'x',
+  ϳ: 'j',
+  ѵ: 'v',
+};
+
+// Capitals that lowercasing reads wrong: Ν becomes ν, which reads as v.
+const CAPITALS: Record<string, string> = {
+  Β: 'b',
+  Ζ: 'z',
+  Η: 'h',
+  Μ: 'm',
+  Ν: 'n',
+  Υ: 'y',
+  Ү: 'y',
+  Ӏ: 'i',
+  Ԛ: 'q',
+  Ԝ: 'w',
+  Ϻ: 'm',
+  Ϝ: 'f',
+  Ԍ: 'g',
 };
 
 const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
 
-export function normalisePhrasing(text: string): string {
+export function normalisePhrasing(text: string, byLook = false): string {
   // NFKC would turn the lunate sigmas into ς and Σ, which the fold can't read as c.
-  const lowered = stripMarks(
-    stripInvisible(text).replace(/[ϲϹ]/g, 'c').normalize('NFKC').toLowerCase().normalize('NFC'),
-  );
+  const compatible = stripInvisible(text).replace(/[ϲϹ]/g, 'c').normalize('NFKC');
+
+  let cased = compatible;
+  if (byLook) {
+    cased = '';
+    for (const char of compatible) cased += CAPITALS[char] ?? char;
+  }
+  const lowered = stripMarks(cased.toLowerCase().normalize('NFC'));
 
   let folded = '';
   for (const char of lowered) folded += CONFUSABLES[char] ?? char;

@@ -116,6 +116,25 @@ const CONFUSABLES: Record<string, string> = {
   τ: 't',
   υ: 'u',
   χ: 'x',
+  ϳ: 'j',
+  ѵ: 'v',
+};
+
+// Capitals that lowercasing reads wrong: Ν becomes ν, which reads as v.
+const CAPITALS: Record<string, string> = {
+  Β: 'b',
+  Ζ: 'z',
+  Η: 'h',
+  Μ: 'm',
+  Ν: 'n',
+  Υ: 'y',
+  Ү: 'y',
+  Ӏ: 'i',
+  Ԛ: 'q',
+  Ԝ: 'w',
+  Ϻ: 'm',
+  Ϝ: 'f',
+  Ԍ: 'g',
 };
 
 const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
@@ -124,15 +143,19 @@ const SPACING = /[\t\n\v\f\r\u0085]/;
 
 const MARKS = /[\p{Mn}\p{Me}]/gu;
 
-function normaliseForClaims(text: string): string {
+function normaliseForClaims(text: string, byLook: boolean): string {
   // NFKC would turn the lunate sigmas into ς and Σ, which the fold can't read as c.
-  const lowered = text
+  const compatible = text
     .replace(INVISIBLE, (char) => (SPACING.test(char) ? char : ''))
     .replace(/[ϲϹ]/g, 'c')
-    .normalize('NFKC')
-    .toLowerCase()
-    .normalize('NFC')
-    .replace(MARKS, '');
+    .normalize('NFKC');
+
+  let cased = compatible;
+  if (byLook) {
+    cased = '';
+    for (const char of compatible) cased += CAPITALS[char] ?? char;
+  }
+  const lowered = cased.toLowerCase().normalize('NFC').replace(MARKS, '');
 
   let folded = '';
   for (const char of lowered) folded += CONFUSABLES[char] ?? char;
@@ -181,10 +204,13 @@ export function hostFacts(input: TrackingInput): HostFacts {
 }
 
 export function claimIn(text: string): string | null {
-  const normalised = normaliseForClaims(text);
-  for (const claim of CLAIM_PATTERNS) {
-    for (const pattern of claim.patterns) {
-      if (pattern.test(normalised)) return claim.kind;
+  // Read twice, since Ν reads as N but ν as v.
+  for (const byLook of [false, true]) {
+    const normalised = normaliseForClaims(text, byLook);
+    for (const claim of CLAIM_PATTERNS) {
+      for (const pattern of claim.patterns) {
+        if (pattern.test(normalised)) return claim.kind;
+      }
     }
   }
   return null;
