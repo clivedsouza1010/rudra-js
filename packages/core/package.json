@@ -1,6 +1,6 @@
 {
   "name": "@rudra-js/core",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "The contracts and logic that turn one tracking payload into one renderable component specification",
   "keywords": [
     "llm",
@@ -54,10 +54,10 @@
     "zod": "^4.0.0"
   },
   "peerDependencies": {
-    "@rudra-js/attested": "^0.7.2"
+    "@rudra-js/attested": "^0.7.3"
   },
   "devDependencies": {
-    "@rudra-js/attested": "0.7.2",
+    "@rudra-js/attested": "0.7.3",
     "@types/node": "^26.4.1"
   }
 }

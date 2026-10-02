@@ -10,6 +10,8 @@ break them.
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-10-01
+
 ### Fixed
 
 - Greek and Cyrillic capitals that look like Latin ones got claims past the
@@ -646,7 +648,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.2...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.6.0...v0.7.0
