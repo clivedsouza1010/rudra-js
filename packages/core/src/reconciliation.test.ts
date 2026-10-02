@@ -1581,6 +1581,7 @@ describe('a claim spelled in characters the patterns do not expect', () => {
     { hidden: 'a lunate sigma', reason: 'in sto\u03F2k in your size' },
     { hidden: 'a capital lunate sigma', reason: 'IN STO\u03F9K in your size' },
     { hidden: 'a Greek capital nu', reason: 'I\u039D STOCK in your size' },
+    { hidden: 'a mathematical capital nu', reason: 'I\u{1D6B4} STOCK in your size' },
     { hidden: 'a palochka for an l', reason: 'se\u04C0\u04C0ing fast in your size' },
     { hidden: 'a blank-rendering Hangul letter', reason: 'in st\u3164ock in your size' },
     { hidden: 'a combining mark', reason: 'in sto\u0305ck in your size' },

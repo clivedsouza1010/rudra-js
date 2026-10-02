@@ -343,6 +343,7 @@ describe('verify — the wording layer', () => {
       '\u039CONEY BACK',
       '\u0392ARGAIN',
       'I\u039D STO\u03F9K',
+      'I\u{1D6B4} STOCK',
     ]) {
       expect(verify(text, NOTHING).wording.supported, text).toBe(false);
     }

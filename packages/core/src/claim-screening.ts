@@ -204,7 +204,7 @@ export function hostFacts(input: TrackingInput): HostFacts {
 }
 
 export function claimIn(text: string): string | null {
-  // Read twice, since Ν reads as N but ν as v, and Ӏ reads as I or l.
+  // Read twice, since Ν reads as N but ν as v.
   for (const byLook of [false, true]) {
     const normalised = normaliseForClaims(text, byLook);
     for (const claim of CLAIM_PATTERNS) {
