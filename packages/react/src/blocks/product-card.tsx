@@ -17,8 +17,7 @@ export function ProductCard({
   context: BlockRenderContext;
 }) {
   const product = sellableProduct(context.products, reference.sku);
-  // Reconciliation drops a SKU the catalog does not have, so this should be
-  // unreachable. Rendering nothing beats rendering a card with holes in it.
+  // Gone from the catalog, or sold out since the spec was made: render nothing, not half a card.
   if (!product) return null;
 
   const isFeatured = reference.emphasis === 'featured';

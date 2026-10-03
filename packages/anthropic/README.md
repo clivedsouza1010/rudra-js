@@ -12,7 +12,7 @@ This adapter is documented at [rudrajs.com](https://rudrajs.com/docs#createAnthr
 ## Install
 
 ```sh
-npm install @rudra-js/anthropic @rudra-js/core
+npm install @rudra-js/anthropic @rudra-js/core @rudra-js/attested
 ```
 
 ```ts

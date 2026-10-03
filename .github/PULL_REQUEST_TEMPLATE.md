@@ -16,11 +16,7 @@ convince yourself the tests would notice a regression — for example, breaking
 the thing on purpose and confirming a test fails. See CONTRIBUTING.md.
 -->
 
-- [ ] `npm run build`
-- [ ] `npm run typecheck`
-- [ ] `npm run lint`
-- [ ] `npm run format:check`
-- [ ] `npm test`
+- [ ] `npm run check`
 - [ ] CHANGELOG.md line, or say why none is needed.
 
 ## Anything reviewers should look at closely

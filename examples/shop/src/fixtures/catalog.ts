@@ -43,8 +43,7 @@ export function generateCatalog(seed: number, size = 2000): Product[] {
       currency: 'USD',
       imageUrl: `/images/rj-${String(index + 1).padStart(5, '0')}.webp`,
       rating: Math.round(random() * 50) / 10,
-      // A tenth out of stock: reconciliation drops these, and a catalog where
-      // that never happens never exercises it.
+      // A tenth out of stock, so the shop's own filter has something to drop.
       isInStock: random() > 0.1,
       tags: Array.from({ length: tagCount }, () => pick(TAGS)).filter(
         (tag, position, all) => all.indexOf(tag) === position,
