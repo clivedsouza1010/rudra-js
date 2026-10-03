@@ -191,8 +191,9 @@ primary model can act. Ours can't.
   so the loss is small. It isn't zero.
 - **Monitoring.** Per-request logging and rate limiting aren't here. What you get is one
   `GenerationEvent` per call through `onEvent`, carrying where the component came from, how long it
-  took, whether a model was called, what it cost and what reconciliation removed. Wiring that to a
-  log or a rate limiter is your job.
+  took, whether a model was called, what it cost and what reconciliation removed. A call the model
+  answered but the adapter turned down was still billed, and its event has no usage, so that cost is
+  missing. Wiring that to a log or a rate limiter is your job.
 
 - **Invisible characters.** The escaping covers every character category that can carry hidden text,
   and `Default_Ignorable_Code_Point` on top of them. That last one is what catches the ones that are

@@ -53,8 +53,9 @@ A quick heads-up: every package here lives under the `@rudra-js` scope. The unsc
 package on npm belongs to someone else, so make sure you include the `@`.
 
 You don't need zod yourself. `@rudra-js/core` brings zod 4 as a dependency, and an app already on
-zod 4 shares that copy. An app on zod 3 gets a second copy, and can't mix its own zod with the
-schemas core exports: `productSchema.array()` works, your `z.array(productSchema)` won't.
+zod 4 shares that copy. On zod 3, npm puts a zod 4 under core, and another under
+`@rudra-js/anthropic` if you use it. Your zod 3 can't mix with the schemas core exports:
+`productSchema.array()` works, your `z.array(productSchema)` won't.
 
 You'll need React 18 or 19. You don't need Server Components: `@rudra-js/react` is plain React with
 no hooks, so it works with `renderToString`, in a client-rendered app, and as a Server Component
@@ -158,8 +159,8 @@ npm run build --workspace @rudra-js/example-shop
 npm run verify:crawlable
 ```
 
-Locally that build is safe on its own, since a key alone no longer spends anything and only
-`RUDRA_SHOP_MODE=record` does. The prefix below just makes it a rule rather than a default:
+Locally that build is safe on its own: building calls no model, and serving the shop only spends
+with `RUDRA_SHOP_MODE=record`. The prefix below just makes it a rule rather than a default:
 
 ```sh
 ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/example-shop

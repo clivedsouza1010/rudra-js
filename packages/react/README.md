@@ -16,13 +16,13 @@ still reads it.
 ## Install
 
 ```sh
-npm install @rudra-js/react @rudra-js/core react
+npm install @rudra-js/react @rudra-js/core @rudra-js/attested react
 ```
 
 Both `@rudra-js/core` and `react` are peer dependencies. The specification you pass in comes from
 your copy of core, and the elements this renders have to come from the same React your app renders.
 With two copies of either, you'd get a spec that fails its own type check, or a component tree React
-refuses to render.
+refuses to render. `@rudra-js/attested` is core's peer: npm and pnpm add it for you, Yarn doesn't.
 
 ```tsx
 import { RudraComponent } from '@rudra-js/react';
@@ -162,9 +162,10 @@ reach the renderer, since they don't depend on the catalog.
 ### What `products` may be
 
 A list of products, or anything keyed by SKU that answers `get(sku)` and `has(sku)`. A `Map` does
-it, and so does your own index. Those two methods are the only ones the renderers ever call, so if
-your catalog is too big to copy into a `Map` on every request, hand over a view of your own store
-instead.
+it, and so does your own index. The renderers only ever call `get`, and `has` is how we tell a keyed
+catalog from a list, so if your catalog is too big to copy into a `Map` on every request, hand over
+a view of your own store instead. The prop is typed as a `ReadonlyMap`, so in TypeScript either
+implement `ReadonlyMap` or cast with `as unknown as ReadonlyMap<string, Product>`.
 
 We look for those two methods rather than for `instanceof Map`, which is per-realm. A `Map` arriving
 from a worker or a `node:vm` sandbox is a perfectly good catalog and fails `instanceof` anyway.

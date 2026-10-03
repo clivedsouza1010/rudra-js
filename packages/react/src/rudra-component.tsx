@@ -16,7 +16,9 @@ export interface RudraComponentProps {
    *
    * A list of products, or anything keyed by SKU — a `Map`, or your own view
    * over a catalog too large to hold in one. The renderers only ever call
-   * `get(sku)` and `has(sku)`, so a view needs nothing else to be fast.
+   * `get(sku)`, and `has` is how a keyed catalog is told apart from a list. The
+   * type asks for a `ReadonlyMap`, so a view of your own implements one or is
+   * cast with `as unknown as ReadonlyMap<string, Product>`.
    *
    * Validate them with `productSchema` from `@rudra-js/core` — the same schema
    * your candidates already passed — not with `parseTrackingInput`, which
@@ -52,7 +54,7 @@ export interface RudraComponentProps {
   className?: string;
 }
 
-/** A list of products, or anything keyed by SKU that answers `get` and `has`. */
+/** A list of products, or a `ReadonlyMap` keyed by SKU, which a view of your own can implement. */
 export type ProductCatalog = readonly Product[] | ReadonlyMap<string, Product>;
 
 // Asks what the renderers call rather than which class the host built, since
@@ -137,9 +139,10 @@ function renderBlock(
 /**
  * Renders a component specification.
  *
- * A Server Component: no hooks, no state, no effects, and therefore no client
- * bundle and no hydration for the recommendation area. The whole component
- * arrives in the initial HTML response, which is what removes the pop-in a
+ * Plain React with no hooks, no state and no effects, so it renders with
+ * `renderToString`, in a client-rendered app, or as a Server Component where the
+ * framework supports them. Rendered on the server, the whole component arrives
+ * in the initial HTML response, which is what removes the pop-in a
  * client-fetched recommendation rail has — and what makes the content visible
  * to a crawler that does not run JavaScript.
  *

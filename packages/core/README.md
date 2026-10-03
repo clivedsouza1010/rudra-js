@@ -16,7 +16,7 @@ package _is_ zod schemas, and an app on any zod 4 shares one copy with it. An
 app on zod 3 gets its own copy alongside ours, and the two don't mix: build on
 the exported schemas with their own methods (`productSchema.array()`) rather
 than your zod's (`z.array(productSchema)`), and read `error.issues` rather than
-checking `instanceof ZodError`. Whichever copy core ends up with writes the tool
+checking `instanceof ZodError`. `@rudra-js/anthropic`'s own zod writes the tool
 schema we send the model, so its wording shifts a little between releases:
 before 4.5, a nullable field is written as `anyOf` rather than a type array. It
 means the same thing either way.
@@ -542,7 +542,10 @@ These are the numbers worth keeping:
   `cache: 'timeout'`, rather than as a rising bill.
 - **Spend** — sum `usage` over the events where `calledModel` is true. Requests
   that joined an in-flight generation carry the same `usage`, so summing over
-  every event counts one call many times.
+  every event counts one call many times. A call the model answered but the
+  adapter turned down (a `max_tokens` stop, a refusal, no tool call, or a reply
+  that doesn't fit the schema) was billed too, and arrives as a
+  `'provider-error'` with no `usage`, so this sum is lower than your bill.
 
 ## Licence
 

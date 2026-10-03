@@ -99,7 +99,7 @@ function shortName(agent: string): string {
 export async function collect(origin: string): Promise<AgentResponse[]> {
   const responses: AgentResponse[] = [];
   for (const agent of AGENTS) {
-    // eslint-disable-next-line no-await-in-loop -- one agent at a time on purpose, so each one sees a cold cache
+    // eslint-disable-next-line no-await-in-loop
     const response = await fetch(`${origin}${PAGE_PATH}`, {
       headers: { 'user-agent': agent, 'accept-encoding': 'identity' },
       signal: AbortSignal.timeout(30_000),
