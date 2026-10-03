@@ -42,22 +42,6 @@ export function findShopper(id: string | undefined): Shopper {
   return byId.get(id ?? '') ?? ANONYMOUS_SHOPPER;
 }
 
-// The adapter keeps the vendor's message out of its error on purpose, so log it here.
-function withVisibleFailures(provider: ComponentProvider): ComponentProvider {
-  return {
-    name: provider.name,
-    model: provider.model,
-    async generate(request) {
-      try {
-        return await provider.generate(request);
-      } catch (error) {
-        console.error('[rudra] provider failed:', error instanceof Error ? error.message : error);
-        throw error;
-      }
-    },
-  };
-}
-
 export function chooseProvider(): ComponentProvider {
   const apiKey = process.env['ANTHROPIC_API_KEY'];
   const mode = process.env['RUDRA_SHOP_MODE'] || 'replay';
@@ -78,9 +62,7 @@ export function chooseProvider(): ComponentProvider {
           '(the key may be coming from examples/shop/.env.local)',
       );
     }
-    return withVisibleFailures(
-      createReplayProvider({ directory: RECORDINGS_DIRECTORY, model: MODEL_ID }),
-    );
+    return createReplayProvider({ directory: RECORDINGS_DIRECTORY, model: MODEL_ID });
   }
 
   if (mode === 'record') {
@@ -90,17 +72,15 @@ export function chooseProvider(): ComponentProvider {
           '(export one, or put it in examples/shop/.env.local)',
       );
     }
-    return withVisibleFailures(
-      createRecordingProvider(
-        createAnthropicProvider({
-          apiKey,
-          model: MODEL_ID,
-          ...(process.env['ANTHROPIC_WORKSPACE_ID']
-            ? { workspaceId: process.env['ANTHROPIC_WORKSPACE_ID'] }
-            : {}),
-        }),
-        RECORDINGS_DIRECTORY,
-      ),
+    return createRecordingProvider(
+      createAnthropicProvider({
+        apiKey,
+        model: MODEL_ID,
+        ...(process.env['ANTHROPIC_WORKSPACE_ID']
+          ? { workspaceId: process.env['ANTHROPIC_WORKSPACE_ID'] }
+          : {}),
+      }),
+      RECORDINGS_DIRECTORY,
     );
   }
 
@@ -116,7 +96,8 @@ export const generator = createComponentGenerator({
   cache: specCache,
   onEvent: (event) => {
     const detail = event.degradedReason ? ` (${event.degradedReason})` : '';
-    console.log(`[rudra] ${event.source}${detail} in ${event.elapsedMs}ms`);
+    const why = event.error instanceof Error ? `: ${event.error.message}` : '';
+    console.log(`[rudra] ${event.source}${detail}${why} in ${event.elapsedMs}ms`);
   },
   modelTimeoutMs: MODEL_TIMEOUT_MS,
 });

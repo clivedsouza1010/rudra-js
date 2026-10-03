@@ -17,10 +17,13 @@ describe('reporting why the check failed', () => {
   it('prints the error, then everything the shop said, then the safe build line', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    reportFailure(new Error('fetch failed'), '[rudra] provider failed: boom\n');
+    reportFailure(new Error('fetch failed'), '[rudra] fallback (provider-error): boom in 3ms\n');
 
     expect(spy).toHaveBeenNthCalledWith(1, 'fetch failed');
-    expect(spy).toHaveBeenNthCalledWith(2, 'the shop said:\n[rudra] provider failed: boom');
+    expect(spy).toHaveBeenNthCalledWith(
+      2,
+      'the shop said:\n[rudra] fallback (provider-error): boom in 3ms',
+    );
     expect(spy).toHaveBeenNthCalledWith(
       3,
       'if there is no production build yet, the safe way to make one is:\n' +

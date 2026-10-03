@@ -139,6 +139,7 @@ describe('where product facts come from', () => {
       products: [
         product('TR-101', { title: 'Switchback Trail Shoe', price: 199, currency: 'GBP' }),
       ],
+      locale: 'en-US',
     });
 
     expect(markup).toContain('Switchback Trail Shoe');
@@ -843,7 +844,7 @@ describe('a bundle', () => {
 
   it('shows the price the shop set, not the sum of the parts', () => {
     // TR-101 and TR-102 are 174 each. The saving is the whole point.
-    const markup = render(bundleSpec(), { bundles: BUNDLES });
+    const markup = render(bundleSpec(), { bundles: BUNDLES, locale: 'en-US' });
 
     expect(markup).toContain('$300.00');
     expect(markup).not.toContain('$348.00');
@@ -889,6 +890,7 @@ describe('a bundle', () => {
     const markup = render(bundleSpec(), {
       bundles: BUNDLES,
       products: [product('TR-101', { currency: 'EUR' }), product('TR-102', { currency: 'EUR' })],
+      locale: 'en-US',
     });
 
     expect(markup).toContain('$300.00');
