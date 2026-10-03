@@ -1,9 +1,8 @@
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generatedSpecSchema, type GeneratedSpec } from '@rudra-js/core';
-import { transcriptPath } from './provider/recording-provider';
 
 vi.mock('@rudra-js/anthropic', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@rudra-js/anthropic')>();
@@ -235,30 +234,23 @@ describe('the mode switch', () => {
     expect(readdirSync(directory)).toHaveLength(1);
   });
 
-  it('says why a replay failed in record mode, as it does for a call', async () => {
-    const directory = scratch();
-    process.env[RECORDINGS] = directory;
+  it('says why the provider failed, in the line every mode prints', async () => {
+    process.env[RECORDINGS] = scratch();
     delete process.env[REPLAY_ONLY];
-    process.env[MODE] = 'record';
-    process.env[KEY] = 'sk-ant-not-a-real-key';
 
-    const { chooseProvider, MODEL_ID } = await import('./shop-context');
-    const factory = await anthropicFactory();
-    factory.mockReturnValue({
-      name: 'anthropic',
-      model: MODEL_ID,
-      generate: async () => {
-        throw new Error('record mode called the model for a page it already had');
-      },
-    });
-    const request = missingRequest();
-    writeFileSync(transcriptPath(directory, MODEL_ID, request), 'not json');
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { bundles, catalog, findShopper, generator } = await import('./shop-context');
+    const { buildTrackingInput } = await import('./fixtures/tracking-input');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await expect(chooseProvider().generate(request)).rejects.toThrow(/not valid JSON/);
-    expect(error).toHaveBeenCalled();
+    await generator.generate(
+      buildTrackingInput(findShopper('S-0001'), catalog[0]!.sku, catalog, bundles),
+    );
 
-    error.mockRestore();
+    expect(log).toHaveBeenCalledWith(expect.stringMatching(/provider-error\): .*no recording/i));
+
+    warn.mockRestore();
+    log.mockRestore();
   });
 });
 

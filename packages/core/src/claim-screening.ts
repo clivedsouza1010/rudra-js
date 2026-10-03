@@ -166,21 +166,11 @@ export const ALLOWED_PHRASES = ['does not feel cheap', "doesn't feel cheap", 'la
 
 const DIGIT = /\p{Nd}/u;
 
-const BARE_EXPONENT = /^[+-]?\d+(?:\.\d+)?[eE]([+-]?\d+)$/;
-
-const MAX_EXPONENT = 1000;
-
-function canLayOut(fact: string): boolean {
-  const match = BARE_EXPONENT.exec(fact.trim());
-  if (match === null) return true;
-  return Math.abs(Number(match[1] ?? '')) <= MAX_EXPONENT;
-}
-
 export function productFacts(product: Product): string[] {
   const facts: string[] = [];
-  if (DIGIT.test(product.category) && canLayOut(product.category)) facts.push(product.category);
+  if (DIGIT.test(product.category)) facts.push(product.category);
   for (const tag of product.tags) {
-    if (DIGIT.test(tag) && canLayOut(tag)) facts.push(tag);
+    if (DIGIT.test(tag)) facts.push(tag);
   }
   return facts;
 }

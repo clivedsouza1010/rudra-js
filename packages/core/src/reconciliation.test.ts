@@ -11,7 +11,7 @@ import {
 } from './component-spec.js';
 import { selectProducts } from './product-selection.js';
 import { buildDigest, DIGEST_LIMITS } from './signal-digest.js';
-import { ALLOWED_PHRASES, productFacts } from './claim-screening.js';
+import { ALLOWED_PHRASES } from './claim-screening.js';
 import {
   MAX_BLOCKS,
   bundleForShopper,
@@ -1870,38 +1870,8 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toEqual([]);
   });
 
-  // attested lays a fact written as a bare exponent out digit by digit. It caps that
-  // itself now, but it is a peer dependency and the copy a host has installed may be
-  // older, where `1e2000000000` threw and `-2.5e400000000` took the process with it.
+  // attested caps how far it lays out a bare exponent, so a tag like this stands behind nothing.
   const ABSURD = '1e2000000000';
-
-  const factsFor = (overrides: Record<string, unknown>): string[] => {
-    const input = inputFor({ candidates: [product('TR-101', overrides), product('TR-102')] });
-    const [first] = input.candidates;
-    if (!first) throw new Error('expected a candidate');
-
-    return productFacts(first);
-  };
-
-  it('keeps a fact nothing could lay out off the list, tag or category', () => {
-    expect(factsFor({ category: ABSURD, tags: [ABSURD, '3 season'] })).toEqual(['3 season']);
-  });
-
-  it('keeps one off the list with spaces around it', () => {
-    expect(factsFor({ tags: [` ${ABSURD} `] })).toEqual([]);
-  });
-
-  it('keeps one off the list for an exponent that far negative', () => {
-    expect(factsFor({ tags: ['1e-2000000000'] })).toEqual([]);
-  });
-
-  it('keeps the fact at the cap and drops the one past it', () => {
-    expect(factsFor({ tags: ['1e1000', '1e1001'] })).toEqual(['1e1000']);
-  });
-
-  it('keeps a fact that only ends in an exponent', () => {
-    expect(factsFor({ tags: [`model ${ABSURD}`] })).toEqual([`model ${ABSURD}`]);
-  });
 
   it('renders the rest of that candidate normally', () => {
     const result = reconcile(

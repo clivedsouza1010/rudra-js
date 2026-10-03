@@ -29,7 +29,7 @@ async function recommendations() {
 
   const spec = await generator.generate(input);
 
-  return <RudraComponent spec={spec} products={input.candidates} />;
+  return <RudraComponent spec={spec} products={input.candidates} locale="en-US" />;
 }
 // --- end quickstart ---
 
