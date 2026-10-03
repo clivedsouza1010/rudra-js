@@ -9,6 +9,11 @@ updates:
       interval: weekly
     commit-message:
       prefix: 'chore(ci)'
+    groups:
+      # CodeQL's init, analyze and upload-sarif have to move together, or the
+      # scan fails until the last of them lands.
+      actions:
+        patterns: ['*']
 
   - package-ecosystem: npm
     directory: /
