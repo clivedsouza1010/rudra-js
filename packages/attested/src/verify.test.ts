@@ -358,6 +358,26 @@ describe('verify — the wording layer', () => {
     expect(verify('ЖЕҢІЛДІК ТҮРЛЕРІ', facts).wording.supported).toBe(true);
   });
 
+  it('catches a generic environmental claim', () => {
+    for (const text of [
+      'Eco-friendly and light',
+      'Carbon neutral shipping',
+      'A sustainable pick',
+    ]) {
+      expect(verify(text, NOTHING).wording.supported, text).toBe(false);
+    }
+  });
+
+  it('leaves the colour green alone', () => {
+    expect(verify('A green trail shoe', NOTHING).wording.supported).toBe(true);
+  });
+
+  it('catches social proof and a countdown nobody can back', () => {
+    for (const text of ['Others are looking at this right now', 'Trending now', 'Ends tonight']) {
+      expect(verify(text, NOTHING).wording.supported, text).toBe(false);
+    }
+  });
+
   it('takes a phrase the host added for their own language', () => {
     const facts = { values: [], bannedPhrases: ['nur noch'] };
     expect(verify('Nur noch wenige', facts).wording.supported).toBe(false);

@@ -10,6 +10,20 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- The claim screen catches more. `@rudra-js/attested`'s phrase list now holds
+  generic environmental claims ("eco-friendly", "carbon neutral",
+  "sustainable" and the like). Under EU Directive 2024/825, applied through
+  each country's own law from 27 September 2026, those are unfair unless the
+  trader can show recognised excellent environmental performance, and a
+  "neutral" claim based on offsetting is unfair outright. It also holds social
+  proof nobody can back ("others are looking at this", "trending") and
+  countdowns ("ends tonight"). It leaves out the bare word "green", which is
+  too often a colour, and core now allows "sustainable pace". Core's stock
+  pattern reads "only two left" as well as "only 2 left". The list grows from
+  81 to 122 phrases.
+
 ## [0.7.3] - 2026-10-01
 
 ### Fixed

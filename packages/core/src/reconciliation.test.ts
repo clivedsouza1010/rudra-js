@@ -1410,6 +1410,11 @@ describe('claims the renderer cannot check', () => {
     },
     { kind: 'stock', catches: 'restocked this morning', keeps: 'sold in three sizes' },
     { kind: 'stock', catches: 'only 3 remain', keeps: 'comfortable for the last few miles' },
+    {
+      kind: 'stock',
+      catches: 'only two left in your size',
+      keeps: 'two left-hand pockets for keys',
+    },
     { kind: 'stock', catches: 'selling fast in your size', keeps: 'nearly weightless in the hand' },
   ];
 
