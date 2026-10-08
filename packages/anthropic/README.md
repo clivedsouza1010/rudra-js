@@ -86,12 +86,16 @@ or a region-specific endpoint you have.
 What's in that request is listed under **What the model sees** in the
 [`@rudra-js/core` README](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core#what-the-model-sees).
 Read it before you send real shopper traffic. In cohort mode, the default, the
-request carries no individual. In per-shopper mode it carries that shopper's
-likes, dislikes, purchases, basket, views and recent searches.
+request carries no individual. In per-shopper mode it carries the product that
+shopper is looking at, their current and recent searches, whether they're
+returning, their likes, dislikes, purchases, basket, most-viewed products, the
+categories they lean towards and interaction counts.
 
 If your shop is in the EU or the UK, you're the one sending personal data to
 Anthropic, so you'll need a data processing agreement with them plus a transfer
-mechanism for the data leaving your region. Your shop is Anthropic's customer.
+mechanism for the data leaving your region. Anthropic's data processing addendum
+covers this, with Anthropic acting as your processor. Your shop is Anthropic's
+customer.
 This package is a piece of code in the middle, and it _isn't_ a party to
 anything.
 

@@ -490,8 +490,13 @@ for `ttlMs`, 60,000 milliseconds by default, so one minute. It holds up to
 `maxEntries`, 10,000 by default. Once it's full, the entry read longest ago is
 the first to go.
 
-An entry holds the generated spec and `generatedAt`, the epoch milliseconds when
-the model produced it. That's the whole of it. No payload, no shopper, no prompt.
+An entry holds the generated spec, as the model returned it before screening,
+and `generatedAt`, the epoch milliseconds when the model produced it. No payload
+and no prompt. In cohort mode nothing in it is about one shopper. In per-shopper
+mode the model wrote it from that shopper's signals, so its text can repeat
+them, a search term for instance, and the entry is personal data until it goes.
+Expiry is checked when an entry is read, so an expired one stays in memory until
+it's read again or pushed out by a newer one.
 
 The port is two methods, and an optional third:
 
@@ -537,6 +542,65 @@ These are the numbers worth keeping:
   adapter turned down (a `max_tokens` stop, a refusal, no tool call, or a reply
   that doesn't fit the schema) was billed too, and arrives as a
   `'provider-error'` with no `usage`, so this sum is lower than your bill.
+
+## Running it in a regulated shop
+
+This isn't legal advice, and which rules apply depends on where you sell. It's
+what the package does, so you can answer what a privacy or consumer-law review
+will ask.
+
+**What leaves your server.** Nothing, unless you pass a `provider`, or a `cache`
+whose store lives somewhere else. With a provider, cohort mode sends the page and
+locale, the category, the segment you set, the shopper's strongest category,
+whether they have any history, and the candidate products. None of that
+identifies anyone. Per-shopper mode adds the shopper's own signals. Both lists
+are under [What the model sees](#what-the-model-sees). `user.id` is never sent in
+either mode. The provider should be your processor, under a contract that says
+so; for Anthropic, see the `@rudra-js/anthropic` README.
+
+**A shopper who objects to profiling.** Leave `signals` and `user.segment` out
+of their payload, and in per-shopper mode `context.searchQuery` and
+`user.isReturning` too. They get the cold-start component, built from the page
+and the catalog, not from them. With those left out, `generateDeterministic(input)`
+gives the same kind of component without calling the model or the cache. Called
+with signals, it still personalises.
+
+**Deleting a shopper's data.** The package keeps nothing about a shopper except
+the cache. In cohort mode a cache entry isn't about anyone. In per-shopper mode
+it is, and nothing maps a shopper to their entries, so keep `ttlMs` short or
+pass `createNullSpecCache()`. `onEvent` sends no shopper id, but in per-shopper mode its
+`key` is derived from one, and `violations` can name SKUs from a shopper's basket
+or purchases, so treat logs of it as personal data.
+
+**Caching pages.** A personalised page says things like "Goes with your cart" and
+"You looked at this recently" in its HTML. Serve those pages with
+`Cache-Control: private` or `no-store`, so a shared cache never hands one
+shopper's page to another.
+
+**Telling shoppers a model wrote the copy.** The wrapper's `data-rudra-source`
+says `llm` or `cache` when a model wrote the copy and `fallback` when it didn't,
+so it's a machine-readable marker you can build on, for example to show a note.
+Whether you must label AI-written copy, and how, depends on where you sell; in
+the EU, Article 50 of the AI Act is the rule to ask about.
+
+**Claims.** The copy on your page is your own advertising, whoever wrote it. The
+screen catches prices, discounts, stock, ratings, delivery, urgency and generic
+environmental claims, but it's a list, and rewordings get through (SECURITY.md
+explains why, and the tests list the known ones). Anything it misses is still
+yours to stand behind.
+
+**Children.** If your shop is aimed at children, don't use per-shopper mode, and
+consider leaving `signals` out entirely.
+
+**Marketplaces.** If you rank other sellers' products, EU platform rules (Article
+27 of the Digital Services Act) ask you, unless you're a micro or small
+business, to describe your recommender's main parameters in your terms, and any
+options shoppers have to change them. Those parameters are the signals listed
+above, the mode you run and your `rank` setting.
+
+**Accessibility.** Every card is one link with a readable name, and headings
+only render when they have text. Contrast, focus styles and layout come from
+your stylesheet, so those are yours to check.
 
 ## Licence
 

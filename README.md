@@ -104,6 +104,9 @@ as the `provider`. Everything above stays the same, except that the model now wr
 the layout and the emphasis. By default the products in a grid or carousel are still chosen by the
 core logic rather than by the model.
 
+Before you send real shopper traffic, read
+[Running it in a regulated shop](packages/core#running-it-in-a-regulated-shop).
+
 That adapter is one option, not the only one. Any model can sit behind the small interface described
 in [Any provider](packages/core#any-provider).
 
