@@ -60,6 +60,9 @@ const html = (element: ReactElement) => renderToStaticMarkup(element);
 const render = (componentSpec: ComponentSpec, props = {}) =>
   html(<RudraComponent spec={componentSpec} products={CATALOG} {...props} />);
 
+// What a screen reader reads out of some markup: the text between the tags.
+const textOf = (markup: string) => markup.split(/<[^>]*>/).join('');
+
 /**
  * The claim the whole design rests on: model output reaches the page as text
  * and nothing else. These assert the rendered HTML rather than the component
@@ -603,12 +606,21 @@ describe('a few behaviours the code asserts', () => {
         '<span class="rudra-hero__cta">Shop</span></a>',
     );
     const link = /<a [^>]*class="rudra-hero__link"[^>]*>(.*?)<\/a>/.exec(markup)?.[1] ?? '';
-    expect(link.replace(/<[^>]+>/g, '')).toBe('Product TR-101 $174.00 Shop');
+    expect(textOf(link)).toBe('Product TR-101 $174.00 Shop');
   });
 
   it('leaves out a hero with nothing left to show', () => {
     const markup = render(
       spec([{ kind: 'hero', headline: '', body: null, sku: 'TR-101', ctaLabel: null }]),
+      { products: [product('TR-101', { isInStock: false })], locale: 'en-US' },
+    );
+
+    expect(markup).not.toContain('rudra-hero');
+  });
+
+  it('treats an empty hero body as nothing to show', () => {
+    const markup = render(
+      spec([{ kind: 'hero', headline: '', body: '', sku: 'TR-101', ctaLabel: null }]),
       { products: [product('TR-101', { isInStock: false })], locale: 'en-US' },
     );
 
@@ -637,7 +649,7 @@ describe('a few behaviours the code asserts', () => {
     const markup = render(gridSpec([reference('TR-101', { badge: 'New' })]), { locale: 'en-US' });
     const link = /<a [^>]*class="rudra-card[^"]*"[^>]*>(.*?)<\/a>/.exec(markup)?.[1] ?? '';
 
-    expect(link.replace(/<[^>]+>/g, '')).toBe('New Product TR-101 $174.00 A dependable pick');
+    expect(textOf(link)).toBe('New Product TR-101 $174.00 A dependable pick');
   });
 
   it('resolves the hero product from the catalog, price and all', () => {
