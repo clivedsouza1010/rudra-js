@@ -10,6 +10,8 @@ break them.
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-10-08
+
 ### Changed
 
 - The claim screen catches more. `@rudra-js/attested`'s phrase list now holds
@@ -677,7 +679,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.3...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.4...HEAD
+[0.7.4]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.0...v0.7.1
