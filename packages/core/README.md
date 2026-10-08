@@ -237,13 +237,14 @@ list, and not an `Accept-Language` header.
 
 ### Cohorts
 
-By default one generated component is shared between shoppers who look alike, and
-each shopper's own products are filled in per request. A cohort is the shopper's
-segment, the surface and slot, the locale, the item count, whether they're a
-first-time visitor, the category being browsed, and the category they lean
-towards. Everything that makes a person an individual stays out of it: who they
-are, what they liked, viewed or searched for. That's what lets many page views
-reuse one call.
+By default one generated component is shared between shoppers who look alike,
+and each shopper's own products are filled in per request. A cohort is the
+shopper's segment, the surface and slot, the locale, the item count, whether
+they have any history, the category being browsed, and the category they lean
+towards. Who they are, what they searched for and the products they liked or
+viewed stay out of it. For the shared cohort we work out only two things from
+their own data: the category they lean towards and whether they have any
+history. That's what lets many page views reuse one call.
 
 The candidate list is part of the cohort too, since the model is shown those
 products and writes about them. In most shops candidates come from the page, so
@@ -492,11 +493,12 @@ the first to go.
 
 An entry holds the generated spec, as the model returned it before screening,
 and `generatedAt`, the epoch milliseconds when the model produced it. No payload
-and no prompt. In cohort mode nothing in it is about one shopper. In per-shopper
-mode the model wrote it from that shopper's signals, so its text can repeat
-them, a search term for instance, and the entry is personal data until it goes.
-Expiry is checked when an entry is read, so an expired one stays in memory until
-it's read again or pushed out by a newer one.
+and no prompt. In cohort mode it holds no shopper id and everyone in the cohort
+shares it, unless its segment or candidates were picked for one shopper. In
+per-shopper mode the model wrote it from that shopper's signals, so its text can
+repeat them, a search term for instance, and the entry is personal data until it
+goes. Expiry is checked when an entry is read, so an expired one stays in memory
+until it's read again or pushed out by a newer one.
 
 The port is two methods, and an optional third:
 
@@ -550,13 +552,16 @@ what the package does, so you can answer what a privacy or consumer-law review
 will ask.
 
 **What leaves your server.** Nothing, unless you pass a `provider`, or a `cache`
-whose store lives somewhere else. With a provider, cohort mode sends the page and
-locale, the category, the segment you set, the shopper's strongest category,
-whether they have any history, and the candidate products. None of that
-identifies anyone. Per-shopper mode adds the shopper's own signals. Both lists
-are under [What the model sees](#what-the-model-sees). `user.id` is never sent in
-either mode. The provider should be your processor, under a contract that says
-so; for Anthropic, see the `@rudra-js/anthropic` README.
+whose store lives somewhere else. With a provider, cohort mode sends the page
+and locale, the category, the segment you set, the shopper's strongest category,
+whether they have any history, and the candidate products. There's no shopper id
+in it, but it can still be personal data: the strongest category and the history
+flag come from that shopper's data, the segment goes exactly as you wrote it,
+and the candidate list is about them too if you pick or order it per shopper.
+Per-shopper mode adds the shopper's own signals. Both lists are under [What the
+model sees](#what-the-model-sees). `user.id` is never sent in either mode. The
+provider should be your processor, under a contract that says so; for Anthropic,
+see the `@rudra-js/anthropic` README.
 
 **A shopper who objects to profiling.** Leave `signals` and `user.segment` out
 of their payload, and in per-shopper mode `context.searchQuery` and
@@ -566,11 +571,14 @@ gives the same kind of component without calling the model or the cache. Called
 with signals, it still personalises.
 
 **Deleting a shopper's data.** The package keeps nothing about a shopper except
-the cache. In cohort mode a cache entry isn't about anyone. In per-shopper mode
-it is, and nothing maps a shopper to their entries, so keep `ttlMs` short or
-pass `createNullSpecCache()`. `onEvent` sends no shopper id, but in per-shopper mode its
-`key` is derived from one, and `violations` can name SKUs from a shopper's basket
-or purchases, so treat logs of it as personal data.
+the cache. In cohort mode an entry holds no shopper id and everyone in the
+cohort shares it, so usually there's no one shopper's entry to delete. The
+exception is a cohort entry whose segment or candidate list was picked for one
+shopper: like every per-shopper entry, it's about that shopper. Nothing maps a
+shopper to their entries, so keep `ttlMs` short or pass `createNullSpecCache()`.
+`onEvent` sends no shopper id, but in per-shopper mode its `key` is derived from
+one, and `violations` can name SKUs from a shopper's basket or purchases, so
+treat logs of it as personal data.
 
 **Caching pages.** A personalised page says things like "Goes with your cart" and
 "You looked at this recently" in its HTML. Serve those pages with
@@ -589,14 +597,38 @@ environmental claims, but it's a list, and rewordings get through (SECURITY.md
 explains why, and the tests list the known ones). Anything it misses is still
 yours to stand behind.
 
-**Children.** If your shop is aimed at children, don't use per-shopper mode, and
-consider leaving `signals` out entirely.
+**Children.** In the UK, the ICO's Children's Code covers any shop that
+under-18s are more likely than not to use, not only one aimed at them. Its
+standard 12 asks for profiling to be off by default unless you can show a
+compelling reason, judged by the child's best interests, and for safeguards when
+it's on. For a shop like that, don't use per-shopper mode. For a shopper under
+18, leave `signals` and `user.segment` out of their payload unless they've
+switched personalisation on, as for a shopper who objects to profiling. If you
+can't tell a shopper's age with confidence that fits the risk, treat every
+shopper as under 18. Cohort mode alone doesn't turn profiling off: the default
+`rank: 'signals'` still orders products by the shopper's signals in cohort mode
+and in the fallback component, even with no provider, and cohort mode still
+sends their strongest category, whether they have any history, and any segment
+to the model.
 
-**Marketplaces.** If you rank other sellers' products, EU platform rules (Article
-27 of the Digital Services Act) ask you, unless you're a micro or small
-business, to describe your recommender's main parameters in your terms, and any
-options shoppers have to change them. Those parameters are the signals listed
-above, the mode you run and your `rank` setting.
+**Marketplaces.** If other sellers list products on your site, EU platform rules
+(Article 27 of the Digital Services Act) ask you, unless you're a micro or small
+business, to set out in your terms your recommender's main parameters, why they
+weigh as they do, and any options shoppers have to change them. If shoppers can
+pick between options, such as switching personalisation off, the control has to
+sit where the products are shown. Which parameters apply depends on your mode
+and your `rank` setting. `rank` sets the order in cohort mode and in the
+fallback component. With `rank: 'given'` that's the order you sent, so describe
+your own ranking. With `rank: 'signals'` it comes from the shopper's category
+interest (the category they're browsing counts too), how often they've viewed a
+product, its rating, and tags it shares with products they've engaged with.
+Category weighs most. In per-shopper mode the model picks which candidates to
+show and in what order, from what's under
+[What the model sees](#what-the-model-sees). In cohort mode the model picks the
+hero's product, from the cohort list there. In every mode, anything out of stock, disliked or
+being looked at right now is left out, and so is anything bought or in the
+basket, except as part of a bundle. A bundle is picked by what's in the basket,
+then what they viewed, then the category being browsed.
 
 **Accessibility.** Every card is one link with a readable name, and headings
 only render when they have text. Contrast, focus styles and layout come from
