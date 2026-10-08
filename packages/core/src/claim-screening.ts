@@ -82,6 +82,7 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
       /\brestocked?\b|\bsold out\b/,
 
       /\b(?:only\s+)?(?:\d+|a few|a handful|a couple|one|few)\s+(?:left|remain(?:s|ing)?)\b/,
+      /\bonly\s+(?:two|three|four|five|six|seven|eight|nine|ten)\s+(?:left|remain(?:s|ing)?)\b/,
       /\bselling fast\b|\b(?:almost|nearly) gone\b|\bwhile stocks last\b/,
     ],
   },
@@ -162,7 +163,12 @@ function normaliseForClaims(text: string, byLook: boolean): string {
   return folded;
 }
 
-export const ALLOWED_PHRASES = ['does not feel cheap', "doesn't feel cheap", 'last few miles'];
+export const ALLOWED_PHRASES = [
+  'does not feel cheap',
+  "doesn't feel cheap",
+  'last few miles',
+  'sustainable pace',
+];
 
 const DIGIT = /\p{Nd}/u;
 

@@ -102,14 +102,21 @@ is two numbers and a fact of 23 does not stand behind it.
 ### Layer two — wording. This is the best-effort half.
 
 Claims with no number in them: "cheap", "bargain", "on sale", "best-selling",
-"selling fast", "in stock", "free delivery". There is no value to check, so
-there is nothing to invert. It stays a denylist, it stays open and
+"selling fast", "in stock", "free delivery", "trending". There is no value to
+check, so there is nothing to invert. It stays a denylist, it stays open and
 English-first, and every result it produces says so:
 
 ```ts
 verify('Selling fast', { values: [] }).wording;
-// { supported: false, strength: 'best-effort', checked: 81, findings: [...] }
+// { supported: false, strength: 'best-effort', checked: 122, findings: [...] }
 ```
+
+The list also carries generic environmental claims — "eco-friendly", "carbon
+neutral", "sustainable". Under EU Directive 2024/825, applied through each
+country's own law from 27 September 2026, a generic environmental claim is
+unfair unless the trader can show recognised excellent environmental
+performance, and a "neutral" claim based on offsetting is unfair outright. The
+list leaves out the bare word "green", which is too often a colour.
 
 Add your own for your own language, and name the wording you stand behind:
 
