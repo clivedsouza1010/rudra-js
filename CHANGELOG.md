@@ -33,6 +33,11 @@ break them.
   are the hero link's and the banner's text and call to action. The react
   README now says the banner and bundle calls to action are plain text, not
   controls.
+- The core README's list of what the model sees was off in two places. A
+  shopper counts as having no history when they have no likes, dislikes,
+  purchases, basket items or views, so one with only searches or other
+  interactions is still sent as "no history at all". And per-shopper mode sends
+  up to six categories the shopper leans towards, not every one.
 
 ## [0.7.3] - 2026-10-01
 
