@@ -599,9 +599,45 @@ describe('a few behaviours the code asserts', () => {
     );
 
     expect(markup).toContain(
-      '<span class="rudra-hero__price">$174.00</span>' +
+      '<span class="rudra-hero__price">$174.00</span> ' +
         '<span class="rudra-hero__cta">Shop</span></a>',
     );
+    const link = /<a [^>]*class="rudra-hero__link"[^>]*>(.*?)<\/a>/.exec(markup)?.[1] ?? '';
+    expect(link.replace(/<[^>]+>/g, '')).toBe('Product TR-101 $174.00 Shop');
+  });
+
+  it('leaves out a hero with nothing left to show', () => {
+    const markup = render(
+      spec([{ kind: 'hero', headline: '', body: null, sku: 'TR-101', ctaLabel: null }]),
+      { products: [product('TR-101', { isInStock: false })], locale: 'en-US' },
+    );
+
+    expect(markup).not.toContain('rudra-hero');
+  });
+
+  it('separates the banner text from its call to action', () => {
+    const markup = render(
+      spec([{ kind: 'banner', text: 'Free returns', ctaLabel: 'Learn more', tone: 'info' }]),
+    );
+
+    expect(markup).toContain('Free returns</span> <span class="rudra-banner__cta">');
+  });
+
+  it('leaves out the hero heading when the screen emptied it', () => {
+    const markup = render(
+      spec([{ kind: 'hero', headline: '', body: null, sku: 'TR-101', ctaLabel: null }]),
+      { locale: 'en-US' },
+    );
+
+    expect(markup).toContain('rudra-hero__link');
+    expect(markup).not.toContain('rudra-hero__headline');
+  });
+
+  it('gives a card link a name a screen reader can read', () => {
+    const markup = render(gridSpec([reference('TR-101', { badge: 'New' })]), { locale: 'en-US' });
+    const link = /<a [^>]*class="rudra-card[^"]*"[^>]*>(.*?)<\/a>/.exec(markup)?.[1] ?? '';
+
+    expect(link.replace(/<[^>]+>/g, '')).toBe('New Product TR-101 $174.00 A dependable pick');
   });
 
   it('resolves the hero product from the catalog, price and all', () => {
