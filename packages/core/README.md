@@ -396,7 +396,8 @@ The two generation modes send different things. Cohort is the default.
 - the category being browsed (`context.currentCategory`)
 - the name of the category the shopper leans towards most. Just the name, the
   score stays behind
-- whether this shopper has no history at all
+- whether this shopper has no history at all, meaning no likes, dislikes,
+  purchases, basket items or views. Searches and other interactions don't count
 - how many products the component may place (`context.maxItems`)
 - the candidate list: one line per product, with its SKU, title, category, rating
   and tags
@@ -412,7 +413,7 @@ Everything above, and:
 - purchased SKUs, and what is in the basket
 - the most-viewed SKUs, each with its view count
 - recent searches
-- every category they lean towards, strongest first
+- up to six categories they lean towards, strongest first
 - the other kinds of interaction, each with a count
 
 ### Left out of both
