@@ -93,6 +93,11 @@ function hasContent(
         (reference) => sellableProduct(products, reference.sku) !== undefined,
       );
     case 'hero':
+      return (
+        block.headline.length > 0 ||
+        (block.body !== null && block.body.length > 0) ||
+        (block.sku !== null && sellableProduct(products, block.sku) !== undefined)
+      );
     case 'banner':
     case 'copy':
       return true;

@@ -69,8 +69,9 @@ later and may be the fresher of the two.
 ## Styling
 
 We ship no CSS. A stylesheet of ours would only fight whatever your site already has. So out of the
-box the block renders as a run-on line — every card element is inline, so titles and prices sit
-together with no separation. That's the starting point you style from.
+box the block renders as a run-on line — every card element is inline, so a card's parts sit on one
+line with spaces between them, and nothing separates one card from the next. That's the starting
+point you style from.
 
 Check out `examples/shop/public/demo-styles.css`. It's a working stylesheet written against nothing
 but the table below, so copy it as a starting point rather than as a supported API. The example shop applies it by default, and `?styles=off`
@@ -97,6 +98,12 @@ keep working.
 `.rudra-carousel__track` is meant to scroll horizontally, so give it `overflow-x: auto`. Nothing
 here uses JavaScript to scroll it for you. `.rudra-card--featured` is applied alongside
 `.rudra-card`, so write `.rudra-card--featured { ... }` after the base rule and let it layer on top.
+
+`.rudra-banner__cta` and `.rudra-bundle__cta` are plain text, not links or buttons, because there is
+nothing for them to do. Don't style them as buttons unless a renderer of your own wraps them in one.
+The hero's call to action sits inside the product link, so that one is clickable. Every card in a
+carousel is a link, so tabbing through them scrolls the track, which keeps it usable by keyboard
+even with the scrollbar hidden.
 
 ### Attributes
 

@@ -33,10 +33,11 @@ export function ProductCard({
         <img className="rudra-card__image" src={product.imageUrl} alt="" loading="lazy" />
       ) : null}
 
+      {/* The spaces are the link's accessible name: "Shoe $53.67 Popular", not "Shoe$53.67Popular". */}
       <span className="rudra-card__body">
-        {reference.badge ? <span className="rudra-card__badge">{reference.badge}</span> : null}
-        <span className="rudra-card__title">{product.title}</span>
-        <span className="rudra-card__price">{context.formatPrice(product)}</span>
+        {reference.badge ? <span className="rudra-card__badge">{reference.badge}</span> : null}{' '}
+        <span className="rudra-card__title">{product.title}</span>{' '}
+        <span className="rudra-card__price">{context.formatPrice(product)}</span>{' '}
         {reference.reason ? <span className="rudra-card__reason">{reference.reason}</span> : null}
       </span>
     </a>

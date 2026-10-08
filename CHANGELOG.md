@@ -24,6 +24,16 @@ break them.
   pattern reads "only two left" as well as "only 2 left". The list grows from
   81 to 122 phrases.
 
+### Fixed
+
+- `@rudra-js/react` no longer renders an empty hero heading when the claim
+  screen removes its text, and a hero left with nothing to show renders
+  nothing. A card's link text, which is what a screen reader announces, ran
+  together ("Shoe$53.67Popular"); its parts are now separated by spaces, and so
+  are the hero link's and the banner's text and call to action. The react
+  README now says the banner and bundle calls to action are plain text, not
+  controls.
+
 ## [0.7.3] - 2026-10-01
 
 ### Fixed

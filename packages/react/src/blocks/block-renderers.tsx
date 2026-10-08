@@ -23,7 +23,7 @@ export function HeroRenderer({
 
   return (
     <section className="rudra-hero">
-      <h3 className="rudra-hero__headline">{block.headline}</h3>
+      {block.headline ? <h3 className="rudra-hero__headline">{block.headline}</h3> : null}
       {block.body ? <p className="rudra-hero__body">{block.body}</p> : null}
       {product ? (
         <a
@@ -31,8 +31,7 @@ export function HeroRenderer({
           href={context.hrefForSku(product.sku)}
           data-rudra-sku={product.sku}
         >
-          {product.title}
-          <span className="rudra-hero__price">{context.formatPrice(product)}</span>
+          {product.title} <span className="rudra-hero__price">{context.formatPrice(product)}</span>{' '}
           {block.ctaLabel ? <span className="rudra-hero__cta">{block.ctaLabel}</span> : null}
         </a>
       ) : null}
@@ -83,7 +82,7 @@ export function CarouselRenderer({
 export function BannerRenderer({ block }: { block: BannerBlock }) {
   return (
     <aside className="rudra-banner" data-rudra-banner-tone={block.tone}>
-      <span className="rudra-banner__text">{block.text}</span>
+      <span className="rudra-banner__text">{block.text}</span>{' '}
       {block.ctaLabel ? <span className="rudra-banner__cta">{block.ctaLabel}</span> : null}
     </aside>
   );
