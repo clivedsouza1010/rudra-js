@@ -14,10 +14,6 @@ const AFTER_MAIN = 'the slot is after </main>, so it is not in position';
 export const HIDDEN_DIV = 'the page holds content in a hidden div for a script to move';
 export const SWAP = 'the page uses a script to move content into place';
 
-// Anything here means a crawler cannot be shown to reach the slot.
-export const PLACEMENT_PROBLEMS = [NO_SLOT, NO_MAIN, AFTER_MAIN];
-export const DEFERRAL_PROBLEMS = [HIDDEN_DIV, SWAP];
-
 export function checkCrawlable(html: string): string[] {
   const problems: string[] = [];
 

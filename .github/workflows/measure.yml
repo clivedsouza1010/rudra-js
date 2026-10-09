@@ -22,11 +22,7 @@ jobs:
 
       - run: npm ci --ignore-scripts
       - run: npm run build
-      # No ANTHROPIC_API_KEY here: the shop replays, and a replay miss is an error.
-      - run: npm run build --workspace @rudra-js/example-shop
 
-      - run: npm run matrix:crawler | tee "$RUNNER_TEMP/matrix.txt"
-        shell: bash
       - run: npm run bench | tee "$RUNNER_TEMP/bench.txt"
         shell: bash
 
@@ -34,6 +30,4 @@ jobs:
         if: always()
         with:
           name: measurements
-          path: |
-            ${{ runner.temp }}/matrix.txt
-            ${{ runner.temp }}/bench.txt
+          path: ${{ runner.temp }}/bench.txt

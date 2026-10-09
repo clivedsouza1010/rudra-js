@@ -17,14 +17,4 @@ describe('importing a crawl entry point', () => {
     expect(startShop).not.toHaveBeenCalled();
     expect(failure).toBeUndefined();
   });
-
-  it('run-matrix.ts starts no shop', async () => {
-    let failure: unknown;
-    await import('./run-matrix.js').catch((error: unknown) => {
-      failure = error;
-    });
-
-    expect(startShop).not.toHaveBeenCalled();
-    expect(failure).toBeUndefined();
-  });
 });
