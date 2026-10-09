@@ -14,13 +14,6 @@ export interface Shopper {
 const SEGMENTS = ['new', 'returning', 'loyalty', 'lapsed'];
 const SEARCHES = ['waterproof jacket', 'trail shoes', 'winter tent', 'merino base layer'];
 
-/**
- * A shopper population as a function of a seed.
- *
- * Roughly a tenth have no history at all. That is the cold-start path, which
- * takes a different branch through the digest and a different cache key, and a
- * population without it never exercises either.
- */
 export function generateShoppers(
   seed: number,
   catalog: readonly Product[],

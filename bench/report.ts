@@ -1,15 +1,5 @@
 import type { ArmResult, TokenPrices } from './measure-arm.js';
 
-/**
- * What the run writes to disk.
- *
- * The file outlives the console, and it is what somebody reads when they write
- * the numbers up. So it carries the setting as well as the numbers: when it
- * was made, what prices were charged, how many shoppers, how many to a page,
- * and every caveat the console prints. A bare list of numbers reads like a
- * measurement of a real model, which is exactly the mistake this branch is
- * here to stop repeating.
- */
 export interface BenchReport {
   generatedAt: string;
   prices: TokenPrices;
@@ -24,17 +14,9 @@ export interface ReportInput {
   prices: TokenPrices;
   population: number;
   shoppersPerPage: number;
-  /** Passed in rather than read off the clock, so a test can pin it. */
   generatedAt: string;
 }
 
-/**
- * The lines that have to travel with the numbers.
- *
- * Which ones apply depends on what answered the arms: under a stub the
- * timings, the tokens and the violation counts all say more about the harness
- * than about a model, and under a live run those same lines would be false.
- */
 export function buildCaveats(arms: readonly ArmResult[], shoppersPerPage: number): string[] {
   let anyStub = false;
   let anyCpu = false;
@@ -92,7 +74,6 @@ export function formatTable(results: readonly ArmResult[]): string {
     const hits = `${(result.cacheHitRate * 100).toFixed(1)}%`;
     const cost = `$${result.costPerThousandViews.toFixed(2)}`;
     const mix = `${result.sources.llm}/${result.sources.cache}/${result.sources.fallback}`;
-    // A stub run has no timings, and 'n/a' is the honest column for it.
     const timings = result.elapsedMs;
     const median = timings === undefined ? 'n/a' : String(timings.median);
     const p95 = timings === undefined ? 'n/a' : String(timings.p95);

@@ -46,7 +46,6 @@ const request = (signal = new AbortController().signal) => ({
   signal,
 });
 
-/** Both the schema test and the cache_control test need the sent request body. */
 const sentBodyOf = (fetch: typeof globalThis.fetch) =>
   JSON.parse(
     String(
@@ -67,8 +66,6 @@ describe('the Anthropic adapter', () => {
   });
 
   it('reports what the call cost', async () => {
-    // Cost is summed over these; an adapter that drops them makes every cost
-    // figure downstream silently zero.
     const provider = createAnthropicProvider({
       apiKey: 'k',
       fetch: answer(toolAnswer(spec, { input_tokens: 11, output_tokens: 3 })),
@@ -132,13 +129,9 @@ describe('the Anthropic adapter', () => {
 
     const sent = sentBodyOf(fetch);
 
-    // Restating the shape here is how a vocabulary drifts: the reconciler would
-    // enforce one thing and the model would be told another.
     expect(sent.tools[0]!.input_schema).toEqual(
       z.toJSONSchema(generatedSpecSchema, { io: 'input' }),
     );
-    // Assertions that hold whatever core's schema evolves into, so this test
-    // still means something if the two ever drift apart.
     expect(sent.tools[0]!.input_schema).toMatchObject({ type: 'object' });
     expect(sent.tools[0]!.input_schema.required).toEqual(
       expect.arrayContaining(['tone', 'headline', 'blocks']),
@@ -146,8 +139,6 @@ describe('the Anthropic adapter', () => {
   });
 
   it('marks the system prompt as the cached prefix', async () => {
-    // Nothing else here would notice a dropped cache_control: the response
-    // still parses, and a higher bill is the only symptom.
     const fetch = answer(toolAnswer(spec));
     const provider = createAnthropicProvider({ apiKey: 'k', fetch });
 
@@ -177,8 +168,6 @@ describe('the Anthropic adapter', () => {
   });
 
   it('keeps the status code even when the error body fails to read', async () => {
-    // The read sits inside the throw; if it rejects, that rejection must not
-    // replace the status error and erase which HTTP code this was.
     const fetch = vi.fn(async () => ({
       ok: false,
       status: 529,
@@ -191,8 +180,6 @@ describe('the Anthropic adapter', () => {
   });
 
   it('rejects when the body is null rather than reading a field off it', async () => {
-    // `null` is valid JSON. Reading `stop_reason` off it throws a TypeError
-    // naming this adapter, when the fault is the vendor's.
     const provider = createAnthropicProvider({ apiKey: 'k', fetch: answer(null) });
 
     await expect(provider.generate(request())).rejects.toThrow(/null, not an object/);
@@ -226,10 +213,6 @@ describe('the Anthropic adapter', () => {
   });
 
   it('rejects distinctly when the model hits its max_tokens budget mid-answer', async () => {
-    // On this model, thinking runs by default and shares the same output
-    // budget as the tool call — a low cap can be spent reasoning before the
-    // tool block is ever emitted. That is a budget setting, not the model
-    // declining to use the tool, so it must not read as "no tool use".
     const provider = createAnthropicProvider({
       apiKey: 'k',
       fetch: answer({
@@ -299,8 +282,6 @@ describe('the Anthropic adapter', () => {
   });
 
   it('stops when the caller aborts', async () => {
-    // Obligation three of the ComponentProvider contract. An adapter that
-    // ignores it keeps a request alive past the deadline that gave up on it.
     const controller = new AbortController();
     const fetch = vi.fn(
       async (_url: string, init?: RequestInit) =>
@@ -313,16 +294,10 @@ describe('the Anthropic adapter', () => {
     const pending = provider.generate(request(controller.signal));
     controller.abort();
 
-    // A matcher, not a bare `.rejects.toThrow()`: without one this test could
-    // pass on any unrelated rejection, or on a 5-second timeout instead of an
-    // actual assertion.
     await expect(pending).rejects.toThrow(/abort/i);
   });
 
   it('does not call out when the caller has already given up', async () => {
-    // The other direction of obligation three. `fetch` covers this on its own
-    // when it is the platform's, but this adapter takes an injected one — and
-    // every test here, plus any caller-supplied transport, is exactly that.
     const controller = new AbortController();
     controller.abort();
     const fetch = vi.fn(
@@ -369,9 +344,6 @@ describe('the Anthropic adapter', () => {
 
 describe('what reaches the caller on a failure', () => {
   it('keeps the vendor error category but not the body it came in', async () => {
-    // Anthropic's 400s quote the offending field back, and for this framework
-    // that field carries a shopper's own search terms. An adopter doing the
-    // ordinary thing with a rejection would otherwise log them.
     const provider = createAnthropicProvider({
       apiKey: 'k',
       fetch: answer(
@@ -419,8 +391,6 @@ const headersOf = (fetch: typeof globalThis.fetch) =>
 
 describe('an identity-linked key', () => {
   it('sends the workspace the request acts in, when one is configured', async () => {
-    // Without it the API answers 400: such a key belongs to a person across
-    // several workspaces, so it cannot infer which one.
     const fetch = answer(toolAnswer(spec));
     const provider = createAnthropicProvider({ apiKey: 'k', workspaceId: 'wrkspc_1', fetch });
 
@@ -441,9 +411,6 @@ describe('an identity-linked key', () => {
 
 describe('when the call never reaches the vendor', () => {
   it('names the transport fault instead of reporting a bare fetch failure', async () => {
-    // undici reports every transport fault as `TypeError: fetch failed` and puts
-    // the reason in `cause`, so a refused connection and a DNS failure read
-    // identically in a log.
     const provider = createAnthropicProvider({
       apiKey: 'k',
       fetch: async () => {
@@ -457,8 +424,6 @@ describe('when the call never reaches the vendor', () => {
   });
 
   it("lets the caller's own abort through unchanged", async () => {
-    // A deadline that fired means something specific upstream; dressing it as a
-    // transport fault would lose that.
     const controller = new AbortController();
     const provider = createAnthropicProvider({
       apiKey: 'k',
@@ -471,9 +436,6 @@ describe('when the call never reaches the vendor', () => {
     const pending = provider.generate(request(controller.signal));
     controller.abort();
 
-    // Asserted as the whole message, not a substring: a wrapped error would
-    // still contain these words, so `toThrow(/aborted by caller/)` would pass
-    // whether the abort travelled through or not.
     await expect(pending).rejects.toThrow(
       expect.objectContaining({ message: 'aborted by caller' }),
     );

@@ -49,7 +49,6 @@ describe('numeralsIn', () => {
   });
 
   it('reads one dot or comma with three digits behind it as grouping, never as a decimal', () => {
-    // The whole ×1000 family: a fact of 4.8 must not stand behind a written 4.800.
     expect(formsOf('1.299')).toEqual(['1299']);
     expect(formsOf('1,299')).toEqual(['1299']);
     expect(formsOf('4.800')).toEqual(['4800']);
@@ -90,7 +89,6 @@ describe('numeralsIn', () => {
   });
 
   it('reads a space or an apostrophe as a thousands mark', () => {
-    // French, Swiss and Swedish price formatting, and the narrow space CLDR emits.
     expect(formsOf('1 299')).toEqual(['1299']);
     expect(formsOf('1\u00a0299')).toEqual(['1299']);
     expect(formsOf('1\u202f299')).toEqual(['1299']);
@@ -102,7 +100,6 @@ describe('numeralsIn', () => {
   });
 
   it('will not read a loose thousands mark as a decimal point', () => {
-    // Otherwise a space would mint 12.000 out of a fact of 12, same as a dot did.
     expect(formsOf('12 000')).toEqual(['12000']);
   });
 
@@ -113,7 +110,6 @@ describe('numeralsIn', () => {
   it('gives a run no locale reads as a number only its own spelling', () => {
     expect(formsOf('3.14.15')).toEqual(['3.14.15']);
     expect(formsOf('24.12.2026')).toEqual(['24.12.2026']);
-    // Scripts still fold, so a Devanagari date and an ASCII one are one string.
     expect(formsOf('२४.१२.२०२६')).toEqual(['24.12.2026']);
   });
 
@@ -134,13 +130,11 @@ describe('numeralsIn', () => {
   });
 
   it('reads a numeral system it was never told about', () => {
-    // Devanagari, then Thai.
     expect(formsOf('३९')).toEqual(['39']);
     expect(formsOf('๓๙')).toEqual(['39']);
   });
 
   it('reads a digit in a block that abuts the block before it', () => {
-    // Mathematical sans-serif bold 1 and 9, then monospace 1 and 3.
     expect(formsOf('\u{1D7ED}\u{1D7F5}')).toEqual(['19']);
     expect(formsOf('\u{1D7F7}\u{1D7F9}')).toEqual(['13']);
     expect(formsOf('\u{1D7EE}')).toEqual(['2']);
@@ -153,8 +147,6 @@ describe('numeralsIn', () => {
   });
 
   it('drops a variation selector, which renders as nothing but is not a format character', () => {
-    // U+FE0F and U+FE00 are category Mn. A class of Cf alone left them in, and
-    // "$1<VS16>3" then read as the two supported numerals 1 and 3.
     expect(numeralsIn('1\ufe0f3')).toEqual([{ token: '13', forms: ['13'], kind: 'digits' }]);
     expect(formsOf('1\ufe003')).toEqual(['13']);
     expect(formsOf('1\u{e0100}3')).toEqual(['13']);
@@ -166,8 +158,6 @@ describe('numeralsIn', () => {
   });
 
   it('still drops a format character that is not default-ignorable', () => {
-    // The Arabic number signs and the interlinear annotation marks are Cf but not
-    // default-ignorable, so the class has to be the union of the two, not either one.
     expect(formsOf('1\u06003')).toEqual(['13']);
     expect(formsOf('1\ufff93')).toEqual(['13']);
     expect(formsOf('1\u{13430}3')).toEqual(['13']);
@@ -228,7 +218,6 @@ describe('supportedValues', () => {
   });
 
   it('lays a number out in positional notation rather than letting String pick exponents', () => {
-    // `String(1e21)` is `1e+21`, which used to read as the two numerals 1 and 21.
     expect(supportedValues([1e21])).toEqual(new Set(['1000000000000000000000']));
     expect(supportedValues([1e-7])).toEqual(new Set(['0.0000001']));
   });
@@ -239,14 +228,10 @@ describe('supportedValues', () => {
   });
 
   it('keeps a negative number on the small side out of the digits', () => {
-    // Splicing the sign back in the middle would mint a 0 the host never supplied.
     expect(supportedValues([-1.5e-7])).toEqual(new Set(['0.00000015']));
   });
 
   it('lays out the digits String chose, never a wider exact expansion', () => {
-    // 0.1 + 0.2 is exactly 0.3000000000000000444089209850062616169452667236328125, but
-    // every renderer in the host's stack writes the shortest round-trip form, so that
-    // is the run the model will write and the only one worth standing behind.
     expect(supportedValues([0.1 + 0.2])).toEqual(new Set(['0.30000000000000004']));
   });
 
@@ -255,23 +240,17 @@ describe('supportedValues', () => {
   });
 
   it('lays out a string fact that is a bare number in exponent notation', () => {
-    // `String(v)`, `JSON.stringify(v)`, a CSV export and a JSON API that writes 64-bit
-    // values as strings all land here, so the host did not choose these digits either.
     expect(supportedValues(['1e21'])).toEqual(new Set(['1000000000000000000000']));
     expect(supportedValues(['1.23E+15'])).toEqual(new Set(['1230000000000000']));
     expect(supportedValues([' 1e-7 '])).toEqual(new Set(['0.0000001']));
   });
 
   it('leaves a string fact alone when the exponent is part of something longer', () => {
-    // There the host really did type the digits, and a SKU is not a number.
     expect(supportedValues(['SKU AX-220e5'])).toEqual(new Set(['220', '5']));
     expect(supportedValues(['1e21 ohms'])).toEqual(new Set(['1', '21']));
   });
 
   it('lays out a thousand digits and stands behind nothing past that', () => {
-    // A twelve-character fact must not become a digit run big enough to take the
-    // process down. Every finite JS number lays out inside a thousand digits — the
-    // widest is 5e-324, at 326 — and no shop sells anything wider.
     expect(supportedValues(['1e999'])).toEqual(new Set([`1${'0'.repeat(999)}`]));
     expect(supportedValues(['1e-1000'])).toEqual(new Set([`0.${'0'.repeat(999)}1`]));
     expect(supportedValues(['1e1000'])).toEqual(new Set());
@@ -283,8 +262,6 @@ describe('supportedValues', () => {
   });
 
   it('stands behind nothing for a value that is neither, rather than throwing', () => {
-    // An optional product field arrives as null, and taking the whole call down over
-    // one missing price is worse than standing behind no numeral for it.
     expect(supportedValues([null, undefined, true] as unknown as (string | number)[])).toEqual(
       new Set(),
     );

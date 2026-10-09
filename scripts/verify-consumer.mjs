@@ -94,8 +94,6 @@ const runConsumer = (file) =>
 try {
   mkdirSync(join(modules, '@rudra-js'), { recursive: true });
 
-  // `--ignore-scripts` so this reads the build every other check ran against,
-  // rather than quietly making a different one through `prepack`.
   const tarballs = new Map();
   const shipped = new Map();
   for (const packageName of PACKAGES) {
@@ -122,7 +120,6 @@ try {
 
     const destination = join(modules, '@rudra-js', packageName);
     mkdirSync(destination, { recursive: true });
-    // Tarball entries live under `package/`.
     run('tar', ['-xzf', join(workspace, filename), '-C', destination, '--strip-components=1']);
   }
 

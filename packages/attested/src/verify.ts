@@ -138,7 +138,6 @@ function standsBehind(allowed: Span[], hit: Span): boolean {
 }
 
 function checkWording(text: string, phrases: string[], allowed: string[]): LayerReport {
-  // Read twice, since Ν reads as N but ν as v; both readings are the same length, so spans line up.
   const texts = [normalisePhrasing(text)];
   const byLook = normalisePhrasing(text, true);
   if (byLook !== texts[0]) texts.push(byLook);

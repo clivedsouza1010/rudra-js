@@ -102,7 +102,6 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
               input_schema: z.toJSONSchema(request.schema, { io: 'input' }),
             },
           ],
-          // Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 reject a forced tool call with a 400.
           tool_choice: { type: 'auto', disable_parallel_tool_use: true },
         }),
       });

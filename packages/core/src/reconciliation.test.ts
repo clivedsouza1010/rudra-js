@@ -64,10 +64,8 @@ const specWith = (blocks: GeneratedSpec['blocks']): GeneratedSpec => ({
 const grid = (items: ProductReference[]) =>
   specWith([{ kind: 'grid', title: 'For you', columns: 3, items }]);
 
-/** One surviving product, so a spec stays usable while its words are tested. */
 const PRODUCT_GRID: Block = { kind: 'grid', title: null, columns: 2, items: [ref('TR-101')] };
 
-/** Runs a spec through reconciliation against a given payload. */
 function reconcile(
   spec: GeneratedSpec,
   overrides: Partial<TrackingInputDraft> = {},
@@ -84,10 +82,6 @@ const WELL_RATED = [
 ];
 
 describe("a reason the shop supplied is the shop's own words", () => {
-  // The screen exists to catch the model. A sentence the host declared about
-  // its own product is not the model's, so it is left alone, the same rule the
-  // titles and prices already follow. What marks it as the host's is that this
-  // request wrote it from the candidate, not that the text happens to match.
   const CLAIM = 'Only 2 left at this price';
   const candidates = [product('TR-101', { reason: CLAIM }), product('TR-102')];
 
@@ -104,9 +98,6 @@ describe("a reason the shop supplied is the shop's own words", () => {
   });
 
   it('screens the identical sentence when the model wrote it', () => {
-    // per-shopper mode: fitToShopper never ran, so nothing is host-written.
-    // Before provenance was carried, matching the host's text was enough to
-    // skip the screen, which let the model launder a claim through it.
     const result = reconcile(grid([ref('TR-101', { reason: CLAIM })]), { candidates });
     const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
 
@@ -135,8 +126,6 @@ describe("a reason the shop supplied is the shop's own words", () => {
 });
 
 describe('a badge is screened like any other sentence', () => {
-  // The shortest, loudest text on a card, and the one most likely to carry
-  // "30% OFF" or "ONLY 2 LEFT". It renders, so it gets read.
   it.each([
     ['a discount', 'Save 30%'],
     ['a stock level', 'Only 2 left'],
@@ -157,11 +146,6 @@ describe('a badge is screened like any other sentence', () => {
     expect(result.violations).toEqual([]);
   });
 
-  /**
-   * A badge is prose too, and 24 characters is plenty to restate the basis the
-   * reason beside it just lost. Dropping the sentence and printing "You viewed
-   * this" underneath it says the same untrue thing, more convincingly.
-   */
   it('drops a badge along with the basis it was stating', () => {
     const result = reconcile(
       grid([ref('TR-101', { basis: 'most_viewed', badge: 'You viewed this' })]),
@@ -183,9 +167,6 @@ describe('a badge is screened like any other sentence', () => {
   });
 });
 describe('the selector writes reasons its own screen accepts', () => {
-  // Every branch of basisFor, driven through selectProducts so the reasons are
-  // the real ones. A reason the screen deletes is a card that loses its line
-  // and a violation counted against a model that said nothing.
   const SHAPES: Array<[string, RecommendationBasis, Partial<TrackingInputDraft>]> = [
     ['a cold-start shopper', 'popular', {}],
     [
@@ -210,8 +191,6 @@ describe('the selector writes reasons its own screen accepts', () => {
     const input = inputFor(overrides);
     const picks = selectProducts(input, buildDigest(input));
     expect(picks.length).toBeGreaterThan(0);
-    // Without this the intended basisFor branch may never run: a precedence
-    // change could pick a different valid reason and leave the test green.
     expect(picks.map((pick) => pick.basis)).toContain(expectedBasis);
 
     const items = picks.map((pick) =>
@@ -232,14 +211,12 @@ describe('the selector writes reasons its own screen accepts', () => {
   });
 });
 
-/** The first product reference of a spec whose only block is a grid. */
 const basisOf = (result: ReconcileResult): ProductReference | undefined => {
   const [block] = result.spec.blocks;
   if (block?.kind !== 'grid') throw new Error('expected a grid');
   return block.items[0];
 };
 
-/** The products that survived, flattened across every block. */
 const placedSkus = (blocks: GeneratedSpec['blocks']): string[] =>
   blocks.flatMap((block) =>
     block.kind === 'grid' || block.kind === 'carousel'
@@ -284,8 +261,6 @@ describe('product truth', () => {
     expect(result.violations).toContain('blocked-sku:TR-101');
   });
 
-  // The prompt asks the model not to do these, and the deterministic path has
-  // always excluded them. Asking is not the same as enforcing.
   it('drops a SKU the shopper already bought', () => {
     const result = reconcile(grid([ref('TR-101'), ref('TR-102')]), {
       signals: { lastPurchased: [{ sku: 'TR-101' }] },
@@ -304,11 +279,6 @@ describe('product truth', () => {
     expect(result.violations).toContain('blocked-sku:TR-102');
   });
 
-  /**
-   * The digest keeps the eight most recent purchases, because that is what a
-   * prompt can afford. The ninth is still something the shopper owns, and the
-   * blocklist reads the payload rather than the digest for exactly that reason.
-   */
   it('drops a purchase older than the digest keeps', () => {
     const bought = Array.from({ length: 9 }, (_, index) => ({
       sku: `BUY-${index + 1}`,
@@ -331,8 +301,6 @@ describe('product truth', () => {
     expect(result.violations).toContain('duplicate-sku:TR-101');
   });
 
-  // The spec schema cannot bound a string, so the SKU here is whatever the
-  // model wrote. It goes straight into a violation string an evaluation logs.
   it('keeps a very long SKU short in the violation it records', () => {
     const result = reconcile(grid([ref('X'.repeat(500))]));
 
@@ -404,7 +372,6 @@ describe('the item budget', () => {
 });
 
 describe('the hero products a spec reserves room for', () => {
-  // Two heroes naming one SKU must not burn two budget slots; the wasted slot costs a bundle.
   it('reserves one slot for a product two heroes both name', () => {
     const input = inputFor();
     const heroes: Block[] = [
@@ -416,10 +383,6 @@ describe('the hero products a spec reserves room for', () => {
   });
 });
 
-/**
- * `basis` is a factual claim about the shopper. The model has every incentive to
- * reach for the most flattering one, so each is checked against the digest.
- */
 describe('verifying the stated reason for a pick', () => {
   it('keeps most_viewed when the shopper really did view it', () => {
     const result = reconcile(grid([ref('TR-101', { basis: 'most_viewed' })]), {
@@ -442,7 +405,6 @@ describe('verifying the stated reason for a pick', () => {
       grid([ref('TR-101', { basis: 'most_viewed', reason: 'You keep coming back to this' })]),
     );
 
-    // The pick may still be fine; the sentence asserting why is not.
     expect(basisOf(result)?.reason).toBeNull();
   });
 
@@ -465,11 +427,6 @@ describe('verifying the stated reason for a pick', () => {
     expect(basisOf(mismatched)?.basis).toBe('popular');
   });
 
-  /**
-   * Affinity scores the category the page is in, which is right for ranking
-   * and is not evidence about the shopper. Otherwise every first-time visitor
-   * on a tent page is told they keep coming back to tents.
-   */
   it('will not read standing in a category as liking it', () => {
     const browsing = { surface: 'pdp', currentCategory: 'Trail Running' };
     const result = reconcile(
@@ -543,7 +500,6 @@ describe('text repair', () => {
     const spec = { ...specWith([]), headline: 'x'.repeat(500) };
     const result = reconcile({ ...spec, blocks: grid([ref('TR-101')]).blocks });
 
-    // The cap is a cap: the ellipsis is inside it, not added on top.
     expect(result.spec.headline).toHaveLength(90);
     expect(result.spec.headline.endsWith('…')).toBe(true);
   });
@@ -603,14 +559,6 @@ describe('usability', () => {
     expect(reconcile(grid([ref('TR-101')])).isUsable).toBe(true);
   });
 
-  // The cliff behind the quantity layer, written down because it is the expensive
-  // half of it. A headline cannot be nulled, so a screened one is emptied, and an
-  // empty headline makes the whole generation unusable — the model call is paid
-  // for and the deterministic component renders instead. On a catalogue with no
-  // digit in any tag or category, and the example shop is one, "Our 3 favourites
-  // for wet weather" is enough to do it. In cohort mode the spec is cached before
-  // reconciliation, so every hit for the rest of the TTL runs the same screen and
-  // reaches the same fallback.
   it('is unusable when a digit the shop never supplied is in the headline', () => {
     const result = reconcile({
       ...specWith([PRODUCT_GRID]),
@@ -683,19 +631,12 @@ describe('usability', () => {
   });
 });
 
-/**
- * `violations` is the evaluation signal — it is what a generation-validity rate
- * is computed from. A string that names the wrong cause is worse than no string
- * at all, because it looks like data.
- */
 describe('attributing a rejection to its real cause', () => {
   const spentBudget = { context: { surface: 'pdp', maxItems: 1 } };
 
   it('still reports a hallucinated SKU once the budget is spent', () => {
     const result = reconcile(grid([ref('TR-101'), ref('GHOST-1')]), spentBudget);
 
-    // Reporting this as budget:dropped would understate how often the model
-    // invents products, which is the number Section V asks for.
     expect(result.violations).toContain('unknown-sku:GHOST-1');
     expect(result.violations).not.toContain('budget:dropped:GHOST-1');
   });
@@ -721,7 +662,6 @@ describe('attributing a rejection to its real cause', () => {
     expect(result.violations).toEqual(['budget:dropped:TR-102']);
   });
 
-  // Shops keep the cart out of the candidate list, so this SKU is both at once.
   it('reports a cart SKU the host never offered as unknown, not blocked', () => {
     const result = reconcile(grid([ref('TR-101'), ref('TR-999')]), {
       signals: { cart: [{ sku: 'TR-999' }] },
@@ -766,7 +706,6 @@ describe('choosing a bundle', () => {
   });
 
   it('throws away a bundleId the model tried to set', () => {
-    // Otherwise the model could name a set this shopper was never offered.
     const result = reconcile(specWith([{ ...block, bundleId: 'BUN-MADE-UP' }]), {
       candidates: [product('A'), product('B')],
       bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
@@ -782,7 +721,6 @@ describe('choosing a bundle', () => {
   });
 
   it('will not show a bundle with a product the shopper cannot buy', () => {
-    // A set missing one of its parts is not that set.
     const result = reconcile(specWith([block]), {
       candidates: [product('A'), product('B', { isInStock: false })],
       bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
@@ -792,7 +730,6 @@ describe('choosing a bundle', () => {
   });
 
   it('will not show a bundle holding something the shopper disliked', () => {
-    // Cart and purchase history are fine in a set. A thumbs-down is not.
     const result = reconcile(specWith([block]), {
       candidates: [product('A'), product('B')],
       bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
@@ -803,8 +740,6 @@ describe('choosing a bundle', () => {
   });
 
   it('will not show a bundle holding a dislike the digest had no room for', () => {
-    // 'B' is the oldest, so it is the one the digest drops. The cap bounds what
-    // the model is told, not what the shopper may be shown.
     const result = reconcile(specWith([block]), {
       candidates: [product('A'), product('B')],
       bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
@@ -853,7 +788,6 @@ describe('choosing a bundle', () => {
   });
 
   it('will not show a bundle whose product is already on the page', () => {
-    // The same product twice on one page reads as a mistake.
     const result = reconcile(
       specWith([{ kind: 'grid', title: 'For you', columns: 3, items: [ref('A')] }, block]),
       {
@@ -876,7 +810,6 @@ describe('choosing a bundle', () => {
     expect(result.spec.blocks).toHaveLength(0);
   });
 
-  // No cart, no views, no affinity: the shop's own order is the only tie-break left.
   it('keeps the first of two sets the signals cannot separate', () => {
     const result = reconcile(specWith([block]), {
       candidates: [product('A'), product('B'), product('C'), product('D')],
@@ -943,7 +876,6 @@ describe('choosing a bundle', () => {
   });
 });
 
-// bundleForShopper and reconcileSpec each pick the set. These pin them to agree.
 describe('the set the generator reserves room for', () => {
   const BUNDLE_BLOCK: Block = {
     kind: 'bundle',
@@ -969,7 +901,6 @@ describe('the set the generator reserves room for', () => {
   };
 
   it('reserves nothing for a set holding a dislike the digest had no room for', () => {
-    // 'B' is the oldest thumbs-down, so it is the one the digest drops.
     const { reserved, placed } = bothPaths({
       ...PAIR,
       signals: {
@@ -1014,8 +945,6 @@ describe('an empty hero', () => {
       ]),
     );
 
-    // Every other block kind disappears when it clamps to nothing; a hero that
-    // survives empty renders a blank region above real content.
     expect(result.spec.blocks.map((block) => block.kind)).toEqual(['grid']);
     expect(result.violations).toContain('empty-block:hero');
   });
@@ -1044,12 +973,9 @@ describe('an empty hero', () => {
 });
 
 describe('claims the renderer cannot check', () => {
-  /** The reason that survived on the one product of a one-grid spec. */
   const reasonFor = (text: string): string | null | undefined =>
     basisOf(reconcile(grid([ref('TR-101', { reason: text })])))?.reason;
 
-  // Typed as the block, not inferred: `body: null` would otherwise infer the
-  // literal type `null` and refuse a string override.
   const bundleBlock: BundleBlock = {
     kind: 'bundle',
     title: 'Get set up',
@@ -1064,8 +990,6 @@ describe('claims the renderer cannot check', () => {
       bundles: [{ id: 'BUN-1', skus: ['A', 'B'], price: 25 }],
     });
 
-  // Straight out of the committed transcript. The prompt told the model not to
-  // state a rating, and it wrote all three of these anyway.
   const FROM_THE_TRANSCRIPT = [
     'one of the best-reviewed picks in Backpacks',
     'another highly rated backpack in this category',
@@ -1094,9 +1018,6 @@ describe('claims the renderer cannot check', () => {
     expect(reasonFor('only 2 left in stock')).toBeNull();
   });
 
-  // The screen is worse than the hole it fills if it eats honest copy. These
-  // talk about weight, warmth and materials, and none of them state a price,
-  // a rating, a delivery date or a stock level.
   const ORDINARY = [
     'a waterproof option from the same category',
     'saves weight on long hikes',
@@ -1114,10 +1035,6 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
-  // A specification is not a claim. Every line here is copy a real shop writes,
-  // and every one of them used to be deleted. They are the regression that stops
-  // this screen becoming worse than the hole it fills. None of them carries a
-  // number, so the quantity layer below has nothing to weigh either.
   const SPECIFICATIONS = [
     'arrives flat-packed',
     'arrives ready to ride',
@@ -1127,8 +1044,6 @@ describe('claims the renderer cannot check', () => {
     'does not feel cheap',
     "doesn't feel cheap",
     'cuts weight at no cost to comfort',
-    // The twin of "saves weight on long hikes" above. Which side of "on" the
-    // noun falls on is not something an author could predict.
     'saves on weight over the Alpine',
   ];
 
@@ -1138,12 +1053,6 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
-  // Three of those survive because `ALLOWED_PHRASES` names them, and an allowance
-  // covers the exact words it spells. So these near neighbours go, and that is the
-  // shape of the list rather than a judgement about the sentences. "extra clearance
-  // for" used to be an allowance and was removed: it ended on a preposition, so it
-  // forgave "clearance" for whatever came next, and "extra clearance for the
-  // weekend only" rendered as a sale nobody was having.
   const NEAR_AN_ALLOWANCE = [
     'extra clearance for thick socks',
     'ample clearance for thick socks',
@@ -1156,11 +1065,6 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
-  // Every one of these used to be kept on the strength of the words around the
-  // number. They are kept now on the strength of the number itself: the shop
-  // tagged the product with it, so the model is repeating a fact rather than
-  // writing one. Take the tag away and the same sentence goes, because -5C and
-  // 20,000mm are not things the model is ever told.
   const NUMERIC_SPECIFICATIONS: { reason: string; tags: string[] }[] = [
     { reason: 'made from 100% recycled nylon', tags: ['100% recycled'] },
     { reason: '100% merino wool against the skin', tags: ['100% merino'] },
@@ -1192,7 +1096,6 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
-  // Money, a customer score, when it arrives, how many are left.
   const REAL_CLAIMS: { reason: string; kind: string }[] = [
     { reason: 'half off this week', kind: 'discount' },
     { reason: 'was 120, now 80', kind: 'price' },
@@ -1220,15 +1123,6 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
-  // `keeps` is the near miss: the sentence this pattern must not fire on. Where
-  // that sentence carries a number, `supports` is what the shop tagged the
-  // product with, because the quantity layer would otherwise drop it before this
-  // pattern got a say and the row would prove nothing about the pattern.
-  //
-  // `droppedLater` is for a near miss no tag can rescue, because a later pass
-  // reads the same sentence and disagrees. The row still proves what it was
-  // written to prove — this pattern did not fire — because the violation names
-  // the pass that did.
   const ONE_ROW_PER_CLAIM_PATTERN: {
     kind: string;
     catches: string;
@@ -1267,8 +1161,6 @@ describe('claims the renderer cannot check', () => {
     {
       kind: 'rating',
       catches: 'highly rated by other hikers',
-      // "top pick" was the near miss here until the wording layer arrived, which
-      // bans it outright: it is a claim about what other shoppers chose.
       keeps: 'well made for winter nights',
     },
     {
@@ -1377,8 +1269,6 @@ describe('claims the renderer cannot check', () => {
       kind: 'discount',
       catches: 'on clearance until the end of the month',
       keeps: 'extra clearance for thick socks',
-      // No tag rescues this one: the wording layer bans "clearance" outright, and
-      // the sentence has to carry the word to exercise the pattern at all.
       droppedLater: 'wording',
     },
     {
@@ -1439,9 +1329,6 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
-  // A pattern spelling the same claim more than one way gets a row per spelling. The
-  // table above takes one row per pattern, and the row it took was a spelling that
-  // already worked while `#1` matched nothing at all.
   const EVERY_SPELLING: { kind: string; catches: string; supports?: string[] }[] = [
     { kind: 'rating', catches: 'our number one seller last winter' },
     { kind: 'rating', catches: 'our no.1 seller last winter' },
@@ -1477,9 +1364,6 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
-  // The reach the pattern keeps on purpose. A selling point is not a sales rank, and both
-  // spellings are dropped as a rating anyway. `number one` did this before `#1` was fixed,
-  // so narrowing one would mean narrowing both, and neither sentence is worth the rule.
   const OVER_REACHES = [
     'the number one selling point is the hood',
     'the #1 selling point is the hood',
@@ -1493,8 +1377,6 @@ describe('claims the renderer cannot check', () => {
     });
   }
 
-  // What the neighbouring rules were careful about. "selling fast" is a stock claim, so
-  // it is dropped either way — what this holds is that the rating pattern is not why.
   const NOT_A_SELLER_CLAIM = ['a reseller of gear', 'resell it later', 'selling fast in your size'];
 
   for (const reason of NOT_A_SELLER_CLAIM) {
@@ -1560,18 +1442,10 @@ describe('claims the renderer cannot check', () => {
   });
 });
 
-/**
- * The patterns read words, and a word can be spelled with characters that are
- * not the ones it looks like. Every reason below renders as the sentence a rule
- * is already written for, and every one of them used to walk straight past it.
- *
- * This is the backstop, not the defence. A reworded claim still gets through.
- */
 describe('a claim spelled in characters the patterns do not expect', () => {
   const reasonFor = (text: string): string | null | undefined =>
     basisOf(reconcile(grid([ref('TR-101', { reason: text })])))?.reason;
 
-  // The kind, not just the drop: attested backstops some of these characters itself.
   const disguisedKindFor = (text: string): string | null => {
     const result = reconcile(grid([ref('TR-101', { reason: text })]));
     const violation = result.violations.find((entry) => entry.startsWith('unverifiable-claim:'));
@@ -1616,7 +1490,6 @@ describe('a claim spelled in characters the patterns do not expect', () => {
     expect(disguisedKindFor('in your hands \u043Evernight')).toBe('delivery');
   });
 
-  // Both need NFKC to run before the lowercase, so the capital it introduces is folded.
   it('drops a price claim hidden behind a double-struck capital', () => {
     expect(disguisedKindFor('\u2119RICED to move')).toBe('price');
   });
@@ -1625,13 +1498,10 @@ describe('a claim spelled in characters the patterns do not expect', () => {
     expect(disguisedKindFor('\u21161 seller in your size')).toBe('rating');
   });
 
-  // Lowercasing without a locale turns the Turkish capital into i plus a
-  // combining dot, which is not the i the pattern is looking for.
   it('drops a price claim hidden behind a Turkish dotted capital I', () => {
     expect(reasonFor('PR\u0130CED to move')).toBeNull();
   });
 
-  // Normalising is how the text is read, not how it is written back.
   it('renders honest copy exactly as the model wrote it', () => {
     const reason = '\uFF33uper light for long days';
 
@@ -1649,12 +1519,6 @@ function declarationOf(path: string, name: string): string {
   return source.slice(start, end);
 }
 
-/**
- * Two more passes, run by @rudra-js/attested after the patterns above have had
- * their say. `quantity` is the only proof in the stack: every numeral in the
- * sentence has to be one this shop supplied. `wording` is a second denylist, for
- * claims that carry no number to check.
- */
 describe('the two passes attested adds', () => {
   const reasonFor = (text: string): string | null | undefined =>
     basisOf(reconcile(grid([ref('TR-101', { reason: text })])))?.reason;
@@ -1665,10 +1529,6 @@ describe('the two passes attested adds', () => {
     return violation ? (violation.split(':')[1] ?? null) : null;
   };
 
-  // Core's patterns answer first, so a sentence both screens catch is still
-  // reported by its kind. `violations` is what a generation-validity rate is
-  // computed from, and reading these as `wording` would erase four of the five
-  // kinds from it overnight.
   it.each([
     ['stock', 'in stock in your size'],
     ['rating', 'highly rated by other hikers'],
@@ -1678,9 +1538,6 @@ describe('the two passes attested adds', () => {
     expect(kindFor(text)).toBe(kind);
   });
 
-  // The one miss real traffic has actually produced. Core's rating pattern reads
-  // "highly", "top", "best", "well", "poorly", "five" and "four" before "-rated",
-  // and the model wrote "highest".
   it('drops the rationale the model really wrote', () => {
     const rationale =
       'Only signals available are the PDP category (Backpacks) and a lapsed segment with no ' +
@@ -1692,8 +1549,6 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toContain('unverifiable-claim:wording:rationale');
   });
 
-  // Claims with no number in them, so only a denylist can reach them, and none of
-  // these is on core's.
   const WORDING = [
     'the highest-rated pack in the category',
     'rated highest by other hikers',
@@ -1713,9 +1568,6 @@ describe('the two passes attested adds', () => {
     });
   }
 
-  // A bare number with no money word, no rating word and no stock word beside it.
-  // Core reads the words, so it reads none of these as a claim, and no wording
-  // list can hold every sentence a number can sit in.
   const QUANTITIES = [
     'yours today for 39',
     'now 45',
@@ -1733,14 +1585,10 @@ describe('the two passes attested adds', () => {
     });
   }
 
-  // Fails both passes. quantity is the proof of the two, so it answers first.
   it('names a sentence both passes reject by its quantity', () => {
     expect(kindFor('rated highest by other hikers, 4.8 overall')).toBe('quantity');
   });
 
-  // A category name is the shop's own string, so the digit in it is the shop's
-  // own number and the model may write it back. This is the sentence the selector
-  // writes, which is the likeliest place a category name turns up in prose.
   it('keeps a category name the shop chose, digit and all', () => {
     const overrides = {
       candidates: [product('TN-1', { category: '3-Season Tents' })],
@@ -1757,11 +1605,6 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toEqual([]);
   });
 
-  // The browsed category is not a row of the shop's catalogue. It is whatever the
-  // host put in this request, and plenty of hosts pass a URL segment straight
-  // through, so standing behind it hands the fact list to whoever types the URL.
-  // A browsed category the model can honestly repeat is a category some candidate
-  // is in, and that one is on the list already.
   it('stands behind no category the shopper is browsing', () => {
     const headline = 'A step up from the 3-Season Tents you were looking at';
     const result = reconcile(
@@ -1773,7 +1616,6 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toContain('unverifiable-claim:quantity:headline');
   });
 
-  // The same rule, and a shopper who typed the fact into the address bar.
   it('stands behind no number a browsed category carries', () => {
     const result = reconcile(
       { ...specWith([PRODUCT_GRID]), headline: 'Scored 4.8 by buyers' },
@@ -1784,15 +1626,9 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toContain('unverifiable-claim:quantity:headline');
   });
 
-  // A headline is about the page rather than about one product, so it reads the
-  // pooled list: every candidate the model was shown. These three are about which
-  // candidates get on it.
   const headlineOn = (headline: string, overrides: Partial<TrackingInputDraft>) =>
     reconcile({ ...specWith([PRODUCT_GRID]), headline }, overrides);
 
-  // A product the prompt never offered cannot be where a number came from. Out of
-  // stock is the loud case: reconciliation refuses to place one at all, so its tags
-  // were backing sentences about products the shopper can actually buy.
   it('stands behind no tag on a candidate that is out of stock', () => {
     const result = headlineOn('4.8 from other hikers', {
       candidates: [product('TR-101'), product('TR-102', { isInStock: false, tags: ['4.8 rated'] })],
@@ -1802,8 +1638,6 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toContain('unverifiable-claim:quantity:headline');
   });
 
-  // The payload holds up to 200 candidates and the prompt shows the first 60, so
-  // the rest are products the model has never heard of.
   const overflowing = (tagged: number) => {
     const many = [product('TR-101')];
     for (let index = 1; index < 120; index += 1) {
@@ -1819,8 +1653,6 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toContain('unverifiable-claim:quantity:headline');
   });
 
-  // The other half of the cap: a tag on the last candidate the prompt shows still
-  // stands, so the rule is "what reached the model", not "the first few".
   it('stands behind a tag on the last candidate the prompt shows', () => {
     const result = headlineOn('a 39 litre pack for long days', { candidates: overflowing(59) });
 
@@ -1828,10 +1660,6 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toEqual([]);
   });
 
-  // The pooled list is the soft part of the check: a numeral is a numeral to it, so
-  // one product's tag backs a sentence about the page. The two fields that name a
-  // product do not read it. A badge is the sharp case — 24 characters beside the
-  // real price, and "Only 2" needs no word core's patterns would catch.
   it.each([
     ['badge', 'Only 2'],
     ['badge', '40 off'],
@@ -1850,9 +1678,6 @@ describe('the two passes attested adds', () => {
     expect(own.violations).toEqual([]);
   });
 
-  // The cap holds for those two fields as well. A candidate past it is still placeable —
-  // it is in stock, so the allowlist takes it — and its own tag was backing its own reason
-  // and badge, on a product the model was never shown.
   it('stands behind nothing on a candidate past the cap the model placed anyway', () => {
     const result = reconcile(
       grid([ref('TR-600', { reason: 'a 39 litre pack for long days', badge: '39 litre' })]),
@@ -1875,7 +1700,6 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toEqual([]);
   });
 
-  // attested caps how far it lays out a bare exponent, so a tag like this stands behind nothing.
   const ABSURD = '1e2000000000';
 
   it('renders the rest of that candidate normally', () => {
@@ -1888,9 +1712,6 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toEqual([]);
   });
 
-  // The prompt shows the model every candidate's rating and tells it never to
-  // state one. Standing behind those numbers here would hand it back a vocabulary
-  // that reads as a price, a stock count or a delivery time just as easily.
   it('stands behind no rating, even one the model was shown', () => {
     const result = reconcile(grid([ref('TR-101', { reason: 'Yours for 4.9' })]), {
       candidates: [product('TR-101', { rating: 4.9 }), product('TR-102')],
@@ -1900,9 +1721,6 @@ describe('the two passes attested adds', () => {
     expect(result.violations).toContain('unverifiable-claim:quantity:reason:TR-101');
   });
 
-  // The exemption branches around the screen, so neither new pass sees a sentence
-  // this library wrote either. Both of these walk past core's patterns and are
-  // dropped by attested, which is what makes them the test.
   it.each([
     ['a number core reads as a specification', 'Made to a 20,000mm waterproof rating'],
     ['wording only a denylist reaches', 'A customer favourite in our Fulham store'],
@@ -1917,16 +1735,10 @@ describe('the two passes attested adds', () => {
     expect(basisOf(kept)?.reason).toBe(claim);
     expect(kept.violations).toEqual([]);
 
-    // The identical sentence with no host provenance is the model's, and goes.
     const screened = reconcile(grid([ref('TR-101', { reason: claim })]), { candidates });
     expect(basisOf(screened)?.reason).toBeNull();
   });
 
-  // The selector writes this one itself, out of a category name the host chose,
-  // and in cohort mode it is what renders. Screening it is this file marking its
-  // own homework, and it loses: a shop with a category called Clearance or Last
-  // Chance would watch the wording layer delete the reason under every card while
-  // the deterministic component printed the same sentence unscreened.
   it.each(['More in Clearance', 'Popular in Last Chance', 'More in Popular Picks'])(
     "leaves the selector's own sentence alone: %s",
     (reason) => {
@@ -1935,15 +1747,10 @@ describe('the two passes attested adds', () => {
       expect(basisOf(kept)?.reason).toBe(reason);
       expect(kept.violations).toEqual([]);
 
-      // The model writing the same sentence is still the model writing it.
       expect(kindFor(reason)).toBe('wording');
     },
   );
 
-  // The quantity layer matches digit code points and nothing else. The one count
-  // claim in the committed transcript was spelled out, which is the half that
-  // survives, and it is the line that stops anyone writing a doc claim the code
-  // does not make.
   it('reads digits, not words', () => {
     const spelled = "Four packs, ordered by how well they've held up";
     const digits = "4 packs, ordered by how well they've held up";
@@ -1964,10 +1771,6 @@ describe('the two passes attested adds', () => {
     expect(kindFor('20% o\u200Bff this week')).toBe('discount');
   });
 
-  // The screen hands attested no facts at all for a sentence with no numeral in
-  // it, because there is nothing there to weigh and reading the fact list again
-  // for every field is most of what this costs. That is attested's promise rather
-  // than ours, so it is held to it here: same verdict, facts or no facts.
   it.each(['Built for wet rock and long days', 'Chosen for the way it carries'])(
     'has nothing for the quantity layer to weigh: %s',
     (text) => {
@@ -1978,11 +1781,6 @@ describe('the two passes attested adds', () => {
     },
   );
 
-  // "Reads digits only" is the half of that sentence a reader hears. The other
-  // half is that a numeric character it cannot read is a drop, not a shrug: there
-  // is no fact that could ever back a ½, and a k on the end of a number hides the
-  // value it stands for. Worth pinning, because the docs say "digits only" and a
-  // reader takes that to mean these are invisible.
   it.each(['A ½-zip fleece for cold starts', 'Sized for a 10K on the trails'])(
     'drops a numeral it cannot read rather than waving it through: %s',
     (reason) => {
@@ -1990,8 +1788,6 @@ describe('the two passes attested adds', () => {
     },
   );
 
-  // Core keeps its own copy of these classes and may not import attested's. Nothing
-  // else would notice the two drifting apart, so this reads both declarations.
   it('keeps its unicode classes identical to the ones in attested', () => {
     for (const [name, attestedPath] of [
       ['INVISIBLE', '../../attested/src/hidden.ts'],
@@ -2005,10 +1801,6 @@ describe('the two passes attested adds', () => {
     }
   });
 
-  // The two ends of the allowance list. An entry that names nothing attested bans
-  // is dead weight — someone renamed a phrase over there and nothing said so. An
-  // entry ending on a function word forgives whatever follows it, which is how
-  // "extra clearance for the weekend only" used to render as a sale.
   it('keeps every allowed phrase pointed at something attested bans', () => {
     for (const allowed of ALLOWED_PHRASES) {
       expect(BANNED_PHRASES.some((banned) => allowed.includes(banned))).toBe(true);
@@ -2023,18 +1815,11 @@ describe('the two passes attested adds', () => {
     }
   });
 
-  // The same rule, end to end: an allowance covers the words it spells and stops.
   it('forgives nothing past the words it allows', () => {
     expect(reasonFor('It does not feel cheap')).toBe('It does not feel cheap');
     expect(kindFor('It does not feel cheap, and the cheap one is on sale')).toBe('discount');
   });
 
-  // Both word lists read one field at a time, and the renderer prints a headline
-  // and the line under it as neighbours. So a claim written across the two is two
-  // innocent fields, and nothing records that it happened. attested's
-  // `verifyFields` closes exactly this and core does not call it — the hole is
-  // real, it is named in SECURITY.md, and this is the test that stops anyone
-  // claiming otherwise by accident.
   it('reads one field at a time, so a claim split over two gets through', () => {
     const split = reconcile({
       ...specWith([PRODUCT_GRID]),
@@ -2046,8 +1831,6 @@ describe('the two passes attested adds', () => {
     expect(split.spec.subheadline).toBe('seller three years running');
     expect(split.violations).toEqual([]);
 
-    // The same sentence in one field is caught, which is what makes the split the
-    // bypass rather than a gap in the lists.
     const whole = reconcile({
       ...specWith([PRODUCT_GRID]),
       headline: 'Our best seller three years running',
@@ -2055,11 +1838,6 @@ describe('the two passes attested adds', () => {
     expect(whole.violations).toContain('unverifiable-claim:rating:headline');
   });
 
-  // Three passes and two of them are fixed word lists, so a rewording that sits on
-  // neither gets through. None of these is on core's patterns, none is on
-  // attested's phrases, and none carries a digit. Read the list as the honest size
-  // of the residual risk the README and SECURITY.md describe: widen a pattern to
-  // catch one and this test says so, and the docs move with it.
   const REWORDINGS_THAT_STILL_PASS = [
     'four and a half stars from other hikers',
     'it will not hurt your wallet',
@@ -2078,12 +1856,6 @@ describe('the two passes attested adds', () => {
   }
 });
 
-/**
- * The screen once ran on four fields, so the same claim could be deleted from a
- * product's small print and kept in the heading right above it. Every string the
- * model writes is read now. Host text is not: a product title, a category and a
- * bundle label are the shop's own words.
- */
 describe('claims in every field the model writes', () => {
   it('drops a claim in the spec headline', () => {
     const result = reconcile({ ...specWith([PRODUCT_GRID]), headline: 'Half price this week' });
@@ -2214,9 +1986,6 @@ describe('claims in every field the model writes', () => {
     expect(result.violations).toContain('unverifiable-claim:delivery:copy-body');
   });
 
-  // The rationale is read by engineers, not shoppers, but it is still the
-  // model's own words and a log that repeats an untrue claim is a log that
-  // hides one.
   it('drops a claim in the spec rationale', () => {
     const result = reconcile({
       ...specWith([PRODUCT_GRID]),
@@ -2235,11 +2004,6 @@ describe('claims in every field the model writes', () => {
   });
 });
 
-/**
- * Four of those fields cannot be null. Emptying one hands the block to the rule
- * that already drops a block whose text clamps to nothing, so a banner reading
- * "20% off" disappears rather than rendering blank.
- */
 describe('a claim in a field that cannot be empty', () => {
   it('drops a banner whose text makes a claim', () => {
     const result = reconcile(
@@ -2291,11 +2055,6 @@ describe('a claim in a field that cannot be empty', () => {
   });
 });
 
-/**
- * Both strings below are from the committed transcript, from the generation
- * whose product reasons were already dropped for saying the same thing. They are
- * the regression that stops a page contradicting itself.
- */
 describe('the words the model really wrote', () => {
   it('drops the subheadline it wrote', () => {
     const result = reconcile({
@@ -2324,7 +2083,6 @@ describe('a claim the cap cuts in half', () => {
     candidates: [product('TR-101', { tags: ['2 person', '3 season'] }), product('TR-102')],
   };
 
-  // 25 characters against a badge cap of 24. Renders as "Ridge picks, only 2…".
   it('drops a badge whose "left" fell outside the cap', () => {
     const result = reconcile(grid([ref('TR-101', { badge: 'Ridge picks, only 2 left!' })]), TAGGED);
 
@@ -2378,11 +2136,6 @@ describe('a claim the cap cuts in half', () => {
   });
 });
 
-/**
- * The same specifications the screen already leaves alone in a product reason. A
- * heading is not a different kind of sentence, and a screen that eats honest
- * copy on every page is worse than the hole it fills.
- */
 describe('ordinary copy in the fields now screened', () => {
   const SPECIFICATIONS: { text: string; tags: string[] }[] = [
     { text: 'made from 100% recycled nylon', tags: ['100% recycled'] },

@@ -1,6 +1,5 @@
 import type { Bundle, Product } from '@rudra-js/core';
 
-// One set per category: the two cheapest things in stock, at a tenth off.
 export function generateBundles(catalog: readonly Product[]): Bundle[] {
   const byCategory = new Map<string, Product[]>();
   for (const product of catalog) {
@@ -19,7 +18,6 @@ export function generateBundles(catalog: readonly Product[]): Bundle[] {
       id: `BUN-${category.replaceAll(' ', '-')}`,
       skus: [cheapest.sku, secondCheapest.sku],
       price: Math.round((cheapest.price + secondCheapest.price) * 0.9 * 100) / 100,
-      // This shop prices everything in dollars, same as the catalog.
       currency: 'USD',
       label: `${category} starter set`,
     });

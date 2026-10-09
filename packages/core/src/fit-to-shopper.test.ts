@@ -18,7 +18,6 @@ const pick = (sku: string, basis: ProductPick['basis'] = 'popular'): ProductPick
   score: 1,
 });
 
-/** What the model wrote, about a product this shopper may never see. */
 const modelItem = () => ({
   sku: 'MODEL-1',
   basis: 'complements_cart' as const,
@@ -94,10 +93,6 @@ describe('fitting a shared component to one shopper', () => {
   });
 
   it('leaves a hero alone, so its words and its product stay together', () => {
-    // The headline was written about the product the hero names. Swapping the
-    // product would leave copy describing something else, and nothing here can
-    // rewrite the copy. Reconciliation drops the link if this shopper cannot
-    // see that product.
     const hero = {
       kind: 'hero' as const,
       headline: 'The Switchback is back',
@@ -144,9 +139,6 @@ describe('fitting a shared component to one shopper', () => {
 });
 
 describe('reporting which reasons this library wrote', () => {
-  // Every reason it places is either the shop's own sentence or the selector's,
-  // so none of them is the model's and none of them wants screening. Reporting
-  // only the shop's half left the screen reading core's own copy.
   it('names every reason it placed, with the words it placed', () => {
     const picks: ProductPick[] = [
       { ...pick('HOST-1'), reason: 'Bought together with your boots' },

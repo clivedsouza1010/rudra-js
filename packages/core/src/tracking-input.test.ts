@@ -13,7 +13,6 @@ const aProduct = {
   price: 174,
 };
 
-/** The smallest payload the contract accepts: a user, a surface, one candidate. */
 function minimalPayload(overrides: Partial<TrackingInputDraft> = {}): TrackingInputDraft {
   return {
     user: { id: 'shopper-1' },
@@ -91,12 +90,6 @@ describe('parseTrackingInput', () => {
   });
 });
 
-/**
- * These bounds are what stop a host-supplied string from becoming an unbounded
- * prompt, and therefore an unbounded model bill. They are load-bearing, not
- * defensive — so every entry in FIELD_LIMITS is exercised at the cap and one
- * past it, from the same builder, which is what makes the boundary meaningful.
- */
 const repeat = (size: number) => 'x'.repeat(size);
 const sized = <T>(size: number, build: (index: number) => T) =>
   Array.from({ length: size }, (_unused, index) => build(index));
@@ -230,11 +223,6 @@ describe.each(capCases)('the cap on %s', (_label, cap, build) => {
   });
 });
 
-/**
- * The contract rejects unrecognised fields rather than dropping them. A lenient
- * schema turns a host's typo into a shopper with no history and no error
- * anywhere, which is the exact failure this module exists to prevent.
- */
 describe('unknown fields', () => {
   it.each([
     ['at the top level', { ...minimalPayload(), unexpected: 'value' }],
@@ -243,8 +231,6 @@ describe('unknown fields', () => {
       { ...minimalPayload(), signals: { recentSeraches: ['hydration vest'] } },
     ],
     ['on a nested object', { ...minimalPayload(), user: { id: 'shopper-1', tier: 'gold' } }],
-    // mostViewed and lastPurchased inherit strictness through .extend(), which
-    // is zod behaviour rather than something this module states. Pin it.
     [
       'on an extended view signal',
       { ...minimalPayload(), signals: { mostViewed: [{ sku: 'TR-104', vieuws: 3 }] } },
@@ -268,8 +254,6 @@ describe('unknown fields', () => {
   });
 
   it('rejects __proto__ as a meta key rather than dropping it', () => {
-    // JSON.parse makes __proto__ an own property; an object literal would have
-    // set the prototype here in the test instead of reaching the schema at all.
     const meta = JSON.parse('{"__proto__": "x"}') as Record<string, string>;
     expect(Object.getPrototypeOf(meta)).toBe(Object.prototype);
 
@@ -280,10 +264,6 @@ describe('unknown fields', () => {
     expect(result.success).toBe(false);
   });
 
-  // 'constructor' and 'prototype' are ordinary own properties: assigning them
-  // shadows, it does not mutate. A host emitting a facet or CMS field by either
-  // name is not a bug, and rejecting it would throw a render the fallback path
-  // exists to prevent.
   it.each(['constructor', 'prototype'])('carries %s through as ordinary meta', (key) => {
     const meta = JSON.parse(`{"${key}": "acme", "a": "y"}`) as Record<string, string>;
 
@@ -299,10 +279,6 @@ describe('unknown fields', () => {
   });
 });
 
-/**
- * Values the host controls that reach a browser or a sort order. A bare capped
- * string accepts things that fail somewhere less obvious than here.
- */
 describe('host-supplied values that are not merely bounded', () => {
   const withProduct = (overrides: Record<string, unknown>) =>
     safeParseTrackingInput(minimalPayload({ candidates: [{ ...aProduct, ...overrides }] }));
@@ -316,8 +292,6 @@ describe('host-supplied values that are not merely bounded', () => {
     ['a root-relative path', '/images/tr-102.png', true],
     ['a protocol-relative url', '//cdn.example.com/tr-102.png', false],
     ['a bare word', 'tr-102.png', false],
-    // A browser reads a backslash as a slash and drops tab and newline before
-    // it parses, so each of these names a host the shop never chose.
     ['a backslash authority', '/\\evil.example/x.png', false],
     ['a tab hiding a second slash', '/\t/evil.example/x.png', false],
     ['a newline hiding two', '/\r\n//evil.example/x.png', false],
@@ -339,8 +313,6 @@ describe('host-supplied values that are not merely bounded', () => {
     expect(withProduct({ currency }).success).toBe(accepted);
   });
 
-  // The locale is part of the cohort cache key, so a value that is really a
-  // list buys one shopper a cohort of their own and a bill to match.
   it.each([
     ['a language on its own', 'en', true],
     ['a language and a region', 'en-US', true],
@@ -397,7 +369,6 @@ describe('bundles', () => {
   });
 
   it('carries the shop own currency for the set', () => {
-    // The set is priced by the shop, so it says which money that price is in.
     const parsed = parseTrackingInput(
       withBundles([{ id: 'BUN-1', skus: ['A', 'B'], price: 25, currency: 'EUR' }]),
     );
@@ -434,7 +405,6 @@ describe('bundles', () => {
   });
 
   it('refuses a bundle naming a product that is not a candidate', () => {
-    // The renderer resolves bundle members from the candidates list.
     expect(() =>
       parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'GHOST'], price: 25 }])),
     ).toThrow();
@@ -453,7 +423,6 @@ describe('bundles', () => {
   });
 
   it('refuses two sets with the same id', () => {
-    // A duplicate id would let the renderer draw the wrong set at the wrong price.
     expect(() =>
       parseTrackingInput(
         withBundles([
@@ -465,7 +434,6 @@ describe('bundles', () => {
   });
 
   it('refuses a set that lists the same product twice', () => {
-    // It renders the product twice and spends two slots for one thing.
     expect(() =>
       parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'A'], price: 25 }])),
     ).toThrow();

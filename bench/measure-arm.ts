@@ -14,19 +14,15 @@ import type { Shopper } from '../examples/shop/src/fixtures/shoppers.js';
 export interface TokenPrices {
   inputPerMillion: number;
   outputPerMillion: number;
-  /** A cached prefix is written once at a premium and read back cheaply. */
   cacheWritePerMillion: number;
   cacheReadPerMillion: number;
 }
 
-/** The numbers read the same whichever answered, so a run has to say which one it was. */
 export type ArmMode = 'stub' | 'replay' | 'live';
 
-/** What an arm claims about itself, next to what actually answered it. */
 export interface ArmIdentity {
   name: string;
   mode: ArmMode;
-  /** Null when the arm runs without a provider at all. */
   providerName: string | null;
   providerModel: string | null;
 }
@@ -43,19 +39,15 @@ export interface ArmResult {
   modelCallsPerThousand: number;
   inputTokens: number;
   outputTokens: number;
-  // Kept out of the input tokens, so a reader can re-price the cached prefix at read rates.
   cacheWriteTokens: number;
   cacheReadTokens: number;
   costPerThousandViews: number;
-  // Filled in by run-arm, which measures a whole process.
   cpuUserMs?: number;
   cpuSystemMs?: number;
-  // Absent for a stub run: the stub answers far below what Date.now() can see.
   elapsedMs?: { median: number; p95: number; p99: number };
   violations: Record<string, number>;
 }
 
-// Nearest-rank on a sorted list. Small samples make interpolation a fiction.
 function percentile(sorted: readonly number[], fraction: number): number {
   if (sorted.length === 0) return 0;
   const rank = Math.ceil(fraction * sorted.length);
@@ -81,7 +73,6 @@ export function summarise(
     sources[event.source] += 1;
     timings.push(event.elapsedMs);
 
-    // A view that joined an in-flight generation carries the same usage and would double the bill.
     if (event.calledModel) {
       modelCalls += 1;
       inputTokens += event.usage?.inputTokens ?? 0;
@@ -134,11 +125,9 @@ export function summarise(
 }
 
 export interface SourceRule {
-  /** 'all' means every view must be a fallback, 'none' means no view may be. */
   fallback: 'none' | 'all';
   minCacheHitRate?: number;
   maxCacheHitRate?: number;
-  /** Not the same check as `fallback: 'all'`: a call that timed out still bills. */
   modelCalls?: 'none';
 }
 
@@ -147,7 +136,6 @@ export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
     throw new Error(`arm ${result.arm}: no views were measured`);
   }
 
-  // The mode is typed in by hand, the provider name comes off whatever answered: they can disagree.
   const stubbed = result.providerName === null || result.providerName === 'stub';
   if (result.mode !== 'stub' && stubbed) {
     throw new Error(
@@ -188,7 +176,6 @@ export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
 }
 
 function candidateSkus(userPrompt: string, limit: number): string[] {
-  // Only the candidates section, so nothing else in the prompt can be read as a SKU.
   const start = userPrompt.indexOf('## Candidates');
   if (start < 0) throw new Error('the stub found no candidates section in the prompt');
   const candidates = userPrompt.slice(start);
@@ -202,8 +189,6 @@ function candidateSkus(userPrompt: string, limit: number): string[] {
   return skus;
 }
 
-// Reconciliation drops a SKU the shopper was never offered and one already in their
-// cart, so the stub picks from the prompt, with a spare.
 const STUB_GRID_ITEMS = 4;
 
 export function createStubProvider(usage: TokenUsage): ComponentProvider {
@@ -218,16 +203,13 @@ export function createStubProvider(usage: TokenUsage): ComponentProvider {
 
 export interface ArmSpec {
   name: string;
-  /** Checked against the provider that answers, so a wrong one throws. */
   mode: ArmMode;
   options: ComponentGeneratorOptions;
   rule: SourceRule;
 }
 
-/** An assumption about traffic, not a measurement, and it sets the headline cache hit rate. */
 export const SHOPPERS_PER_PAGE = 10;
 
-// A unique product per shopper would mean a unique cohort per shopper, and nothing shared.
 export function skuFor(
   index: number,
   shopperCount: number,
@@ -240,8 +222,6 @@ export function skuFor(
   }
   if (inStock.length === 0) throw new Error('the catalog has nothing in stock');
 
-  // Clamped rather than folded: folding more pages than products back onto the catalog
-  // would merge cohorts and inflate the cache hit rate.
   const pages = Math.min(Math.max(1, Math.floor(shopperCount / shoppersPerPage)), inStock.length);
   return inStock[index % pages]!.sku;
 }
@@ -283,11 +263,9 @@ export async function measureArm(
     },
   });
 
-  // Population order on a cold cache: the first shopper of a cohort misses and the rest hit.
   for (let index = 0; index < shoppers.length; index += 1) {
     const shopper = shoppers[index]!;
     const sku = skuFor(index, shoppers.length, catalog, shoppersPerPage);
-    // One at a time is the measurement: in parallel, a cohort would race its own first request.
     // oxlint-disable-next-line no-await-in-loop
     await generator.generate(buildTrackingInput(shopper, sku, catalog, []));
   }

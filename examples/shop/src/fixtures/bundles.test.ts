@@ -5,7 +5,6 @@ import { generateBundles } from './bundles.js';
 
 const catalog = generateCatalog(1, 200);
 
-// Small enough to work out the right answer by hand.
 const handBuilt = [
   { sku: 'TR-1', title: 'Trail one', category: 'Trail Running', price: 100 },
   { sku: 'TR-2', title: 'Trail two', category: 'Trail Running', price: 50 },
@@ -16,8 +15,6 @@ const handBuilt = [
 
 describe('the generated bundles', () => {
   it('pairs the two cheapest in stock in a category, at a tenth off', () => {
-    // Trail Running: 50 and 70 are the two cheapest in stock. The 10 is out
-    // of stock. Tents has only one product, so it gets no set.
     expect(generateBundles(handBuilt)).toEqual([
       {
         id: 'BUN-Trail-Running',
@@ -43,7 +40,6 @@ describe('the generated bundles', () => {
   });
 
   it('rounds a set price to the penny', () => {
-    // A tenth off 33.33 and 66.66 is 89.991, and a shop cannot charge that.
     const awkward = [
       { sku: 'X-1', title: 'One', category: 'Tents', price: 33.33 },
       { sku: 'X-2', title: 'Two', category: 'Tents', price: 66.66 },

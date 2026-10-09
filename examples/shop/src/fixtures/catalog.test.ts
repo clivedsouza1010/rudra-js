@@ -4,10 +4,6 @@ import { generateCatalog } from './catalog';
 
 describe('the generated catalog', () => {
   it('is identical for the same seed', () => {
-    // Pinned to one product captured from a real run, not cross-checked
-    // against a second call: a generator that ignored `seed` and always
-    // started from one hardcoded state would leave both sides equally wrong,
-    // and two live invocations agreeing with each other would not catch that.
     expect(generateCatalog(1, 50)[0]).toEqual({
       sku: 'RJ-00001',
       title: 'Traverse Cordura Backpacks',
@@ -36,8 +32,6 @@ describe('the generated catalog', () => {
   });
 
   it('produces only products the payload contract accepts', () => {
-    // A fixture that fails validation makes every downstream test a test of the
-    // fixture. The generator validates its own output for that reason.
     for (const product of generateCatalog(3, 200)) {
       expect(() => productSchema.parse(product)).not.toThrow();
     }
@@ -47,8 +41,6 @@ describe('the generated catalog', () => {
     const catalog = generateCatalog(4, 500);
     const categories = new Set(catalog.map((product) => product.category));
 
-    // Cohort keys are derived from category affinity in a later slice, so a
-    // catalog with one category would make every shopper one cohort.
     expect(categories.size).toBeGreaterThanOrEqual(8);
   });
 

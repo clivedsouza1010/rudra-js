@@ -68,10 +68,6 @@ describe('recording a provider', () => {
   });
 
   it('writes one transcript and calls the model once when the same request is made twice', async () => {
-    // The other half of the naming contract: a nondeterministic name (a
-    // timestamp, a counter) would pass the distinct-request test above while
-    // silently breaking replay for every clone, since replay recomputes this
-    // same name and expects to find exactly one file under it.
     const directory = scratch();
     const recorded = inner();
     const provider = createRecordingProvider(recorded, directory);
@@ -143,10 +139,6 @@ describe('replaying a provider', () => {
 
 describe('when the transcript cannot be written', () => {
   it('still returns the answer the model was already paid for', async () => {
-    // A directory that cannot be created: the scratch path is a file, so
-    // mkdirSync fails with ENOTDIR. Throwing here would make a local disk fault
-    // indistinguishable from the vendor being down — the generator degrades the
-    // page either way, and the bill still arrives.
     const file = join(scratch(), 'not-a-directory');
     writeFileSync(file, 'x');
     const warn = vi.spyOn(console, 'error').mockImplementation(() => {});

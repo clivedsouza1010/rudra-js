@@ -5,9 +5,6 @@ import { ARM_NAMES, PRICES } from './arms.js';
 import { SHOPPERS_PER_PAGE, type ArmResult } from './measure-arm.js';
 import { buildReport, formatTable } from './report.js';
 
-// Separated so it can be tested. The row label comes from the child, so it has
-// to be checked against what was asked for, or one arm's numbers get published
-// under another's name.
 export function parseArmOutput(name: string, output: string): ArmResult {
   let result: ArmResult;
   try {
@@ -29,7 +26,6 @@ export function parseArmOutput(name: string, output: string): ArmResult {
 }
 
 function main(): void {
-  // One process per arm, so the CPU figure is that arm's own work.
   const results: ArmResult[] = [];
   for (const name of ARM_NAMES) {
     let output: string;

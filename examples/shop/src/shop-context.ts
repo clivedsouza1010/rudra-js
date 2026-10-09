@@ -15,11 +15,9 @@ const SHOPPER_SEED = 9;
 
 export const MODEL_ID = 'claude-opus-5';
 
-// Anchored on the working directory because Turbopack rejects `import.meta.url` here.
 export const RECORDINGS_DIRECTORY =
   process.env['RUDRA_SHOP_RECORDINGS'] || join(process.cwd(), 'recordings');
 
-// Core defaults to 1500ms, which is under this model's thinking time.
 const MODEL_TIMEOUT_MS = 60_000;
 
 export const catalog = generateCatalog(CATALOG_SEED);

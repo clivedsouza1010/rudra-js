@@ -14,14 +14,12 @@ export function BundleRenderer({
   const products: Product[] = [];
   for (const sku of bundle.skus) {
     const product = sellableProduct(context.products, sku);
-    // A set missing one of its parts is not that set.
     if (!product) return null;
     products.push(product);
   }
 
   return (
     <section className="rudra-bundle">
-      {/* The shop's label is the one name here anyone can check, so it leads. */}
       {bundle.label ? <h3 className="rudra-bundle__label">{bundle.label}</h3> : null}
       {block.title ? <p className="rudra-bundle__title">{block.title}</p> : null}
       {block.body ? <p className="rudra-bundle__body">{block.body}</p> : null}

@@ -19,8 +19,6 @@ describe('the tracking payload the shop builds', () => {
   });
 
   it('offers only in-stock candidates', () => {
-    // Out-of-stock products are dropped by reconciliation anyway; sending them
-    // spends prompt budget on products that cannot be placed.
     const input = buildTrackingInput(shoppers[0]!, 'RJ-00001', catalog, bundles);
 
     expect(input.candidates?.every((candidate) => candidate.isInStock === true)).toBe(true);
@@ -33,22 +31,14 @@ describe('the tracking payload the shop builds', () => {
   });
 
   it('gives two different shoppers different payloads', () => {
-    // Identical payloads would collapse to one cache key, and every later
-    // measurement of hit rate would be measuring the fixture.
     const first = buildTrackingInput(shoppers[0]!, 'RJ-00001', catalog, bundles);
     const second = buildTrackingInput(shoppers[1]!, 'RJ-00001', catalog, bundles);
 
     expect(first).not.toEqual(second);
-    // The two shoppers' other fields (segment, signals, ...) already differ by
-    // chance, so the assertion above passes even if `user.id` were hardcoded.
-    // This pins down the specific field a cache key would be built from.
     expect(first.user.id).not.toBe(second.user.id);
   });
 
   it('never recommends the product being viewed, even when its category has no other in-stock member', () => {
-    // Forces the fallback branch: the primary category filter comes up empty,
-    // so this only exercises anything when that fallback also excludes the
-    // viewed SKU.
     const viewed = catalog.find((product) => product.isInStock)!;
     const otherCategoryProducts = catalog.filter(
       (product) => product.category !== viewed.category && product.isInStock,
@@ -67,7 +57,6 @@ describe('the tracking payload the shop builds', () => {
   });
 
   describe('the bundles it offers', () => {
-    // Small, hand-picked catalog, so we know exactly which SKUs are candidates.
     const smallCatalog = [
       productSchema.parse({ sku: 'current', title: 'Current', category: 'Cat', price: 15 }),
       productSchema.parse({ sku: 'A', title: 'A', category: 'Cat', price: 10 }),

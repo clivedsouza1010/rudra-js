@@ -15,7 +15,6 @@ const MODE = 'RUDRA_SHOP_MODE';
 const WORKSPACE = 'ANTHROPIC_WORKSPACE_ID';
 const RECORDINGS = 'RUDRA_SHOP_RECORDINGS';
 
-// So afterEach can put this back instead of erasing it - a pool sharing one process across files needs that.
 const AMBIENT_REPLAY_ONLY = process.env[REPLAY_ONLY];
 const AMBIENT_RECORDINGS = process.env[RECORDINGS];
 
@@ -43,7 +42,6 @@ afterEach(() => {
   restore(REPLAY_ONLY, AMBIENT_REPLAY_ONLY);
   restore(RECORDINGS, AMBIENT_RECORDINGS);
   vi.clearAllMocks();
-  // The module reads the environment once, so each case needs a fresh copy.
   vi.resetModules();
 });
 
@@ -67,8 +65,6 @@ const recordedSpec: GeneratedSpec = {
 
 describe('the replay-only switch', () => {
   it('is already on by default, so a key alone in the shell cannot bill during npm test', async () => {
-    // vitest.config.ts turns this on for every test file. Not setting it here
-    // on purpose - this proves the config protects a run, not this test.
     process.env[KEY] = 'sk-ant-not-a-real-key';
 
     await expect(import('./shop-context')).rejects.toThrow(/replay only/i);

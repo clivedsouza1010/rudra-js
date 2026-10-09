@@ -16,17 +16,10 @@ import ProductPage from './page';
 const SKU = 'RJ-00001';
 const SHOPPER = 'S-0001';
 
-/**
- * A replay miss cannot fail this test directly: the provider throws, but core's
- * generator catches provider errors and degrades by design. So this asserts the
- * effect instead — once a transcript exists for this page, the page must be
- * served from it. Armed on this page's own transcript, not on any JSON.
- */
 const input = parseTrackingInput(buildTrackingInput(findShopper(SHOPPER), SKU, catalog, bundles));
 const transcript = transcriptPath(
   RECORDINGS_DIRECTORY,
   MODEL_ID,
-  // The shop runs in cohort mode, so this is the prompt it actually sends.
   buildPrompt(input, toCohortDigest(buildDigest(input))),
 );
 const hasTranscript = existsSync(transcript);

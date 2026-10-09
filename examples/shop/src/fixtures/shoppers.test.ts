@@ -6,10 +6,6 @@ const catalog = generateCatalog(1, 200);
 
 describe('the generated shopper population', () => {
   it('is identical for the same seed', () => {
-    // Pinned to one shopper captured from a real run, not cross-checked
-    // against a second call: a generator that ignored `seed` and always
-    // started from one hardcoded state would leave both sides equally wrong,
-    // and two live invocations agreeing with each other would not catch that.
     expect(generateShoppers(9, catalog, 20)[0]).toEqual({
       id: 'S-0001',
       segment: 'lapsed',
@@ -37,8 +33,6 @@ describe('the generated shopper population', () => {
   });
 
   it('references only SKUs the catalog has', () => {
-    // A signal naming a ghost SKU exercises reconciliation's error path by
-    // accident, and hides it from the tests that mean to exercise it.
     const skus = new Set(catalog.map((product) => product.sku));
 
     for (const shopper of generateShoppers(9, catalog, 100)) {

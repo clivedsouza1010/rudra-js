@@ -5,11 +5,9 @@ on:
     branches: [main]
   pull_request:
 
-# This job only reads the repository. Nothing here needs write access.
 permissions:
   contents: read
 
-# A new push supersedes whatever is still running for the same ref.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -22,28 +20,17 @@ jobs:
       matrix:
         node: ['22.12.0', '22']
     steps:
-      # Actions are pinned by commit: a tag is a mutable ref, and this workflow
-      # runs on every pull request. actions/checkout also leaves its token in
-      # .git/config by default, so do not persist it.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # The floor and a current 22. The floor is >=22.12 because Node 20 is
-      # end of life and verify:consumer needs --experimental-strip-types.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      # Some dependencies in the tree do carry an install script (esbuild's
-      # postinstall sets up its binary, and it is not darwin-only), but none
-      # of them need to run for this workspace to build and test, so do not
-      # run arbitrary code from the dependency graph on every CI run.
       - run: npm ci --ignore-scripts
 
-      # Build first: the workspace packages resolve each other through their
-      # generated `dist/`, which `npm ci` does not produce.
       - run: npm run build
 
       - run: npm run typecheck
@@ -54,17 +41,10 @@ jobs:
 
       - run: npm test
 
-      # Asserts what a tarball contains; this asserts that the tarball works —
-      # it packs all four packages, resolves them from outside the repository, and
-      # renders. Nothing else here would notice a package that installs but
-      # cannot be imported.
       - run: npm run verify:consumer
 
-  # A separate job so the fast checks above stay fast: a Next.js build is
-  # slower than everything else in `verify` put together.
   shop:
     runs-on: ubuntu-latest
-    # Without this, a hung shop falls back to GitHub's six-hour default.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -78,8 +58,6 @@ jobs:
 
       - run: npm ci --ignore-scripts
       - run: npm run build
-      # No RUDRA_SHOP_MODE here: the shop replays, and a replay miss is an error.
       - run: npm run build --workspace @rudra-js/example-shop
-      # Seconds, and it runs before the step that starts a server.
       - run: npm run typecheck --workspace @rudra-js/example-shop
       - run: npm run verify:crawlable

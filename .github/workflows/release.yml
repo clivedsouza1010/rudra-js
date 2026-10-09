@@ -14,8 +14,6 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      # Mints the OIDC token npm uses to attest that this build produced this
-      # package. Without it, --provenance fails rather than silently skipping.
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -23,11 +21,6 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      # A tag on any branch would otherwise publish with valid provenance, so it
-      # has to sit on main, be main's tip, and name the version in package.json.
-      # Ancestry alone is not enough: every commit after the bump reads the
-      # bumped version too, so a tag a few commits back clears the other two and
-      # publishes a tree missing whatever landed since.
       - run: git fetch --no-tags origin main && git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - run: test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
       - run: test "v$(node -p "require('./packages/core/package.json').version")" = "$GITHUB_REF_NAME"
@@ -41,43 +34,12 @@ jobs:
 
       - run: npm run build
 
-      # Publishing an artefact nobody verified is how a broken release ships.
-      # The same checks CI runs, in the same order — a release must not be
-      # held to a lower standard than a pull request.
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
       - run: npm run verify:consumer
 
-      # Provenance links the published tarball to this commit, this workflow and
-      # this runner, so a consumer can check where it came from. It requires a
-      # public `repository` field in package.json matching this repo, which every
-      # package has.
-      #
-      # npm has no transactional multi-publish. If one package succeeds and the
-      # next fails, the tag cannot simply be re-run — npm rejects republishing a
-      # version that exists, so the job would fail on the first one again before
-      # reaching the rest. Publishing by hand is not the way out either: the only
-      # credential is the OIDC token this job mints, and there is no token to run
-      # npm publish with from a laptop. Recover by bumping the version and
-      # tagging a new patch release.
-      #
-      # So the order is what an install can satisfy. @rudra-js/attested depends
-      # on nothing and core peers it, so attested goes first; react and
-      # anthropic both peer core, so core leads them. Anything published before
-      # a failure is already public and stuck at a version the next tag cannot
-      # reuse.
-      #
-      # Adding a package is the case that needs thought. A name npm has not seen
-      # has no trusted publisher, because one is configured from a package's
-      # settings page and that needs the package to exist, so its first publish
-      # fails auth. Put its step as early as its own peers allow, where that
-      # failure costs least. All four names exist now, so none of them carries
-      # that risk any more.
-
-      # Node 22 ships npm 10. Trusted publishing needs 11.5, which reads the
-      # OIDC token itself - no registry-url, no NODE_AUTH_TOKEN.
       - run: npm install -g npm@11.19.1
       - run: npm --version
       - run: npm publish --provenance --access public

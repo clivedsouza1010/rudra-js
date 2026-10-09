@@ -46,7 +46,6 @@ const modelSpec = (skus: string[]): GeneratedSpec => ({
   rationale: 'Test fixture.',
 });
 
-/** A provider that answers with a fixed spec and counts how often it was asked. */
 function countingProvider(spec: GeneratedSpec = modelSpec(['TR-101'])) {
   let calls = 0;
   const provider: ComponentProvider = {
@@ -74,19 +73,12 @@ const providerAdvancingClock = (milliseconds: number): ComponentProvider => ({
   },
 });
 
-/** A provider that never answers and ignores its signal, to exercise the deadline. */
 const hangingProvider = (): ComponentProvider => ({
   name: 'slow',
   model: 'slow-model',
   generate: () => new Promise(() => {}),
 });
 
-/**
- * A provider that never answers but does stop when told to, which is what the
- * `ComponentProvider` contract asks for. It rejects from inside the deadline's
- * own `abort()` call, so its rejection reaches the caller ahead of the
- * deadline's — the case a provider that ignores its signal cannot exercise.
- */
 const abortingProvider = (): ComponentProvider => ({
   name: 'obedient',
   model: 'obedient-model',
@@ -110,13 +102,11 @@ const respondingWith = (spec: unknown): ComponentProvider => ({
   generate: async () => ({ spec: spec as GeneratedSpec }),
 });
 
-/** Every SKU that survived into a rendered component. */
 const placedSkus = (spec: { blocks: GeneratedSpec['blocks'] }): string[] =>
   spec.blocks.flatMap((block) =>
     block.kind === 'grid' || block.kind === 'carousel' ? block.items.map((item) => item.sku) : [],
   );
 
-/** The set reconciliation chose, if the spec ended up with a bundle at all. */
 const bundleIdOf = (spec: { blocks: GeneratedSpec['blocks'] }): string | null => {
   for (const block of spec.blocks) {
     if (block.kind === 'bundle') return block.bundleId;
@@ -124,7 +114,6 @@ const bundleIdOf = (spec: { blocks: GeneratedSpec['blocks'] }): string | null =>
   return null;
 };
 
-/** The reason under the first product in the first grid, if there is one. */
 const reasonOn = (spec: { blocks: GeneratedSpec['blocks'] }): string | null => {
   for (const block of spec.blocks) {
     if (block.kind === 'grid') return block.items[0]?.reason ?? null;
@@ -132,7 +121,6 @@ const reasonOn = (spec: { blocks: GeneratedSpec['blocks'] }): string | null => {
   return null;
 };
 
-/** The product the hero kept, if it kept one. */
 const heroSkuOf = (spec: { blocks: GeneratedSpec['blocks'] }): string | null => {
   for (const block of spec.blocks) {
     if (block.kind === 'hero') return block.sku;
@@ -148,7 +136,6 @@ const heroBlock = (sku: string | null): Block => ({
   ctaLabel: null,
 });
 
-// Only the number of slots matters in cohort mode: the products are replaced.
 const gridBlock = (skus: string[]): Block => ({
   kind: 'grid',
   title: null,
@@ -181,11 +168,6 @@ const specOf = (blocks: Block[]): GeneratedSpec => ({
 const generatorWith = (options: ComponentGeneratorOptions = {}) =>
   createComponentGenerator({ cache: createNullSpecCache(), ...options });
 
-/**
- * The one promise this module makes. Everything a model can do wrong ends in a
- * component rather than an error, because a page that renders nothing is worse
- * than a page that renders something plain.
- */
 describe('always returns something renderable', () => {
   it.each([
     ['there is no provider', {}],
@@ -212,9 +194,6 @@ describe('always returns something renderable', () => {
     expect(await reasonFor({})).toBe('no-provider');
     expect(await reasonFor({ provider: throwingProvider() })).toBe('provider-error');
     expect(await reasonFor({ provider: hangingProvider(), modelTimeoutMs: 20 })).toBe('timeout');
-    // A malformed answer is the adapter's fault; an answer that names nothing
-    // this shopper can be shown is the model's. They want different responses,
-    // so they get different reasons.
     expect(await reasonFor({ provider: respondingWith({ bad: true }) })).toBe('invalid-generation');
     expect(
       await reasonFor({
@@ -245,12 +224,6 @@ describe('the deadline', () => {
     expect(Date.now() - startedAt).toBeLessThan(500);
   });
 
-  /**
-   * Guards against blaming the vendor for the caller's own deadline. The
-   * better-behaved the adapter, the more it used to happen: an adapter that
-   * honours `signal` rejects before the deadline does, so classifying on the
-   * error that arrives reported every one of its timeouts as 'provider-error'.
-   */
   it('calls a timeout a timeout, even when the provider stops on its own', async () => {
     const events: GenerationEvent[] = [];
     const spec = await generatorWith({
@@ -309,11 +282,6 @@ describe('the cache', () => {
     expect(counted.calls).toBe(2);
   });
 
-  /**
-   * The reason a cached component is reconciled on the way out rather than the
-   * way in. Stock moves independently of the cache key, so a component checked
-   * a minute ago can be wrong now.
-   */
   it('never serves a cached product that has since sold out', async () => {
     const counted = countingProvider(modelSpec(['TR-101', 'TR-102']));
     const generator = createComponentGenerator({
@@ -339,9 +307,6 @@ describe('the cache', () => {
       cache: createMemorySpecCache(),
     });
 
-    // This is why the cache holds what the model said rather than what was
-    // servable at the time. Storing the narrowed form would lose TR-101 for the
-    // life of the entry, and no test would have noticed.
     const soldOut = await generator.generate(
       payload({ candidates: [product('TR-101', { isInStock: false }), product('TR-102')] }),
     );
@@ -466,8 +431,6 @@ describe('concurrent requests for the same shopper', () => {
       Array.from({ length: 8 }, () => generator.generate(payload())),
     );
 
-    // Eight shoppers arriving together on a cold key would otherwise buy the
-    // same answer eight times.
     expect(calls).toBe(1);
     expect(results.every((spec) => spec.source === 'llm')).toBe(true);
   });
@@ -550,11 +513,7 @@ describe('provenance', () => {
     const spec = await generatorWith({ provider: slow }).generate(payload());
     const after = Date.now();
 
-    // A hardcoded zero satisfies "at least zero", so the figure has to be
-    // pinned against something that actually elapsed.
     expect(spec.latencyMs).toBeGreaterThanOrEqual(35);
-    // Stamped when the spec was produced, not when the request arrived — so it
-    // has to be past the time the model spent, not merely inside the window.
     expect(spec.generatedAt).toBeGreaterThanOrEqual(before + 35);
     expect(spec.generatedAt).toBeLessThanOrEqual(after);
   });
@@ -568,7 +527,7 @@ describe('what it reports', () => {
       onEvent: (event) => events.push(event),
       ...options,
     });
-    // eslint-disable-next-line no-await-in-loop -- sequential on purpose, so run two reads what run one cached
+    // eslint-disable-next-line no-await-in-loop
     for (let run = 0; run < runs; run += 1) await generator.generate(payload());
     return events;
   };
@@ -579,8 +538,6 @@ describe('what it reports', () => {
     ['no provider at all', {}, 1],
     ['two runs, one cached', { provider: countingProvider().provider }, 2],
   ])('reports exactly one event for %s', async (_label, options, runs) => {
-    // Every ratio the evaluation computes is over all calls, so a call that
-    // reports nothing makes every one of them wrong.
     expect(await collect(options, runs)).toHaveLength(runs);
   });
 
@@ -602,9 +559,6 @@ describe('what it reports', () => {
       generation: 'per-shopper',
     });
 
-    // The model was asked and billed. Reporting calledModel: false here would
-    // hide exactly the calls worth knowing about — the ones that produced
-    // nothing renderable.
     expect(event).toMatchObject({
       source: 'fallback',
       degradedReason: 'unusable-on-serve',
@@ -613,12 +567,6 @@ describe('what it reports', () => {
     expect(event?.violations).toContain('unknown-sku:GHOST-1');
   });
 
-  /**
-   * A call that fails still went out, and a vendor that charges for tokens has
-   * already charged for it. Reporting `calledModel: false` on these paths made
-   * the calls that produce nothing the only ones missing from the count — the
-   * exact opposite of what the flag exists for.
-   */
   it.each([
     ['the provider errors', { provider: throwingProvider() }, 'provider-error'],
     ['the deadline fires', { provider: hangingProvider(), modelTimeoutMs: 20 }, 'timeout'],
@@ -639,8 +587,6 @@ describe('what it reports', () => {
   });
 
   it('reports what an unparseable answer cost', async () => {
-    // The tokens are spent by the time the schema rejects it. Dropping the
-    // usage here loses the spend on the answers a vendor is worst at.
     const [event] = await collect({
       provider: {
         name: 'odd',
@@ -660,8 +606,6 @@ describe('what it reports', () => {
   });
 
   it('counts one model call when eight requests share a generation that fails', async () => {
-    // The flag separates the caller that sent the request from the ones that
-    // joined it. A failure must not turn one call into eight.
     const events: GenerationEvent[] = [];
     const generator = createComponentGenerator({
       cache: createNullSpecCache(),
@@ -710,9 +654,6 @@ describe('what it reports', () => {
 
     await Promise.all(Array.from({ length: 8 }, () => generator.generate(payload())));
 
-    // Eight events, because eight callers asked. One model call, because seven
-    // of them shared the first one's answer — cost is summed over the flag, not
-    // over the events.
     expect(events).toHaveLength(8);
     expect(events.filter((event) => event.calledModel)).toHaveLength(1);
   });
@@ -786,7 +727,6 @@ describe('what it reports', () => {
       },
     });
 
-    // A broken metrics hook must not take down a page.
     await expect(generator.generate(payload())).resolves.toMatchObject({ source: 'llm' });
   });
 });
@@ -802,8 +742,6 @@ describe('when the component was generated', () => {
     await new Promise((resolve) => setTimeout(resolve, 60));
     const cached = await generator.generate(payload());
 
-    // A cached component is not newly generated. Stamping it with the serve
-    // time makes any measure of how stale a page is showing read as zero.
     expect(cached.source).toBe('cache');
     expect(cached.generatedAt).toBe(first.generatedAt);
   });
@@ -849,8 +787,6 @@ describe('generateDeterministic', () => {
   });
 });
 
-// Two shoppers who look the same to a cohort: same segment, same surface, and
-// both interested in the same category. They differ only as individuals.
 const cohortMate = (id: string, likedSku: string): TrackingInputDraft =>
   payload({
     user: { id, segment: 'loyalty' },
@@ -915,9 +851,6 @@ describe('generation modes', () => {
   });
 
   it('renders even when the model names products that do not exist', async () => {
-    // In cohort mode the model's SKUs are replaced before anything checks them,
-    // so it cannot put a made-up product on a page. In per-shopper mode the same
-    // answer falls back.
     const generator = createComponentGenerator({
       provider: respondingWith(modelSpec(['GHOST-1', 'GHOST-2'])),
       cache: createNullSpecCache(),
@@ -930,7 +863,6 @@ describe('generation modes', () => {
   });
 
   it('shows two shoppers in one cohort a bundle each, chosen for them', async () => {
-    // The bundle is picked per request in reconciliation, not cached with the spec.
     const bundleSpec: GeneratedSpec = {
       tone: 'neutral',
       headline: 'Buy them together',
@@ -979,15 +911,6 @@ describe('generation modes', () => {
   });
 });
 
-/**
- * A cohort spec is refilled with this shopper's products, and the grid used to
- * take the whole item budget. A bundle block found nothing left, so the set was
- * dropped and the shop never showed one. The set is chosen first now, and the
- * grid is handed what is left.
- *
- * A hero counts too: its product is never swapped, so it spends a slot before
- * the grid gets any.
- */
 describe('keeping room for the set', () => {
   const CATALOG = ['A', 'B', 'C', 'D', 'E', 'F'];
   const SETS = [
@@ -995,9 +918,6 @@ describe('keeping room for the set', () => {
     { id: 'BUN-CD', skus: ['C', 'D'], price: 20 },
   ];
 
-  // C is in the cart, so BUN-CD is the better-fitting set and C is never
-  // recommended on its own. The products are alike otherwise, so the picks come
-  // back in SKU order: A, B, D, E, F.
   const shopper = (overrides: Partial<TrackingInputDraft> = {}): TrackingInputDraft => ({
     user: { id: 'S-0001', segment: 'loyalty' },
     context: { surface: 'pdp' },
@@ -1010,7 +930,6 @@ describe('keeping room for the set', () => {
   const generatorFor = (spec: GeneratedSpec, options: ComponentGeneratorOptions = {}) =>
     generatorWith({ provider: countingProvider(spec).provider, ...options });
 
-  /** Every product the page shows, the set's own members included. */
   const shownProducts = (spec: { blocks: GeneratedSpec['blocks'] }): string[] => {
     const shown: string[] = [];
     for (const block of spec.blocks) {
@@ -1043,12 +962,10 @@ describe('keeping room for the set', () => {
     expect(heroSkuOf(rendered)).toBe('E');
     expect(placedSkus(rendered)).toEqual(['A']);
     expect(bundleIdOf(rendered)).toBe('BUN-CD');
-    // The hero, one grid item and both members of the set: four, the maximum.
     expect(shownProducts(rendered)).toHaveLength(4);
   });
 
   it('renders the set the hero has left free, not the one it took a product from', async () => {
-    // D is the hero's, so BUN-CD is out of reach and BUN-AB is what is chosen.
     const rendered = await generatorFor(
       specOf([heroBlock('D'), gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
     ).generate(shopper());
@@ -1060,8 +977,6 @@ describe('keeping room for the set', () => {
   });
 
   it('renders the set it chose whichever side of it the hero sits', async () => {
-    // Nothing is placed when a bundle block comes first, so the set is picked
-    // without the hero, and the hero gives its product up as a repeat.
     const rendered = await generatorFor(
       specOf([bundleBlock, heroBlock('D'), gridBlock(['A', 'B', 'C', 'D'])]),
     ).generate(shopper());
@@ -1087,8 +1002,6 @@ describe('keeping room for the set', () => {
   });
 
   it('gives the grid back the slot of a hero naming a product in the cart', async () => {
-    // C is the sibling's job, not the hero's: it is already in the cart, so the
-    // hero gives it up the same way it would give up an out-of-stock product.
     const rendered = await generatorFor(
       specOf([heroBlock('C'), gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
     ).generate(shopper());
@@ -1099,9 +1012,6 @@ describe('keeping room for the set', () => {
   });
 
   it('counts a hero below the bundle block toward the room it reserves', async () => {
-    // E is the hero's and sits after the bundle block. The reservation has to
-    // count it too, or the carousel and grid ahead of it spend the slot first
-    // and the hero loses its product for want of budget.
     const carousel: Block = {
       kind: 'carousel',
       title: null,
@@ -1117,8 +1027,6 @@ describe('keeping room for the set', () => {
   });
 
   it('keeps every product in the set out of the grid', async () => {
-    // A is in the cart, so BUN-AB is the set and B is the best pick left. The
-    // grid would have shown B if the set had not spoken for it first.
     const rendered = await generatorFor(
       specOf([gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
     ).generate(shopper({ signals: { cart: [{ sku: 'A', at: 1_700_000_000_000 }] } }));
@@ -1146,8 +1054,6 @@ describe('keeping room for the set', () => {
   });
 
   it('keeps no room at all when the set would leave the grid empty', async () => {
-    // Three items, a hero and a set of two: reserving would leave the grid
-    // nothing. A set that does not render is better than a grid that does not.
     const tight = shopper({ context: { surface: 'pdp', maxItems: 3 } });
 
     const rendered = await generatorFor(
@@ -1180,8 +1086,6 @@ describe('keeping room for the set', () => {
   });
 
   it('keeps a second bundle block from going over the item budget', async () => {
-    // Room is reserved for one set. The second bundle block finds nothing left
-    // once the first one has spent it, so it drops rather than going over.
     const events: GenerationEvent[] = [];
     const rendered = await generatorFor(
       specOf([gridBlock(['A', 'B', 'C', 'D']), bundleBlock, bundleBlock]),
@@ -1203,7 +1107,6 @@ describe('keeping room for the set', () => {
     const perShopper = await generatorFor(spec, { generation: 'per-shopper' }).generate(shopper());
     const cohort = await generatorFor(spec).generate(shopper());
 
-    // Per-shopper keeps the model's own four products and the set is dropped.
     expect(placedSkus(perShopper)).toEqual(['A', 'B', 'D', 'E']);
     expect(bundleIdOf(perShopper)).toBeNull();
 
@@ -1213,8 +1116,6 @@ describe('keeping room for the set', () => {
 });
 
 describe('what one shopper can put in another shopper page', () => {
-  // A provider that writes the prompt it was given into the component, so a
-  // test can see exactly what reached the model.
   const echoingProvider = (): ComponentProvider => ({
     name: 'echo',
     model: 'echo-model',

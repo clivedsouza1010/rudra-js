@@ -11,11 +11,6 @@ const SKU = 'RJ-00001';
 const render = async (sku: string, shopper: string) =>
   renderToStaticMarkup(await ProductPageContent({ sku, shopperId: shopper }));
 
-/**
- * Shoppers are chosen by what they have done, never by id: naming `S-0001` pins
- * a test to one seed, and the case named for the cold-start path once took it
- * only by luck.
- */
 function shopperWho(description: string, matches: (shopper: Shopper) => boolean): Shopper {
   const shopper = shoppers.find(matches);
   if (!shopper) throw new Error(`the shopper population has nobody who ${description}`);
@@ -35,18 +30,12 @@ describe('a product page', () => {
   it('renders the recommendation area into the HTML itself', async () => {
     const markup = await render(SKU, richShopper.id);
 
-    // The whole architecture claims this: it is in the response, not fetched
-    // afterwards.
     expect(markup).toContain('data-rudra-slot="recommendations"');
   });
 
   it('takes every product fact in the recommendation area from the catalog', async () => {
     const markup = await render(SKU, richShopper.id);
 
-    // Sliced from the recommendation area onwards. The page's own <article>
-    // renders the current product's price above it, so a bare "there is a
-    // price in the markup" assertion passes even when this area rendered
-    // nothing at all.
     const slotAt = markup.indexOf('data-rudra-slot=');
     expect(slotAt).toBeGreaterThan(-1);
     const recommendations = markup.slice(slotAt);
@@ -54,14 +43,9 @@ describe('a product page', () => {
     const recommendedSku = /data-rudra-sku="([^"]+)"/.exec(recommendations)?.[1];
     expect(recommendedSku).toBeDefined();
 
-    // 1 is the shop's catalog seed. Generated here rather than read back off
-    // the shop, so the price below is the fixture's, not the page's own.
     const product = generateCatalog(1).find((candidate) => candidate.sku === recommendedSku);
     expect(product, `${String(recommendedSku)} is not a SKU this catalog has`).toBeDefined();
 
-    // The exact string the renderer produces from the catalog's price and
-    // currency. A renderer that ever read a price out of the model's spec
-    // would put a different one here.
     expect(recommendations).toContain(
       new Intl.NumberFormat('en-US', {
         style: 'currency',
@@ -71,10 +55,8 @@ describe('a product page', () => {
   });
 
   it('renders for a cold-start shopper as well as a rich one', async () => {
-    // Different digests, different cache keys, different code paths through
-    // selection. A page that only works for one is not working.
     for (const shopper of [coldStartShopper, richShopper]) {
-      // eslint-disable-next-line no-await-in-loop -- sequential on purpose, so a failure names the shopper that failed
+      // eslint-disable-next-line no-await-in-loop
       expect(await render(SKU, shopper.id)).toContain('data-rudra-slot');
     }
   });
@@ -85,12 +67,9 @@ describe('a product page', () => {
 });
 
 it('renders nothing for a SKU the catalog does not have, so the route can answer 404', () => {
-  // Substituting a different product would show, and track, something the
-  // shopper never asked for.
   return expect(ProductPageContent({ sku: 'NOT-A-SKU', shopperId: undefined })).resolves.toBeNull();
 });
 
-/** `notFound()` signals by throwing, and a throw is assertable. */
 const route = (sku: string) =>
   ProductPage({ params: Promise.resolve({ sku }), searchParams: Promise.resolve({}) });
 

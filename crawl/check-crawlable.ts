@@ -1,10 +1,5 @@
-// What the renderer puts on the wrapper. Finding this is finding the slot.
 const SLOT = 'data-rudra-slot';
 
-// React parks content it could not send in place inside one of these, then
-// moves it with a script. A crawler runs neither. Checked against react-dom
-// 19.2.8: a host that sets React's identifierPrefix moves the S: prefix, and
-// then both of these stop matching without saying so.
 const HIDDEN_HOLDER = '<div hidden id="S:';
 const SWAP_SCRIPT = '$RC(';
 
@@ -19,7 +14,6 @@ export function checkCrawlable(html: string): string[] {
 
   const slotAt = html.indexOf(SLOT);
   if (slotAt === -1) {
-    // Nothing else can be judged without it.
     return [NO_SLOT];
   }
 

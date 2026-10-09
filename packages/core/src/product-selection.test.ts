@@ -161,7 +161,6 @@ describe('ordering', () => {
       },
     });
 
-    // Both score the same, so the tie-break on SKU is what puts AA-1 first.
     expect(skus(picks)).toEqual(['AA-1', 'BB-2']);
   });
 });
@@ -174,12 +173,6 @@ describe('the score', () => {
   });
 });
 
-/**
- * The selector is held to the same standard as the model: every basis it states
- * has to be one reconciliation can verify. A claim it cannot support would be
- * downgraded there just the same, so stating one is simply a lie it gets caught
- * telling.
- */
 describe('the stated basis', () => {
   const basisOf = (sku: string, overrides: Partial<TrackingInputDraft>) =>
     pickFor(overrides).find((pick) => pick.product.sku === sku)?.basis;
@@ -266,8 +259,6 @@ describe('a host that brings its own ranking', () => {
     const input = inputFor();
     const byScore = selectProducts(input, buildDigest(input));
 
-    // A-1 is the only rated product, so scoring has to move it off its sent
-    // position. If this ever matches the sent order the test proves nothing.
     expect(byScore.map((pick) => pick.product.sku)).not.toEqual(['Z-9', 'A-1', 'M-5']);
     expect(byScore[0]?.product.sku).toBe('A-1');
   });
