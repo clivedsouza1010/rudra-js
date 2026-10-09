@@ -2,9 +2,7 @@ import type { Bundle, Product } from '@rudra-js/core';
 
 export interface BlockRenderContext {
   readonly products: ReadonlyMap<string, Product>;
-
   readonly bundles: ReadonlyMap<string, Bundle>;
-
   readonly hrefForSku: (sku: string) => string;
   readonly formatPrice: (product: Product) => string;
   readonly formatBundlePrice: (bundle: Bundle) => string;
@@ -22,6 +20,17 @@ export function sellableProduct(
   return product?.isInStock === false ? undefined : product;
 }
 
+function formatMoney(price: number, currency: string, locale?: string): string {
+  // Fall back only when Intl rejects the locale or currency; format() errors surface.
+  let formatter: Intl.NumberFormat;
+  try {
+    formatter = new Intl.NumberFormat(locale, { style: 'currency', currency });
+  } catch {
+    return `${currency} ${price}`;
+  }
+  return formatter.format(price);
+}
+
 export function defaultFormatPrice(product: Product, locale?: string): string {
   if (!Number.isFinite(product.price)) {
     throw new TypeError(
@@ -29,15 +38,7 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
         'catalog objects must satisfy productSchema from @rudra-js/core',
     );
   }
-
-  let formatter: Intl.NumberFormat;
-  try {
-    formatter = new Intl.NumberFormat(locale, { style: 'currency', currency: product.currency });
-  } catch {
-    return `${product.currency} ${product.price}`;
-  }
-
-  return formatter.format(product.price);
+  return formatMoney(product.price, product.currency, locale);
 }
 
 export function defaultFormatBundlePrice(bundle: Bundle, locale?: string): string {
@@ -47,13 +48,5 @@ export function defaultFormatBundlePrice(bundle: Bundle, locale?: string): strin
         'bundle objects must satisfy bundleSchema from @rudra-js/core',
     );
   }
-
-  let formatter: Intl.NumberFormat;
-  try {
-    formatter = new Intl.NumberFormat(locale, { style: 'currency', currency: bundle.currency });
-  } catch {
-    return `${bundle.currency} ${bundle.price}`;
-  }
-
-  return formatter.format(bundle.price);
+  return formatMoney(bundle.price, bundle.currency, locale);
 }

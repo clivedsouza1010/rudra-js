@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   SPEC_VERSION,
   generatedSpecSchema,
-  type Block,
   type ComponentSpec,
   type DegradedReason,
   type GeneratedSpec,
@@ -12,7 +11,7 @@ import { buildFallbackSpec } from './fallback-component.js';
 import { buildPrompt } from './model-prompt.js';
 import type { ComponentProvider, TokenUsage } from './provider.js';
 import { bundleForShopper, capBlocks, placeableHeroSkus, reconcileSpec } from './reconciliation.js';
-import { selectProducts, type RankOrder, type ProductPick } from './product-selection.js';
+import { selectProducts, type RankOrder } from './product-selection.js';
 import { fitToShopper, type FittedSpec } from './fit-to-shopper.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import {
@@ -31,11 +30,8 @@ import {
 export interface GenerationEvent {
   key: string | null;
   source: SpecSource;
-
   elapsedMs: number;
-
   calledModel: boolean;
-
   violations?: string[];
   usage?: TokenUsage;
   degradedReason?: DegradedReason;
@@ -45,23 +41,16 @@ export interface GenerationEvent {
 
 export interface ComponentGeneratorOptions {
   provider?: ComponentProvider | null;
-
   cache?: SpecCache;
-
   modelTimeoutMs?: number;
-
   cacheTimeoutMs?: number;
-
   generation?: 'cohort' | 'per-shopper';
-
   rank?: RankOrder;
-
   onEvent?: (event: GenerationEvent) => void;
 }
 
 export interface ComponentGenerator {
   generate(input: TrackingInputDraft): Promise<ComponentSpec>;
-
   generateDeterministic(input: TrackingInputDraft): ComponentSpec;
 }
 
@@ -92,27 +81,11 @@ async function withinBudget<T>(
   try {
     return await Promise.race([start(controller.signal), deadline]);
   } catch (error) {
+    // An aborted provider rejects first with its own error; report the timeout instead.
     throw expired ?? error;
   } finally {
     clearTimeout(timer);
   }
-}
-
-function createSingleFlight() {
-  const inFlight = new Map<string, Promise<ModelCall>>();
-
-  return {
-    isRunning: (key: string) => inFlight.has(key),
-
-    run(key: string, task: () => Promise<ModelCall>): Promise<ModelCall> {
-      const existing = inFlight.get(key);
-      if (existing) return existing;
-
-      const started = task().finally(() => inFlight.delete(key));
-      inFlight.set(key, started);
-      return started;
-    },
-  };
 }
 
 const cachedSpecSchema = z.object({
@@ -139,32 +112,20 @@ function fitCohortSpec(
   const picks = selectProducts(input, digest, { rank });
   const blocks = capBlocks(spec.blocks);
 
-  let hasBundleBlock = false;
-  const aboveBundle: Block[] = [];
-  for (const block of blocks) {
-    if (block.kind === 'bundle') {
-      hasBundleBlock = true;
-      break;
-    }
-    aboveBundle.push(block);
-  }
-  if (!hasBundleBlock) return fitToShopper(spec, picks, digest.maxItems);
+  const bundleAt = blocks.findIndex((block) => block.kind === 'bundle');
+  if (bundleAt === -1) return fitToShopper(spec, picks, digest.maxItems);
 
-  const chosen = bundleForShopper(input, digest, placeableHeroSkus(aboveBundle, input));
-  if (!chosen) return fitToShopper(spec, picks, digest.maxItems);
+  const heroesAbove = placeableHeroSkus(blocks.slice(0, bundleAt), input);
+  const bundle = bundleForShopper(input, digest, heroesAbove);
+  if (!bundle) return fitToShopper(spec, picks, digest.maxItems);
 
-  const spokenFor = new Set<string>(chosen.skus);
+  const spokenFor = new Set<string>(bundle.skus);
   for (const sku of placeableHeroSkus(blocks, input)) spokenFor.add(sku);
 
   const roomLeft = digest.maxItems - spokenFor.size;
-
   if (roomLeft <= 0) return fitToShopper(spec, picks, digest.maxItems);
 
-  const forGrid: ProductPick[] = [];
-  for (const pick of picks) {
-    if (!spokenFor.has(pick.product.sku)) forGrid.push(pick);
-  }
-
+  const forGrid = picks.filter((pick) => !spokenFor.has(pick.product.sku));
   return fitToShopper(spec, forGrid, roomLeft);
 }
 
@@ -177,7 +138,7 @@ export function createComponentGenerator(
   const rank = options.rank ?? 'signals';
   const modelTimeoutMs = options.modelTimeoutMs ?? 1_500;
   const cacheTimeoutMs = options.cacheTimeoutMs ?? 50;
-  const singleFlight = createSingleFlight();
+  const inFlight = new Map<string, Promise<ModelCall>>();
 
   const report = (event: GenerationEvent): void => {
     if (!options.onEvent) return;
@@ -186,13 +147,13 @@ export function createComponentGenerator(
     } catch {}
   };
 
-  const buildDeterministic = (
+  const serveFallback = (
     input: TrackingInput,
     digest: SignalDigest,
     startedAt: number,
     key: string | null,
     degradedReason: DegradedReason,
-    modelCall: Pick<GenerationEvent, 'calledModel' | 'usage' | 'violations' | 'cache' | 'error'> = {
+    details: Pick<GenerationEvent, 'calledModel' | 'usage' | 'violations' | 'cache' | 'error'> = {
       calledModel: false,
     },
   ): ComponentSpec => {
@@ -201,7 +162,7 @@ export function createComponentGenerator(
       key,
       source: 'fallback',
       elapsedMs: finishedAt - startedAt,
-      ...modelCall,
+      ...details,
       degradedReason,
     });
 
@@ -240,64 +201,65 @@ export function createComponentGenerator(
     promptDigest: SignalDigest,
   ): Promise<ModelCall> => {
     const { system, user } = buildPrompt(input, promptDigest);
-
     const result = await withinBudget('generation', modelTimeoutMs, (signal) =>
       active.generate({ system, user, schema: generatedSpecSchema, signal }),
     );
-
     const parsed = generatedSpecSchema.safeParse(result.spec);
-
     return {
       spec: parsed.success ? parsed.data : null,
       ...(result.usage ? { usage: result.usage } : {}),
     };
   };
 
+  const sharedCall = (key: string, ask: () => Promise<ModelCall>): Promise<ModelCall> => {
+    const running = inFlight.get(key);
+    if (running) return running;
+    const started = ask().finally(() => inFlight.delete(key));
+    inFlight.set(key, started);
+    return started;
+  };
+
   return {
     generateDeterministic(draft) {
       const startedAt = Date.now();
       const input = parseTrackingInput(draft);
-      return buildDeterministic(input, buildDigest(input), startedAt, null, 'requested');
+      return serveFallback(input, buildDigest(input), startedAt, null, 'requested');
     },
 
     async generate(draft) {
       const startedAt = Date.now();
-
       const input = parseTrackingInput(draft);
       const digest = buildDigest(input);
-
-      if (!provider) {
-        return buildDeterministic(input, digest, startedAt, null, 'no-provider');
-      }
+      if (!provider) return serveFallback(input, digest, startedAt, null, 'no-provider');
 
       const identity = { name: provider.name, model: provider.model };
-      const candidateSkus = input.candidates.map((product) => product.sku);
+      const skus = input.candidates.map((product) => product.sku);
       const key =
         generation === 'cohort'
-          ? cohortCacheKey(digest, candidateSkus, identity)
-          : specCacheKey(digest, candidateSkus, identity);
+          ? cohortCacheKey(digest, skus, identity)
+          : specCacheKey(digest, skus, identity);
 
       const read = await readCache(key);
       const cached = read.entry;
       let calledModel = false;
-      let answer: { spec: GeneratedSpec; usage?: TokenUsage };
-
+      let spec: GeneratedSpec;
+      let usage: TokenUsage | undefined;
       let generatedAt: number;
 
       if (cached) {
-        answer = { spec: cached.spec };
+        spec = cached.spec;
         generatedAt = cached.generatedAt;
       } else {
-        calledModel = !singleFlight.isRunning(key);
-
+        // Checked before sharedCall adds the key, so only the first caller counts.
+        calledModel = !inFlight.has(key);
         let call: ModelCall;
         try {
-          call = await singleFlight.run(key, () =>
+          call = await sharedCall(key, () =>
             askModel(provider, input, generation === 'cohort' ? toCohortDigest(digest) : digest),
           );
         } catch (error) {
           const reason = error instanceof TimeoutError ? 'timeout' : 'provider-error';
-          return buildDeterministic(input, digest, startedAt, key, reason, {
+          return serveFallback(input, digest, startedAt, key, reason, {
             calledModel,
             cache: read.outcome,
             error,
@@ -305,31 +267,31 @@ export function createComponentGenerator(
         }
 
         if (!call.spec) {
-          return buildDeterministic(input, digest, startedAt, key, 'invalid-generation', {
+          return serveFallback(input, digest, startedAt, key, 'invalid-generation', {
             calledModel,
             cache: read.outcome,
             ...(call.usage ? { usage: call.usage } : {}),
           });
         }
 
-        answer = { spec: call.spec, ...(call.usage ? { usage: call.usage } : {}) };
+        spec = call.spec;
+        usage = call.usage;
         generatedAt = Date.now();
-
-        if (calledModel) storeInBackground(key, { spec: answer.spec, generatedAt });
+        if (calledModel) storeInBackground(key, { spec, generatedAt });
       }
 
       const { spec: served, ourReasons } =
         generation === 'cohort'
-          ? fitCohortSpec(answer.spec, input, digest, rank)
-          : { spec: answer.spec, ourReasons: new Map<string, string>() };
+          ? fitCohortSpec(spec, input, digest, rank)
+          : { spec, ourReasons: new Map<string, string>() };
 
       const reconciled = reconcileSpec(served, input, digest, ourReasons);
       if (!reconciled.isUsable) {
-        return buildDeterministic(input, digest, startedAt, key, 'unusable-on-serve', {
+        return serveFallback(input, digest, startedAt, key, 'unusable-on-serve', {
           calledModel,
           cache: read.outcome,
           violations: reconciled.violations,
-          ...(answer.usage ? { usage: answer.usage } : {}),
+          ...(usage ? { usage } : {}),
         });
       }
 
@@ -342,7 +304,7 @@ export function createComponentGenerator(
         calledModel,
         cache: read.outcome,
         violations: reconciled.violations,
-        ...(answer.usage ? { usage: answer.usage } : {}),
+        ...(usage ? { usage } : {}),
       });
 
       return {

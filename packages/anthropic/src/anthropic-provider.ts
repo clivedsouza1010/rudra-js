@@ -8,21 +8,15 @@ import type {
 
 export interface AnthropicProviderOptions {
   apiKey: string;
-
   model?: string;
   maxTokens?: number;
   baseUrl?: string;
-
   workspaceId?: string;
-
   thinking?: { type: 'adaptive' | 'disabled' } | null;
-
   fetch?: typeof globalThis.fetch;
 }
 
 const TOOL_NAME = 'emit_component_spec';
-
-const DEFAULT_MAX_TOKENS = 8192;
 
 interface ToolUseBlock {
   type: 'tool_use';
@@ -33,7 +27,7 @@ interface ToolUseBlock {
 function describeShape(input: unknown): string {
   if (input === null) return 'null';
   if (Array.isArray(input)) return `an array of ${input.length}`;
-  if (typeof input !== 'object') return String(typeof input);
+  if (typeof input !== 'object') return typeof input;
 
   const keys = Object.keys(input);
   return keys.length === 0 ? 'an empty object' : `an object with keys ${keys.join(', ')}`;
@@ -45,13 +39,10 @@ function onlyValue(input: unknown): unknown {
   return values.length === 1 ? values[0] : undefined;
 }
 
-function isToolUseBlock(candidate: unknown): candidate is ToolUseBlock {
-  return (
-    typeof candidate === 'object' &&
-    candidate !== null &&
-    (candidate as Record<string, unknown>)['type'] === 'tool_use' &&
-    (candidate as Record<string, unknown>)['name'] === TOOL_NAME
-  );
+function isSpecToolUse(block: unknown): block is ToolUseBlock {
+  if (typeof block !== 'object' || block === null) return false;
+  const fields = block as Record<string, unknown>;
+  return fields['type'] === 'tool_use' && fields['name'] === TOOL_NAME;
 }
 
 export function createAnthropicProvider(options: AnthropicProviderOptions): ComponentProvider {
@@ -59,10 +50,9 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
   const thinking =
     options.thinking === undefined ? { type: 'disabled' as const } : options.thinking;
   const call = options.fetch ?? globalThis.fetch;
-
   let baseUrl = options.baseUrl ?? 'https://api.anthropic.com';
   while (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-  const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
+  const maxTokens = options.maxTokens ?? 8192;
 
   return {
     name: 'anthropic',
@@ -79,13 +69,11 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
           'anthropic-version': '2023-06-01',
           ...(options.workspaceId ? { 'anthropic-workspace-id': options.workspaceId } : {}),
         },
-
         signal: request.signal,
         body: JSON.stringify({
           model,
           max_tokens: maxTokens,
           ...(thinking ? { thinking } : {}),
-
           system: [
             { type: 'text', text: request.system, cache_control: { type: 'ephemeral' } },
             {
@@ -98,7 +86,6 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
             {
               name: TOOL_NAME,
               description: 'Return the component specification.',
-
               input_schema: z.toJSONSchema(request.schema, { io: 'input' }),
             },
           ],
@@ -108,24 +95,21 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
 
       if (!response.ok) {
         const category = await errorCategory(response);
-
         throw new Error(`anthropic responded ${response.status}${category}`);
       }
 
-      const parsed: unknown = await response.json();
-
-      if (typeof parsed !== 'object' || parsed === null) {
+      const json: unknown = await response.json();
+      if (typeof json !== 'object' || json === null) {
         throw new Error(
-          `anthropic returned ${parsed === null ? 'null' : typeof parsed}, not an object`,
+          `anthropic returned ${json === null ? 'null' : typeof json}, not an object`,
         );
       }
 
-      const body = parsed as {
+      const body = json as {
         content?: unknown;
         usage?: Record<string, unknown>;
         stop_reason?: string;
       };
-
       if (body.stop_reason === 'max_tokens') {
         throw new Error(
           `anthropic stopped at the max_tokens budget (${maxTokens}) before returning a tool use`,
@@ -136,16 +120,15 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
       }
 
       const blocks = Array.isArray(body.content) ? body.content : [];
-      const block = blocks.find(isToolUseBlock);
-
+      const block = blocks.find(isSpecToolUse);
       if (!block) {
         throw new Error(`anthropic returned no ${TOOL_NAME} tool use`);
       }
 
+      // Models sometimes wrap the spec in one key ({ body: spec }); accept only that case
       const asSent = request.schema.safeParse(block.input);
-      const usable = asSent.success ? asSent : request.schema.safeParse(onlyValue(block.input));
-
-      if (!usable.success) {
+      const result = asSent.success ? asSent : request.schema.safeParse(onlyValue(block.input));
+      if (!result.success) {
         throw new Error(
           `anthropic returned a ${TOOL_NAME} tool use that does not fit the schema. ` +
             `It sent ${describeShape(block.input)}.`,
@@ -153,10 +136,8 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
         );
       }
 
-      const spec = usable.data;
       const usage = toUsage(body.usage);
-
-      return { spec, ...(usage ? { usage } : {}) };
+      return usage ? { spec: result.data, usage } : { spec: result.data };
     },
   };
 }
@@ -167,12 +148,12 @@ async function send(call: typeof globalThis.fetch, url: string, init: RequestIni
   } catch (error) {
     if (init.signal?.aborted) throw error;
 
+    // Fetch hides the real network fault (ECONNREFUSED and the like) in error.cause
     const cause = error instanceof Error ? (error.cause ?? error) : error;
     const detail =
-      cause && typeof cause === 'object' && 'code' in cause
-        ? String((cause as { code: unknown }).code)
+      typeof cause === 'object' && cause !== null && 'code' in cause
+        ? String(cause.code)
         : String(cause instanceof Error ? cause.message : cause);
-
     throw new Error(`anthropic did not answer: ${detail}`, { cause: error });
   }
 }
@@ -187,25 +168,20 @@ async function errorCategory(response: Response): Promise<string> {
   }
 }
 
+const USAGE_FIELDS = [
+  ['input_tokens', 'inputTokens'],
+  ['output_tokens', 'outputTokens'],
+  ['cache_read_input_tokens', 'cacheReadTokens'],
+  ['cache_creation_input_tokens', 'cacheWriteTokens'],
+] as const;
+
 function toUsage(usage: Record<string, unknown> | undefined): TokenUsage | undefined {
   if (!usage) return undefined;
 
-  const numberAt = (key: string): number | undefined => {
-    const value = usage[key];
-    return typeof value === 'number' ? value : undefined;
-  };
-
-  const inputTokens = numberAt('input_tokens');
-  const outputTokens = numberAt('output_tokens');
-  const cacheReadTokens = numberAt('cache_read_input_tokens');
-  const cacheWriteTokens = numberAt('cache_creation_input_tokens');
-
-  const mapped = {
-    ...(inputTokens === undefined ? {} : { inputTokens }),
-    ...(outputTokens === undefined ? {} : { outputTokens }),
-    ...(cacheReadTokens === undefined ? {} : { cacheReadTokens }),
-    ...(cacheWriteTokens === undefined ? {} : { cacheWriteTokens }),
-  };
-
+  const mapped: TokenUsage = {};
+  for (const [from, to] of USAGE_FIELDS) {
+    const value = usage[from];
+    if (typeof value === 'number') mapped[to] = value;
+  }
   return Object.keys(mapped).length > 0 ? mapped : undefined;
 }

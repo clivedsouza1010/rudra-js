@@ -44,17 +44,17 @@ function hasContent(
   products: ReadonlyMap<string, Product>,
   bundles: ReadonlyMap<string, Bundle>,
 ): boolean {
+  const isSellable = (sku: string) => sellableProduct(products, sku) !== undefined;
+
   switch (block.kind) {
     case 'grid':
     case 'carousel':
-      return block.items.some(
-        (reference) => sellableProduct(products, reference.sku) !== undefined,
-      );
+      return block.items.some((reference) => isSellable(reference.sku));
     case 'hero':
       return (
         block.headline.length > 0 ||
         (block.body !== null && block.body.length > 0) ||
-        (block.sku !== null && sellableProduct(products, block.sku) !== undefined)
+        (block.sku !== null && isSellable(block.sku))
       );
     case 'banner':
     case 'copy':
@@ -62,10 +62,7 @@ function hasContent(
     case 'bundle': {
       if (block.bundleId === null) return false;
       const bundle = bundles.get(block.bundleId);
-      return (
-        bundle !== undefined &&
-        bundle.skus.every((sku) => sellableProduct(products, sku) !== undefined)
-      );
+      return bundle !== undefined && bundle.skus.every((sku) => isSellable(sku));
     }
     default:
       block satisfies never;
@@ -110,12 +107,9 @@ export function RudraComponent({
   hasDiagnostics = false,
   className,
 }: RudraComponentProps) {
-  const productMap = toProductMap(products);
-  const bundlesById = new Map((bundles ?? []).map((bundle) => [bundle.id, bundle]));
-
   const context: BlockRenderContext = {
-    products: productMap,
-    bundles: bundlesById,
+    products: toProductMap(products),
+    bundles: new Map((bundles ?? []).map((bundle) => [bundle.id, bundle])),
     hrefForSku,
     formatPrice: formatPrice ?? ((product) => defaultFormatPrice(product, locale)),
     formatBundlePrice: formatBundlePrice ?? ((bundle) => defaultFormatBundlePrice(bundle, locale)),
