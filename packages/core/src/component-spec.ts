@@ -8,25 +8,17 @@ export const EMPHASIS = ['normal', 'featured'] as const;
 
 export const RECOMMENDATION_BASES = [
   'similar_to_current',
-
   'most_viewed',
-
   'complements_cart',
-
   'complements_purchase',
-
   'liked_category',
-
   'popular',
 ] as const;
 
 export const productReferenceSchema = z.object({
   sku: z.string(),
-
   basis: z.enum(RECOMMENDATION_BASES),
-
   reason: z.string().nullable(),
-
   badge: z.string().nullable(),
   emphasis: z.enum(EMPHASIS),
 });
@@ -47,6 +39,10 @@ const gridBlockSchema = z.object({
   columns: z.union([z.literal(2), z.literal(3), z.literal(4)]),
   items: z.array(productReferenceSchema),
 });
+
+export function columnsFor(count: number, widest: 2 | 3 | 4): 2 | 3 | 4 {
+  return Math.min(widest, Math.max(2, count)) as 2 | 3 | 4;
+}
 
 const carouselBlockSchema = z.object({
   kind: z.literal('carousel'),
@@ -72,7 +68,6 @@ const bundleBlockSchema = z.object({
   title: z.string().nullable(),
   body: z.string().nullable(),
   ctaLabel: z.string().nullable(),
-
   bundleId: z.string().nullable(),
 });
 
@@ -99,7 +94,6 @@ export const generatedSpecSchema = z.object({
   headline: z.string(),
   subheadline: z.string().nullable(),
   blocks: z.array(blockSchema),
-
   rationale: z.string(),
 });
 export type GeneratedSpec = z.infer<typeof generatedSpecSchema>;
@@ -121,15 +115,10 @@ export interface ComponentSpec extends GeneratedSpec {
   specVersion: typeof SPEC_VERSION;
   slot: string;
   source: SpecSource;
-
   generatedAt: number;
-
   latencyMs: number;
-
   provider: string | null;
-
   model: string | null;
-
   degradedReason?: DegradedReason;
 }
 

@@ -1,4 +1,4 @@
-import type { GeneratedSpec, ProductReference } from './component-spec.js';
+import { columnsFor, type GeneratedSpec, type ProductReference } from './component-spec.js';
 import type { SignalDigest } from './signal-digest.js';
 import { selectProducts, type SelectOptions } from './product-selection.js';
 import type { TrackingInput } from './tracking-input.js';
@@ -17,12 +17,6 @@ function headlineFor(digest: SignalDigest): { headline: string; subheadline: str
     return { headline: 'Picked for you', subheadline: `More from ${topCategory}` };
   }
   return { headline: 'You might also like', subheadline: null };
-}
-
-function columnsFor(count: number): 2 | 3 | 4 {
-  if (count >= 4) return 4;
-  if (count === 3) return 3;
-  return 2;
 }
 
 export function buildFallbackSpec(
@@ -48,7 +42,7 @@ export function buildFallbackSpec(
     blocks:
       items.length === 0
         ? []
-        : [{ kind: 'grid', title: null, columns: columnsFor(items.length), items }],
+        : [{ kind: 'grid', title: null, columns: columnsFor(items.length, 4), items }],
     rationale: digest.isColdStart
       ? 'Deterministic: no behavioural signals, ranked by rating and stock.'
       : 'Deterministic: ranked by category affinity, revisit, rating and tag overlap.',

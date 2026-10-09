@@ -111,26 +111,3 @@ export function specCacheKey(
 
   return createHash('sha256').update(material).digest('hex').slice(0, 32);
 }
-
-export function cohortCacheKey(
-  digest: SignalDigest,
-  candidateSkus: readonly string[],
-  provider: { name: string; model: string },
-): string {
-  const material = canonicalise({
-    specVersion: SPEC_VERSION,
-    prompt: PROMPT_FINGERPRINT,
-    provider,
-    segment: digest.segment ?? null,
-    surface: digest.surface,
-    slot: digest.slot,
-    locale: digest.locale,
-    maxItems: digest.maxItems,
-    isColdStart: digest.isColdStart,
-    currentCategory: digest.currentCategory ?? null,
-    topCategory: digest.categoryAffinity[0]?.category ?? null,
-    candidates: candidateSkus.toSorted(),
-  });
-
-  return createHash('sha256').update(material).digest('hex').slice(0, 32);
-}

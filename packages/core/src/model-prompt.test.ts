@@ -208,6 +208,74 @@ describe('what the shopper half says', () => {
     expect(user).toContain('at most 1 product across');
     expect(user).not.toContain('1 products');
   });
+
+  it('reads exactly like this for a shopper with every kind of signal', () => {
+    const { user } = promptFor({
+      user: { id: 'shopper-1', segment: 'endurance', isReturning: true },
+      context: {
+        surface: 'pdp',
+        slot: 'rail',
+        locale: 'en-GB',
+        currentSku: 'TR-101',
+        currentCategory: 'Trail Running',
+        searchQuery: 'hydration vest',
+        maxItems: 3,
+      },
+      signals: {
+        likes: [{ sku: 'TR-102' }],
+        dislikes: [{ sku: 'OW-303' }],
+        lastPurchased: [{ sku: 'TR-103' }],
+        cart: [{ sku: 'NU-201' }],
+        mostViewed: [
+          { sku: 'TR-101', views: 7 },
+          { sku: 'TR-102', views: 2 },
+        ],
+        recentSearches: ['hydration vest', 'gaiters'],
+        interactions: [
+          { type: 'size_guide_opened' },
+          { type: 'size_guide_opened' },
+          { type: 'review_read' },
+        ],
+      },
+      candidates: [
+        product('TR-101', { rating: 4.5, tags: ['waterproof', 'wide fit'] }),
+        product('TR-102'),
+        product('NU-201', { category: 'Nutrition' }),
+        product('OW-303', { category: 'Outerwear', isInStock: false }),
+      ],
+    });
+
+    expect(user).toBe(`BEGIN_UNTRUSTED_DATA
+
+## Shopper
+
+Page: "pdp", slot "rail", locale "en-GB"
+Looking at: "TR-101"
+Category being browsed: "Trail Running"
+Searched for: "hydration vest"
+Segment: "endurance"
+Returning shopper: yes
+Liked: "TR-102"
+Disliked, never show these: "OW-303"
+Already bought: "TR-103"
+In the basket: "NU-201"
+Most viewed: "TR-101" viewed 7x, "TR-102" viewed 2x
+Recent searches: "hydration vest", "gaiters"
+Category interest, strongest first: "Trail Running", "Nutrition"
+Other activity: "size_guide_opened" x2, "review_read" x1
+
+## Candidates
+
+- "TR-101" | "Product TR-101" | "Trail Running" | rated 4.5 | tags "waterproof"/"wide fit"
+- "TR-102" | "Product TR-102" | "Trail Running"
+- "NU-201" | "Product NU-201" | "Nutrition"
+
+END_UNTRUSTED_DATA
+
+# Task
+
+Design the component for the shopper described above. Place at most 3 products across all blocks.`);
+  });
 });
 
 describe('invisible and direction-changing characters', () => {
@@ -292,6 +360,28 @@ describe('invisible and direction-changing characters', () => {
 
     expect(escaping.length).toBeLessThan(plain.length * 1.5);
     expect(plain).toContain('a'.repeat(FIELD_LIMITS.searchQuery));
+  });
+
+  const quotedSearch = (term: string) => {
+    const line = promptFor({ context: { surface: 'pdp', searchQuery: term } })
+      .user.split('\n')
+      .find((row) => row.startsWith('Searched for: '));
+    return line?.slice('Searched for: '.length);
+  };
+
+  it('cuts a long value between characters, so it still parses as one string', () => {
+    const term = '"\\'.repeat(FIELD_LIMITS.searchQuery / 2);
+
+    const quoted = quotedSearch(term);
+
+    expect(quoted).toHaveLength(400);
+    expect(JSON.parse(quoted!)).toBe(term.slice(0, 199));
+  });
+
+  it('never cuts an escape or an emoji in half', () => {
+    const term = `${'\u{10C6}'.repeat(49)}abcde${'\u{1F600}'.repeat(10)}`;
+
+    expect(quotedSearch(term)).toBe(`"${'\\u{10C6}'.repeat(49)}abcde"`);
   });
 });
 
