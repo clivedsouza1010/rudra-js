@@ -102,6 +102,39 @@ interface ModelCall {
   usage?: TokenUsage;
 }
 
+interface Settings {
+  options: ComponentGeneratorOptions;
+  provider: ComponentProvider | null;
+  cache: SpecCache;
+  generation: 'cohort' | 'per-shopper';
+  rank: RankOrder;
+  modelTimeoutMs: number;
+  cacheTimeoutMs: number;
+  inFlight: Map<string, Promise<ModelCall>>;
+}
+
+interface Run {
+  input: TrackingInput;
+  digest: SignalDigest;
+  startedAt: number;
+}
+
+interface Trace {
+  calledModel: boolean;
+  cache: CacheRead['outcome'];
+  usage: TokenUsage | undefined;
+  error?: unknown;
+}
+
+type Found =
+  | { spec: GeneratedSpec; generatedAt: number; source: 'cache' | 'llm'; trace: Trace }
+  | { failed: DegradedReason; trace: Trace };
+
+type EventDetails = Pick<
+  GenerationEvent,
+  'calledModel' | 'usage' | 'violations' | 'cache' | 'error'
+>;
+
 function fitCohortSpec(
   spec: GeneratedSpec,
   input: TrackingInput,
@@ -131,190 +164,200 @@ function fitCohortSpec(
 export function createComponentGenerator(
   options: ComponentGeneratorOptions = {},
 ): ComponentGenerator {
-  const provider = options.provider ?? null;
-  const cache = options.cache ?? createMemorySpecCache();
-  const generation = options.generation ?? 'cohort';
-  const rank = options.rank ?? 'signals';
-  const modelTimeoutMs = options.modelTimeoutMs ?? 1_500;
-  const cacheTimeoutMs = options.cacheTimeoutMs ?? 50;
-  const inFlight = new Map<string, Promise<ModelCall>>();
-
-  const report = (event: GenerationEvent): void => {
-    if (!options.onEvent) return;
-    try {
-      options.onEvent(event);
-    } catch {}
-  };
-
-  const serveFallback = (
-    input: TrackingInput,
-    digest: SignalDigest,
-    startedAt: number,
-    key: string | null,
-    degradedReason: DegradedReason,
-    details: Pick<GenerationEvent, 'calledModel' | 'usage' | 'violations' | 'cache' | 'error'> = {
-      calledModel: false,
-    },
-  ): ComponentSpec => {
-    const finishedAt = Date.now();
-    report({
-      key,
-      source: 'fallback',
-      elapsedMs: finishedAt - startedAt,
-      ...details,
-      degradedReason,
-    });
-
-    return {
-      ...buildFallbackSpec(input, digest, { rank }),
-      specVersion: SPEC_VERSION,
-      slot: digest.slot,
-      source: 'fallback',
-      generatedAt: finishedAt,
-      latencyMs: finishedAt - startedAt,
-      provider: null,
-      model: null,
-      degradedReason,
-    };
-  };
-
-  const readCache = async (key: string): Promise<CacheRead> => {
-    try {
-      const stored = await withinBudget('cache read', cacheTimeoutMs, () => cache.get(key));
-      const parsed = cachedSpecSchema.safeParse(stored);
-      return parsed.success ? { outcome: 'hit', entry: parsed.data } : { outcome: 'miss' };
-    } catch (error) {
-      return { outcome: error instanceof TimeoutError ? 'timeout' : 'error' };
-    }
-  };
-
-  const storeInBackground = (key: string, cached: CachedSpec): void => {
-    void Promise.resolve()
-      .then(() => cache.set(key, cached))
-      .catch(() => {});
-  };
-
-  const askModel = async (
-    active: ComponentProvider,
-    input: TrackingInput,
-    promptDigest: SignalDigest,
-  ): Promise<ModelCall> => {
-    const { system, user } = buildPrompt(input, promptDigest);
-    const result = await withinBudget('generation', modelTimeoutMs, (signal) =>
-      active.generate({ system, user, schema: generatedSpecSchema, signal }),
-    );
-    const parsed = generatedSpecSchema.safeParse(result.spec);
-    return {
-      spec: parsed.success ? parsed.data : null,
-      ...(result.usage ? { usage: result.usage } : {}),
-    };
-  };
-
-  const sharedCall = (key: string, ask: () => Promise<ModelCall>): Promise<ModelCall> => {
-    const running = inFlight.get(key);
-    if (running) return running;
-    const started = ask().finally(() => inFlight.delete(key));
-    inFlight.set(key, started);
-    return started;
+  const settings: Settings = {
+    options,
+    provider: options.provider ?? null,
+    cache: options.cache ?? createMemorySpecCache(),
+    generation: options.generation ?? 'cohort',
+    rank: options.rank ?? 'signals',
+    modelTimeoutMs: options.modelTimeoutMs ?? 1_500,
+    cacheTimeoutMs: options.cacheTimeoutMs ?? 50,
+    inFlight: new Map(),
   };
 
   return {
-    generateDeterministic(draft) {
-      const startedAt = Date.now();
-      const input = parseTrackingInput(draft);
-      return serveFallback(input, buildDigest(input), startedAt, null, 'requested');
-    },
-
-    async generate(draft) {
-      const startedAt = Date.now();
-      const input = parseTrackingInput(draft);
-      const digest = buildDigest(input);
-      if (!provider) return serveFallback(input, digest, startedAt, null, 'no-provider');
-
-      const identity = { name: provider.name, model: provider.model };
-      const skus = input.candidates.map((product) => product.sku);
-      const key =
-        generation === 'cohort'
-          ? cohortCacheKey(digest, skus, identity)
-          : specCacheKey(digest, skus, identity);
-
-      const read = await readCache(key);
-      const cached = read.entry;
-      let calledModel = false;
-      let spec: GeneratedSpec;
-      let usage: TokenUsage | undefined;
-      let generatedAt: number;
-
-      if (cached) {
-        spec = cached.spec;
-        generatedAt = cached.generatedAt;
-      } else {
-        calledModel = !inFlight.has(key);
-        let call: ModelCall;
-        try {
-          call = await sharedCall(key, () =>
-            askModel(provider, input, generation === 'cohort' ? toCohortDigest(digest) : digest),
-          );
-        } catch (error) {
-          const reason = error instanceof TimeoutError ? 'timeout' : 'provider-error';
-          return serveFallback(input, digest, startedAt, key, reason, {
-            calledModel,
-            cache: read.outcome,
-            error,
-          });
-        }
-
-        if (!call.spec) {
-          return serveFallback(input, digest, startedAt, key, 'invalid-generation', {
-            calledModel,
-            cache: read.outcome,
-            ...(call.usage ? { usage: call.usage } : {}),
-          });
-        }
-
-        spec = call.spec;
-        usage = call.usage;
-        generatedAt = Date.now();
-        if (calledModel) storeInBackground(key, { spec, generatedAt });
-      }
-
-      const { spec: served, ourReasons } =
-        generation === 'cohort'
-          ? fitCohortSpec(spec, input, digest, rank)
-          : { spec, ourReasons: new Map<string, string>() };
-
-      const reconciled = reconcileSpec(served, input, digest, ourReasons);
-      if (!reconciled.isUsable) {
-        return serveFallback(input, digest, startedAt, key, 'unusable-on-serve', {
-          calledModel,
-          cache: read.outcome,
-          violations: reconciled.violations,
-          ...(usage ? { usage } : {}),
-        });
-      }
-
-      const finishedAt = Date.now();
-      const source: SpecSource = cached ? 'cache' : 'llm';
-      report({
-        key,
-        source,
-        elapsedMs: finishedAt - startedAt,
-        calledModel,
-        cache: read.outcome,
-        violations: reconciled.violations,
-        ...(usage ? { usage } : {}),
-      });
-
-      return {
-        ...reconciled.spec,
-        specVersion: SPEC_VERSION,
-        slot: digest.slot,
-        source,
-        generatedAt,
-        latencyMs: finishedAt - startedAt,
-        provider: provider.name,
-        model: provider.model,
-      };
-    },
+    generate: (draft) => generate(settings, draft),
+    generateDeterministic: (draft) => generateDeterministic(settings, draft),
   };
+}
+
+async function generate(settings: Settings, draft: TrackingInputDraft): Promise<ComponentSpec> {
+  const run = startRun(draft);
+  const provider = settings.provider;
+  if (!provider) return fallback(settings, run, null, 'no-provider');
+
+  const key = cacheKeyFor(settings, provider, run);
+  const found = await findSpec(settings, provider, run, key);
+  if ('failed' in found)
+    return fallback(settings, run, key, found.failed, eventDetails(found.trace));
+
+  const reconciled = shapeForShopper(settings, run, found.spec);
+  const details = eventDetails(found.trace, reconciled.violations);
+  if (!reconciled.isUsable) return fallback(settings, run, key, 'unusable-on-serve', details);
+
+  const finishedAt = Date.now();
+  report(settings, {
+    key,
+    source: found.source,
+    elapsedMs: finishedAt - run.startedAt,
+    ...details,
+  });
+
+  return {
+    ...reconciled.spec,
+    specVersion: SPEC_VERSION,
+    slot: run.digest.slot,
+    source: found.source,
+    generatedAt: found.generatedAt,
+    latencyMs: finishedAt - run.startedAt,
+    provider: provider.name,
+    model: provider.model,
+  };
+}
+
+function generateDeterministic(settings: Settings, draft: TrackingInputDraft): ComponentSpec {
+  return fallback(settings, startRun(draft), null, 'requested');
+}
+
+function startRun(draft: TrackingInputDraft): Run {
+  const startedAt = Date.now();
+  const input = parseTrackingInput(draft);
+  return { input, digest: buildDigest(input), startedAt };
+}
+
+function cacheKeyFor(settings: Settings, provider: ComponentProvider, run: Run): string {
+  const identity = { name: provider.name, model: provider.model };
+  const skus = run.input.candidates.map((product) => product.sku);
+  if (settings.generation === 'cohort') return cohortCacheKey(run.digest, skus, identity);
+  return specCacheKey(run.digest, skus, identity);
+}
+
+async function findSpec(
+  settings: Settings,
+  provider: ComponentProvider,
+  run: Run,
+  key: string,
+): Promise<Found> {
+  const read = await readCache(settings, key);
+  if (read.entry) {
+    const trace = { calledModel: false, cache: read.outcome, usage: undefined };
+    return { spec: read.entry.spec, generatedAt: read.entry.generatedAt, source: 'cache', trace };
+  }
+
+  const calledModel = !settings.inFlight.has(key);
+  let call: ModelCall;
+  try {
+    call = await sharedCall(settings, key, () => askModel(settings, provider, run));
+  } catch (error) {
+    const failed = error instanceof TimeoutError ? 'timeout' : 'provider-error';
+    return { failed, trace: { calledModel, cache: read.outcome, usage: undefined, error } };
+  }
+
+  const trace = { calledModel, cache: read.outcome, usage: call.usage };
+  if (!call.spec) return { failed: 'invalid-generation', trace };
+
+  const generatedAt = Date.now();
+  if (calledModel) storeInBackground(settings, key, { spec: call.spec, generatedAt });
+  return { spec: call.spec, generatedAt, source: 'llm', trace };
+}
+
+async function readCache(settings: Settings, key: string): Promise<CacheRead> {
+  try {
+    const stored = await withinBudget('cache read', settings.cacheTimeoutMs, () =>
+      settings.cache.get(key),
+    );
+    const parsed = cachedSpecSchema.safeParse(stored);
+    return parsed.success ? { outcome: 'hit', entry: parsed.data } : { outcome: 'miss' };
+  } catch (error) {
+    return { outcome: error instanceof TimeoutError ? 'timeout' : 'error' };
+  }
+}
+
+async function askModel(
+  settings: Settings,
+  provider: ComponentProvider,
+  run: Run,
+): Promise<ModelCall> {
+  const promptDigest = settings.generation === 'cohort' ? toCohortDigest(run.digest) : run.digest;
+  const { system, user } = buildPrompt(run.input, promptDigest);
+  const result = await withinBudget('generation', settings.modelTimeoutMs, (signal) =>
+    provider.generate({ system, user, schema: generatedSpecSchema, signal }),
+  );
+  const parsed = generatedSpecSchema.safeParse(result.spec);
+  return {
+    spec: parsed.success ? parsed.data : null,
+    ...(result.usage ? { usage: result.usage } : {}),
+  };
+}
+
+function sharedCall(
+  settings: Settings,
+  key: string,
+  ask: () => Promise<ModelCall>,
+): Promise<ModelCall> {
+  const running = settings.inFlight.get(key);
+  if (running) return running;
+  const started = ask().finally(() => settings.inFlight.delete(key));
+  settings.inFlight.set(key, started);
+  return started;
+}
+
+function storeInBackground(settings: Settings, key: string, cached: CachedSpec): void {
+  void Promise.resolve()
+    .then(() => settings.cache.set(key, cached))
+    .catch(() => {});
+}
+
+function shapeForShopper(settings: Settings, run: Run, spec: GeneratedSpec) {
+  if (settings.generation !== 'cohort') {
+    return reconcileSpec(spec, run.input, run.digest, new Map<string, string>());
+  }
+  const fitted = fitCohortSpec(spec, run.input, run.digest, settings.rank);
+  return reconcileSpec(fitted.spec, run.input, run.digest, fitted.ourReasons);
+}
+
+function fallback(
+  settings: Settings,
+  run: Run,
+  key: string | null,
+  degradedReason: DegradedReason,
+  details: EventDetails = { calledModel: false },
+): ComponentSpec {
+  const finishedAt = Date.now();
+  report(settings, {
+    key,
+    source: 'fallback',
+    elapsedMs: finishedAt - run.startedAt,
+    ...details,
+    degradedReason,
+  });
+
+  return {
+    ...buildFallbackSpec(run.input, run.digest, { rank: settings.rank }),
+    specVersion: SPEC_VERSION,
+    slot: run.digest.slot,
+    source: 'fallback',
+    generatedAt: finishedAt,
+    latencyMs: finishedAt - run.startedAt,
+    provider: null,
+    model: null,
+    degradedReason,
+  };
+}
+
+function eventDetails(trace: Trace, violations?: string[]): EventDetails {
+  return {
+    calledModel: trace.calledModel,
+    cache: trace.cache,
+    ...(violations ? { violations } : {}),
+    ...(trace.usage ? { usage: trace.usage } : {}),
+    ...('error' in trace ? { error: trace.error } : {}),
+  };
+}
+
+function report(settings: Settings, event: GenerationEvent): void {
+  if (!settings.options.onEvent) return;
+  try {
+    settings.options.onEvent(event);
+  } catch {}
 }
