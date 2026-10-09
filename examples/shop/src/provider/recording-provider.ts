@@ -23,14 +23,15 @@ export function createRecordingProvider(
   inner: ComponentProvider,
   directory: string,
 ): ComponentProvider {
-  const replay = createReplayProvider({ directory, model: inner.model });
+  const replay = createReplayProvider({ directory, name: inner.name, model: inner.model });
 
   return {
     name: inner.name,
     model: inner.model,
 
     async generate(request) {
-      if (existsSync(transcriptPath(directory, inner.model, request))) {
+      const path = transcriptPath(directory, inner.model, request);
+      if (existsSync(path)) {
         return replay.generate(request);
       }
 
@@ -39,7 +40,7 @@ export function createRecordingProvider(
       try {
         mkdirSync(directory, { recursive: true });
         writeFileSync(
-          transcriptPath(directory, inner.model, request),
+          path,
           `${JSON.stringify({ model: inner.model, system: request.system, user: request.user, result }, null, 2)}\n`,
         );
       } catch (error) {
@@ -53,10 +54,11 @@ export function createRecordingProvider(
 
 export function createReplayProvider(options: {
   directory: string;
+  name: string;
   model: string;
 }): ComponentProvider {
   return {
-    name: 'anthropic',
+    name: options.name,
     model: options.model,
 
     async generate(request) {
@@ -68,23 +70,19 @@ export function createReplayProvider(options: {
         throw new Error(message);
       }
 
-      let transcript: Transcript;
+      let transcript: Partial<Transcript> | null;
       try {
-        transcript = JSON.parse(readFileSync(path, 'utf8')) as Transcript;
+        transcript = JSON.parse(readFileSync(path, 'utf8')) as Partial<Transcript> | null;
       } catch (cause) {
         throw new Error(`recording is not valid JSON: ${path}`, { cause });
       }
 
-      if (
-        typeof transcript !== 'object' ||
-        transcript === null ||
-        !('result' in transcript) ||
-        typeof (transcript as { result?: unknown }).result !== 'object'
-      ) {
+      const result = transcript?.result;
+      if (typeof result !== 'object' || result === null) {
         throw new Error(`the recording at ${path} has no result to replay`);
       }
 
-      return { ...transcript.result, spec: request.schema.parse(transcript.result.spec) };
+      return { ...result, spec: request.schema.parse(result.spec) };
     },
   };
 }

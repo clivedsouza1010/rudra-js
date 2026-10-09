@@ -12,6 +12,9 @@ one costs. It's a measurement of the framework, not of a model. Nothing here mak
 - `d per-shopper` — the same stub in `per-shopper` mode. One generation per shopper, so there's
   almost nothing left to share.
 
+Only the stub, or nothing at all, may answer an arm. If a real provider answers one, the run refuses
+to publish it.
+
 ## Running it
 
 ```sh
@@ -24,8 +27,6 @@ gitignored.
 
 ## The columns
 
-- **Mode** — what answered the arm: `stub`, `replay` or `live`. If an arm's provider doesn't match
-  its label, the run refuses to publish it.
 - **Views**, **Model calls** — shoppers served, and how many of them reached the provider.
 - **LLM/Cache/Fallback** — where each view's component came from.
 - **Cache hits** — the share of views served from the cache. Remember it's one cold pass at ten
@@ -37,5 +38,6 @@ gitignored.
   you.
 - **CPU ms** — user plus system time for the arm's own process: parse, digest, select, reconcile and
   render. No model call is in it.
-- **Median, p95, p99** — `n/a` for a stub run. The stub answers far below the millisecond
-  `Date.now()` can see, so a median would just be a 0 or a 1 written down as a result.
+
+There are no timing columns. The stub answers far below the millisecond `Date.now()` can see, so a
+median would just be a 0 or a 1 written down as a result.

@@ -31,14 +31,7 @@ jobs:
           cache: npm
 
       - run: npm ci --ignore-scripts
-
-      - run: npm run build
-
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm test
-      - run: npm run verify:consumer
+      - run: npm run check
 
       - run: npm install -g npm@11.19.1
       - run: npm --version

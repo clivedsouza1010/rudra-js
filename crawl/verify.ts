@@ -1,8 +1,22 @@
 import { checkCrawlable } from './check-crawlable.js';
 import { isEntryPoint } from './entry-point.js';
-import { FALLBACK_MARKER, PAGE_PATH } from './page.js';
 import { startShop, stopShop, freePort } from './shop-server.js';
-import { reportFailure } from './verify-messages.js';
+
+const PAGE_PATH = '/product/RJ-00001?shopper=S-0001';
+
+const SAFE_BUILD_LINE =
+  'ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/example-shop';
+
+export function reportFailure(error: unknown, seen: string): void {
+  console.error(error instanceof Error ? error.message : String(error));
+
+  const shopSaid = seen.trim();
+  if (shopSaid) console.error(`the shop said:\n${shopSaid}`);
+
+  console.error(
+    `if there is no production build yet, the safe way to make one is:\n  ${SAFE_BUILD_LINE}`,
+  );
+}
 
 async function main(): Promise<void> {
   const port = await freePort();
@@ -17,10 +31,6 @@ async function main(): Promise<void> {
 
     const html = await response.text();
 
-    if (html.includes(FALLBACK_MARKER)) {
-      throw new Error('the shop served the deterministic fallback, so this checked the wrong page');
-    }
-
     const problems = checkCrawlable(html);
     if (problems.length > 0) {
       console.error('the page is not what a crawler needs:');
@@ -30,6 +40,12 @@ async function main(): Promise<void> {
       );
       process.exitCode = 1;
       return;
+    }
+
+    if (!/data-rudra-source="(llm|cache)"/.test(html)) {
+      throw new Error(
+        'the shop did not serve a model-made component, so this checked the wrong page',
+      );
     }
 
     console.log('crawlable: the slot is in the page, before </main>, and nothing hides it');

@@ -11,7 +11,6 @@ const PRICES: TokenPrices = {
 
 const armResult = (overrides: Partial<ArmResult> = {}): ArmResult => ({
   arm: 'c cohort',
-  mode: 'stub',
   providerName: 'stub',
   providerModel: 'stub',
   views: 500,
@@ -67,26 +66,19 @@ describe('the result file', () => {
 });
 
 describe('the caveats a stub run needs', () => {
-  const caveatsFor = (mode: ArmResult['mode']): readonly string[] =>
-    buildCaveats([armResult({ mode })], 10);
+  const caveats = (): readonly string[] => buildCaveats([armResult()], 10);
 
   it('says the violation counts cannot be anything but zero', () => {
-    expect(hasLine(caveatsFor('stub'), 'no violation the stub can produce')).toBe(true);
+    expect(hasLine(caveats(), 'no violation the stub can produce')).toBe(true);
   });
 
   it('says there are no timings and why', () => {
-    expect(hasLine(caveatsFor('stub'), 'No timings are reported')).toBe(true);
-  });
-
-  it('drops the stub caveats when a real model answered', () => {
-    expect(hasLine(caveatsFor('live'), 'no violation the stub can produce')).toBe(false);
-    expect(hasLine(caveatsFor('live'), 'No timings are reported')).toBe(false);
-    expect(hasLine(caveatsFor('live'), 'one real recorded call')).toBe(false);
+    expect(hasLine(caveats(), 'No timings are reported')).toBe(true);
   });
 
   it('says the cost is a ceiling and how far off a real run it is', () => {
-    expect(hasLine(caveatsFor('stub'), 'close to twice a steady-state run')).toBe(true);
-    expect(hasLine(caveatsFor('stub'), 'ceiling')).toBe(true);
+    expect(hasLine(caveats(), 'close to twice a steady-state run')).toBe(true);
+    expect(hasLine(caveats(), 'ceiling')).toBe(true);
   });
 
   it('names the shoppers per page it was actually given', () => {
@@ -94,20 +86,13 @@ describe('the caveats a stub run needs', () => {
   });
 
   it('says the hit rate is one cold pass and not a steady state', () => {
-    expect(hasLine(caveatsFor('stub'), 'one cold pass')).toBe(true);
-    expect(hasLine(caveatsFor('live'), 'one cold pass')).toBe(true);
+    expect(hasLine(caveats(), 'one cold pass')).toBe(true);
   });
 });
 
 describe('the printed table', () => {
   it('calls the cost column a ceiling', () => {
     expect(formatTable([armResult()])).toContain('Cost / 1k views (ceiling)');
-  });
-
-  it('prints the mode right after the arm', () => {
-    const table = formatTable([armResult({ arm: 'c cohort', mode: 'stub' })]);
-
-    expect(table).toContain('| c cohort | stub |');
   });
 
   it('prints the mix in the order the heading names', () => {
@@ -122,24 +107,10 @@ describe('the printed table', () => {
     expect(table).toContain('| 54.5% |');
   });
 
-  it('prints n/a where a stub run has no timings', () => {
-    const table = formatTable([armResult({ mode: 'stub' })]);
+  it('prints n/a where an arm has no cpu', () => {
+    const table = formatTable([armResult()]);
 
-    expect(table).toContain('| n/a | n/a | n/a | n/a |');
-  });
-
-  it('prints the timings a timed run does have', () => {
-    const table = formatTable([
-      armResult({ mode: 'live', elapsedMs: { median: 820, p95: 1400, p99: 1490 } }),
-    ]);
-
-    expect(table).toContain('| 820 | 1400 | 1490 |');
-  });
-
-  it('prints the mode a live run would carry', () => {
-    const table = formatTable([armResult({ arm: 'c cohort', mode: 'live' })]);
-
-    expect(table).toContain('| c cohort | live |');
+    expect(table).toContain('| n/a |');
   });
 
   it('says what the cpu figure leaves out when there is one', () => {
@@ -150,14 +121,6 @@ describe('the printed table', () => {
 
   it('says nothing about cpu when no arm measured it', () => {
     expect(buildCaveats([armResult()], 10).join(' ')).not.toMatch(/cpu/i);
-  });
-
-  it('does not promise a live run has no network wait in it', () => {
-    const live = [armResult({ mode: 'live', cpuUserMs: 134, cpuSystemMs: 2 })];
-    const caveat = buildCaveats(live, 10).join(' ');
-
-    expect(caveat).toMatch(/no model call is in it/i);
-    expect(caveat).not.toMatch(/network wait/i);
   });
 
   it('says nothing about cpu when only half of it arrived', () => {

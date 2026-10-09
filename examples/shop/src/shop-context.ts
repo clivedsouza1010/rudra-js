@@ -43,46 +43,41 @@ export function findShopper(id: string | undefined): Shopper {
 export function chooseProvider(): ComponentProvider {
   const apiKey = process.env['ANTHROPIC_API_KEY'];
   const mode = process.env['RUDRA_SHOP_MODE'] || 'replay';
+  const replayOnly = process.env['RUDRA_REPLAY_ONLY'];
 
   if (mode !== 'replay' && mode !== 'record') {
     throw new Error(`RUDRA_SHOP_MODE is "${mode}": it must be "replay" or "record"`);
   }
-
-  if (process.env['RUDRA_REPLAY_ONLY']) {
-    if (mode === 'record') {
-      throw new Error(
-        'RUDRA_REPLAY_ONLY is set and RUDRA_SHOP_MODE is record: refusing to start, because replay only means no model calls',
-      );
-    }
-    if (apiKey) {
-      throw new Error(
-        'RUDRA_REPLAY_ONLY is set and so is ANTHROPIC_API_KEY: refusing to start, because replay only means no model calls ' +
-          '(the key may be coming from examples/shop/.env.local)',
-      );
-    }
-    return createReplayProvider({ directory: RECORDINGS_DIRECTORY, model: MODEL_ID });
+  if (replayOnly && mode === 'record') {
+    throw new Error(
+      'RUDRA_REPLAY_ONLY is set and RUDRA_SHOP_MODE is record: refusing to start, because replay only means no model calls',
+    );
   }
-
-  if (mode === 'record') {
-    if (!apiKey) {
-      throw new Error(
-        'RUDRA_SHOP_MODE is record but ANTHROPIC_API_KEY is not set: recording calls the model, so it needs a key ' +
-          '(export one, or put it in examples/shop/.env.local)',
-      );
-    }
-    return createRecordingProvider(
-      createAnthropicProvider({
-        apiKey,
-        model: MODEL_ID,
-        ...(process.env['ANTHROPIC_WORKSPACE_ID']
-          ? { workspaceId: process.env['ANTHROPIC_WORKSPACE_ID'] }
-          : {}),
-      }),
-      RECORDINGS_DIRECTORY,
+  if (replayOnly && apiKey) {
+    throw new Error(
+      'RUDRA_REPLAY_ONLY is set and so is ANTHROPIC_API_KEY: refusing to start, because replay only means no model calls ' +
+        '(the key may be coming from examples/shop/.env.local)',
+    );
+  }
+  if (mode === 'replay') {
+    return createReplayProvider({
+      directory: RECORDINGS_DIRECTORY,
+      name: 'anthropic',
+      model: MODEL_ID,
+    });
+  }
+  if (!apiKey) {
+    throw new Error(
+      'RUDRA_SHOP_MODE is record but ANTHROPIC_API_KEY is not set: recording calls the model, so it needs a key ' +
+        '(export one, or put it in examples/shop/.env.local)',
     );
   }
 
-  return createReplayProvider({ directory: RECORDINGS_DIRECTORY, model: MODEL_ID });
+  const workspaceId = process.env['ANTHROPIC_WORKSPACE_ID'];
+  return createRecordingProvider(
+    createAnthropicProvider({ apiKey, model: MODEL_ID, ...(workspaceId ? { workspaceId } : {}) }),
+    RECORDINGS_DIRECTORY,
+  );
 }
 
 const CACHE_TTL_MS = 60 * 60 * 1000;

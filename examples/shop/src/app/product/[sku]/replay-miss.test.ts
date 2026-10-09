@@ -40,6 +40,6 @@ describe('the replay-miss rule', () => {
       }),
     );
 
-    expect(markup).not.toContain('data-rudra-source="fallback"');
+    expect(markup).toMatch(/data-rudra-source="(llm|cache)"/);
   });
 });

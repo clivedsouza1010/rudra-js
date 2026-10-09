@@ -1,5 +1,5 @@
 import type { Product } from '@rudra-js/core';
-import { createSeededRandom } from './seeded-random';
+import { mulberry32, pick } from './seeded-random';
 
 export interface Shopper {
   id: string;
@@ -19,26 +19,24 @@ export function generateShoppers(
   catalog: readonly Product[],
   count = 500,
 ): Shopper[] {
-  const random = createSeededRandom(seed);
-  const pick = <Item>(items: readonly Item[]): Item => items[Math.floor(random() * items.length)]!;
-  const someSkus = (howMany: number): string[] =>
-    Array.from({ length: howMany }, () => pick(catalog).sku).filter(
-      (sku, position, all) => all.indexOf(sku) === position,
-    );
+  const random = mulberry32(seed);
+  const someSkus = (howMany: number): string[] => [
+    ...new Set(Array.from({ length: howMany }, () => pick(random, catalog).sku)),
+  ];
 
   return Array.from({ length: count }, (_unused, index) => {
     const isColdStart = random() < 0.1;
 
     return {
       id: `S-${String(index + 1).padStart(4, '0')}`,
-      segment: pick(SEGMENTS),
+      segment: pick(random, SEGMENTS),
       isReturning: !isColdStart && random() > 0.3,
       likedSkus: isColdStart ? [] : someSkus(Math.floor(random() * 4)),
       viewedSkus: isColdStart ? [] : someSkus(1 + Math.floor(random() * 8)),
       cartSkus: isColdStart ? [] : someSkus(Math.floor(random() * 3)),
       searches: isColdStart
         ? []
-        : Array.from({ length: Math.floor(random() * 2) }, () => pick(SEARCHES)),
+        : Array.from({ length: Math.floor(random() * 2) }, () => pick(random, SEARCHES)),
     };
   });
 }

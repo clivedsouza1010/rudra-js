@@ -209,6 +209,19 @@ describe('the mode switch', () => {
     );
   });
 
+  it('replays under the same provider name it records under', async () => {
+    delete process.env[REPLAY_ONLY];
+
+    const { chooseProvider } = await import('./shop-context');
+    const replayed = chooseProvider();
+    process.env[MODE] = 'record';
+    process.env[KEY] = 'sk-ant-not-a-real-key';
+    const recorded = chooseProvider();
+
+    expect(replayed.name).toBe('anthropic');
+    expect(recorded.name).toBe(replayed.name);
+  });
+
   it('keeps a transcript of the call record mode paid for', async () => {
     const directory = scratch();
     process.env[RECORDINGS] = directory;
