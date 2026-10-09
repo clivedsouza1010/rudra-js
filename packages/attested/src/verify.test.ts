@@ -31,8 +31,6 @@ describe('verify — the quantity layer', () => {
   });
 
   it('takes a bigint fact, which is the only way to hand it an id past 2^53', () => {
-    // `JSON.parse` has already rounded a 19-digit id by the time a number reaches
-    // here, so the exact spelling has to arrive as a bigint or as a string.
     const facts = { values: [9007199254740993n] };
     expect(verify('Order 9007199254740993 confirmed', facts).supported).toBe(true);
     expect(verify('Order 9007199254740992 confirmed', facts).supported).toBe(false);
@@ -88,7 +86,6 @@ describe('verify — the quantity layer', () => {
   });
 
   it('reads a number the host wrote large or small enough for String to use an exponent', () => {
-    // `String(1e21)` is `1e+21`, which used to mint the two values 1 and 21.
     expect(verify('Only 21 sold', { values: [1e21] }).supported).toBe(false);
     expect(verify('1 left', { values: [1e21] }).supported).toBe(false);
     expect(verify('1000000000000000000000 in stock', { values: [1e21] }).quantity.supported).toBe(
@@ -102,8 +99,6 @@ describe('verify — the quantity layer', () => {
   });
 
   it('survives a host value whose exponent is past anything a shop could mean', () => {
-    // These laid the digits out before anything could weigh the run: a RangeError at
-    // 1e2000000000, and at -2.5e400000000 a heap abort no caller can catch.
     const wild = ['1e2000000000', '1e-2000000000', '-2.5e400000000', `1e${'9'.repeat(400)}`];
     for (const value of wild) {
       expect(verify('1000000 sold', { values: [value] }).quantity.supported).toBe(false);
@@ -139,7 +134,6 @@ describe('verify — the quantity layer', () => {
   });
 });
 
-// Every case below is one a red team landed on this package.
 describe('verify — quantities a grouping mark used to manufacture', () => {
   const SHOP = { values: [39.99, 4.8, 210, 12, 20, 'TR-101'] };
 
@@ -158,7 +152,6 @@ describe('verify — quantities a grouping mark used to manufacture', () => {
 
   it('closes the same manufacture in the Arabic thousands mark', () => {
     expect(verify('٤\u066c٨٠٠ تقييم', SHOP).supported).toBe(false);
-    // The Arabic decimal mark still reads as a decimal point, because it is one.
     expect(verify('٤\u066b٨ من ٥', { values: [4.8, 5] }).supported).toBe(true);
   });
 
@@ -239,8 +232,6 @@ describe('verify — digits that render as something else', () => {
   });
 
   it('will not let a variation selector split one number into two supported ones', () => {
-    // A shopper reads $13; the facts carry only 1 and 3. The zero-width case was
-    // closed and this one was not, because U+FE0F is category Mn rather than Cf.
     expect(verify('$1\ufe0f3', { values: [1, 3] }).supported).toBe(false);
     expect(verify('$1\ufe003', { values: [1, 3] }).supported).toBe(false);
     expect(verify('$1\u{e0100}3', { values: [1, 3] }).supported).toBe(false);
@@ -250,23 +241,18 @@ describe('verify — digits that render as something else', () => {
   });
 
   it('will not let a control character split one number into two supported ones', () => {
-    // The two survivors of a default-ignorable-only class: Cc is neither Cf nor
-    // default-ignorable, and a backspace renders as nothing between the digits.
     expect(verify('$1\u00083', { values: [1, 3] }).supported).toBe(false);
     expect(verify('$1\u001d3', { values: [1, 3] }).supported).toBe(false);
     expect(verify('$1\u00013', { values: [1, 3] }).supported).toBe(false);
   });
 
   it('will not let a combining mark split one number into two supported ones', () => {
-    // U+0305 hangs over the 4 and takes no column, so the shopper reads $49.
     expect(verify('Yours for $4\u03059 today', { values: [4, 9] }).supported).toBe(false);
     expect(verify('Only 1\u03052 left', { values: [1, 2] }).supported).toBe(false);
     expect(verify('Since 1\u0305999', { values: [1, 999] }).supported).toBe(false);
   });
 
   it('still reads two numbers apart when what sits between them takes room', () => {
-    // A line break and a spacing mark are both visible gaps, so `2` and `3` are two
-    // numbers there and a fact of 23 does not stand behind them.
     expect(verify('Only 2\n3 left', { values: [2, 3] }).supported).toBe(true);
     expect(verify('Only 2\n3 left', { values: [23] }).supported).toBe(false);
     expect(verify('Only 2\u093e3 left', { values: [2, 3] }).supported).toBe(true);
@@ -385,8 +371,6 @@ describe('verify — the wording layer', () => {
   });
 
   it('holds a host phrase against the registers their own language writes it in', () => {
-    // Turkish and Kazakh all-caps, Spanish decomposed accents, Japanese with a space dropped
-    // in, and a Greek case ending.
     expect(
       verify('ÜCRETSİZ KARGO', { values: [], bannedPhrases: ['ücretsiz kargo'] }).wording.supported,
     ).toBe(false);
@@ -415,7 +399,6 @@ describe('verify — the wording layer', () => {
   });
 
   it('normalises a phrase the host added', () => {
-    // Not a built-in, or the built-in list would catch it and this would prove nothing.
     const facts = { values: [], bannedPhrases: ['NUR-NOCH'] };
     expect(verify('Nur noch wenige', facts).wording.supported).toBe(false);
   });
@@ -439,7 +422,6 @@ describe('verify — the wording layer', () => {
       .checked;
     expect(plain).toBeGreaterThan(20);
     expect(added).toBe(plain + 1);
-    // An allowance works on the text, not the list, so the whole list is still screened.
     expect(dropped).toBe(plain);
   });
 
@@ -463,8 +445,6 @@ describe('verify — the wording layer', () => {
   });
 });
 
-// An allowance masks the text: a banned claim sitting wholly inside one of the
-// host's phrases is not reported, and the same words elsewhere still are.
 describe('verify — allowedPhrases', () => {
   const NESTED: [string, string][] = [
     ['best seller', 'One of our best sellers.'],
@@ -477,8 +457,6 @@ describe('verify — allowedPhrases', () => {
   ];
 
   it('forgives a phrase another listed phrase sits inside', () => {
-    // Deleting the exact string left these seven allowable in name only: the
-    // matcher drops spaces, so `best seller` was still caught as `bestseller`.
     for (const [allowed, text] of NESTED) {
       const result = verify(text, { values: [], allowedPhrases: [allowed] });
       expect(tokensOf(result.wording.findings), `${allowed} in "${text}"`).toEqual([]);
@@ -508,8 +486,6 @@ describe('verify — allowedPhrases', () => {
   });
 
   it('forgives inwards and never outwards', () => {
-    // The mirror of the bug above, and correct: `in stock` is not a promise about
-    // `back in stock`, which claims a restock as well.
     expect(
       tokensOf(
         verify('Back in stock', { values: [], allowedPhrases: ['in stock'] }).wording.findings,
@@ -536,8 +512,6 @@ describe('verify — allowedPhrases', () => {
   });
 
   it('does not mint a claim the text never made by blanking out the allowed run', () => {
-    // Spaces are dropped before matching, so masking `in stock` with spaces would
-    // glue `free` to `shipping` and report a phrase nobody wrote.
     const facts = { values: [], allowedPhrases: ['in stock'] };
     expect(tokensOf(verify('free in stock shipping', facts).wording.findings)).toEqual([]);
   });
@@ -551,7 +525,6 @@ describe('verify — allowedPhrases', () => {
   });
 
   it('ignores an allowance that normalises to nothing', () => {
-    // The length guard is clarity, not load-bearing: an empty phrase spans nothing.
     const result = verify('on sale now', { values: [], allowedPhrases: ['   '] });
     expect(tokensOf(result.wording.findings)).toEqual(['sale']);
     expect(result.wording.checked).toBe(BANNED_PHRASES.length);
@@ -568,8 +541,6 @@ describe('verify — allowedPhrases', () => {
   });
 
   it('does not reach across a line break to forgive a claim standing on its own', () => {
-    // The model picks where the paragraph breaks fall. A rule or a blank line puts
-    // the negation in one block and the claim in another, and the shopper reads two.
     const cases: [string, string, string][] = [
       [
         'We do not offer\n\n---\n\nFree shipping on every order.',
@@ -607,8 +578,6 @@ describe('verify — allowedPhrases', () => {
   });
 
   it('still reads a banned phrase straight through the break it will not forgive', () => {
-    // The two rules pull opposite ways on purpose: the denylist catches more, the
-    // allowance forgives less, and both of them err toward reporting.
     expect(tokensOf(verify('Free\n\nshipping on every order', NOTHING).wording.findings)).toEqual([
       'free shipping',
     ]);
@@ -637,7 +606,6 @@ describe('verifyFields', () => {
   });
 
   it('catches a claim split across two fields of the same card', () => {
-    // The model picks the field boundaries, so a per-field check is one it can choose.
     const result = verifyFields(
       { badge: 'Free', deliveryLine: 'delivery on every order', price: '$39' },
       { values: [39] },
@@ -654,7 +622,6 @@ describe('verifyFields', () => {
     expect(tokensOf(joined.acrossFields.findings)).toEqual([]);
     expect(joined.supported).toBe(true);
 
-    // The allowance is global across the call, but it is still positional inside it.
     const split = verifyFields(
       { a: 'Back in stock', b: 'In stock now' },
       { values: [], allowedPhrases: ['back in stock'] },
@@ -677,7 +644,6 @@ describe('verifyFields', () => {
   });
 });
 
-// The holes the README states. A test is the only thing that keeps the list honest.
 describe('verify — what it does not catch, proved to still not catch it', () => {
   it('passes a number written as a word', () => {
     expect(verify('Only two left.', { values: [12] }).supported).toBe(true);
@@ -705,24 +671,18 @@ describe('verify — what it does not catch, proved to still not catch it', () =
   });
 
   it('passes a character that folds into the wording the host allowed', () => {
-    // An allowance is matched against normalised copy, so U+2116 and a superscript
-    // both count as the word `no`. The README says so under what it cannot catch.
     const facts = { values: [], allowedPhrases: ['no sale'] };
     expect(verify('№ SALE - EVERYTHING MUST GO', facts).wording.supported).toBe(true);
     expect(verify('ⁿᵒ SALE ON EVERYTHING', facts).wording.supported).toBe(true);
   });
 
   it('passes a phrase a footnote marker is glued to', () => {
-    // The superscript folds to an `a`, which glues to `shipping`, and the same
-    // word-gap rule that stops `cheap` matching `cheapskate` drops the finding.
     expect(verify('FREE SHIPPINGᵃ see terms', NOTHING).wording.supported).toBe(true);
   });
 });
 
 describe('verify — what it over-rejects, proved to still over-reject it', () => {
   it('rejects a fact written back in the exponent notation it arrived in', () => {
-    // The bill for laying a fact out positionally: the text still reads `1e-7` as
-    // the two numerals 1 and 7, and the fact is now 0.0000001, so they never meet.
     expect(verify('1e-7 mol per litre', { values: [1e-7] }).quantity.supported).toBe(false);
     expect(verify('0.0000001 mol per litre', { values: [1e-7] }).quantity.supported).toBe(true);
   });

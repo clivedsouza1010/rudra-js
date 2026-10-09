@@ -14,9 +14,7 @@ jobs:
   analysis:
     runs-on: ubuntu-latest
     permissions:
-      # Needed to upload the result to the code-scanning dashboard.
       security-events: write
-      # Needed for the publish step to attest the result came from this workflow.
       id-token: write
       contents: read
       actions: read

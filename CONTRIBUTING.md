@@ -147,8 +147,6 @@ npm run verify:consumer  # packs all four packages and uses them from outside th
 ```
 
 All six run in CI as separate steps, so a failed run names the check that failed.
-`tests/packaging.test.ts` holds us to that: the commands in `check` have to be the CI steps, in the
-same order.
 
 ## Releasing
 
@@ -174,8 +172,8 @@ stops the release on a tag you can't take back:
   carries without saying so. Those fields pick the glibc or musl build of Next's SWC and oxlint's
   native binaries on the runner.
 
-`tests/packaging.test.ts` checks all of it, so a bump that misses a spot fails on the pull request
-instead of on the tag.
+Nothing checks this list for you, so go through it on the pull request. Miss one and the release
+either fails on the tag or publishes packages that can't be installed together.
 
 Nothing automates the paperwork either. `release.yml` publishes to npm and stops — no GitHub
 release, no CHANGELOG edit. Move the `## [Unreleased]` heading and the `[unreleased]:` compare link
@@ -265,25 +263,6 @@ If a publish does half-finish — attested published, core failed — there's no
 with. Bump the patch version on all four, merge, and tag again. Don't go hunting for a token to
 finish the run: a package whose npmjs.com settings don't require trusted publishing will accept a
 granular one, and you'd end up with a version where some tarballs are attested and some aren't.
-
-## When the tool-schema golden fails
-
-`tests/golden/tool-input-schema.json` is the schema sent to the model as the tool's `input_schema`,
-so it's part of the prompt. The repo's own zod writes it, and a zod upgrade has already rewritten it
-once. An app on an older zod 4 sends the same schema in different words, and that's expected. When
-the test fails:
-
-1. Run `npm run build` first. The regeneration command the test prints imports
-   `packages/core/dist/index.js`, so a stale or missing build regenerates the old schema, or
-   nothing at all.
-2. Run the command the failure message prints, then `git diff` the golden.
-3. Read the diff for three things: a field whose `type` changed, a nullable field written a new way
-   (4.5.0 moved those from `anyOf` to a type array), and `additionalProperties` turning up where it
-   wasn't before. The provider is sent the `input` shape, which carries none.
-4. Run `npx vitest run packages/anthropic`. The adapter builds the request around this schema, and
-   a shape it can't fill is a runtime refusal, not a test failure here.
-5. Commit the golden with the zod version in the message, so the next reader can tell a deliberate
-   regeneration from a drift nobody looked at.
 
 ## Reporting a security issue
 

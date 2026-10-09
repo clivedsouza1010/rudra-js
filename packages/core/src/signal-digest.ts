@@ -8,7 +8,6 @@ import type {
 
 export interface CategoryAffinity {
   category: string;
-
   score: number;
 }
 
@@ -67,22 +66,29 @@ const SIGNAL_WEIGHTS = {
   dislike: -6,
 } as const;
 
-const effectiveWeight = (signal: { weight?: number | undefined }): number => signal.weight ?? 1;
+interface Signal {
+  sku: string;
+  category?: string | undefined;
+  weight?: number | undefined;
+}
 
-function byMostRecent(
-  left: { at?: number | undefined },
-  right: { at?: number | undefined },
-): number {
-  return (right.at ?? 0) - (left.at ?? 0);
+interface MergedView extends ViewedProduct {
+  category?: string;
+  weight: number;
+}
+
+function weightOf(signal: Signal): number {
+  return signal.weight ?? 1;
 }
 
 function recentUniqueSkus(signals: SkuSignal[], limit: number): string[] {
+  const newestFirst = signals.toSorted((left, right) => (right.at ?? 0) - (left.at ?? 0));
   const skus: string[] = [];
-  const alreadySeen = new Set<string>();
+  const seen = new Set<string>();
 
-  for (const signal of signals.toSorted(byMostRecent)) {
-    if (alreadySeen.has(signal.sku)) continue;
-    alreadySeen.add(signal.sku);
+  for (const signal of newestFirst) {
+    if (seen.has(signal.sku)) continue;
+    seen.add(signal.sku);
     skus.push(signal.sku);
     if (skus.length >= limit) break;
   }
@@ -90,54 +96,34 @@ function recentUniqueSkus(signals: SkuSignal[], limit: number): string[] {
   return skus;
 }
 
-function categoryOf(
-  signal: { sku: string; category?: string | undefined },
-  candidatesBySku: Map<string, Product>,
-): string | undefined {
+function categoryOf(signal: Signal, candidatesBySku: Map<string, Product>): string | undefined {
   return signal.category ?? candidatesBySku.get(signal.sku)?.category;
 }
 
-function computeCategoryAffinity(
-  input: TrackingInput,
-  candidatesBySku: Map<string, Product>,
-): CategoryAffinity[] {
-  const scoreByCategory = new Map<string, number>();
+function scoreCategories(input: TrackingInput): CategoryAffinity[] {
+  const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
+  const scores = new Map<string, number>();
 
-  const addScore = (category: string | undefined, score: number): void => {
+  const add = (category: string | undefined, score: number): void => {
     if (!category) return;
-    scoreByCategory.set(category, (scoreByCategory.get(category) ?? 0) + score);
+    scores.set(category, (scores.get(category) ?? 0) + score);
+  };
+  const addSignal = (signal: Signal, base: number): void => {
+    add(categoryOf(signal, candidatesBySku), base * weightOf(signal));
   };
 
   const { signals } = input;
-
-  for (const purchase of signals.lastPurchased) {
-    addScore(
-      categoryOf(purchase, candidatesBySku),
-      SIGNAL_WEIGHTS.purchase * effectiveWeight(purchase),
-    );
-  }
-  for (const like of signals.likes) {
-    addScore(categoryOf(like, candidatesBySku), SIGNAL_WEIGHTS.like * effectiveWeight(like));
-  }
-  for (const inCart of signals.cart) {
-    addScore(categoryOf(inCart, candidatesBySku), SIGNAL_WEIGHTS.cart * effectiveWeight(inCart));
-  }
-
+  for (const purchase of signals.lastPurchased) addSignal(purchase, SIGNAL_WEIGHTS.purchase);
+  for (const like of signals.likes) addSignal(like, SIGNAL_WEIGHTS.like);
+  for (const inCart of signals.cart) addSignal(inCart, SIGNAL_WEIGHTS.cart);
   for (const view of mergeViewsBySku(signals.mostViewed)) {
-    const scaledViews = Math.log2(1 + view.views);
-    addScore(categoryOf(view, candidatesBySku), SIGNAL_WEIGHTS.view * scaledViews * view.weight);
+    addSignal(view, SIGNAL_WEIGHTS.view * Math.log2(1 + view.views));
   }
-  for (const dislike of signals.dislikes) {
-    addScore(
-      categoryOf(dislike, candidatesBySku),
-      SIGNAL_WEIGHTS.dislike * effectiveWeight(dislike),
-    );
-  }
-
-  addScore(input.context.currentCategory, SIGNAL_WEIGHTS.like);
+  for (const dislike of signals.dislikes) addSignal(dislike, SIGNAL_WEIGHTS.dislike);
+  add(input.context.currentCategory, SIGNAL_WEIGHTS.like);
 
   const affinities: CategoryAffinity[] = [];
-  for (const [category, score] of scoreByCategory) {
+  for (const [category, score] of scores) {
     const rounded = Math.round(score * 100) / 100;
     if (rounded > 0) affinities.push({ category, score: rounded });
   }
@@ -165,33 +151,26 @@ export function engagedCategories(input: TrackingInput): Set<string> {
   return categories;
 }
 
-interface MergedView extends ViewedProduct {
-  category?: string;
-  weight: number;
-}
-
 function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
-  const totalsBySku = new Map<string, MergedView>();
+  const totals = new Map<string, MergedView>();
 
   for (const view of views) {
-    const running = totalsBySku.get(view.sku);
-    if (running) {
-      running.views += view.views;
-      if (view.dwellMs !== undefined) running.dwellMs = (running.dwellMs ?? 0) + view.dwellMs;
-      if (view.category !== undefined) running.category ??= view.category;
-      running.weight = Math.max(running.weight, effectiveWeight(view));
+    const total = totals.get(view.sku);
+    if (!total) {
+      const first: MergedView = { sku: view.sku, views: view.views, weight: weightOf(view) };
+      if (view.dwellMs !== undefined) first.dwellMs = view.dwellMs;
+      if (view.category !== undefined) first.category = view.category;
+      totals.set(view.sku, first);
       continue;
     }
-    totalsBySku.set(view.sku, {
-      sku: view.sku,
-      views: view.views,
-      ...(view.dwellMs !== undefined ? { dwellMs: view.dwellMs } : {}),
-      ...(view.category !== undefined ? { category: view.category } : {}),
-      weight: effectiveWeight(view),
-    });
+
+    total.views += view.views;
+    if (view.dwellMs !== undefined) total.dwellMs = (total.dwellMs ?? 0) + view.dwellMs;
+    if (view.category !== undefined) total.category ??= view.category;
+    total.weight = Math.max(total.weight, weightOf(view));
   }
 
-  return [...totalsBySku.values()];
+  return [...totals.values()];
 }
 
 function mostViewedProducts(views: ViewSignal[]): ViewedProduct[] {
@@ -206,12 +185,10 @@ function mostViewedProducts(views: ViewSignal[]): ViewedProduct[] {
 
 function countByInteractionType(interactions: Interaction[]): InteractionCount[] {
   const countByType = new Map<string, number>();
+  for (const { type } of interactions) countByType.set(type, (countByType.get(type) ?? 0) + 1);
 
-  for (const interaction of interactions) {
-    countByType.set(interaction.type, (countByType.get(interaction.type) ?? 0) + 1);
-  }
-
-  const counts = [...countByType.entries()].map(([type, count]) => ({ type, count }));
+  const counts: InteractionCount[] = [];
+  for (const [type, count] of countByType) counts.push({ type, count });
 
   return counts
     .toSorted((left, right) => right.count - left.count)
@@ -219,7 +196,6 @@ function countByInteractionType(interactions: Interaction[]): InteractionCount[]
 }
 
 export function buildDigest(input: TrackingInput): SignalDigest {
-  const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
   const { signals, context, user } = input;
 
   const likedSkus = recentUniqueSkus(signals.likes, DIGEST_LIMITS.liked);
@@ -254,7 +230,7 @@ export function buildDigest(input: TrackingInput): SignalDigest {
     cartSkus,
     topViewed,
     recentSearches: signals.recentSearches.slice(0, DIGEST_LIMITS.searches),
-    categoryAffinity: computeCategoryAffinity(input, candidatesBySku),
+    categoryAffinity: scoreCategories(input),
     interactionCounts: countByInteractionType(signals.interactions),
 
     isColdStart: evidenceCount === 0,

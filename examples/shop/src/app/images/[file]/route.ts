@@ -1,6 +1,3 @@
-// The catalog fixture invents an image path per product. Rather than ship two
-// thousand binaries, draw one: the same SKU always gets the same colour, so the
-// grid looks like a shop instead of a wall of broken images.
 const PALETTE = ['#2f4858', '#33658a', '#55696e', '#5b5f97', '#3c6e57', '#7a5c61'];
 
 export async function GET(

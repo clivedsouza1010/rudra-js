@@ -26,7 +26,6 @@ jobs:
       - run: npm install -g npm@11.19.1
       - run: npm --version
 
-      # Same order as release.yml, so the rehearsal walks the real sequence.
       - run: npm publish --dry-run --access public
         working-directory: packages/attested
 

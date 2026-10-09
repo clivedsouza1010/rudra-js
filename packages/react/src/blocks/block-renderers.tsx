@@ -1,13 +1,3 @@
-/**
- * Five of the six block renderers. The bundle one lives in `bundle-block.tsx`,
- * next door, since it draws a set the shop picked rather than the model.
- *
- * Each takes a block the model produced and a context the host owns. None of
- * them interpolate markup, and none of them read a product fact from the block
- * — that is what keeps generated output to the role of deciding layout, order
- * and wording.
- */
-
 import type { BannerBlock, CarouselBlock, CopyBlock, GridBlock, HeroBlock } from '@rudra-js/core';
 import { sellableProduct, type BlockRenderContext } from '../render-context.js';
 import { ProductCard } from './product-card.js';
@@ -68,8 +58,6 @@ export function CarouselRenderer({
   return (
     <section className="rudra-carousel">
       {block.title ? <h3 className="rudra-carousel__title">{block.title}</h3> : null}
-      {/* Scrolls with CSS overflow rather than JavaScript, so the whole
-          component still needs no client bundle. */}
       <div className="rudra-carousel__track">
         {block.items.map((reference) => (
           <ProductCard key={reference.sku} reference={reference} context={context} />

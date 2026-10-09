@@ -1,9 +1,3 @@
-/**
- * A seeded generator (mulberry32), so a fixture is a function of its seed.
- * `Math.random()` cannot be seeded, and a fixture that moves between runs turns
- * every failure into a question about the fixture.
- */
-
 export function createSeededRandom(seed: number): () => number {
   let state = seed >>> 0;
 

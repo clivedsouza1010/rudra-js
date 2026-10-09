@@ -158,7 +158,6 @@ const CONFUSABLES: Record<string, string> = {
   ѵ: 'v',
 };
 
-// Capitals that lowercasing reads wrong: Ν becomes ν, which reads as v.
 const CAPITALS: Record<string, string> = {
   Β: 'b',
   Ζ: 'z',
@@ -178,7 +177,6 @@ const CAPITALS: Record<string, string> = {
 const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
 
 export function normalisePhrasing(text: string, byLook = false): string {
-  // NFKC would turn the lunate sigmas into ς and Σ, which the fold can't read as c.
   const compatible = stripInvisible(text).replace(/[ϲϹ]/g, 'c').normalize('NFKC');
 
   let cased = compatible;

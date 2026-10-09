@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FALLBACK_MARKER } from './page.js';
 
-// verify.ts works at import time, so this imports it with the shop and the fetch replaced.
 vi.mock('./entry-point.js', () => ({ isEntryPoint: () => true }));
 vi.mock('./shop-server.js', () => ({
   freePort: () => Promise.resolve(3999),

@@ -15,8 +15,6 @@ async function main(): Promise<void> {
   const catalog = generateCatalog(1);
   const shoppers = generateShoppers(2, catalog);
 
-  // Taken after the fixtures are built, so the arm is charged for its own work
-  // and not for generating 2,000 products and 500 shoppers.
   const before = process.cpuUsage();
   const result = await measureArm(buildArm(name), shoppers, catalog, PRICES);
   const spent = process.cpuUsage(before);

@@ -1,23 +1,8 @@
 import type { Bundle, Product, TrackingInputDraft } from '@rudra-js/core';
 import type { Shopper } from './shoppers';
 
-/**
- * Fixed so a page is reproducible.
- *
- * Not because it reaches a key — the digest carries no timestamp, so neither
- * the cache key nor the prompt nor a transcript hash ever sees this value. It
- * orders signals against each other, and one shared constant keeps that order
- * stable from run to run.
- */
 const AT = 1_700_000_000_000;
 
-/**
- * What the shop sends for one page view.
- *
- * Candidates are the merchandising decision — whatever is left out cannot be
- * recommended — so this is where the shop, not the model, decides what is
- * eligible.
- */
 export function buildTrackingInput(
   shopper: Shopper,
   currentSku: string,
@@ -31,8 +16,6 @@ export function buildTrackingInput(
   );
   const finalCandidates = (inCategory.length > 0 ? inCategory : offerable).slice(0, 24);
 
-  // A bundle with a member outside the candidates would fail the tracking
-  // input contract, so only pass along the ones that fit.
   const candidateSkus = new Set(finalCandidates.map((product) => product.sku));
   const offered: Bundle[] = [];
   for (const bundle of bundles) {

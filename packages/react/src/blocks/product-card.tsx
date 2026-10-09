@@ -1,14 +1,6 @@
 import type { ProductReference } from '@rudra-js/core';
 import { sellableProduct, type BlockRenderContext } from '../render-context.js';
 
-/**
- * One product.
- *
- * Every fact here — the title, the price, the image, the link — is read from
- * the catalog, not from the specification. The specification contributes only
- * `reason`, `badge` and `emphasis`, and React escapes all three on the way
- * into the markup.
- */
 export function ProductCard({
   reference,
   context,
@@ -17,7 +9,6 @@ export function ProductCard({
   context: BlockRenderContext;
 }) {
   const product = sellableProduct(context.products, reference.sku);
-  // Gone from the catalog, or sold out since the spec was made: render nothing, not half a card.
   if (!product) return null;
 
   const isFeatured = reference.emphasis === 'featured';
@@ -33,7 +24,6 @@ export function ProductCard({
         <img className="rudra-card__image" src={product.imageUrl} alt="" loading="lazy" />
       ) : null}
 
-      {/* The spaces are the link's accessible name: "Shoe $53.67 Popular", not "Shoe$53.67Popular". */}
       <span className="rudra-card__body">
         {reference.badge ? <span className="rudra-card__badge">{reference.badge}</span> : null}{' '}
         <span className="rudra-card__title">{product.title}</span>{' '}

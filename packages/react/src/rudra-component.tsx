@@ -10,57 +10,19 @@ import { defaultRegistry, type BlockRegistry } from './registry.js';
 
 export interface RudraComponentProps {
   spec: ComponentSpec;
-  /**
-   * The host catalog. Every product fact on the page comes from here rather
-   * than from the specification.
-   *
-   * A list of products, or anything keyed by SKU — a `Map`, or your own view
-   * over a catalog too large to hold in one. The renderers only ever call
-   * `get(sku)`, and `has` is how a keyed catalog is told apart from a list. The
-   * type asks for a `ReadonlyMap`, so a view of your own implements one or is
-   * cast with `as unknown as ReadonlyMap<string, Product>`.
-   *
-   * Validate them with `productSchema` from `@rudra-js/core` — the same schema
-   * your candidates already passed — not with `parseTrackingInput`, which
-   * parses a whole tracking payload and will reject a bare catalog.
-   *
-   * This is a second door into the framework. `imageUrl` lands in an
-   * `<img src>`, and `productSchema` is the only thing that rejects a
-   * protocol-relative `//evil.example/pixel.png` or a `data:` URL — React
-   * neutralises `javascript:` on its own, but not those. A price that is not a
-   * finite number throws rather than rendering as free.
-   */
   products: ProductCatalog;
-  /** Sets the shop sells together. Only needed if a spec can carry a bundle block. */
   bundles?: readonly Bundle[];
   registry?: BlockRegistry;
   hrefForSku?: (sku: string) => string;
   formatPrice?: (product: Product) => string;
-  /** Same as `formatPrice`, but for a bundle — the shop's price, not a sum of the parts. */
   formatBundlePrice?: (bundle: Bundle) => string;
-  /**
-   * The shopper's locale, used to punctuate prices. Defaults to the server's,
-   * which is almost never the shopper's — pass it if the shop serves more than
-   * one. Ignored when `formatPrice` and `formatBundlePrice` are supplied.
-   */
   locale?: string;
-  /**
-   * Adds the model's own reasoning, the provider and the model name to the
-   * markup. Useful while developing and while benchmarking; it publishes which
-   * vendor a shop uses and whether the component is currently degraded, so it
-   * is off unless asked for.
-   */
   hasDiagnostics?: boolean;
   className?: string;
 }
 
-/** A list of products, or a `ReadonlyMap` keyed by SKU, which a view of your own can implement. */
 export type ProductCatalog = readonly Product[] | ReadonlyMap<string, Product>;
 
-// Asks what the renderers call rather than which class the host built, since
-// `instanceof Map` is per-realm. Checked before the list branch because a
-// collection can answer both: an Immutable.js map has `map`, and converting
-// through it yields `[sku, product]` pairs rather than products.
 function isKeyedBySku(catalog: ProductCatalog): catalog is ReadonlyMap<string, Product> {
   const candidate = catalog as { get?: unknown; has?: unknown };
   return typeof candidate.get === 'function' && typeof candidate.has === 'function';
@@ -77,26 +39,22 @@ function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
   return new Map(catalog.map((product) => [product.sku, product]));
 }
 
-// Whether a block still has anything to say once the catalog is applied. A SKU
-// can sell out between generating a spec and rendering it — the row goes, or it
-// is flagged out of stock, and both read the same here: grid and carousel lose
-// the products that did, a bundle loses itself if any one member did.
 function hasContent(
   block: Block,
   products: ReadonlyMap<string, Product>,
   bundles: ReadonlyMap<string, Bundle>,
 ): boolean {
+  const isSellable = (sku: string) => sellableProduct(products, sku) !== undefined;
+
   switch (block.kind) {
     case 'grid':
     case 'carousel':
-      return block.items.some(
-        (reference) => sellableProduct(products, reference.sku) !== undefined,
-      );
+      return block.items.some((reference) => isSellable(reference.sku));
     case 'hero':
       return (
         block.headline.length > 0 ||
         (block.body !== null && block.body.length > 0) ||
-        (block.sku !== null && sellableProduct(products, block.sku) !== undefined)
+        (block.sku !== null && isSellable(block.sku))
       );
     case 'banner':
     case 'copy':
@@ -104,10 +62,7 @@ function hasContent(
     case 'bundle': {
       if (block.bundleId === null) return false;
       const bundle = bundles.get(block.bundleId);
-      return (
-        bundle !== undefined &&
-        bundle.skus.every((sku) => sellableProduct(products, sku) !== undefined)
-      );
+      return bundle !== undefined && bundle.skus.every((sku) => isSellable(sku));
     }
     default:
       block satisfies never;
@@ -135,24 +90,11 @@ function renderBlock(
     case 'bundle':
       return <registry.bundle key={index} block={block} context={context} />;
     default:
-      // A block kind this renderer predates loses that block, not the page.
       block satisfies never;
       return null;
   }
 }
 
-/**
- * Renders a component specification.
- *
- * Plain React with no hooks, no state and no effects, so it renders with
- * `renderToString`, in a client-rendered app, or as a Server Component where the
- * framework supports them. Rendered on the server, the whole component arrives
- * in the initial HTML response, which is what removes the pop-in a
- * client-fetched recommendation rail has — and what makes the content visible
- * to a crawler that does not run JavaScript.
- *
- * Renders nothing at all when no block produced markup.
- */
 export function RudraComponent({
   spec,
   products,
@@ -165,12 +107,9 @@ export function RudraComponent({
   hasDiagnostics = false,
   className,
 }: RudraComponentProps) {
-  const productMap = toProductMap(products);
-  const bundlesById = new Map((bundles ?? []).map((bundle) => [bundle.id, bundle]));
-
   const context: BlockRenderContext = {
-    products: productMap,
-    bundles: bundlesById,
+    products: toProductMap(products),
+    bundles: new Map((bundles ?? []).map((bundle) => [bundle.id, bundle])),
     hrefForSku,
     formatPrice: formatPrice ?? ((product) => defaultFormatPrice(product, locale)),
     formatBundlePrice: formatBundlePrice ?? ((bundle) => defaultFormatBundlePrice(bundle, locale)),
@@ -181,8 +120,6 @@ export function RudraComponent({
   );
   if (visible.length === 0) return null;
 
-  // React drops a data-* attribute whose value is undefined, so degradedReason
-  // needs no branch of its own.
   const diagnosticAttributes = hasDiagnostics
     ? {
         'data-rudra-provider': spec.provider ?? 'none',

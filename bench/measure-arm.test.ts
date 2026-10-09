@@ -22,7 +22,6 @@ import { buildTrackingInput } from '../examples/shop/src/fixtures/tracking-input
 import { generateCatalog } from '../examples/shop/src/fixtures/catalog.js';
 import { generateShoppers } from '../examples/shop/src/fixtures/shoppers.js';
 
-// Four different numbers, so a cost test cannot pass with two of them swapped.
 const PRICES: TokenPrices = {
   inputPerMillion: 5,
   outputPerMillion: 25,
@@ -74,15 +73,12 @@ describe('summarising a run', () => {
   });
 
   it('counts only the requests that were sent', () => {
-    // A request that joined an in-flight generation did not call the model.
     const result = summarise(identity('c'), [event(), event({ calledModel: false })], PRICES);
 
     expect(result.modelCalls).toBe(1);
   });
 
   it('scales the model calls to a thousand views', () => {
-    // One call in four views is 250 calls per thousand. This number is written
-    // into the result file, so it needs an assertion of its own.
     const result = summarise(
       identity('c'),
       [
@@ -98,8 +94,6 @@ describe('summarising a run', () => {
   });
 
   it('bills a shared answer once', () => {
-    // Both events carry the same usage, because the second joined the first.
-    // Summing both would double the bill.
     const usage = { inputTokens: 1_000_000, outputTokens: 0 };
     const result = summarise(
       identity('c'),
@@ -108,16 +102,10 @@ describe('summarising a run', () => {
     );
 
     expect(result.inputTokens).toBe(1_000_000);
-    // One million input tokens over two views: $5 spread over 2 views is
-    // $2,500 per thousand.
     expect(result.costPerThousandViews).toBe(2500);
   });
 
   it('bills the cached prefix as well as the plain input', () => {
-    // A real call marks the system prompt as a cached prefix, so it reports
-    // four token counts and only two of them used to be billed.
-    // A different count for each field, so the four prices cannot be swapped
-    // around and still add up.
     const usage = {
       inputTokens: 1_000_000,
       outputTokens: 2_000_000,
@@ -128,7 +116,6 @@ describe('summarising a run', () => {
 
     expect(result.cacheWriteTokens).toBe(4_000_000);
     expect(result.cacheReadTokens).toBe(8_000_000);
-    // 1x5 + 2x25 + 4x6.25 + 8x0.5 is $84, over a single view.
     expect(result.costPerThousandViews).toBe(84_000);
   });
 
@@ -173,9 +160,6 @@ describe('summarising a run', () => {
   });
 
   it('reports no timings at all for a stub run', () => {
-    // The stub answers far below a millisecond, so Date.now() reads 0 or 1 for
-    // every view. Writing that down as a median is writing down a result the
-    // run did not measure.
     const events: GenerationEvent[] = [];
     for (let ms = 0; ms <= 5; ms += 1) events.push(event({ elapsedMs: ms }));
 
@@ -198,7 +182,6 @@ describe('summarising a run', () => {
   });
 
   it('groups a violation that carries more than one colon by its first word', () => {
-    // Core emits `unverifiable-claim:<kind>:<field>` and `unsupported-basis:<basis>:<sku>`.
     const result = summarise(
       identity('c'),
       [
@@ -264,7 +247,6 @@ describe('refusing a mislabelled arm', () => {
   });
 
   it('refuses a cohort run that was really the deterministic arm', () => {
-    // The whole point: this is arm (b) wearing arm (c)'s label.
     expect(() => assertSourceMix(resultWith({ llm: 0, cache: 0, fallback: 100 }), cohort)).toThrow(
       /fell back/,
     );
@@ -309,10 +291,6 @@ describe('refusing a mislabelled arm', () => {
   });
 
   it('refuses a run labelled live that the stub answered', () => {
-    // The failure this whole benchmark exists to catch: numbers measured with
-    // the model switched off, published under a heading saying it was on. The
-    // label is written by hand in the arm; the name comes off whatever object
-    // actually answered, so the two can disagree.
     const result = resultWith(
       { llm: 10, cache: 90, fallback: 0 },
       { mode: 'live', providerName: 'stub', providerModel: 'stub' },
@@ -331,8 +309,6 @@ describe('refusing a mislabelled arm', () => {
   });
 
   it('refuses a run labelled stub that a real provider answered', () => {
-    // The other direction, which bills money: whoever runs this expects a
-    // stub and gets an invoice.
     const result = resultWith(
       { llm: 100, cache: 0, fallback: 0 },
       { mode: 'stub', providerName: 'anthropic', providerModel: 'claude-opus-5' },
@@ -351,9 +327,6 @@ describe('refusing a mislabelled arm', () => {
   });
 
   it('refuses a run where every view fell back but the model was still called', () => {
-    // A provider that times out or errors still calls the model and still
-    // bills for it, even though its source comes back as fallback.
-    // `fallback: 'all'` alone does not see this; `modelCalls: 'none'` does.
     const result: ArmResult = { ...resultWith({ llm: 0, cache: 0, fallback: 100 }), modelCalls: 5 };
 
     expect(() => assertSourceMix(result, { fallback: 'all', modelCalls: 'none' })).toThrow(
@@ -372,14 +345,10 @@ describe('refusing a mislabelled arm', () => {
 
 const catalog = generateCatalog(7, 40);
 const shoppers = generateShoppers(11, catalog).slice(0, 5);
-// The stub reads its SKU from the prompt, so it always answers with a
-// product the shopper was actually offered.
 const stub = () => createStubProvider({ inputTokens: 1000, outputTokens: 200 });
 
 describe('choosing which page a shopper looks at', () => {
   it('opens more pages when fewer shoppers share one', () => {
-    // Shoppers per page is the whole cache hit rate, so it has to be a knob
-    // and not a number buried in the middle of the function.
     const shopperCount = 20;
 
     const skusAtFive = new Set<string>();
@@ -423,9 +392,6 @@ describe('choosing which page a shopper looks at', () => {
     for (const product of catalog) {
       if (product.isInStock) inStockSkus.push(product.sku);
     }
-    // Comfortably past the point where shopperCount / 10 exceeds the number
-    // of in-stock products, which is where folding the page count back onto
-    // the catalog used to double up on some of them.
     const shopperCount = inStockSkus.length * 10 + 30;
 
     const shopperCountPerSku = new Map<string, number>();
@@ -473,13 +439,6 @@ describe('measuring one arm', () => {
   });
 
   it('serves later shoppers in a cohort from the cache', async () => {
-    // A bigger slice than the other tests: sharing a page is necessary for a
-    // cohort to form, but not enough on its own — segment and cold-start
-    // status still split shoppers into different cohorts, so a handful of
-    // shoppers is too small a sample to reliably land two of them in the
-    // same one. Twenty is also the point where a page holds more than one
-    // page's worth of shoppers, which is what tells this test apart from a
-    // run that puts everyone on a single page regardless of population size.
     const cohortShoppers = generateShoppers(11, catalog).slice(0, 20);
     const arm: ArmSpec = {
       name: 'c',
@@ -490,11 +449,6 @@ describe('measuring one arm', () => {
     const result = await measureArm(arm, cohortShoppers, catalog, PRICES);
 
     expect(result.sources.fallback).toBe(0);
-    // The exact count, not just "fewer than everyone": a run that collapsed
-    // every shopper onto one page would still show fewer calls than views,
-    // so that relation alone cannot tell a spread-out population from a
-    // squashed one. Nine is the number of distinct cohorts this seeded
-    // population of twenty actually forms.
     expect(result.modelCalls).toBe(9);
   });
 
@@ -526,10 +480,6 @@ describe('measuring one arm', () => {
   });
 
   it('hands the shoppers-per-page down to the run', async () => {
-    // The same twenty shoppers as the cohort test above, five to a page
-    // instead of ten: four pages instead of two, so more cohorts form and the
-    // model is called more often. Fourteen is what this seeded population
-    // forms at five to a page.
     const cohortShoppers = generateShoppers(11, catalog).slice(0, 20);
     const arm: ArmSpec = {
       name: 'c',
@@ -557,7 +507,6 @@ describe('measuring one arm', () => {
   });
 
   it('throws rather than report a cohort run that never reached a model', async () => {
-    // The mislabelling case, end to end: arm (b)'s options under arm (c)'s rule.
     const arm: ArmSpec = {
       name: 'c',
       mode: 'stub',
@@ -592,8 +541,6 @@ describe('measuring one arm', () => {
       signal: new AbortController().signal,
     };
 
-    // The whole message, not just "no candidate": the two guards below each
-    // other read almost the same, and a loose matcher passes for either one.
     await expect(provider.generate(request)).rejects.toThrow(/no candidates section/);
   });
 
@@ -643,15 +590,11 @@ describe('two requests for one key, in flight together', () => {
       onEvent: (generationEvent) => events.push(generationEvent),
     });
 
-    // Both start before either resolves, so the second reaches the key while
-    // the first is still running. No cache entry exists yet for it to hit.
     const input = buildTrackingInput(shopper!, smallCatalog[0]!.sku, smallCatalog, []);
     await Promise.all([generator.generate(input), generator.generate(input)]);
 
     expect(calls()).toBe(1);
     expect(events.filter((one) => one.calledModel)).toHaveLength(1);
-    // The joiner has to get the answer, not a fallback. That is what sharing
-    // one generation means, and billing once is worthless without it.
     expect(events.map((one) => one.source)).toEqual(['llm', 'llm']);
     expect(summarise(identity('c'), events, PRICES).inputTokens).toBe(1_000_000);
   });

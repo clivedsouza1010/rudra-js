@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { createMemorySpecCache, type TokenUsage } from '@rudra-js/core';
 import { createStubProvider, type ArmSpec, type TokenPrices } from './measure-arm.js';
 
-// claude-opus-5 list price, checked 2026-09-01.
 export const PRICES: TokenPrices = {
   inputPerMillion: 5,
   outputPerMillion: 25,
@@ -51,9 +50,6 @@ function coldUsage(): TokenUsage {
   return cachedColdUsage;
 }
 
-// A run with hundreds of model calls can take longer than core's default, and
-// an entry expiring mid-run would fail an arm for a reason unrelated to
-// cohorting.
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export const ARM_NAMES = ['b deterministic', 'c cohort', 'd per-shopper'] as const;
@@ -64,13 +60,7 @@ export function isArmName(value: string): value is ArmName {
   return (ARM_NAMES as readonly string[]).includes(value);
 }
 
-// Built fresh each call: a provider and a cache are live objects, and an arm
-// that reused another's cache would not be measuring a cold one.
 export function buildArm(name: ArmName): ArmSpec {
-  // A switch with no default: adding a name to ARM_NAMES without a case here
-  // stops compiling. The old shape returned per-shopper for anything it did
-  // not recognise, which is a mislabelled arm - the thing this harness exists
-  // to prevent.
   switch (name) {
     case 'b deterministic':
       return {
@@ -88,9 +78,6 @@ export function buildArm(name: ArmName): ArmSpec {
           generation: 'cohort',
           cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
         },
-        // Both a floor and a ceiling: this fixture (ten shoppers to a page, four
-        // shopper segments) lands cohort caching around 54%. A run that collapsed
-        // back to one page per cohort would print ~98% and pass a floor alone.
         rule: { fallback: 'none', minCacheHitRate: 0.45, maxCacheHitRate: 0.65 },
       };
     case 'd per-shopper':

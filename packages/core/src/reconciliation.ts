@@ -19,7 +19,6 @@ const CLAMP = {
   bannerText: 160,
   copyBody: 420,
   rationale: 300,
-
   violationSku: 32,
 } as const;
 
@@ -31,9 +30,7 @@ export function capBlocks(blocks: Block[]): Block[] {
 
 export interface ReconcileResult {
   spec: GeneratedSpec;
-
   isUsable: boolean;
-
   violations: string[];
 }
 
@@ -50,7 +47,6 @@ function clamp(value: string, limit: number): string {
 interface Allowlist {
   allowed: Set<string>;
   blocked: Set<string>;
-
   blockedInBundle: Set<string>;
 }
 
@@ -58,18 +54,13 @@ function refusedEverywhere(input: TrackingInput): Set<string> {
   const refused = new Set<string>();
   for (const signal of input.signals.dislikes) refused.add(signal.sku);
   if (input.context.currentSku) refused.add(input.context.currentSku);
-
   return refused;
 }
 
 export function neverRecommend(input: TrackingInput): Set<string> {
-  const { signals } = input;
-
   const blocked = refusedEverywhere(input);
-  for (const signal of [...signals.lastPurchased, ...signals.cart]) {
-    blocked.add(signal.sku);
-  }
-
+  for (const signal of input.signals.lastPurchased) blocked.add(signal.sku);
+  for (const signal of input.signals.cart) blocked.add(signal.sku);
   return blocked;
 }
 
@@ -78,12 +69,7 @@ function buildAllowlist(input: TrackingInput): Allowlist {
   for (const product of input.candidates) {
     if (product.isInStock) allowed.add(product.sku);
   }
-
-  return {
-    allowed,
-    blocked: neverRecommend(input),
-    blockedInBundle: refusedEverywhere(input),
-  };
+  return { allowed, blocked: neverRecommend(input), blockedInBundle: refusedEverywhere(input) };
 }
 
 function verifyBasis(
@@ -112,40 +98,30 @@ function verifyBasis(
 }
 
 const NUMERAL = /[\p{Nd}\p{No}\p{Nl}]/u;
-
 const NO_FACTS: readonly string[] = [];
 
-function createPlacementTracker(maxItems: number, facts: HostFacts) {
-  const placedSkus = new Set<string>();
-  const violations: string[] = [];
-  let remaining = maxItems;
-
-  return {
-    violations,
-    facts: facts.pooled,
-    factsFor: (sku: string): readonly string[] => facts.bySku.get(sku) ?? NO_FACTS,
-    get remaining() {
-      return remaining;
-    },
-    hasPlaced: (sku: string) => placedSkus.has(sku),
-    record(violation: string) {
-      violations.push(violation);
-    },
-    place(sku: string) {
-      placedSkus.add(sku);
-      remaining -= 1;
-    },
-  };
+interface Tracker {
+  placed: Set<string>;
+  remaining: number;
+  violations: string[];
+  facts: HostFacts;
 }
 
-type PlacementTracker = ReturnType<typeof createPlacementTracker>;
+function newTracker(maxItems: number, facts: HostFacts): Tracker {
+  return { placed: new Set(), remaining: maxItems, violations: [], facts };
+}
+
+function place(tracker: Tracker, sku: string): void {
+  tracker.placed.add(sku);
+  tracker.remaining -= 1;
+}
 
 function screenClaim(
   value: string | null,
   limit: number,
   field: string,
-  tracker: PlacementTracker,
-  facts: readonly string[] = tracker.facts,
+  tracker: Tracker,
+  facts: readonly string[] = tracker.facts.pooled,
 ): string | null {
   if (value === null) return null;
 
@@ -154,40 +130,32 @@ function screenClaim(
 
   const kind = claimIn(value) ?? claimIn(clamped);
   if (kind !== null) {
-    tracker.record(`unverifiable-claim:${kind}:${field}`);
+    tracker.violations.push(`unverifiable-claim:${kind}:${field}`);
     return null;
   }
 
-  const weighed = NUMERAL.test(clamped) ? facts : NO_FACTS;
-
-  const result = verify(clamped, { values: weighed, allowedPhrases: ALLOWED_PHRASES });
+  const values = NUMERAL.test(clamped) ? facts : NO_FACTS;
+  const result = verify(clamped, { values, allowedPhrases: ALLOWED_PHRASES });
   if (!result.quantity.supported) {
-    tracker.record(`unverifiable-claim:quantity:${field}`);
+    tracker.violations.push(`unverifiable-claim:quantity:${field}`);
     return null;
   }
   if (!result.wording.supported) {
-    tracker.record(`unverifiable-claim:wording:${field}`);
+    tracker.violations.push(`unverifiable-claim:wording:${field}`);
     return null;
   }
-
   return clamped;
 }
 
-function screenRequired(
-  value: string,
-  limit: number,
-  field: string,
-  tracker: PlacementTracker,
-): string {
+function screenRequired(value: string, limit: number, field: string, tracker: Tracker): string {
   return screenClaim(value, limit, field, tracker) ?? '';
 }
 
-function rejectionFor(sku: string, allowlist: Allowlist, tracker: PlacementTracker): string | null {
+function rejectionFor(sku: string, allowlist: Allowlist, tracker: Tracker): string | null {
   const named = clamp(sku, CLAMP.violationSku);
-
   if (!allowlist.allowed.has(sku)) return `unknown-sku:${named}`;
   if (allowlist.blocked.has(sku)) return `blocked-sku:${named}`;
-  if (tracker.hasPlaced(sku)) return `duplicate-sku:${named}`;
+  if (tracker.placed.has(sku)) return `duplicate-sku:${named}`;
   if (tracker.remaining <= 0) return `budget:dropped:${named}`;
   return null;
 }
@@ -195,10 +163,10 @@ function rejectionFor(sku: string, allowlist: Allowlist, tracker: PlacementTrack
 function reconcileItems(
   items: ProductReference[],
   allowlist: Allowlist,
-  candidatesBySku: Map<string, Product>,
+  products: Map<string, Product>,
   digest: SignalDigest,
   engaged: ReadonlySet<string>,
-  tracker: PlacementTracker,
+  tracker: Tracker,
   ourReasons: ReadonlyMap<string, string>,
 ): ProductReference[] {
   const kept: ProductReference[] = [];
@@ -206,30 +174,25 @@ function reconcileItems(
   for (const item of items) {
     const rejection = rejectionFor(item.sku, allowlist, tracker);
     if (rejection) {
-      tracker.record(rejection);
+      tracker.violations.push(rejection);
       continue;
     }
 
-    const product = candidatesBySku.get(item.sku);
-
+    const product = products.get(item.sku);
     if (!product) continue;
-
-    tracker.place(item.sku);
+    place(tracker, item.sku);
 
     const hasSupportedBasis = verifyBasis(item.basis, product, digest, engaged);
-    if (!hasSupportedBasis) tracker.record(`unsupported-basis:${item.basis}:${item.sku}`);
-
-    const isOurs = item.reason !== null && ourReasons.get(item.sku) === item.reason;
-
-    const own = tracker.factsFor(item.sku);
+    if (!hasSupportedBasis) tracker.violations.push(`unsupported-basis:${item.basis}:${item.sku}`);
 
     let reason: string | null = null;
     let badge: string | null = null;
     if (hasSupportedBasis) {
+      const own = tracker.facts.bySku.get(item.sku) ?? NO_FACTS;
+      const isOurs = item.reason !== null && ourReasons.get(item.sku) === item.reason;
       reason = isOurs
         ? clamp(item.reason ?? '', CLAMP.reason) || null
         : screenClaim(item.reason, CLAMP.reason, `reason:${item.sku}`, tracker, own);
-
       badge = screenClaim(item.badge, CLAMP.badge, `badge:${item.sku}`, tracker, own);
     }
 
@@ -251,19 +214,13 @@ interface BundleFit {
   categoryHits: number;
 }
 
-function fitOf(
-  bundle: Bundle,
-  digest: SignalDigest,
-  candidatesBySku: Map<string, Product>,
-): BundleFit {
+function fitOf(bundle: Bundle, digest: SignalDigest, products: Map<string, Product>): BundleFit {
   const fit: BundleFit = { cartHits: 0, viewedHits: 0, categoryHits: 0 };
-
   for (const sku of bundle.skus) {
     if (digest.cartSkus.includes(sku)) fit.cartHits += 1;
     else if (digest.topViewed.some((viewed) => viewed.sku === sku)) fit.viewedHits += 1;
-    else if (candidatesBySku.get(sku)?.category === digest.currentCategory) fit.categoryHits += 1;
+    else if (products.get(sku)?.category === digest.currentCategory) fit.categoryHits += 1;
   }
-
   return fit;
 }
 
@@ -278,8 +235,8 @@ function chooseBundle(
   bundles: readonly Bundle[],
   allowlist: Allowlist,
   digest: SignalDigest,
-  candidatesBySku: Map<string, Product>,
-  tracker: PlacementTracker,
+  products: Map<string, Product>,
+  tracker: Tracker,
 ): Bundle | undefined {
   let best: Bundle | undefined;
   let bestFit: BundleFit | undefined;
@@ -291,11 +248,11 @@ function chooseBundle(
     for (const sku of bundle.skus) {
       if (!allowlist.allowed.has(sku)) isPlaceable = false;
       if (allowlist.blockedInBundle.has(sku)) isPlaceable = false;
-      if (tracker.hasPlaced(sku)) isPlaceable = false;
+      if (tracker.placed.has(sku)) isPlaceable = false;
     }
     if (!isPlaceable) continue;
 
-    const fit = fitOf(bundle, digest, candidatesBySku);
+    const fit = fitOf(bundle, digest, products);
     if (isBetterFit(fit, bestFit)) {
       best = bundle;
       bestFit = fit;
@@ -311,37 +268,32 @@ export function bundleForShopper(
   spokenFor: readonly string[],
 ): Bundle | undefined {
   const allowlist = buildAllowlist(input);
-  const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
-  const tracker = createPlacementTracker(digest.maxItems, hostFacts(input));
+  const products = new Map(input.candidates.map((product) => [product.sku, product]));
+  const tracker = newTracker(digest.maxItems, hostFacts(input));
+  for (const sku of spokenFor) place(tracker, sku);
 
-  for (const sku of spokenFor) tracker.place(sku);
-
-  return chooseBundle(input.bundles, allowlist, digest, candidatesBySku, tracker);
+  return chooseBundle(input.bundles, allowlist, digest, products, tracker);
 }
 
 export function placeableHeroSkus(blocks: readonly Block[], input: TrackingInput): string[] {
   const allowlist = buildAllowlist(input);
-
   const skus: string[] = [];
   for (const block of blocks) {
-    if (block.kind !== 'hero') continue;
-    if (block.sku === null) continue;
+    if (block.kind !== 'hero' || block.sku === null) continue;
     if (!allowlist.allowed.has(block.sku) || allowlist.blocked.has(block.sku)) continue;
-    if (skus.includes(block.sku)) continue;
-    skus.push(block.sku);
+    if (!skus.includes(block.sku)) skus.push(block.sku);
   }
-
   return skus;
 }
 
 function reconcileBlock(
   block: Block,
   allowlist: Allowlist,
-  candidatesBySku: Map<string, Product>,
+  products: Map<string, Product>,
   digest: SignalDigest,
   engaged: ReadonlySet<string>,
   bundles: readonly Bundle[],
-  tracker: PlacementTracker,
+  tracker: Tracker,
   ourReasons: ReadonlyMap<string, string>,
 ): Block | null {
   switch (block.kind) {
@@ -350,17 +302,16 @@ function reconcileBlock(
       if (sku !== null) {
         const rejection = rejectionFor(sku, allowlist, tracker);
         if (rejection) {
-          tracker.record(rejection);
-
+          tracker.violations.push(rejection);
           sku = null;
         } else {
-          tracker.place(sku);
+          place(tracker, sku);
         }
       }
 
       const headline = screenRequired(block.headline, CLAMP.headline, 'hero-headline', tracker);
       if (headline.length === 0 && sku === null) {
-        tracker.record('empty-block:hero');
+        tracker.violations.push('empty-block:hero');
         return null;
       }
       return {
@@ -376,20 +327,19 @@ function reconcileBlock(
       const items = reconcileItems(
         block.items,
         allowlist,
-        candidatesBySku,
+        products,
         digest,
         engaged,
         tracker,
         ourReasons,
       );
       if (items.length === 0) {
-        tracker.record('empty-block:grid');
+        tracker.violations.push('empty-block:grid');
         return null;
       }
       return {
         kind: 'grid',
         title: screenClaim(block.title, CLAMP.blockTitle, 'grid-title', tracker),
-
         columns: Math.min(block.columns, Math.max(2, items.length)) as 2 | 3 | 4,
         items,
       };
@@ -399,14 +349,14 @@ function reconcileBlock(
       const items = reconcileItems(
         block.items,
         allowlist,
-        candidatesBySku,
+        products,
         digest,
         engaged,
         tracker,
         ourReasons,
       );
       if (items.length === 0) {
-        tracker.record('empty-block:carousel');
+        tracker.violations.push('empty-block:carousel');
         return null;
       }
       return {
@@ -419,7 +369,7 @@ function reconcileBlock(
     case 'banner': {
       const text = screenRequired(block.text, CLAMP.bannerText, 'banner-text', tracker);
       if (text.length === 0) {
-        tracker.record('empty-block:banner');
+        tracker.violations.push('empty-block:banner');
         return null;
       }
       return {
@@ -433,7 +383,7 @@ function reconcileBlock(
     case 'copy': {
       const body = screenRequired(block.body, CLAMP.copyBody, 'copy-body', tracker);
       if (body.length === 0) {
-        tracker.record('empty-block:copy');
+        tracker.violations.push('empty-block:copy');
         return null;
       }
       return {
@@ -444,20 +394,18 @@ function reconcileBlock(
     }
 
     case 'bundle': {
-      const chosen = chooseBundle(bundles, allowlist, digest, candidatesBySku, tracker);
+      const chosen = chooseBundle(bundles, allowlist, digest, products, tracker);
       if (!chosen) {
-        tracker.record('no-bundle');
+        tracker.violations.push('no-bundle');
         return null;
       }
 
-      for (const sku of chosen.skus) tracker.place(sku);
-
+      for (const sku of chosen.skus) place(tracker, sku);
       return {
         kind: 'bundle',
         title: screenClaim(block.title, CLAMP.blockTitle, 'bundle-title', tracker),
         body: screenClaim(block.body, CLAMP.subheadline, 'bundle-body', tracker),
         ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'bundle-cta', tracker),
-
         bundleId: chosen.id,
       };
     }
@@ -478,16 +426,15 @@ export function reconcileSpec(
   generated: GeneratedSpec,
   input: TrackingInput,
   digest: SignalDigest,
-
   ourReasons: ReadonlyMap<string, string> = new Map(),
 ): ReconcileResult {
   const allowlist = buildAllowlist(input);
-  const candidatesBySku = new Map(input.candidates.map((product) => [product.sku, product]));
+  const products = new Map(input.candidates.map((product) => [product.sku, product]));
   const engaged = engagedCategories(input);
-  const tracker = createPlacementTracker(digest.maxItems, hostFacts(input));
+  const tracker = newTracker(digest.maxItems, hostFacts(input));
 
   if (generated.blocks.length > MAX_BLOCKS) {
-    tracker.record(`too-many-blocks:${generated.blocks.length}`);
+    tracker.violations.push(`too-many-blocks:${generated.blocks.length}`);
   }
 
   const blocks: Block[] = [];
@@ -495,7 +442,7 @@ export function reconcileSpec(
     const reconciled = reconcileBlock(
       block,
       allowlist,
-      candidatesBySku,
+      products,
       digest,
       engaged,
       input.bundles,
@@ -513,9 +460,10 @@ export function reconcileSpec(
     rationale: screenRequired(generated.rationale, CLAMP.rationale, 'rationale', tracker),
   };
 
-  if (!showsAnyProduct(blocks)) tracker.record('unusable:no-products');
-  if (spec.headline.length === 0) tracker.record('unusable:no-headline');
-  const isUsable = showsAnyProduct(blocks) && spec.headline.length > 0;
+  const hasProducts = showsAnyProduct(blocks);
+  if (!hasProducts) tracker.violations.push('unusable:no-products');
+  if (spec.headline.length === 0) tracker.violations.push('unusable:no-headline');
+  const isUsable = hasProducts && spec.headline.length > 0;
 
   return { spec, isUsable, violations: tracker.violations };
 }

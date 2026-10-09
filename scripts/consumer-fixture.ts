@@ -1,4 +1,3 @@
-// Written into the temp consumer by verify-consumer.mjs, which fills in the forbidden specifier.
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
@@ -34,7 +33,6 @@ const products = [
 ];
 const catalog: ProductCatalog = products;
 
-// A set the shop sells together, validated the way a host validates one.
 const bundles = [
   bundleSchema.parse({
     id: 'BUN-1',
@@ -63,8 +61,6 @@ if (!markup.includes('$174.00')) {
   throw new Error(`rendered markup has no price in it: ${markup.slice(0, 200)}`);
 }
 
-// The bundle half of the public surface: the block kind, the `bundles` prop,
-// and the shop's own name and price for the set.
 const bundleSpec: ComponentSpec = {
   ...spec,
   blocks: [{ kind: 'bundle', title: 'Get set up', body: null, ctaLabel: null, bundleId: 'BUN-1' }],
@@ -88,27 +84,20 @@ const [firstBundle] = bundles;
 if (!firstBundle) {
   throw new Error('bundleSchema.parse returned nothing');
 }
-// Takes the set and an optional locale — no catalog. The price and the currency
-// both come off the bundle itself.
 const bundlePrice = defaultFormatBundlePrice(firstBundle, 'en-US');
 if (bundlePrice !== '$180.00') {
   throw new Error(`defaultFormatBundlePrice returned ${bundlePrice}`);
 }
 
-// The set says which money it is in, so a euro set in a dollar catalog is still
-// priced in euros.
 const euroPrice = defaultFormatBundlePrice({ ...firstBundle, currency: 'EUR' }, 'en-US');
 if (euroPrice !== '€180.00') {
   throw new Error(`defaultFormatBundlePrice ignored the bundle currency: ${euroPrice}`);
 }
 
-// The locale is optional, and leaving it out must still produce a price.
 if (defaultFormatBundlePrice(firstBundle).length === 0) {
   throw new Error('defaultFormatBundlePrice returned nothing without a locale');
 }
 
-// Proves the package's entry point and types resolve for a real consumer under
-// nodenext, without ever making a network call.
 const anthropicProvider = createAnthropicProvider({
   apiKey: 'not-a-real-key',
   fetch: async () => new Response('{}'),
@@ -117,8 +106,6 @@ if (typeof anthropicProvider.name !== 'string' || typeof anthropicProvider.model
   throw new Error('@rudra-js/anthropic provider has no name/model strings');
 }
 
-// The guarantee half, resolving with no dependencies of its own and no node
-// builtins — which is the only reason it can claim to run anywhere.
 const facts: Facts = { values: [174] };
 const claim = verify('Only 2 left at $174', facts);
 if (claim.supported) {
@@ -128,11 +115,6 @@ if (claim.quantity.findings[0]?.token !== '2') {
   throw new Error(`@rudra-js/attested named the wrong token: ${JSON.stringify(claim.quantity)}`);
 }
 
-// The consumer must not be able to reach the repository's own dependency tree —
-// if it can, an undeclared dependency in a published package resolves here and
-// this whole check reports a false green.
-// Held in a variable so the specifier is not a literal: tsc resolves literals,
-// and would report this deliberate miss as a compile error.
 const forbidden: string = '__FORBIDDEN_PACKAGE__';
 const failure: unknown = await import(forbidden).then(
   () => null,
@@ -144,8 +126,6 @@ if (failure === null) {
       'this check cannot be trusted until that is fixed',
   );
 }
-// Isolated means a miss on this exact name. A package that resolved and then missed an import
-// of its own names itself in the importer path, which an unanchored message test reads as a miss.
 const miss = failure as { code?: unknown; message?: unknown };
 if (
   miss.code !== 'ERR_MODULE_NOT_FOUND' ||

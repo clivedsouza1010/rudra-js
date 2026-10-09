@@ -50,8 +50,6 @@ describe('createFixedSpecProvider', () => {
       provider.generate({ ...request(), user: 'a completely different shopper' }),
     ]);
 
-    // Identical output for different input is the point: it isolates the cost
-    // of the framework from the latency and variance of a model.
     expect(first?.spec).toEqual(second?.spec);
   });
 
@@ -62,12 +60,6 @@ describe('createFixedSpecProvider', () => {
   });
 });
 
-/**
- * The contract says an adapter must not answer a caller that has already given
- * up. The reference implementation does no slow work, which is exactly why it
- * is worth checking here: an example that skips the cheap half of an obligation
- * teaches every adapter author reading it to skip it too.
- */
 describe('an aborted request', () => {
   it('is rejected rather than answered', async () => {
     const provider = createFixedSpecProvider(SPEC);
@@ -99,11 +91,6 @@ describe('an aborted request', () => {
   });
 });
 
-/**
- * The port is mostly types, and a type that drifts breaks every adapter written
- * against it. These assertions are erased at runtime but checked by
- * `npm run typecheck`, which covers test files.
- */
 describe('the port contract', () => {
   it('is satisfied by the reference implementation', () => {
     expectTypeOf(createFixedSpecProvider(SPEC)).toExtend<ComponentProvider>();
@@ -114,8 +101,6 @@ describe('the port contract', () => {
   });
 
   it('keeps the cached prefix and the per-request turn as separate fields', () => {
-    // Merging them would be the single most expensive mistake available here:
-    // a prompt cache keys on a byte-stable prefix.
     expectTypeOf<ProviderRequest['system']>().toEqualTypeOf<string>();
     expectTypeOf<ProviderRequest['user']>().toEqualTypeOf<string>();
   });

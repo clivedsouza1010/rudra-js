@@ -10,9 +10,6 @@ async function main(): Promise<void> {
 
   try {
     await ready;
-    // A stalled connection would otherwise hang the script forever. One
-    // deadline for the whole exchange: aborting errors the body stream too, so
-    // reading it below is bounded by the same signal.
     const response = await fetch(`http://localhost:${port}${PAGE_PATH}`, {
       signal: AbortSignal.timeout(30_000),
     });
@@ -20,8 +17,6 @@ async function main(): Promise<void> {
 
     const html = await response.text();
 
-    // A fallback page is still server-rendered, so every crawlability check
-    // would pass while the page is not the one we meant to measure.
     if (html.includes(FALLBACK_MARKER)) {
       throw new Error('the shop served the deterministic fallback, so this checked the wrong page');
     }
@@ -30,7 +25,6 @@ async function main(): Promise<void> {
     if (problems.length > 0) {
       console.error('the page is not what a crawler needs:');
       for (const problem of problems) console.error(`  - ${problem}`);
-      // The usual cause, in plain terms rather than React's own vocabulary.
       console.error(
         'this usually means a loading.tsx got added, or the recommendations got wrapped in <Suspense>',
       );
@@ -43,7 +37,6 @@ async function main(): Promise<void> {
     reportFailure(error, seen());
     process.exitCode = 1;
   } finally {
-    // Always, including when the check failed or the fetch threw.
     await stopShop(shop);
   }
 }

@@ -181,7 +181,6 @@ describe('most viewed', () => {
       },
     }).categoryAffinity[0]?.score;
 
-    // An omitted weight means full strength, so the strongest of the two is 1.
     expect(unweightedPlusWeak).toBe(unweightedAlone);
   });
 
@@ -317,9 +316,6 @@ describe('category affinity', () => {
       signals: { mostViewed: Array.from({ length: 30 }, () => ({ sku: 'TR-101', views: 1 })) },
     });
 
-    // Asserting the score itself, not merely that the two agree: if scoring
-    // ever yields NaN, both collapse to [] and an equality check passes
-    // vacuously.
     const expected = [{ category: 'Trail Running', score: 4.95 }];
     expect(asOneRecord.categoryAffinity).toEqual(expected);
     expect(asManyRecords.categoryAffinity).toEqual(expected);

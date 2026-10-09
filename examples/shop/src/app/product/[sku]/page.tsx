@@ -23,8 +23,6 @@ export default async function ProductPage({
   const { shopper, styles } = await searchParams;
 
   const content = await ProductPageContent({ sku, shopperId: shopper });
-  // A URL naming a product the catalog does not have is a 404, not an excuse to
-  // show a different product and track it as though the shopper asked for it.
   if (content === null) notFound();
 
   const styled = styles !== 'off';

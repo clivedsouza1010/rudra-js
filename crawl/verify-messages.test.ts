@@ -33,8 +33,6 @@ describe('reporting why the check failed', () => {
   });
 
   it('names the safe build line even when the shop said nothing', () => {
-    // A build so broken that next never even prints — nothing to point to
-    // except the one command that is safe to run next.
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     reportFailure(new Error('the shop did not start within 60 seconds'), '');

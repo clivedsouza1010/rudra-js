@@ -5,7 +5,6 @@ import type { SignalDigest } from './signal-digest.js';
 
 export interface CachedSpec {
   spec: GeneratedSpec;
-
   generatedAt: number;
 }
 
@@ -17,9 +16,7 @@ export interface SpecCache {
 
 export interface MemorySpecCacheOptions {
   ttlMs?: number;
-
   maxEntries?: number;
-
   now?: () => number;
 }
 
@@ -55,12 +52,9 @@ export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): Spe
       const entry = entries.get(key);
       if (!entry) return undefined;
 
-      if (entry.expiresAt <= now()) {
-        entries.delete(key);
-        return undefined;
-      }
-
+      const isExpired = entry.expiresAt <= now();
       entries.delete(key);
+      if (isExpired) return undefined;
       entries.set(key, entry);
       return entry.cached;
     },
@@ -69,10 +63,9 @@ export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): Spe
       entries.delete(key);
       entries.set(key, { cached, expiresAt: now() + ttlMs });
 
-      while (entries.size > maxEntries) {
-        const oldest = entries.keys().next();
-        if (oldest.done) break;
-        entries.delete(oldest.value);
+      for (const oldest of entries.keys()) {
+        if (entries.size <= maxEntries) break;
+        entries.delete(oldest);
       }
     },
 
@@ -83,23 +76,22 @@ export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): Spe
 }
 
 export function createNullSpecCache(): SpecCache {
-  return {
-    async get() {
-      return undefined;
-    },
-    async set() {},
-  };
+  return { get: async () => undefined, set: async () => {} };
 }
 
 function canonicalise(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
   if (Array.isArray(value)) return `[${value.map(canonicalise).join(',')}]`;
 
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, fieldValue]) => fieldValue !== undefined)
-    .toSorted(([left], [right]) => (left < right ? -1 : 1));
-
-  return `{${entries.map(([name, fieldValue]) => `${JSON.stringify(name)}:${canonicalise(fieldValue)}`).join(',')}}`;
+  const sorted = Object.entries(value as Record<string, unknown>).toSorted(([left], [right]) =>
+    left < right ? -1 : 1,
+  );
+  const fields: string[] = [];
+  for (const [name, fieldValue] of sorted) {
+    if (fieldValue === undefined) continue;
+    fields.push(`${JSON.stringify(name)}:${canonicalise(fieldValue)}`);
+  }
+  return `{${fields.join(',')}}`;
 }
 
 const PROMPT_FINGERPRINT = createHash('sha256').update(SYSTEM_PROMPT).digest('hex').slice(0, 16);
@@ -135,10 +127,8 @@ export function cohortCacheKey(
     locale: digest.locale,
     maxItems: digest.maxItems,
     isColdStart: digest.isColdStart,
-
     currentCategory: digest.currentCategory ?? null,
     topCategory: digest.categoryAffinity[0]?.category ?? null,
-
     candidates: candidateSkus.toSorted(),
   });
 

@@ -61,8 +61,6 @@ describe('the result file', () => {
       generatedAt: '2026-09-01T12:00:00.000Z',
     });
 
-    // The file is what somebody reads months later, so a caveat that lives
-    // only in the console is a caveat nobody sees.
     expect(hasLine(report.caveats, 'one real recorded call')).toBe(true);
     expect(hasLine(report.caveats, '10 shoppers to a page')).toBe(true);
   });
@@ -73,8 +71,6 @@ describe('the caveats a stub run needs', () => {
     buildCaveats([armResult({ mode })], 10);
 
   it('says the violation counts cannot be anything but zero', () => {
-    // Every arm prints an empty violations object, and under the stub that is
-    // not a measurement: nothing it answers can break a rule.
     expect(hasLine(caveatsFor('stub'), 'no violation the stub can produce')).toBe(true);
   });
 
@@ -89,8 +85,6 @@ describe('the caveats a stub run needs', () => {
   });
 
   it('says the cost is a ceiling and how far off a real run it is', () => {
-    // A reader who quotes the cost column is out by about half unless the
-    // caveat says so — every call here pays a fresh cache write.
     expect(hasLine(caveatsFor('stub'), 'close to twice a steady-state run')).toBe(true);
     expect(hasLine(caveatsFor('stub'), 'ceiling')).toBe(true);
   });
@@ -100,8 +94,6 @@ describe('the caveats a stub run needs', () => {
   });
 
   it('says the hit rate is one cold pass and not a steady state', () => {
-    // 54% can be quoted as a ceiling or as a floor by anyone who does not
-    // know the run was a single cold pass at ten views per page.
     expect(hasLine(caveatsFor('stub'), 'one cold pass')).toBe(true);
     expect(hasLine(caveatsFor('live'), 'one cold pass')).toBe(true);
   });
@@ -109,7 +101,6 @@ describe('the caveats a stub run needs', () => {
 
 describe('the printed table', () => {
   it('calls the cost column a ceiling', () => {
-    // The number is a cold-cache worst case, so the heading has to say so.
     expect(formatTable([armResult()])).toContain('Cost / 1k views (ceiling)');
   });
 

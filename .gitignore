@@ -5,10 +5,8 @@ dist/
 .env.local
 .DS_Store
 
-# Next writes both on every build of examples/shop.
 .next/
 next-env.d.ts
 
-# Benchmark output. Every run writes a new timestamped file.
 bench/results/
 .vercel

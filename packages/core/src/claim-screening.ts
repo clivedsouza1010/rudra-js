@@ -121,7 +121,6 @@ const CONFUSABLES: Record<string, string> = {
   ѵ: 'v',
 };
 
-// Capitals that lowercasing reads wrong: Ν becomes ν, which reads as v.
 const CAPITALS: Record<string, string> = {
   Β: 'b',
   Ζ: 'z',
@@ -145,7 +144,6 @@ const SPACING = /[\t\n\v\f\r\u0085]/;
 const MARKS = /[\p{Mn}\p{Me}]/gu;
 
 function normaliseForClaims(text: string, byLook: boolean): string {
-  // NFKC would turn the lunate sigmas into ς and Σ, which the fold can't read as c.
   const compatible = text
     .replace(INVISIBLE, (char) => (SPACING.test(char) ? char : ''))
     .replace(/[ϲϹ]/g, 'c')
@@ -200,7 +198,6 @@ export function hostFacts(input: TrackingInput): HostFacts {
 }
 
 export function claimIn(text: string): string | null {
-  // Read twice, since Ν reads as N but ν as v.
   for (const byLook of [false, true]) {
     const normalised = normaliseForClaims(text, byLook);
     for (const claim of CLAIM_PATTERNS) {

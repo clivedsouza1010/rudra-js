@@ -2,10 +2,6 @@ import { RudraComponent } from '@rudra-js/react';
 import { bundles, catalog, findShopper, generator } from './shop-context';
 import { buildTrackingInput } from './fixtures/tracking-input';
 
-/**
- * Separated from the route so the route can answer `notFound()` — which signals
- * by throwing — while this half stays testable by rendering it.
- */
 export async function ProductPageContent({
   sku,
   shopperId,

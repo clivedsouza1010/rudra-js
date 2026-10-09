@@ -103,8 +103,6 @@ describe('generatedSpecSchema', () => {
         return rest;
       })(),
     ],
-    // Distinct from omission: `.nullable()` would still demand the key while
-    // letting the model send null, which is a pick with no stated reason.
     ['null', { ...productRef, basis: null }],
   ])('rejects a basis that is %s, so no pick goes unexplained', (_label, ref) => {
     expect(productReferenceSchema.safeParse(ref).success).toBe(false);
@@ -119,11 +117,6 @@ describe('generatedSpecSchema', () => {
   });
 });
 
-/**
- * The model cannot express anything the renderer would have to trust. These are
- * the fields it is structurally unable to send, which is the whole security
- * argument for a spec instead of generated markup.
- */
 describe('what the model cannot say', () => {
   it.each([
     ['a price', { price: 99 }],
@@ -131,9 +124,6 @@ describe('what the model cannot say', () => {
     ['an image', { imageUrl: 'https://evil.example.com/x.png' }],
     ['a link', { href: 'javascript:alert(1)' }],
   ])('discards %s smuggled onto a product reference', (_label, extra) => {
-    // Stripped rather than rejected: a stray key from a model is drift, and
-    // failing the whole generation over it would cost the shopper the
-    // component. What matters is that it cannot reach the renderer.
     const parsed = productReferenceSchema.parse({ ...productRef, ...extra });
 
     expect(Object.keys(parsed).toSorted()).toEqual(['badge', 'basis', 'emphasis', 'reason', 'sku']);
@@ -152,21 +142,11 @@ describe('what the model cannot say', () => {
     );
     const [block] = parsed.blocks as [Block];
 
-    // Stored verbatim and typed as a string. Nothing here interprets it.
     expect(block).toEqual({ kind: 'copy', title: null, body: '<b>bold</b>' });
   });
 });
 
-/**
- * This schema is sent to providers as a structured-output JSON Schema. Strict
- * mode rejects string length bounds and numeric ranges, and requires every
- * declared property to be present — which is why optionality is expressed as
- * `.nullable()` throughout. Both constraints are pinned here rather than left
- * to a comment.
- */
 describe('provider structured-output compatibility', () => {
-  // 'input' is the shape the provider sends. Checking 'output' would verify
-  // an object nobody transmits.
   const jsonSchema = z.toJSONSchema(generatedSpecSchema, { io: 'input' });
   const serialised = JSON.stringify(jsonSchema);
 
@@ -216,7 +196,6 @@ describe('type surface', () => {
     );
     const [block] = parsed.blocks;
 
-    // The discriminated union is what lets the renderer switch without casting.
     if (block?.kind !== 'grid') throw new Error('expected a grid block');
     expect(block.columns).toBe(4);
     expect(block.items[0]?.sku).toBe('TR-102');
@@ -241,7 +220,6 @@ describe('a bundle block', () => {
   });
 
   it('names no product of its own', () => {
-    // A stray `skus` key is stripped, not rejected — same as every other block.
     const parsed = blockSchema.parse({ ...bundleBlock, skus: ['A', 'B'] });
 
     expect(parsed).not.toHaveProperty('skus');
@@ -254,19 +232,12 @@ describe('a bundle block', () => {
   });
 });
 
-/**
- * `basis` exists so a claim about the shopper can be checked. Reconciliation
- * does the checking; this pins the shape it depends on.
- */
 describe('recommendation basis', () => {
   it('offers a basis that makes no claim about the shopper', () => {
-    // Something has to be safe to fall back to when nothing else is provable.
     expect(RECOMMENDATION_BASES).toContain('popular');
   });
 
   it('names only bases the framework has the data to verify', () => {
-    // Each of these would need catalog or inventory history the contract never
-    // receives, so the server could only ever take the model's word for it.
     for (const unverifiable of ['new_arrival', 'back_in_stock', 'trending_today', 'low_stock']) {
       expect(RECOMMENDATION_BASES).not.toContain(unverifiable);
     }
@@ -279,7 +250,6 @@ describe('recommendation basis', () => {
       reason: 'You keep coming back to this',
     });
 
-    // The enum is what reconciliation checks; the prose is what renders.
     expect(parsed.basis).toBe('most_viewed');
     expect(parsed.reason).toBe('You keep coming back to this');
   });

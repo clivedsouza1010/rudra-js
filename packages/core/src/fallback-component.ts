@@ -1,6 +1,6 @@
 import type { GeneratedSpec, ProductReference } from './component-spec.js';
 import type { SignalDigest } from './signal-digest.js';
-import { selectProducts, type SelectOptions, type ProductPick } from './product-selection.js';
+import { selectProducts, type SelectOptions } from './product-selection.js';
 import type { TrackingInput } from './tracking-input.js';
 
 const MIN_PICKS_FOR_A_FEATURED_LEAD = 3;
@@ -19,20 +19,10 @@ function headlineFor(digest: SignalDigest): { headline: string; subheadline: str
   return { headline: 'You might also like', subheadline: null };
 }
 
-function columnsFor(itemCount: number): 2 | 3 | 4 {
-  if (itemCount >= 4) return 4;
-  if (itemCount === 3) return 3;
+function columnsFor(count: number): 2 | 3 | 4 {
+  if (count >= 4) return 4;
+  if (count === 3) return 3;
   return 2;
-}
-
-function toProductReference(pick: ProductPick, index: number, total: number): ProductReference {
-  return {
-    sku: pick.product.sku,
-    basis: pick.basis,
-    reason: pick.reason,
-    badge: null,
-    emphasis: index === 0 && total >= MIN_PICKS_FOR_A_FEATURED_LEAD ? 'featured' : 'normal',
-  };
 }
 
 export function buildFallbackSpec(
@@ -42,7 +32,14 @@ export function buildFallbackSpec(
 ): GeneratedSpec {
   const picks = selectProducts(input, digest, options).slice(0, digest.maxItems);
   const { headline, subheadline } = headlineFor(digest);
-  const items = picks.map((pick, index) => toProductReference(pick, index, picks.length));
+  const isLeadFeatured = picks.length >= MIN_PICKS_FOR_A_FEATURED_LEAD;
+  const items: ProductReference[] = picks.map((pick, index) => ({
+    sku: pick.product.sku,
+    basis: pick.basis,
+    reason: pick.reason,
+    badge: null,
+    emphasis: index === 0 && isLeadFeatured ? 'featured' : 'normal',
+  }));
 
   return {
     tone: 'neutral',

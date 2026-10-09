@@ -1,8 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-// The code below is the quickstart in README.md. If you change one, change the
-// other: readme-quickstart.test.ts fails when they drift apart.
 // --- quickstart ---
 import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
 import { RudraComponent } from '@rudra-js/react';
@@ -38,8 +36,6 @@ describe('the quickstart', () => {
     const markup = renderToStaticMarkup(await recommendations());
 
     expect(markup).toContain('data-rudra-slot="recommendations"');
-    // The knife, because the skillet is the page and the dutch oven is already
-    // in the cart. No model was asked.
     expect(markup).toContain('Chef knife');
     expect(markup).toContain('$55.00');
     expect(markup).toContain('Goes with your cart');

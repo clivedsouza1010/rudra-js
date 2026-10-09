@@ -80,12 +80,6 @@ describe('the deterministic component', () => {
   });
 });
 
-/**
- * The property the evaluation rests on. Arms (b) and (c) are only comparable if
- * the deterministic component is subject to the same rules as the generated one
- * — so its own output has to pass reconciliation untouched. If it ever does not,
- * the two arms differ by more than the model, and the comparison is invalid.
- */
 describe('survives its own reconciliation', () => {
   it.each([
     ['a first-time visitor', {}],

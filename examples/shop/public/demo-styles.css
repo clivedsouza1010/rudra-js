@@ -1,9 +1,3 @@
-/*
- * The example's own stylesheet. @rudra-js/react ships no CSS — this is written
- * against the class table in its README and nothing else, to show that the
- * table is enough. Copy it as a starting point, not as a supported API.
- */
-
 .rudra {
   --demo-ink: #1b1b1f;
   --demo-quiet: #6b6b76;
@@ -58,7 +52,6 @@
   gap: 1.25rem;
 }
 
-/* Nothing here scrolls it with JavaScript, so the track has to scroll itself. */
 .rudra-carousel__track {
   grid-auto-flow: column;
   grid-auto-columns: minmax(13rem, 1fr);
@@ -75,7 +68,6 @@
   background: #fff;
 }
 
-/* Applied alongside .rudra-card, so this comes after the base rule. */
 .rudra-card--featured {
   border-color: var(--demo-accent);
   box-shadow: 0 1px 0 var(--demo-accent);
@@ -153,7 +145,6 @@
   font-size: 0.875rem;
 }
 
-/* Text, not a control: neither of these has a destination to send anyone to. */
 .rudra-bundle__cta,
 .rudra-banner__cta {
   font-weight: 600;
