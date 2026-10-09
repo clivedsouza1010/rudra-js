@@ -3,12 +3,12 @@ import type { Block, BlockKind } from '@rudra-js/core';
 import type { BlockRenderContext } from './render-context.js';
 import {
   BannerRenderer,
+  BundleRenderer,
   CarouselRenderer,
   CopyRenderer,
   GridRenderer,
   HeroRenderer,
 } from './blocks/block-renderers.js';
-import { BundleRenderer } from './blocks/bundle-block.js';
 
 export type BlockRenderer<Kind extends BlockKind> = (props: {
   block: Extract<Block, { kind: Kind }>;

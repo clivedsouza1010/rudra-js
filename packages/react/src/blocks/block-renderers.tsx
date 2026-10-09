@@ -1,4 +1,12 @@
-import type { BannerBlock, CarouselBlock, CopyBlock, GridBlock, HeroBlock } from '@rudra-js/core';
+import type {
+  BannerBlock,
+  BundleBlock,
+  CarouselBlock,
+  CopyBlock,
+  GridBlock,
+  HeroBlock,
+  Product,
+} from '@rudra-js/core';
 import { sellableProduct, type BlockRenderContext } from '../render-context.js';
 import { ProductCard } from './product-card.js';
 
@@ -81,6 +89,45 @@ export function CopyRenderer({ block }: { block: CopyBlock }) {
     <section className="rudra-copy">
       {block.title ? <h3 className="rudra-copy__title">{block.title}</h3> : null}
       <p className="rudra-copy__body">{block.body}</p>
+    </section>
+  );
+}
+
+export function BundleRenderer({
+  block,
+  context,
+}: {
+  block: BundleBlock;
+  context: BlockRenderContext;
+}) {
+  const bundle = block.bundleId === null ? undefined : context.bundles.get(block.bundleId);
+  if (!bundle) return null;
+
+  const products: Product[] = [];
+  for (const sku of bundle.skus) {
+    const product = sellableProduct(context.products, sku);
+    if (!product) return null;
+    products.push(product);
+  }
+
+  return (
+    <section className="rudra-bundle">
+      {bundle.label ? <h3 className="rudra-bundle__label">{bundle.label}</h3> : null}
+      {block.title ? <p className="rudra-bundle__title">{block.title}</p> : null}
+      {block.body ? <p className="rudra-bundle__body">{block.body}</p> : null}
+
+      <ul className="rudra-bundle__items">
+        {products.map((product) => (
+          <li key={product.sku} className="rudra-bundle__item" data-rudra-sku={product.sku}>
+            <a className="rudra-bundle__link" href={context.hrefForSku(product.sku)}>
+              {product.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+
+      <p className="rudra-bundle__price">{context.formatBundlePrice(bundle)}</p>
+      {block.ctaLabel ? <span className="rudra-bundle__cta">{block.ctaLabel}</span> : null}
     </section>
   );
 }
