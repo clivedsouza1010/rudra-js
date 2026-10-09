@@ -174,22 +174,28 @@ const CAPITALS: Record<string, string> = {
   Ԍ: 'g',
 };
 
+const BEFORE_NFKC: Record<string, string> = {
+  ϲ: 'c',
+  Ϲ: 'c',
+};
+
 const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
 
-export function normalisePhrasing(text: string, byLook = false): string {
-  const compatible = stripInvisible(text).replace(/[ϲϹ]/g, 'c').normalize('NFKC');
-
-  let cased = compatible;
-  if (byLook) {
-    cased = '';
-    for (const char of compatible) cased += CAPITALS[char] ?? char;
-  }
-  const lowered = stripMarks(cased.toLowerCase().normalize('NFC'));
-
+function foldChars(text: string, table: Record<string, string>): string {
   let folded = '';
-  for (const char of lowered) folded += CONFUSABLES[char] ?? char;
+  for (const char of text) folded += table[char] ?? char;
+  return folded;
+}
 
-  return folded
+export function foldLookalikes(text: string, byLook = false): string {
+  const compatible = foldChars(stripInvisible(text), BEFORE_NFKC).normalize('NFKC');
+  const cased = byLook ? foldChars(compatible, CAPITALS) : compatible;
+  const lowered = stripMarks(cased.toLowerCase().normalize('NFC'));
+  return foldChars(lowered, CONFUSABLES);
+}
+
+export function normalisePhrasing(text: string, byLook = false): string {
+  return foldLookalikes(text, byLook)
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[-_\u2010-\u2015]+/g, ' ')
     .replace(/\s+/g, (run) => (LINE_BREAK.test(run) ? '\n' : ' '))
@@ -204,37 +210,34 @@ function isGlued(char: string | undefined): boolean {
 
 export interface Span {
   start: number;
-
   end: number;
 }
 
 export interface Indexed {
   text: string;
-
-  haystack: string;
-
-  spots: number[];
+  squeezed: string;
+  offsets: number[];
 }
 
 export function indexPhrasing(text: string): Indexed {
-  const tight: string[] = [];
-  const spots: number[] = [];
+  const kept: string[] = [];
+  const offsets: number[] = [];
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index] ?? '';
 
     if (char === ' ' || char === '\n') continue;
-    tight.push(char);
-    spots.push(index);
+    kept.push(char);
+    offsets.push(index);
   }
 
-  return { text, haystack: tight.join(''), spots };
+  return { text, squeezed: kept.join(''), offsets };
 }
 
 export function spansIn(indexed: Indexed, phrase: string): Span[] {
-  const { text, haystack, spots } = indexed;
+  const { text, squeezed, offsets } = indexed;
 
   const spans: Span[] = [];
-  const needle = phrase.replaceAll(' ', '').replaceAll('\n', '');
+  const needle = indexPhrasing(phrase).squeezed;
   if (needle.length === 0) return spans;
 
   const guardStart = ASCII_WORD.test(needle[0] ?? '');
@@ -242,18 +245,18 @@ export function spansIn(indexed: Indexed, phrase: string): Span[] {
 
   let from = 0;
   for (;;) {
-    const at = haystack.indexOf(needle, from);
+    const at = squeezed.indexOf(needle, from);
     if (at === -1) return spans;
 
-    const start = spots[at] ?? 0;
-    const end = spots[at + needle.length - 1] ?? 0;
+    const start = offsets[at] ?? 0;
+    const end = offsets[at + needle.length - 1] ?? 0;
     const next = text[end + 1];
 
     const plural = next === 's' && !isGlued(text[end + 2]);
 
-    const before = guardStart && isGlued(text[start - 1]);
-    const after = guardEnd && isGlued(next) && !plural;
-    if (!before && !after) spans.push({ start, end });
+    const gluedBefore = guardStart && isGlued(text[start - 1]);
+    const gluedAfter = guardEnd && isGlued(next) && !plural;
+    if (!gluedBefore && !gluedAfter) spans.push({ start, end });
 
     from = at + 1;
   }
