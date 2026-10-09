@@ -125,7 +125,6 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
         throw new Error(`anthropic returned no ${TOOL_NAME} tool use`);
       }
 
-      // Models sometimes wrap the spec in one key ({ body: spec }); accept only that case
       const asSent = request.schema.safeParse(block.input);
       const result = asSent.success ? asSent : request.schema.safeParse(onlyValue(block.input));
       if (!result.success) {
@@ -148,7 +147,6 @@ async function send(call: typeof globalThis.fetch, url: string, init: RequestIni
   } catch (error) {
     if (init.signal?.aborted) throw error;
 
-    // Fetch hides the real network fault (ECONNREFUSED and the like) in error.cause
     const cause = error instanceof Error ? (error.cause ?? error) : error;
     const detail =
       typeof cause === 'object' && cause !== null && 'code' in cause

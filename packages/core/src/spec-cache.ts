@@ -55,7 +55,6 @@ export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): Spe
       const isExpired = entry.expiresAt <= now();
       entries.delete(key);
       if (isExpired) return undefined;
-      // Re-insert so the first key in the map is always the least recently used.
       entries.set(key, entry);
       return entry.cached;
     },

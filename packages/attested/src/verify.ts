@@ -60,7 +60,6 @@ function supportedOf(facts: Facts): Set<string> {
   const values = facts.values;
   if (!Array.isArray(values)) return supportedValues(values);
 
-  // The host may edit this array between calls, so reuse only a matching copy
   const cached = cache.get(values);
   if (cached !== undefined && sameValues(cached.copy, values)) return cached.supported;
 

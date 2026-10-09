@@ -34,7 +34,6 @@ function digitValue(char: string): number {
     zeroOf.set(code, zero);
   }
 
-  // Abutting digit blocks (maths digits at U+1D7CE) form one long run, hence the % 10
   return (code - zero) % 10;
 }
 
@@ -102,7 +101,6 @@ function formsOf(token: string): string[] {
   const leading = marks.slice(0, -1);
   const point = marks.at(-1) ?? '';
 
-  // "1.234" could be either; when it is valid grouping, read it only as a thousand
   const groupingWins = grouped && leading.length === 0 && fraction.length === 3;
   if (
     !groupingWins &&

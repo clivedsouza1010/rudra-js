@@ -172,8 +172,8 @@ stops the release on a tag you can't take back:
   carries without saying so. Those fields pick the glibc or musl build of Next's SWC and oxlint's
   native binaries on the runner.
 
-Nothing checks this list for you, so go through it on the pull request. A missed spot fails on the
-tag.
+Nothing checks this list for you, so go through it on the pull request. Miss one and the release
+either fails on the tag or publishes packages that can't be installed together.
 
 Nothing automates the paperwork either. `release.yml` publishes to npm and stops — no GitHub
 release, no CHANGELOG edit. Move the `## [Unreleased]` heading and the `[unreleased]:` compare link

@@ -81,7 +81,6 @@ async function withinBudget<T>(
   try {
     return await Promise.race([start(controller.signal), deadline]);
   } catch (error) {
-    // An aborted provider rejects first with its own error; report the timeout instead.
     throw expired ?? error;
   } finally {
     clearTimeout(timer);
@@ -250,7 +249,6 @@ export function createComponentGenerator(
         spec = cached.spec;
         generatedAt = cached.generatedAt;
       } else {
-        // Checked before sharedCall adds the key, so only the first caller counts.
         calledModel = !inFlight.has(key);
         let call: ModelCall;
         try {

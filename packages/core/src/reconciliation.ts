@@ -47,7 +47,6 @@ function clamp(value: string, limit: number): string {
 interface Allowlist {
   allowed: Set<string>;
   blocked: Set<string>;
-  // Bundles may include bought or cart items, so this list is shorter than blocked.
   blockedInBundle: Set<string>;
 }
 
@@ -190,7 +189,6 @@ function reconcileItems(
     let badge: string | null = null;
     if (hasSupportedBasis) {
       const own = tracker.facts.bySku.get(item.sku) ?? NO_FACTS;
-      // A reason the shop wrote itself is its own words, so it skips the claim screen.
       const isOurs = item.reason !== null && ourReasons.get(item.sku) === item.reason;
       reason = isOurs
         ? clamp(item.reason ?? '', CLAMP.reason) || null

@@ -21,7 +21,6 @@ export function sellableProduct(
 }
 
 function formatMoney(price: number, currency: string, locale?: string): string {
-  // Fall back only when Intl rejects the locale or currency; format() errors surface.
   let formatter: Intl.NumberFormat;
   try {
     formatter = new Intl.NumberFormat(locale, { style: 'currency', currency });
