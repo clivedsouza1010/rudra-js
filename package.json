@@ -2,8 +2,9 @@
   "name": "rudra-js",
   "version": "0.7.5",
   "private": true,
-  "description": "A framework of server side components built dynamically and rendered in real time",
+  "description": "Monorepo for rudra-js, an open-source TypeScript library for LLM-designed product recommendations",
   "license": "MIT",
+  "homepage": "https://rudrajs.com",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/clivedsouza1010/rudra-js.git"

@@ -1,5 +1,11 @@
 # @rudra-js/react
 
+This package is part of [rudra-js](https://rudrajs.com).
+
+rudra-js is an open-source TypeScript library (MIT) you install from npm. A language model designs one product-recommendation block for a page in your shop, rudra-js checks it against your catalog, and React renders it.
+
+It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
+
 Renders a component specification from
 [`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core) with React
 18 or 19.
@@ -44,8 +50,8 @@ the model wrote is rendered as escaped text.
 | Tone, headline, the words in each block                             | Every price             |
 | Only in per-shopper mode: which products, and how each is described | Every image and link    |
 
-In the default cohort mode the framework fills in the products, their order and the reason under
-each, per request, and a badge the model wrote gets dropped. The model picks those only under
+In the default cohort mode core fills in the products, their order and the reason under each,
+per request, and a badge the model wrote gets dropped. The model picks those only under
 `generation: 'per-shopper'`. In either mode it still chooses the product a hero names. You'll find
 the full split in
 [What the model decides, by mode](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core#what-the-model-decides-by-mode).
@@ -54,8 +60,8 @@ The specification has no field carrying a title, a price, an image or a URL. Pro
 resolved at render time from `products`, keyed by a SKU reconciliation has already checked.
 
 **Validate `products` with `productSchema` from `@rudra-js/core`**, the same schema your candidates
-already passed. This prop is a second door into the framework. `imageUrl` lands in an `<img src>`,
-and `productSchema` is what rejects a protocol-relative `//evil.example/pixel.png` or a `data:` URL.
+already passed. This prop is a second way for data to reach the page. `imageUrl` lands in an
+`<img src>`, and `productSchema` is what rejects a protocol-relative `//evil.example/pixel.png` or a `data:` URL.
 It reads a path the way a browser does, so `/\evil.example/pixel.png` and the same trick written
 with a tab or a newline in it are rejected too — each one resolves to someone else's host. React
 neutralises a `javascript:` URL by itself, but not any of those. And if a price isn't a finite
@@ -192,7 +198,7 @@ page is broken.
 The sets your shop sells together, the same way `products` is your catalog. The model only asks for
 a bundle block. It never invents one, and it _never_ sees a price.
 
-You offer the sets, and the framework picks which one fills each block. That happens inside
+You offer the sets, and core picks which one fills each block. That happens inside
 `reconcileSpec` as the page is served, after the spec was generated rather than before, and it goes on what this
 shopper has in their basket, has looked at, or is browsing right now. The spec then carries the id
 it picked. This prop supplies the rest: that set's members, its price, the currency that price is

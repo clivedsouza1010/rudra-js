@@ -1,14 +1,17 @@
 {
   "name": "@rudra-js/attested",
   "version": "0.7.5",
-  "description": "Checks model-written product copy against the facts a shop stands behind",
+  "description": "From rudra-js: checks model-written product copy against the facts a shop stands behind",
   "keywords": [
+    "rudra-js",
+    "product-recommendations",
     "llm",
     "hallucination",
     "grounding",
     "verification",
     "ecommerce",
-    "guardrails"
+    "guardrails",
+    "typescript"
   ],
   "license": "MIT",
   "author": "Clive Dsouza",

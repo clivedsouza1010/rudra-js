@@ -1,5 +1,11 @@
 # @rudra-js/anthropic
 
+This package is part of [rudra-js](https://rudrajs.com).
+
+rudra-js is an open-source TypeScript library (MIT) you install from npm. A language model designs one product-recommendation block for a page in your shop, rudra-js checks it against your catalog, and React renders it.
+
+It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
+
 An Anthropic adapter for
 [`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core)'s
 `ComponentProvider`.
@@ -118,7 +124,7 @@ anything.
 When the API answers with an error, the `Error` we throw carries the status code
 and the vendor's error category, like `anthropic responded 400
 (invalid_request_error)`. We leave the vendor's own message out. It quotes the
-request back, and for this framework the request can hold a shopper's search
+request back, and in rudra-js the request can hold a shopper's search
 terms, which an adopter's `console.error(error)` would then write to a log. A
 test in `anthropic-provider.test.ts` puts a search term in that message and
 asserts it does not reach the thrown error.

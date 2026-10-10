@@ -1,15 +1,18 @@
 {
   "name": "@rudra-js/react",
   "version": "0.7.5",
-  "description": "Renders a rudra component specification with React 18 or 19, on the server or in the browser",
+  "description": "React renderer for rudra-js: renders an LLM-designed product-recommendation block from your own catalog, on the server or in the browser",
   "keywords": [
+    "rudra-js",
+    "product-recommendations",
     "react",
     "react-server-components",
     "rsc",
     "llm",
     "recommendations",
     "ecommerce",
-    "ssr"
+    "ssr",
+    "typescript"
   ],
   "license": "MIT",
   "author": "Clive Dsouza",

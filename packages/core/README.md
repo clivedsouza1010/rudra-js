@@ -1,7 +1,16 @@
 # @rudra-js/core
 
-The contracts and logic that turn one tracking payload into one renderable
-component specification.
+This package is part of [rudra-js](https://rudrajs.com).
+
+rudra-js is an open-source TypeScript library (MIT) you install from npm. A language model designs one product-recommendation block for a page in your shop, rudra-js checks it against your catalog, and React renders it.
+
+It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
+
+You give this package one page view: the shopper and what they've been doing,
+the page they're on, and the products you're willing to show. It gives back a
+specification for the recommendations on that page, written by your model or
+built without one, and checked against those products. There's no React in it.
+`@rudra-js/react` turns the specification into markup.
 
 Every export of this package is documented at [rudrajs.com](https://rudrajs.com/docs).
 
