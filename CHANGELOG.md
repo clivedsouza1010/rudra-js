@@ -10,6 +10,8 @@ break them.
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-10-10
+
 ### Added
 
 - `@rudra-js/attested` exports `foldLookalikes(text, byLook?)`, the part of its
@@ -693,7 +695,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.4...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.5...HEAD
+[0.7.5]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.1...v0.7.2
