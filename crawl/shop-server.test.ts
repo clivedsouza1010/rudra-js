@@ -1,6 +1,12 @@
 import { createServer, type AddressInfo } from 'node:net';
 import { describe, expect, it } from 'vitest';
-import { freePort, startShop, stopShop, type ShopCommand } from './shop-server.js';
+import {
+  exitedBeforeServing,
+  freePort,
+  startShop,
+  stopShop,
+  type ShopCommand,
+} from './shop-server.js';
 
 const IN_GROUP = "{ stdio: 'ignore' }";
 const HOLDS_THE_PIPE = "{ stdio: ['ignore', 'inherit', 'inherit'], detached: true }";
@@ -28,6 +34,18 @@ setTimeout(() => {}, 60000);
 function grandchildOf(output: string): number {
   return Number(/grandchild (\d+)/.exec(output)?.[1]);
 }
+
+describe('the message for a shop that exited before serving', () => {
+  it('names the exit code', () => {
+    expect(exitedBeforeServing(1, null)).toEqual('the shop exited with 1 before serving anything');
+  });
+
+  it('names the signal when one killed the shop, because there is no code then', () => {
+    expect(exitedBeforeServing(null, 'SIGKILL')).toEqual(
+      'the shop was killed by SIGKILL before serving anything',
+    );
+  });
+});
 
 describe('freePort', () => {
   it('returns a port nothing is listening on', async () => {

@@ -1,5 +1,6 @@
+import { foldLookalikes, verify } from '@rudra-js/attested';
 import { offeredCandidates } from './model-prompt.js';
-import type { Product, TrackingInput } from './tracking-input.js';
+import type { TrackingInput } from './tracking-input.js';
 
 const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
   {
@@ -8,18 +9,13 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
       /\breviews?\b|\breviewed\b/,
       /\b(?:\d+(?:\.\d+)?|three|four|five)[\s-]?stars?\b/,
       /\bstars?[\s-]?ratings?\b/,
-
       /\b(?:customer|shopper|buyer|user|average|overall)[\s-]ratings?\b/,
-
       /\bratings?\s+of\s+[0-5]\.\d\b/,
-
       /\b[0-5](?:\.\d)?\s+out of\s+(?:5|five)\b/,
       /\b(?:highly|top|best|well|poorly|five|four)[\s-]rated\b/,
-
-      /\brated\s+(?:[0-5]\.\d|(?:[0-5]|three|four|five)\s+(?:stars?|out of))\b/,
-
+      /\brated\s+[0-5]\.\d\b/,
+      /\brated\s+(?:[0-5]|three|four|five)\s+(?:stars?|out of)\b/,
       /\bbest[\s-]?sell(?:er|ers|ing)\b/,
-
       /(?:\bnumber one|\bno\.? ?1|#\s?1)[\s-]?sell(?:er|ers|ing)\b/,
       /\bloved by (?:thousands|hundreds|millions|\d)/,
     ],
@@ -29,22 +25,15 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
     patterns: [
       /[$£€¥₹]/,
       /\b\d+(?:\.\d+)?\s?(?:usd|eur|gbp|dollars?|pounds?|euros?)\b/,
-
       /\bdollars?\b|\beuros?\b/,
-
       /\b(?:usd|eur|gbp)\s?\d/,
-
       /\bkr\s?\d|\d\s?kr\b/,
       /\bpric(?:e|es|ed|ing)\b/,
-
       /\bwas\s+[$£€¥]?\s?\d[\d,.]*\s*[,;–—-]?\s*now\s+[$£€¥]?\s?\d/,
-
       /\bcheap(?:er|est)\b/,
       /\baffordable\b|\bbargain\b/,
-
       /\bcosts?\s+(?:less|more|only|just|about|around|[$£€¥]?\d)/,
       /\blow(?:er)?[\s-]cost\b/,
-
       /\bsaves?\s+(?:you\s+)?(?:money|cash|[$£€¥]\s?\d)/,
     ],
   },
@@ -56,12 +45,12 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
       /\bdiscount(?:s|ed)?\b/,
       /\bsale\b|\bmarked down\b|\bdeal of\b/,
       /\bhalf[\s-]?(?:price|off)\b/,
-
       /\bsaves?\s+\d[\d.,]*\s+off\b/,
-
       /\bclearance\s+(?:sale|price|event|deal)\b|\bon clearance\b/,
-
-      /\bprice reduced\b|\breduced price\b|\breduced by \d+\s?(?:%|percent)|\breduced\s+(?:this|next|last)\s+week\b/,
+      /\bprice reduced\b/,
+      /\breduced price\b/,
+      /\breduced by \d+\s?(?:%|percent)/,
+      /\breduced\s+(?:this|next|last)\s+week\b/,
     ],
   },
   {
@@ -80,86 +69,12 @@ const CLAIM_PATTERNS: { kind: string; patterns: RegExp[] }[] = [
       /\b(?:in|out of|low on) stock\b/,
       /\blimited stock\b/,
       /\brestocked?\b|\bsold out\b/,
-
       /\b(?:only\s+)?(?:\d+|a few|a handful|a couple|one|few)\s+(?:left|remain(?:s|ing)?)\b/,
       /\bonly\s+(?:two|three|four|five|six|seven|eight|nine|ten)\s+(?:left|remain(?:s|ing)?)\b/,
       /\bselling fast\b|\b(?:almost|nearly) gone\b|\bwhile stocks last\b/,
     ],
   },
 ];
-
-const CONFUSABLES: Record<string, string> = {
-  а: 'a',
-  в: 'b',
-  е: 'e',
-  к: 'k',
-  м: 'm',
-  н: 'h',
-  о: 'o',
-  р: 'p',
-  с: 'c',
-  т: 't',
-  х: 'x',
-  у: 'y',
-  ѕ: 's',
-  і: 'i',
-  ј: 'j',
-  ԁ: 'd',
-  һ: 'h',
-  ӏ: 'l',
-  α: 'a',
-  ε: 'e',
-  ι: 'i',
-  κ: 'k',
-  ν: 'v',
-  ο: 'o',
-  ρ: 'p',
-  τ: 't',
-  υ: 'u',
-  χ: 'x',
-  ϳ: 'j',
-  ѵ: 'v',
-};
-
-const CAPITALS: Record<string, string> = {
-  Β: 'b',
-  Ζ: 'z',
-  Η: 'h',
-  Μ: 'm',
-  Ν: 'n',
-  Υ: 'y',
-  Ү: 'y',
-  Ӏ: 'i',
-  Ԛ: 'q',
-  Ԝ: 'w',
-  Ϻ: 'm',
-  Ϝ: 'f',
-  Ԍ: 'g',
-};
-
-const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu;
-
-const SPACING = /[\t\n\v\f\r\u0085]/;
-
-const MARKS = /[\p{Mn}\p{Me}]/gu;
-
-function normaliseForClaims(text: string, byLook: boolean): string {
-  const compatible = text
-    .replace(INVISIBLE, (char) => (SPACING.test(char) ? char : ''))
-    .replace(/[ϲϹ]/g, 'c')
-    .normalize('NFKC');
-
-  let cased = compatible;
-  if (byLook) {
-    cased = '';
-    for (const char of compatible) cased += CAPITALS[char] ?? char;
-  }
-  const lowered = cased.toLowerCase().normalize('NFC').replace(MARKS, '');
-
-  let folded = '';
-  for (const char of lowered) folded += CONFUSABLES[char] ?? char;
-  return folded;
-}
 
 export const ALLOWED_PHRASES = [
   'does not feel cheap',
@@ -168,16 +83,10 @@ export const ALLOWED_PHRASES = [
   'sustainable pace',
 ];
 
-const DIGIT = /\p{Nd}/u;
+const FACT_DIGIT = /\p{Nd}/u;
+const NUMERAL = /[\p{Nd}\p{No}\p{Nl}]/u;
 
-export function productFacts(product: Product): string[] {
-  const facts: string[] = [];
-  if (DIGIT.test(product.category)) facts.push(product.category);
-  for (const tag of product.tags) {
-    if (DIGIT.test(tag)) facts.push(tag);
-  }
-  return facts;
-}
+export const NO_FACTS: readonly string[] = [];
 
 export interface HostFacts {
   pooled: string[];
@@ -189,7 +98,7 @@ export function hostFacts(input: TrackingInput): HostFacts {
   const bySku = new Map<string, string[]>();
 
   for (const product of offeredCandidates(input)) {
-    const own = productFacts(product);
+    const own = [product.category, ...product.tags].filter((text) => FACT_DIGIT.test(text));
     bySku.set(product.sku, own);
     for (const fact of own) pooled.add(fact);
   }
@@ -197,14 +106,28 @@ export function hostFacts(input: TrackingInput): HostFacts {
   return { pooled: [...pooled], bySku };
 }
 
-export function claimIn(text: string): string | null {
-  for (const byLook of [false, true]) {
-    const normalised = normaliseForClaims(text, byLook);
-    for (const claim of CLAIM_PATTERNS) {
-      for (const pattern of claim.patterns) {
-        if (pattern.test(normalised)) return claim.kind;
-      }
-    }
+function kindIn(reading: string): string | null {
+  for (const claim of CLAIM_PATTERNS) {
+    if (claim.patterns.some((pattern) => pattern.test(reading))) return claim.kind;
   }
+  return null;
+}
+
+function claimIn(text: string): string | null {
+  return kindIn(foldLookalikes(text)) ?? kindIn(foldLookalikes(text, true));
+}
+
+export function unbackedClaim(
+  raw: string,
+  clamped: string,
+  facts: readonly string[],
+): string | null {
+  const kind = claimIn(raw) ?? claimIn(clamped);
+  if (kind !== null) return kind;
+
+  const values = NUMERAL.test(clamped) ? facts : NO_FACTS;
+  const result = verify(clamped, { values, allowedPhrases: ALLOWED_PHRASES });
+  if (!result.quantity.supported) return 'quantity';
+  if (!result.wording.supported) return 'wording';
   return null;
 }

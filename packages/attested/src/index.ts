@@ -10,4 +10,4 @@ export {
   type VerifyResult,
 } from './verify.js';
 
-export { BANNED_PHRASES } from './phrases.js';
+export { BANNED_PHRASES, foldLookalikes } from './phrases.js';

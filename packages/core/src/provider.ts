@@ -10,11 +10,8 @@ export interface TokenUsage {
 
 export interface ProviderRequest {
   system: string;
-
   user: string;
-
   schema: z.ZodType<GeneratedSpec>;
-
   signal: AbortSignal;
 }
 
@@ -25,7 +22,6 @@ export interface ProviderResult {
 
 export interface ComponentProvider {
   readonly name: string;
-
   readonly model: string;
   generate(request: ProviderRequest): Promise<ProviderResult>;
 }

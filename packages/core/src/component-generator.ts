@@ -16,7 +16,6 @@ import { fitToShopper, type FittedSpec } from './fit-to-shopper.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import {
   createMemorySpecCache,
-  cohortCacheKey,
   specCacheKey,
   type CachedSpec,
   type SpecCache,
@@ -116,6 +115,7 @@ interface Settings {
 interface Run {
   input: TrackingInput;
   digest: SignalDigest;
+  promptDigest: SignalDigest;
   startedAt: number;
 }
 
@@ -182,11 +182,11 @@ export function createComponentGenerator(
 }
 
 async function generate(settings: Settings, draft: TrackingInputDraft): Promise<ComponentSpec> {
-  const run = startRun(draft);
+  const run = startRun(settings, draft);
   const provider = settings.provider;
   if (!provider) return fallback(settings, run, null, 'no-provider');
 
-  const key = cacheKeyFor(settings, provider, run);
+  const key = cacheKeyFor(provider, run);
   const found = await findSpec(settings, provider, run, key);
   if ('failed' in found)
     return fallback(settings, run, key, found.failed, eventDetails(found.trace));
@@ -216,20 +216,21 @@ async function generate(settings: Settings, draft: TrackingInputDraft): Promise<
 }
 
 function generateDeterministic(settings: Settings, draft: TrackingInputDraft): ComponentSpec {
-  return fallback(settings, startRun(draft), null, 'requested');
+  return fallback(settings, startRun(settings, draft), null, 'requested');
 }
 
-function startRun(draft: TrackingInputDraft): Run {
+function startRun(settings: Settings, draft: TrackingInputDraft): Run {
   const startedAt = Date.now();
   const input = parseTrackingInput(draft);
-  return { input, digest: buildDigest(input), startedAt };
+  const digest = buildDigest(input);
+  const promptDigest = settings.generation === 'cohort' ? toCohortDigest(digest) : digest;
+  return { input, digest, promptDigest, startedAt };
 }
 
-function cacheKeyFor(settings: Settings, provider: ComponentProvider, run: Run): string {
+function cacheKeyFor(provider: ComponentProvider, run: Run): string {
   const identity = { name: provider.name, model: provider.model };
   const skus = run.input.candidates.map((product) => product.sku);
-  if (settings.generation === 'cohort') return cohortCacheKey(run.digest, skus, identity);
-  return specCacheKey(run.digest, skus, identity);
+  return specCacheKey(run.promptDigest, skus, identity);
 }
 
 async function findSpec(
@@ -278,8 +279,7 @@ async function askModel(
   provider: ComponentProvider,
   run: Run,
 ): Promise<ModelCall> {
-  const promptDigest = settings.generation === 'cohort' ? toCohortDigest(run.digest) : run.digest;
-  const { system, user } = buildPrompt(run.input, promptDigest);
+  const { system, user } = buildPrompt(run.input, run.promptDigest);
   const result = await withinBudget('generation', settings.modelTimeoutMs, (signal) =>
     provider.generate({ system, user, schema: generatedSpecSchema, signal }),
   );

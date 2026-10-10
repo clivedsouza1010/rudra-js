@@ -1,12 +1,8 @@
 import {
   createComponentGenerator,
   type ComponentGeneratorOptions,
-  type ComponentProvider,
-  type GeneratedSpec,
   type GenerationEvent,
   type Product,
-  type ProductReference,
-  type TokenUsage,
 } from '@rudra-js/core';
 import { buildTrackingInput } from '../examples/shop/src/fixtures/tracking-input.js';
 import type { Shopper } from '../examples/shop/src/fixtures/shoppers.js';
@@ -18,18 +14,14 @@ export interface TokenPrices {
   cacheReadPerMillion: number;
 }
 
-export type ArmMode = 'stub' | 'replay' | 'live';
-
 export interface ArmIdentity {
   name: string;
-  mode: ArmMode;
   providerName: string | null;
   providerModel: string | null;
 }
 
 export interface ArmResult {
   arm: string;
-  mode: ArmMode;
   providerName: string | null;
   providerModel: string | null;
   views: number;
@@ -44,15 +36,7 @@ export interface ArmResult {
   costPerThousandViews: number;
   cpuUserMs?: number;
   cpuSystemMs?: number;
-  elapsedMs?: { median: number; p95: number; p99: number };
   violations: Record<string, number>;
-}
-
-function percentile(sorted: readonly number[], fraction: number): number {
-  if (sorted.length === 0) return 0;
-  const rank = Math.ceil(fraction * sorted.length);
-  const index = Math.min(Math.max(rank, 1), sorted.length) - 1;
-  return sorted[index]!;
 }
 
 export function summarise(
@@ -62,7 +46,6 @@ export function summarise(
 ): ArmResult {
   const sources = { llm: 0, cache: 0, fallback: 0 };
   const violations: Record<string, number> = {};
-  const timings: number[] = [];
   let modelCalls = 0;
   let inputTokens = 0;
   let outputTokens = 0;
@@ -71,7 +54,6 @@ export function summarise(
 
   for (const event of events) {
     sources[event.source] += 1;
-    timings.push(event.elapsedMs);
 
     if (event.calledModel) {
       modelCalls += 1;
@@ -94,11 +76,9 @@ export function summarise(
     (outputTokens / 1_000_000) * prices.outputPerMillion +
     (cacheWriteTokens / 1_000_000) * prices.cacheWritePerMillion +
     (cacheReadTokens / 1_000_000) * prices.cacheReadPerMillion;
-  timings.sort((left, right) => left - right);
 
   return {
     arm: identity.name,
-    mode: identity.mode,
     providerName: identity.providerName,
     providerModel: identity.providerModel,
     views,
@@ -111,15 +91,6 @@ export function summarise(
     cacheWriteTokens,
     cacheReadTokens,
     costPerThousandViews: views === 0 ? 0 : (cost / views) * 1000,
-    ...(identity.mode === 'stub'
-      ? {}
-      : {
-          elapsedMs: {
-            median: percentile(timings, 0.5),
-            p95: percentile(timings, 0.95),
-            p99: percentile(timings, 0.99),
-          },
-        }),
     violations,
   };
 }
@@ -136,13 +107,7 @@ export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
     throw new Error(`arm ${result.arm}: no views were measured`);
   }
 
-  const stubbed = result.providerName === null || result.providerName === 'stub';
-  if (result.mode !== 'stub' && stubbed) {
-    throw new Error(
-      `arm ${result.arm}: this arm says '${result.mode}', but nothing but a stub answered it`,
-    );
-  }
-  if (result.mode === 'stub' && !stubbed) {
+  if (result.providerName !== null && result.providerName !== 'stub') {
     throw new Error(
       `arm ${result.arm}: this arm says 'stub', but the provider ${result.providerName} answered it, which is a real one and bills`,
     );
@@ -175,77 +140,27 @@ export function assertSourceMix(result: ArmResult, rule: SourceRule): void {
   }
 }
 
-function candidateSkus(userPrompt: string, limit: number): string[] {
-  const start = userPrompt.indexOf('## Candidates');
-  if (start < 0) throw new Error('the stub found no candidates section in the prompt');
-  const candidates = userPrompt.slice(start);
-  const skus: string[] = [];
-  for (const line of candidates.split('\n')) {
-    const match = line.match(/^- "([^"]+)"/);
-    if (match) skus.push(match[1]!);
-    if (skus.length === limit) break;
-  }
-  if (skus.length === 0) throw new Error('the stub found no candidate in the prompt');
-  return skus;
-}
-
-const STUB_GRID_ITEMS = 4;
-
-export function createStubProvider(usage: TokenUsage): ComponentProvider {
-  return {
-    name: 'stub',
-    model: 'stub',
-    async generate(request) {
-      return { spec: buildStubSpec(candidateSkus(request.user, STUB_GRID_ITEMS)), usage };
-    },
-  };
-}
-
 export interface ArmSpec {
   name: string;
-  mode: ArmMode;
   options: ComponentGeneratorOptions;
   rule: SourceRule;
 }
 
 export const SHOPPERS_PER_PAGE = 10;
 
-export function skuFor(
-  index: number,
+export function skuForEachShopper(
   shopperCount: number,
   catalog: readonly Product[],
   shoppersPerPage: number = SHOPPERS_PER_PAGE,
-): string {
-  const inStock: Product[] = [];
-  for (const product of catalog) {
-    if (product.isInStock) inStock.push(product);
-  }
+): string[] {
+  if (shopperCount === 0) return [];
+
+  const inStock = catalog.filter((product) => product.isInStock);
   if (inStock.length === 0) throw new Error('the catalog has nothing in stock');
 
-  const pages = Math.min(Math.max(1, Math.floor(shopperCount / shoppersPerPage)), inStock.length);
-  return inStock[index % pages]!.sku;
-}
-
-function buildStubSpec(skus: readonly string[]): GeneratedSpec {
-  const items: ProductReference[] = [];
-  for (const sku of skus) {
-    items.push({ sku, basis: 'popular', reason: null, badge: null, emphasis: 'normal' });
-  }
-
-  return {
-    tone: 'neutral',
-    headline: 'More to see',
-    subheadline: null,
-    blocks: [
-      {
-        kind: 'grid',
-        title: 'Picked for you',
-        columns: 3,
-        items,
-      },
-    ],
-    rationale: 'A fixed spec, so the numbers measure the framework and not the model.',
-  };
+  const pageCount = Math.max(1, Math.floor(shopperCount / shoppersPerPage));
+  const pages = inStock.slice(0, pageCount);
+  return Array.from({ length: shopperCount }, (_unused, index) => pages[index % pages.length]!.sku);
 }
 
 export async function measureArm(
@@ -263,9 +178,10 @@ export async function measureArm(
     },
   });
 
+  const skus = skuForEachShopper(shoppers.length, catalog, shoppersPerPage);
   for (let index = 0; index < shoppers.length; index += 1) {
     const shopper = shoppers[index]!;
-    const sku = skuFor(index, shoppers.length, catalog, shoppersPerPage);
+    const sku = skus[index]!;
     // oxlint-disable-next-line no-await-in-loop
     await generator.generate(buildTrackingInput(shopper, sku, catalog, []));
   }
@@ -274,7 +190,6 @@ export async function measureArm(
   const result = summarise(
     {
       name: arm.name,
-      mode: arm.mode,
       providerName: provider === null ? null : provider.name,
       providerModel: provider === null ? null : provider.model,
     },

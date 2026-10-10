@@ -116,10 +116,12 @@ if (claim.quantity.findings[0]?.token !== '2') {
 }
 
 const forbidden: string = '__FORBIDDEN_PACKAGE__';
-const failure: unknown = await import(forbidden).then(
-  () => null,
-  (error: unknown) => error,
-);
+let failure: unknown = null;
+try {
+  await import(forbidden);
+} catch (error) {
+  failure = error;
+}
 if (failure === null) {
   throw new Error(
     `the consumer resolved '${forbidden}', so it is not isolated from the repo — ` +

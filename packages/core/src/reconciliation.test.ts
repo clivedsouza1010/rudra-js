@@ -1,5 +1,4 @@
 import { BANNED_PHRASES, verify } from '@rudra-js/attested';
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   RECOMMENDATION_BASES,
@@ -19,7 +18,7 @@ import {
   reconcileSpec,
   type ReconcileResult,
 } from './reconciliation.js';
-import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
+import { FIELD_LIMITS, parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
   sku,
@@ -122,6 +121,19 @@ describe("a reason the shop supplied is the shop's own words", () => {
 
     expect(items[0]?.reason).toBeNull();
     expect(result.violations.join()).toMatch(/^unverifiable-claim:[a-z]+:reason:TR-101$/);
+  });
+
+  it('keeps a reason at the longest length the shop may send, uncut', () => {
+    const longest = 'a'.repeat(FIELD_LIMITS.reason);
+    const result = reconcile(
+      grid([ref('TR-101', { reason: longest })]),
+      { candidates: [product('TR-101', { reason: longest }), product('TR-102')] },
+      new Map([['TR-101', longest]]),
+    );
+    const items = result.spec.blocks.flatMap((b) => (b.kind === 'grid' ? b.items : []));
+
+    expect(items[0]?.reason).toBe(longest);
+    expect(result.violations).toEqual([]);
   });
 });
 
@@ -535,6 +547,16 @@ describe('text repair', () => {
     const [block] = result.spec.blocks;
     if (block?.kind !== 'grid') throw new Error('expected a grid');
 
+    expect(block.columns).toBe(2);
+  });
+
+  it('keeps a grid no wider than the model asked for', () => {
+    const items = [ref('TR-101'), ref('TR-102'), ref('NU-201')];
+    const result = reconcile(specWith([{ kind: 'grid', title: null, columns: 2, items }]));
+    const [block] = result.spec.blocks;
+    if (block?.kind !== 'grid') throw new Error('expected a grid');
+
+    expect(block.items).toHaveLength(3);
     expect(block.columns).toBe(2);
   });
 });
@@ -1509,16 +1531,6 @@ describe('a claim spelled in characters the patterns do not expect', () => {
   });
 });
 
-function declarationOf(path: string, name: string): string {
-  const source = readFileSync(new URL(path, import.meta.url), 'utf8');
-  const start = source.indexOf(`const ${name}`);
-  const end = source.indexOf(';\n\n', start);
-
-  expect(start, `${name} is missing from ${path}`).toBeGreaterThan(-1);
-  expect(end, `${name} does not end where expected in ${path}`).toBeGreaterThan(start);
-  return source.slice(start, end);
-}
-
 describe('the two passes attested adds', () => {
   const reasonFor = (text: string): string | null | undefined =>
     basisOf(reconcile(grid([ref('TR-101', { reason: text })])))?.reason;
@@ -1787,19 +1799,6 @@ describe('the two passes attested adds', () => {
       expect(kindFor(reason)).toBe('quantity');
     },
   );
-
-  it('keeps its unicode classes identical to the ones in attested', () => {
-    for (const [name, attestedPath] of [
-      ['INVISIBLE', '../../attested/src/hidden.ts'],
-      ['MARKS', '../../attested/src/hidden.ts'],
-      ['CONFUSABLES', '../../attested/src/phrases.ts'],
-      ['CAPITALS', '../../attested/src/phrases.ts'],
-    ] as const) {
-      expect(declarationOf('./claim-screening.ts', name), `${name} has drifted`).toBe(
-        declarationOf(attestedPath, name),
-      );
-    }
-  });
 
   it('keeps every allowed phrase pointed at something attested bans', () => {
     for (const allowed of ALLOWED_PHRASES) {

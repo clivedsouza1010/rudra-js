@@ -17,17 +17,7 @@ export function buildTrackingInput(
   const finalCandidates = (inCategory.length > 0 ? inCategory : offerable).slice(0, 24);
 
   const candidateSkus = new Set(finalCandidates.map((product) => product.sku));
-  const offered: Bundle[] = [];
-  for (const bundle of bundles) {
-    let hasEveryMember = true;
-    for (const sku of bundle.skus) {
-      if (!candidateSkus.has(sku)) {
-        hasEveryMember = false;
-        break;
-      }
-    }
-    if (hasEveryMember) offered.push(bundle);
-  }
+  const offered = bundles.filter((bundle) => bundle.skus.every((sku) => candidateSkus.has(sku)));
 
   return {
     user: { id: shopper.id, segment: shopper.segment, isReturning: shopper.isReturning },

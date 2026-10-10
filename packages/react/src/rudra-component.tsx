@@ -39,12 +39,8 @@ function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
   return new Map(catalog.map((product) => [product.sku, product]));
 }
 
-function hasContent(
-  block: Block,
-  products: ReadonlyMap<string, Product>,
-  bundles: ReadonlyMap<string, Bundle>,
-): boolean {
-  const isSellable = (sku: string) => sellableProduct(products, sku) !== undefined;
+function hasContent(block: Block, context: BlockRenderContext): boolean {
+  const isSellable = (sku: string) => sellableProduct(context.products, sku) !== undefined;
 
   switch (block.kind) {
     case 'grid':
@@ -61,7 +57,7 @@ function hasContent(
       return true;
     case 'bundle': {
       if (block.bundleId === null) return false;
-      const bundle = bundles.get(block.bundleId);
+      const bundle = context.bundles.get(block.bundleId);
       return bundle !== undefined && bundle.skus.every((sku) => isSellable(sku));
     }
     default:
@@ -115,9 +111,7 @@ export function RudraComponent({
     formatBundlePrice: formatBundlePrice ?? ((bundle) => defaultFormatBundlePrice(bundle, locale)),
   };
 
-  const visible = spec.blocks.filter((block) =>
-    hasContent(block, context.products, context.bundles),
-  );
+  const visible = spec.blocks.filter((block) => hasContent(block, context));
   if (visible.length === 0) return null;
 
   const diagnosticAttributes = hasDiagnostics

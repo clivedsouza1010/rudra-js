@@ -13,7 +13,6 @@ export const FIELD_LIMITS = {
   bundles: 20,
   localeTag: 35,
   maxItems: 12,
-
   reason: 120,
 } as const;
 
@@ -22,13 +21,21 @@ const RESERVED_META_KEY = '__proto__';
 const MAX_EPOCH_MS = Date.UTC(2100, 0, 1);
 
 const identifier = () => z.string().min(1).max(FIELD_LIMITS.identifier);
-const optionalIdentifier = () => z.string().min(1).max(FIELD_LIMITS.identifier).optional();
+const optionalIdentifier = () => identifier().optional();
+
+const currencyCode = () =>
+  z
+    .string()
+    .regex(/^[A-Z]{3}$/, 'expected a three-letter ISO 4217 code')
+    .default('USD');
+
+const isUnique = (values: string[]) => new Set(values).size === values.length;
 
 const epochMs = () => z.number().int().min(0).max(MAX_EPOCH_MS).optional();
 
 const isRootRelative = (value: string) => {
-  const asParsed = value.replace(/[\t\n\r]/g, '');
-  return value.startsWith('/') && /^\/(?![/\\])/.test(asParsed);
+  const asBrowserReadsIt = value.replace(/[\t\n\r]/g, '');
+  return value.startsWith('/') && /^\/(?![/\\])/.test(asBrowserReadsIt);
 };
 
 const imageReference = () =>
@@ -36,8 +43,7 @@ const imageReference = () =>
     .string()
     .max(FIELD_LIMITS.shortText)
     .refine(
-      (value) =>
-        isRootRelative(value) ? true : z.url({ protocol: /^https?$/ }).safeParse(value).success,
+      (value) => isRootRelative(value) || z.url({ protocol: /^https?$/ }).safeParse(value).success,
       { message: 'expected an http(s) URL or a root-relative path' },
     );
 
@@ -46,14 +52,9 @@ export const productSchema = z.strictObject({
   title: z.string().min(1).max(FIELD_LIMITS.shortText),
   category: identifier(),
   price: z.number().nonnegative(),
-  currency: z
-    .string()
-    .regex(/^[A-Z]{3}$/, 'expected a three-letter ISO 4217 code')
-    .default('USD'),
-
+  currency: currencyCode(),
   imageUrl: imageReference().optional(),
   rating: z.number().min(0).max(5).optional(),
-
   reason: z.string().min(1).max(FIELD_LIMITS.reason).optional(),
   isInStock: z.boolean().default(true),
   tags: z
@@ -67,7 +68,6 @@ export const skuSignalSchema = z.strictObject({
   sku: identifier(),
   category: optionalIdentifier(),
   at: epochMs(),
-
   weight: z.number().min(0).max(1).optional(),
 });
 export type SkuSignal = z.infer<typeof skuSignalSchema>;
@@ -93,7 +93,7 @@ const metaKeysAreSafe = z.custom<Record<string, string | number | boolean>>(
 const metaSchema = metaKeysAreSafe.pipe(
   z
     .record(
-      z.string().min(1).max(FIELD_LIMITS.identifier),
+      identifier(),
       z.union([z.string().max(FIELD_LIMITS.shortText), z.number(), z.boolean()]),
     )
     .refine((entries) => Object.keys(entries).length <= FIELD_LIMITS.metaEntries, {
@@ -113,18 +113,15 @@ export type Interaction = z.infer<typeof interactionSchema>;
 
 export const renderContextSchema = z.strictObject({
   surface: identifier(),
-
-  slot: z.string().min(1).max(FIELD_LIMITS.identifier).default('recommendations'),
+  slot: identifier().default('recommendations'),
   currentSku: optionalIdentifier(),
   currentCategory: optionalIdentifier(),
   searchQuery: z.string().max(FIELD_LIMITS.searchQuery).optional(),
-
   locale: z
     .string()
     .max(FIELD_LIMITS.localeTag)
     .regex(/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/, 'expected one language tag, such as en-US')
     .default('en-US'),
-
   maxItems: z.number().int().min(1).max(FIELD_LIMITS.maxItems).default(4),
 });
 export type RenderContext = z.infer<typeof renderContextSchema>;
@@ -149,15 +146,9 @@ export const bundleSchema = z.strictObject({
     .array(identifier())
     .min(2)
     .max(FIELD_LIMITS.productsPerBundle)
-    .refine((skus) => new Set(skus).size === skus.length, {
-      message: 'a bundle must not list the same product twice',
-    }),
-
+    .refine(isUnique, { message: 'a bundle must not list the same product twice' }),
   price: z.number().nonnegative(),
-  currency: z
-    .string()
-    .regex(/^[A-Z]{3}$/, 'expected a three-letter ISO 4217 code')
-    .default('USD'),
+  currency: currencyCode(),
   label: z.string().min(1).max(FIELD_LIMITS.shortText).optional(),
 });
 export type Bundle = z.infer<typeof bundleSchema>;
@@ -171,24 +162,18 @@ export const trackingInputSchema = z
       isReturning: z.boolean().optional(),
     }),
     context: renderContextSchema,
-
     signals: trackingSignalsSchema.prefault({}),
-
     candidates: z
       .array(productSchema)
       .min(1)
       .max(FIELD_LIMITS.candidates)
-      .refine(
-        (products) => new Set(products.map((product) => product.sku)).size === products.length,
-        {
-          message: 'candidates must have unique SKUs',
-        },
-      ),
-
+      .refine((products) => isUnique(products.map((product) => product.sku)), {
+        message: 'candidates must have unique SKUs',
+      }),
     bundles: z
       .array(bundleSchema)
       .max(FIELD_LIMITS.bundles)
-      .refine((bundles) => new Set(bundles.map((bundle) => bundle.id)).size === bundles.length, {
+      .refine((bundles) => isUnique(bundles.map((bundle) => bundle.id)), {
         message: 'bundles must have unique ids',
       })
       .default([]),

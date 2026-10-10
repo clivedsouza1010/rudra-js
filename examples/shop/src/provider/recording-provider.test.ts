@@ -106,7 +106,7 @@ describe('replaying a provider', () => {
     const recorded = inner();
     await createRecordingProvider(recorded, directory).generate(request());
 
-    const replay = createReplayProvider({ directory, model: 'test-model' });
+    const replay = createReplayProvider({ directory, name: 'test', model: 'test-model' });
 
     await expect(replay.generate(request())).resolves.toMatchObject({
       spec,
@@ -116,7 +116,11 @@ describe('replaying a provider', () => {
   });
 
   it('warns and then rejects on a miss, so a run cannot silently measure the fallback', async () => {
-    const replay = createReplayProvider({ directory: scratch(), model: 'test-model' });
+    const replay = createReplayProvider({
+      directory: scratch(),
+      name: 'test',
+      model: 'test-model',
+    });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await expect(replay.generate(request())).rejects.toThrow(/no recording/i);
@@ -131,9 +135,32 @@ describe('replaying a provider', () => {
     const [file] = readdirSync(directory);
     writeFileSync(join(directory, file!), 'not valid json');
 
-    const replay = createReplayProvider({ directory, model: 'test-model' });
+    const replay = createReplayProvider({ directory, name: 'test', model: 'test-model' });
 
     await expect(replay.generate(request())).rejects.toThrow(/recording is not valid json/i);
+  });
+
+  it('fails with a clear message when a recorded transcript has a null result', async () => {
+    const directory = scratch();
+    const path = transcriptPath(directory, 'test-model', request());
+    writeFileSync(
+      path,
+      JSON.stringify({ model: 'test-model', system: 'SYSTEM', user: 'USER', result: null }),
+    );
+
+    const replay = createReplayProvider({ directory, name: 'test', model: 'test-model' });
+
+    await expect(replay.generate(request())).rejects.toThrow(/has no result to replay/);
+  });
+
+  it('answers under the name it was given', () => {
+    const replay = createReplayProvider({
+      directory: scratch(),
+      name: 'anthropic',
+      model: 'test-model',
+    });
+
+    expect(replay.name).toBe('anthropic');
   });
 });
 

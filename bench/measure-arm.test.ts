@@ -6,11 +6,11 @@ import {
   type GenerationEvent,
   type ProviderRequest,
 } from '@rudra-js/core';
+import { createStubProvider } from './arms.js';
 import {
   assertSourceMix,
-  createStubProvider,
   measureArm,
-  skuFor,
+  skuForEachShopper,
   summarise,
   type ArmIdentity,
   type ArmResult,
@@ -39,7 +39,6 @@ const event = (overrides: Partial<GenerationEvent> = {}): GenerationEvent => ({
 
 const identity = (name: string, overrides: Partial<ArmIdentity> = {}): ArmIdentity => ({
   name,
-  mode: 'stub',
   providerName: 'stub',
   providerModel: 'stub',
   ...overrides,
@@ -130,44 +129,6 @@ describe('summarising a run', () => {
     expect(result.cacheReadTokens).toBe(0);
   });
 
-  it('reports the middle and the tail of the timings', () => {
-    const events: GenerationEvent[] = [];
-    for (let ms = 1; ms <= 33; ms += 1) events.push(event({ elapsedMs: ms }));
-
-    const result = summarise(
-      identity('c', { mode: 'replay', providerName: 'recording', providerModel: 'claude-opus-5' }),
-      events,
-      PRICES,
-    );
-
-    expect(result.elapsedMs?.median).toBe(17);
-    expect(result.elapsedMs?.p95).toBe(32);
-    expect(result.elapsedMs?.p99).toBe(33);
-  });
-
-  it('times every view, not just the ones that reached the model', () => {
-    const result = summarise(
-      identity('c', { mode: 'replay', providerName: 'recording', providerModel: 'claude-opus-5' }),
-      [
-        event({ elapsedMs: 1, source: 'cache', calledModel: false }),
-        event({ elapsedMs: 1, source: 'cache', calledModel: false }),
-        event({ elapsedMs: 900 }),
-      ],
-      PRICES,
-    );
-
-    expect(result.elapsedMs?.median).toBe(1);
-  });
-
-  it('reports no timings at all for a stub run', () => {
-    const events: GenerationEvent[] = [];
-    for (let ms = 0; ms <= 5; ms += 1) events.push(event({ elapsedMs: ms }));
-
-    const result = summarise(identity('c'), events, PRICES);
-
-    expect(result.elapsedMs).toBe(undefined);
-  });
-
   it('groups violations by their kind', () => {
     const result = summarise(
       identity('c'),
@@ -218,7 +179,6 @@ const resultWith = (
   const views = sources.llm + sources.cache + sources.fallback;
   return {
     arm: 'test',
-    mode: 'stub',
     providerName: 'stub',
     providerModel: 'stub',
     views,
@@ -231,7 +191,6 @@ const resultWith = (
     cacheWriteTokens: 0,
     cacheReadTokens: 0,
     costPerThousandViews: 0,
-    elapsedMs: { median: 0, p95: 0, p99: 0 },
     violations: {},
     ...overrides,
   };
@@ -290,28 +249,10 @@ describe('refusing a mislabelled arm', () => {
     ).toThrow(/reached a model/);
   });
 
-  it('refuses a run labelled live that the stub answered', () => {
-    const result = resultWith(
-      { llm: 10, cache: 90, fallback: 0 },
-      { mode: 'live', providerName: 'stub', providerModel: 'stub' },
-    );
-
-    expect(() => assertSourceMix(result, { fallback: 'none' })).toThrow(/nothing but a stub/);
-  });
-
-  it('refuses a run labelled live that had no provider at all', () => {
-    const result = resultWith(
-      { llm: 0, cache: 0, fallback: 100 },
-      { mode: 'replay', providerName: null, providerModel: null },
-    );
-
-    expect(() => assertSourceMix(result, { fallback: 'all' })).toThrow(/nothing but a stub/);
-  });
-
   it('refuses a run labelled stub that a real provider answered', () => {
     const result = resultWith(
       { llm: 100, cache: 0, fallback: 0 },
-      { mode: 'stub', providerName: 'anthropic', providerModel: 'claude-opus-5' },
+      { providerName: 'anthropic', providerModel: 'claude-opus-5' },
     );
 
     expect(() => assertSourceMix(result, { fallback: 'none' })).toThrow(/provider anthropic/);
@@ -320,7 +261,7 @@ describe('refusing a mislabelled arm', () => {
   it('accepts the no-model arm as a stub run', () => {
     const result = resultWith(
       { llm: 0, cache: 0, fallback: 100 },
-      { mode: 'stub', providerName: null, providerModel: null },
+      { providerName: null, providerModel: null },
     );
 
     expect(() => assertSourceMix(result, { fallback: 'all' })).not.toThrow();
@@ -351,38 +292,21 @@ describe('choosing which page a shopper looks at', () => {
   it('opens more pages when fewer shoppers share one', () => {
     const shopperCount = 20;
 
-    const skusAtFive = new Set<string>();
-    for (let index = 0; index < shopperCount; index += 1) {
-      skusAtFive.add(skuFor(index, shopperCount, catalog, 5));
-    }
-
-    const skusAtTwenty = new Set<string>();
-    for (let index = 0; index < shopperCount; index += 1) {
-      skusAtTwenty.add(skuFor(index, shopperCount, catalog, 20));
-    }
+    const skusAtFive = new Set(skuForEachShopper(shopperCount, catalog, 5));
+    const skusAtTwenty = new Set(skuForEachShopper(shopperCount, catalog, 20));
 
     expect(skusAtFive.size).toBe(4);
     expect(skusAtTwenty.size).toBe(1);
   });
 
   it('puts ten shoppers on a page when nobody says otherwise', () => {
-    const shopperCount = 20;
-
-    const skus = new Set<string>();
-    for (let index = 0; index < shopperCount; index += 1) {
-      skus.add(skuFor(index, shopperCount, catalog));
-    }
+    const skus = new Set(skuForEachShopper(20, catalog));
 
     expect(skus.size).toBe(2);
   });
 
   it('drops a part page rather than opening one for the remainder', () => {
-    const shopperCount = 25;
-
-    const skus = new Set<string>();
-    for (let index = 0; index < shopperCount; index += 1) {
-      skus.add(skuFor(index, shopperCount, catalog));
-    }
+    const skus = new Set(skuForEachShopper(25, catalog));
 
     expect(skus.size).toBe(2);
   });
@@ -395,8 +319,7 @@ describe('choosing which page a shopper looks at', () => {
     const shopperCount = inStockSkus.length * 10 + 30;
 
     const shopperCountPerSku = new Map<string, number>();
-    for (let index = 0; index < shopperCount; index += 1) {
-      const sku = skuFor(index, shopperCount, catalog);
+    for (const sku of skuForEachShopper(shopperCount, catalog)) {
       shopperCountPerSku.set(sku, (shopperCountPerSku.get(sku) ?? 0) + 1);
     }
 
@@ -416,7 +339,6 @@ describe('measuring one arm', () => {
   it('reports a view for every shopper', async () => {
     const arm: ArmSpec = {
       name: 'b',
-      mode: 'stub',
       options: { provider: null },
       rule: { fallback: 'all' },
     };
@@ -428,7 +350,6 @@ describe('measuring one arm', () => {
   it('calls no model on the deterministic arm', async () => {
     const arm: ArmSpec = {
       name: 'b',
-      mode: 'stub',
       options: { provider: null },
       rule: { fallback: 'all' },
     };
@@ -442,7 +363,6 @@ describe('measuring one arm', () => {
     const cohortShoppers = generateShoppers(11, catalog).slice(0, 20);
     const arm: ArmSpec = {
       name: 'c',
-      mode: 'stub',
       options: { provider: stub(), generation: 'cohort' },
       rule: { fallback: 'none' },
     };
@@ -452,16 +372,14 @@ describe('measuring one arm', () => {
     expect(result.modelCalls).toBe(9);
   });
 
-  it('records the mode and the provider that answered', async () => {
+  it('records the provider that answered', async () => {
     const arm: ArmSpec = {
       name: 'd',
-      mode: 'stub',
       options: { provider: stub(), generation: 'per-shopper' },
       rule: { fallback: 'none' },
     };
     const result = await measureArm(arm, shoppers, catalog, PRICES);
 
-    expect(result.mode).toBe('stub');
     expect(result.providerName).toBe('stub');
     expect(result.providerModel).toBe('stub');
   });
@@ -469,7 +387,6 @@ describe('measuring one arm', () => {
   it('records no provider for the arm that runs without one', async () => {
     const arm: ArmSpec = {
       name: 'b',
-      mode: 'stub',
       options: { provider: null },
       rule: { fallback: 'all' },
     };
@@ -483,7 +400,6 @@ describe('measuring one arm', () => {
     const cohortShoppers = generateShoppers(11, catalog).slice(0, 20);
     const arm: ArmSpec = {
       name: 'c',
-      mode: 'stub',
       options: { provider: stub(), generation: 'cohort' },
       rule: { fallback: 'none' },
     };
@@ -495,7 +411,6 @@ describe('measuring one arm', () => {
   it('calls the model for every shopper in per-shopper mode', async () => {
     const arm: ArmSpec = {
       name: 'd',
-      mode: 'stub',
       options: { provider: stub(), generation: 'per-shopper' },
       rule: { fallback: 'none' },
     };
@@ -509,7 +424,6 @@ describe('measuring one arm', () => {
   it('throws rather than report a cohort run that never reached a model', async () => {
     const arm: ArmSpec = {
       name: 'c',
-      mode: 'stub',
       options: { provider: null },
       rule: { fallback: 'none' },
     };
@@ -520,7 +434,6 @@ describe('measuring one arm', () => {
   it('gives the same numbers twice', async () => {
     const build = (): ArmSpec => ({
       name: 'c',
-      mode: 'stub',
       options: { provider: stub(), generation: 'cohort' },
       rule: { fallback: 'none' },
     });

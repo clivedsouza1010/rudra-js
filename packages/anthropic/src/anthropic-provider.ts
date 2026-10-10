@@ -24,6 +24,12 @@ interface ToolUseBlock {
   input: unknown;
 }
 
+interface MessagesReply {
+  stop_reason?: string;
+  content?: unknown;
+  usage?: Record<string, unknown>;
+}
+
 function describeShape(input: unknown): string {
   if (input === null) return 'null';
   if (Array.isArray(input)) return `an array of ${input.length}`;
@@ -33,7 +39,7 @@ function describeShape(input: unknown): string {
   return keys.length === 0 ? 'an empty object' : `an object with keys ${keys.join(', ')}`;
 }
 
-function onlyValue(input: unknown): unknown {
+function unwrapSingleKey(input: unknown): unknown {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
   const values = Object.values(input);
   return values.length === 1 ? values[0] : undefined;
@@ -61,84 +67,88 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): Comp
     async generate(request: ProviderRequest): Promise<ProviderResult> {
       request.signal.throwIfAborted();
 
+      const headers = {
+        'content-type': 'application/json',
+        'x-api-key': options.apiKey,
+        'anthropic-version': '2023-06-01',
+        ...(options.workspaceId ? { 'anthropic-workspace-id': options.workspaceId } : {}),
+      };
+      const body = {
+        model,
+        max_tokens: maxTokens,
+        ...(thinking ? { thinking } : {}),
+        system: [
+          { type: 'text', text: request.system, cache_control: { type: 'ephemeral' } },
+          {
+            type: 'text',
+            text: `Return that JSON as the input to the ${TOOL_NAME} tool, not as text. You may say a brief sentence first.`,
+          },
+        ],
+        messages: [{ role: 'user', content: request.user }],
+        tools: [
+          {
+            name: TOOL_NAME,
+            description: 'Return the component specification.',
+            input_schema: z.toJSONSchema(request.schema, { io: 'input' }),
+          },
+        ],
+        tool_choice: { type: 'auto', disable_parallel_tool_use: true },
+      };
+
       const response = await send(call, `${baseUrl}/v1/messages`, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': options.apiKey,
-          'anthropic-version': '2023-06-01',
-          ...(options.workspaceId ? { 'anthropic-workspace-id': options.workspaceId } : {}),
-        },
+        headers,
         signal: request.signal,
-        body: JSON.stringify({
-          model,
-          max_tokens: maxTokens,
-          ...(thinking ? { thinking } : {}),
-          system: [
-            { type: 'text', text: request.system, cache_control: { type: 'ephemeral' } },
-            {
-              type: 'text',
-              text: `Return that JSON as the input to the ${TOOL_NAME} tool, not as text. You may say a brief sentence first.`,
-            },
-          ],
-          messages: [{ role: 'user', content: request.user }],
-          tools: [
-            {
-              name: TOOL_NAME,
-              description: 'Return the component specification.',
-              input_schema: z.toJSONSchema(request.schema, { io: 'input' }),
-            },
-          ],
-          tool_choice: { type: 'auto', disable_parallel_tool_use: true },
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
-        const category = await errorCategory(response);
-        throw new Error(`anthropic responded ${response.status}${category}`);
+        const suffix = await errorTypeSuffix(response);
+        throw new Error(`anthropic responded ${response.status}${suffix}`);
       }
 
-      const json: unknown = await response.json();
-      if (typeof json !== 'object' || json === null) {
-        throw new Error(
-          `anthropic returned ${json === null ? 'null' : typeof json}, not an object`,
-        );
-      }
-
-      const body = json as {
-        content?: unknown;
-        usage?: Record<string, unknown>;
-        stop_reason?: string;
-      };
-      if (body.stop_reason === 'max_tokens') {
-        throw new Error(
-          `anthropic stopped at the max_tokens budget (${maxTokens}) before returning a tool use`,
-        );
-      }
-      if (body.stop_reason === 'refusal') {
-        throw new Error('anthropic refused to answer (stop_reason: refusal)');
-      }
-
-      const blocks = Array.isArray(body.content) ? body.content : [];
-      const block = blocks.find(isSpecToolUse);
-      if (!block) {
-        throw new Error(`anthropic returned no ${TOOL_NAME} tool use`);
-      }
-
-      const asSent = request.schema.safeParse(block.input);
-      const result = asSent.success ? asSent : request.schema.safeParse(onlyValue(block.input));
-      if (!result.success) {
-        throw new Error(
-          `anthropic returned a ${TOOL_NAME} tool use that does not fit the schema. ` +
-            `It sent ${describeShape(block.input)}.`,
-          { cause: asSent.error },
-        );
-      }
-
-      const usage = toUsage(body.usage);
-      return usage ? { spec: result.data, usage } : { spec: result.data };
+      return readSpec(await response.json(), request.schema, maxTokens);
     },
   };
+}
+
+function readSpec(
+  reply: unknown,
+  schema: ProviderRequest['schema'],
+  maxTokens: number,
+): ProviderResult {
+  if (typeof reply !== 'object' || reply === null) {
+    throw new Error(`anthropic returned ${reply === null ? 'null' : typeof reply}, not an object`);
+  }
+
+  const { stop_reason: stopReason, content, usage } = reply as MessagesReply;
+  if (stopReason === 'max_tokens') {
+    throw new Error(
+      `anthropic stopped at the max_tokens budget (${maxTokens}) before returning a tool use`,
+    );
+  }
+  if (stopReason === 'refusal') {
+    throw new Error('anthropic refused to answer (stop_reason: refusal)');
+  }
+
+  const blocks = Array.isArray(content) ? content : [];
+  const block = blocks.find(isSpecToolUse);
+  if (!block) {
+    throw new Error(`anthropic returned no ${TOOL_NAME} tool use`);
+  }
+
+  const asSent = schema.safeParse(block.input);
+  const result = asSent.success ? asSent : schema.safeParse(unwrapSingleKey(block.input));
+  if (!result.success) {
+    throw new Error(
+      `anthropic returned a ${TOOL_NAME} tool use that does not fit the schema. ` +
+        `It sent ${describeShape(block.input)}.`,
+      { cause: asSent.error },
+    );
+  }
+
+  const tokenUsage = toUsage(usage);
+  return tokenUsage ? { spec: result.data, usage: tokenUsage } : { spec: result.data };
 }
 
 async function send(call: typeof globalThis.fetch, url: string, init: RequestInit) {
@@ -146,17 +156,18 @@ async function send(call: typeof globalThis.fetch, url: string, init: RequestIni
     return await call(url, init);
   } catch (error) {
     if (init.signal?.aborted) throw error;
-
-    const cause = error instanceof Error ? (error.cause ?? error) : error;
-    const detail =
-      typeof cause === 'object' && cause !== null && 'code' in cause
-        ? String(cause.code)
-        : String(cause instanceof Error ? cause.message : cause);
-    throw new Error(`anthropic did not answer: ${detail}`, { cause: error });
+    throw new Error(`anthropic did not answer: ${transportFault(error)}`, { cause: error });
   }
 }
 
-async function errorCategory(response: Response): Promise<string> {
+function transportFault(error: unknown): string {
+  const cause = error instanceof Error ? (error.cause ?? error) : error;
+  if (typeof cause === 'object' && cause !== null && 'code' in cause) return String(cause.code);
+  if (cause instanceof Error) return String(cause.message);
+  return String(cause);
+}
+
+async function errorTypeSuffix(response: Response): Promise<string> {
   try {
     const body: unknown = JSON.parse(await response.text());
     const type = (body as { error?: { type?: unknown } })?.error?.type;

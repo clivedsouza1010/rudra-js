@@ -1,6 +1,6 @@
 import type { RecommendationBasis } from './component-spec.js';
 import type { SignalDigest } from './signal-digest.js';
-import { neverRecommend } from './reconciliation.js';
+import { blockedForPicks } from './reconciliation.js';
 import type { Product, TrackingInput } from './tracking-input.js';
 
 export interface ProductPick {
@@ -19,6 +19,7 @@ export interface SelectOptions {
 const SCORE_WEIGHTS = { category: 3, revisit: 1.5, rating: 1.2, tagOverlap: 0.6 } as const;
 const MAX_TAG_OVERLAP = 3;
 const UNRATED = 3.5;
+const VIEWS_TO_SATURATE = 7;
 
 function engagedTags(input: TrackingInput, digest: SignalDigest): Set<string> {
   const engagedSkus = new Set([
@@ -67,7 +68,7 @@ export function selectProducts(
   );
   const strongestAffinity = Math.max(1, ...affinityByCategory.values());
   const tags = engagedTags(input, digest);
-  const excluded = neverRecommend(input);
+  const excluded = blockedForPicks(input);
   const viewsBySku = new Map(digest.topViewed.map((viewed) => [viewed.sku, viewed.views]));
 
   const picks: ProductPick[] = [];
@@ -77,7 +78,8 @@ export function selectProducts(
     const categoryScore = (affinityByCategory.get(product.category) ?? 0) / strongestAffinity;
     const sharedTags = product.tags.filter((tag) => tags.has(tag)).length;
     const ratingScore = (product.rating ?? UNRATED) / 5;
-    const revisitScore = Math.min(1, Math.log2(1 + (viewsBySku.get(product.sku) ?? 0)) / 3);
+    const views = viewsBySku.get(product.sku) ?? 0;
+    const revisitScore = Math.min(1, Math.log2(1 + views) / Math.log2(1 + VIEWS_TO_SATURATE));
 
     const score =
       categoryScore * SCORE_WEIGHTS.category +

@@ -1,7 +1,14 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createMemorySpecCache, type TokenUsage } from '@rudra-js/core';
-import { createStubProvider, type ArmSpec, type TokenPrices } from './measure-arm.js';
+import { fileURLToPath } from 'node:url';
+import {
+  createMemorySpecCache,
+  type ComponentProvider,
+  type GeneratedSpec,
+  type ProductReference,
+  type TokenUsage,
+} from '@rudra-js/core';
+import type { ArmSpec, TokenPrices } from './measure-arm.js';
 
 export const PRICES: TokenPrices = {
   inputPerMillion: 5,
@@ -11,7 +18,8 @@ export const PRICES: TokenPrices = {
 };
 
 const RECORDINGS_DIRECTORY =
-  process.env['RUDRA_SHOP_RECORDINGS'] ?? join(process.cwd(), 'examples/shop/recordings');
+  process.env['RUDRA_SHOP_RECORDINGS'] ||
+  fileURLToPath(new URL('../examples/shop/recordings', import.meta.url));
 
 export function loadColdUsage(directory: string = RECORDINGS_DIRECTORY): TokenUsage {
   const transcripts: string[] = [];
@@ -43,11 +51,52 @@ export function loadColdUsage(directory: string = RECORDINGS_DIRECTORY): TokenUs
   };
 }
 
-let cachedColdUsage: TokenUsage | null = null;
+const STUB_GRID_ITEMS = 4;
 
-function coldUsage(): TokenUsage {
-  if (cachedColdUsage === null) cachedColdUsage = loadColdUsage();
-  return cachedColdUsage;
+function candidateSkus(userPrompt: string, limit: number): string[] {
+  const start = userPrompt.indexOf('## Candidates');
+  if (start < 0) throw new Error('the stub found no candidates section in the prompt');
+  const candidates = userPrompt.slice(start);
+  const skus: string[] = [];
+  for (const line of candidates.split('\n')) {
+    const match = line.match(/^- "([^"]+)"/);
+    if (match) skus.push(match[1]!);
+    if (skus.length === limit) break;
+  }
+  if (skus.length === 0) throw new Error('the stub found no candidate in the prompt');
+  return skus;
+}
+
+function buildStubSpec(skus: readonly string[]): GeneratedSpec {
+  const items: ProductReference[] = [];
+  for (const sku of skus) {
+    items.push({ sku, basis: 'popular', reason: null, badge: null, emphasis: 'normal' });
+  }
+
+  return {
+    tone: 'neutral',
+    headline: 'More to see',
+    subheadline: null,
+    blocks: [
+      {
+        kind: 'grid',
+        title: 'Picked for you',
+        columns: 3,
+        items,
+      },
+    ],
+    rationale: 'A fixed spec, so the numbers measure the framework and not the model.',
+  };
+}
+
+export function createStubProvider(usage: TokenUsage): ComponentProvider {
+  return {
+    name: 'stub',
+    model: 'stub',
+    async generate(request) {
+      return { spec: buildStubSpec(candidateSkus(request.user, STUB_GRID_ITEMS)), usage };
+    },
+  };
 }
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
@@ -65,16 +114,14 @@ export function buildArm(name: ArmName): ArmSpec {
     case 'b deterministic':
       return {
         name,
-        mode: 'stub',
         options: { provider: null },
         rule: { fallback: 'all', modelCalls: 'none' },
       };
     case 'c cohort':
       return {
         name,
-        mode: 'stub',
         options: {
-          provider: createStubProvider(coldUsage()),
+          provider: createStubProvider(loadColdUsage()),
           generation: 'cohort',
           cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
         },
@@ -83,9 +130,8 @@ export function buildArm(name: ArmName): ArmSpec {
     case 'd per-shopper':
       return {
         name,
-        mode: 'stub',
         options: {
-          provider: createStubProvider(coldUsage()),
+          provider: createStubProvider(loadColdUsage()),
           generation: 'per-shopper',
           cache: createMemorySpecCache({ ttlMs: CACHE_TTL_MS }),
         },

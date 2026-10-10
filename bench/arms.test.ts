@@ -2,7 +2,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generatedSpecSchema, type TokenUsage } from '@rudra-js/core';
 import { buildArm, loadColdUsage, PRICES, type ArmName } from './arms.js';
 
@@ -55,7 +55,6 @@ describe('how each arm is set up', () => {
   it('b deterministic runs without a provider and must not call a model', () => {
     const arm = buildArm('b deterministic');
 
-    expect(arm.mode).toBe('stub');
     expect(arm.options.provider).toBe(null);
     expect(arm.rule).toEqual({ fallback: 'all', modelCalls: 'none' });
   });
@@ -116,5 +115,28 @@ describe('reading the committed transcript', () => {
     writeFileSync(join(directory, 'a.json'), JSON.stringify({ result: { spec: {} } }));
 
     expect(() => loadColdUsage(directory)).toThrow(/reports no usage/);
+  });
+});
+
+describe('the recordings directory', () => {
+  const ambient = process.env['RUDRA_SHOP_RECORDINGS'];
+
+  afterEach(() => {
+    if (ambient === undefined) {
+      delete process.env['RUDRA_SHOP_RECORDINGS'];
+    } else {
+      process.env['RUDRA_SHOP_RECORDINGS'] = ambient;
+    }
+    vi.resetModules();
+  });
+
+  it('falls back to the committed recordings when the variable is set but empty', async () => {
+    process.env['RUDRA_SHOP_RECORDINGS'] = '';
+    vi.resetModules();
+
+    const fresh = await import('./arms.js');
+    const recorded = committedUsage();
+
+    expect(fresh.loadColdUsage().inputTokens).toBe(recorded.inputTokens);
   });
 });

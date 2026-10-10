@@ -1,19 +1,19 @@
-import { verify } from '@rudra-js/attested';
-import { ALLOWED_PHRASES, claimIn, hostFacts, type HostFacts } from './claim-screening.js';
-import type {
-  Block,
-  GeneratedSpec,
-  ProductReference,
-  RecommendationBasis,
+import { hostFacts, NO_FACTS, unbackedClaim, type HostFacts } from './claim-screening.js';
+import {
+  columnsFor,
+  type Block,
+  type GeneratedSpec,
+  type ProductReference,
+  type RecommendationBasis,
 } from './component-spec.js';
-import { engagedCategories, type SignalDigest } from './signal-digest.js';
-import type { Bundle, Product, TrackingInput } from './tracking-input.js';
+import { categoriesTouchedBySignals, type SignalDigest } from './signal-digest.js';
+import { FIELD_LIMITS, type Bundle, type Product, type TrackingInput } from './tracking-input.js';
 
 const CLAMP = {
   headline: 90,
   subheadline: 140,
   blockTitle: 80,
-  reason: 120,
+  reason: FIELD_LIMITS.reason,
   badge: 24,
   ctaLabel: 32,
   bannerText: 160,
@@ -44,40 +44,66 @@ function clamp(value: string, limit: number): string {
   return `${base.replace(/[.,;:!?-]+$/, '')}…`;
 }
 
-interface Allowlist {
-  allowed: Set<string>;
-  blocked: Set<string>;
-  blockedInBundle: Set<string>;
+function blockedForBundles(input: TrackingInput): Set<string> {
+  const blocked = new Set<string>();
+  for (const signal of input.signals.dislikes) blocked.add(signal.sku);
+  if (input.context.currentSku) blocked.add(input.context.currentSku);
+  return blocked;
 }
 
-function refusedEverywhere(input: TrackingInput): Set<string> {
-  const refused = new Set<string>();
-  for (const signal of input.signals.dislikes) refused.add(signal.sku);
-  if (input.context.currentSku) refused.add(input.context.currentSku);
-  return refused;
-}
-
-export function neverRecommend(input: TrackingInput): Set<string> {
-  const blocked = refusedEverywhere(input);
+export function blockedForPicks(input: TrackingInput): Set<string> {
+  const blocked = blockedForBundles(input);
   for (const signal of input.signals.lastPurchased) blocked.add(signal.sku);
   for (const signal of input.signals.cart) blocked.add(signal.sku);
   return blocked;
 }
 
-function buildAllowlist(input: TrackingInput): Allowlist {
-  const allowed = new Set<string>();
+function inStockSkus(input: TrackingInput): Set<string> {
+  const skus = new Set<string>();
   for (const product of input.candidates) {
-    if (product.isInStock) allowed.add(product.sku);
+    if (product.isInStock) skus.add(product.sku);
   }
-  return { allowed, blocked: neverRecommend(input), blockedInBundle: refusedEverywhere(input) };
+  return skus;
 }
 
-function verifyBasis(
-  basis: RecommendationBasis,
-  product: Product,
+interface Run {
+  readonly allowed: ReadonlySet<string>;
+  readonly blockedForPicks: ReadonlySet<string>;
+  readonly blockedForBundles: ReadonlySet<string>;
+  readonly products: ReadonlyMap<string, Product>;
+  readonly digest: SignalDigest;
+  readonly engaged: ReadonlySet<string>;
+  readonly bundles: readonly Bundle[];
+  readonly ourReasons: ReadonlyMap<string, string>;
+  readonly facts: HostFacts;
+  placed: Set<string>;
+  remaining: number;
+  violations: string[];
+}
+
+function startRun(
+  input: TrackingInput,
   digest: SignalDigest,
-  engaged: ReadonlySet<string>,
-): boolean {
+  ourReasons: ReadonlyMap<string, string>,
+): Run {
+  return {
+    allowed: inStockSkus(input),
+    blockedForPicks: blockedForPicks(input),
+    blockedForBundles: blockedForBundles(input),
+    products: new Map(input.candidates.map((product) => [product.sku, product])),
+    digest,
+    engaged: categoriesTouchedBySignals(input),
+    bundles: input.bundles,
+    ourReasons,
+    facts: hostFacts(input),
+    placed: new Set(),
+    remaining: digest.maxItems,
+    violations: [],
+  };
+}
+
+function verifyBasis(basis: RecommendationBasis, product: Product, run: Run): boolean {
+  const { digest } = run;
   switch (basis) {
     case 'most_viewed':
       return digest.topViewed.some((viewed) => viewed.sku === product.sku);
@@ -87,7 +113,7 @@ function verifyBasis(
       return digest.purchasedSkus.length > 0;
     case 'liked_category':
       return (
-        engaged.has(product.category) &&
+        run.engaged.has(product.category) &&
         digest.categoryAffinity.some((affinity) => affinity.category === product.category)
       );
     case 'similar_to_current':
@@ -97,112 +123,82 @@ function verifyBasis(
   }
 }
 
-const NUMERAL = /[\p{Nd}\p{No}\p{Nl}]/u;
-const NO_FACTS: readonly string[] = [];
-
-interface Tracker {
-  placed: Set<string>;
-  remaining: number;
-  violations: string[];
-  facts: HostFacts;
-}
-
-function newTracker(maxItems: number, facts: HostFacts): Tracker {
-  return { placed: new Set(), remaining: maxItems, violations: [], facts };
-}
-
-function place(tracker: Tracker, sku: string): void {
-  tracker.placed.add(sku);
-  tracker.remaining -= 1;
+function place(run: Run, sku: string): void {
+  run.placed.add(sku);
+  run.remaining -= 1;
 }
 
 function screenClaim(
   value: string | null,
   limit: number,
   field: string,
-  tracker: Tracker,
-  facts: readonly string[] = tracker.facts.pooled,
+  run: Run,
+  facts: readonly string[] = run.facts.pooled,
 ): string | null {
   if (value === null) return null;
 
   const clamped = clamp(value, limit);
   if (clamped.length === 0) return null;
 
-  const kind = claimIn(value) ?? claimIn(clamped);
-  if (kind !== null) {
-    tracker.violations.push(`unverifiable-claim:${kind}:${field}`);
-    return null;
-  }
+  const kind = unbackedClaim(value, clamped, facts);
+  if (kind === null) return clamped;
 
-  const values = NUMERAL.test(clamped) ? facts : NO_FACTS;
-  const result = verify(clamped, { values, allowedPhrases: ALLOWED_PHRASES });
-  if (!result.quantity.supported) {
-    tracker.violations.push(`unverifiable-claim:quantity:${field}`);
-    return null;
-  }
-  if (!result.wording.supported) {
-    tracker.violations.push(`unverifiable-claim:wording:${field}`);
-    return null;
-  }
-  return clamped;
-}
-
-function screenRequired(value: string, limit: number, field: string, tracker: Tracker): string {
-  return screenClaim(value, limit, field, tracker) ?? '';
-}
-
-function rejectionFor(sku: string, allowlist: Allowlist, tracker: Tracker): string | null {
-  const named = clamp(sku, CLAMP.violationSku);
-  if (!allowlist.allowed.has(sku)) return `unknown-sku:${named}`;
-  if (allowlist.blocked.has(sku)) return `blocked-sku:${named}`;
-  if (tracker.placed.has(sku)) return `duplicate-sku:${named}`;
-  if (tracker.remaining <= 0) return `budget:dropped:${named}`;
+  run.violations.push(`unverifiable-claim:${kind}:${field}`);
   return null;
 }
 
-function reconcileItems(
-  items: ProductReference[],
-  allowlist: Allowlist,
-  products: Map<string, Product>,
-  digest: SignalDigest,
-  engaged: ReadonlySet<string>,
-  tracker: Tracker,
-  ourReasons: ReadonlyMap<string, string>,
-): ProductReference[] {
+function screenRequired(value: string, limit: number, field: string, run: Run): string {
+  return screenClaim(value, limit, field, run) ?? '';
+}
+
+function rejectionFor(sku: string, run: Run): string | null {
+  const named = clamp(sku, CLAMP.violationSku);
+  if (!run.allowed.has(sku)) return `unknown-sku:${named}`;
+  if (run.blockedForPicks.has(sku)) return `blocked-sku:${named}`;
+  if (run.placed.has(sku)) return `duplicate-sku:${named}`;
+  if (run.remaining <= 0) return `budget:dropped:${named}`;
+  return null;
+}
+
+function takeSlot(sku: string, run: Run): string | null {
+  const rejection = rejectionFor(sku, run);
+  if (rejection !== null) {
+    run.violations.push(rejection);
+    return null;
+  }
+  place(run, sku);
+  return sku;
+}
+
+function reconcileItems(items: ProductReference[], run: Run): ProductReference[] {
   const kept: ProductReference[] = [];
 
   for (const item of items) {
-    const rejection = rejectionFor(item.sku, allowlist, tracker);
-    if (rejection) {
-      tracker.violations.push(rejection);
+    if (takeSlot(item.sku, run) === null) continue;
+
+    const product = run.products.get(item.sku);
+    if (!product) continue;
+
+    if (!verifyBasis(item.basis, product, run)) {
+      run.violations.push(`unsupported-basis:${item.basis}:${item.sku}`);
+      kept.push({
+        sku: item.sku,
+        basis: 'popular',
+        reason: null,
+        badge: null,
+        emphasis: item.emphasis,
+      });
       continue;
     }
 
-    const product = products.get(item.sku);
-    if (!product) continue;
-    place(tracker, item.sku);
+    const own = run.facts.bySku.get(item.sku) ?? NO_FACTS;
+    const reason =
+      item.reason !== null && run.ourReasons.get(item.sku) === item.reason
+        ? clamp(item.reason, CLAMP.reason) || null
+        : screenClaim(item.reason, CLAMP.reason, `reason:${item.sku}`, run, own);
+    const badge = screenClaim(item.badge, CLAMP.badge, `badge:${item.sku}`, run, own);
 
-    const hasSupportedBasis = verifyBasis(item.basis, product, digest, engaged);
-    if (!hasSupportedBasis) tracker.violations.push(`unsupported-basis:${item.basis}:${item.sku}`);
-
-    let reason: string | null = null;
-    let badge: string | null = null;
-    if (hasSupportedBasis) {
-      const own = tracker.facts.bySku.get(item.sku) ?? NO_FACTS;
-      const isOurs = item.reason !== null && ourReasons.get(item.sku) === item.reason;
-      reason = isOurs
-        ? clamp(item.reason ?? '', CLAMP.reason) || null
-        : screenClaim(item.reason, CLAMP.reason, `reason:${item.sku}`, tracker, own);
-      badge = screenClaim(item.badge, CLAMP.badge, `badge:${item.sku}`, tracker, own);
-    }
-
-    kept.push({
-      sku: item.sku,
-      basis: hasSupportedBasis ? item.basis : 'popular',
-      reason,
-      badge,
-      emphasis: item.emphasis,
-    });
+    kept.push({ sku: item.sku, basis: item.basis, reason, badge, emphasis: item.emphasis });
   }
 
   return kept;
@@ -214,7 +210,11 @@ interface BundleFit {
   categoryHits: number;
 }
 
-function fitOf(bundle: Bundle, digest: SignalDigest, products: Map<string, Product>): BundleFit {
+function fitOf(
+  bundle: Bundle,
+  digest: SignalDigest,
+  products: ReadonlyMap<string, Product>,
+): BundleFit {
   const fit: BundleFit = { cartHits: 0, viewedHits: 0, categoryHits: 0 };
   for (const sku of bundle.skus) {
     if (digest.cartSkus.includes(sku)) fit.cartHits += 1;
@@ -231,28 +231,19 @@ function isBetterFit(fit: BundleFit, best: BundleFit | undefined): boolean {
   return fit.categoryHits > best.categoryHits;
 }
 
-function chooseBundle(
-  bundles: readonly Bundle[],
-  allowlist: Allowlist,
-  digest: SignalDigest,
-  products: Map<string, Product>,
-  tracker: Tracker,
-): Bundle | undefined {
+function chooseBundle(run: Run): Bundle | undefined {
   let best: Bundle | undefined;
   let bestFit: BundleFit | undefined;
 
-  for (const bundle of bundles) {
-    if (bundle.skus.length > tracker.remaining) continue;
+  for (const bundle of run.bundles) {
+    if (bundle.skus.length > run.remaining) continue;
 
-    let isPlaceable = true;
-    for (const sku of bundle.skus) {
-      if (!allowlist.allowed.has(sku)) isPlaceable = false;
-      if (allowlist.blockedInBundle.has(sku)) isPlaceable = false;
-      if (tracker.placed.has(sku)) isPlaceable = false;
-    }
+    const isPlaceable = bundle.skus.every(
+      (sku) => run.allowed.has(sku) && !run.blockedForBundles.has(sku) && !run.placed.has(sku),
+    );
     if (!isPlaceable) continue;
 
-    const fit = fitOf(bundle, digest, products);
+    const fit = fitOf(bundle, run.digest, run.products);
     if (isBetterFit(fit, bestFit)) {
       best = bundle;
       bestFit = fit;
@@ -267,145 +258,109 @@ export function bundleForShopper(
   digest: SignalDigest,
   spokenFor: readonly string[],
 ): Bundle | undefined {
-  const allowlist = buildAllowlist(input);
-  const products = new Map(input.candidates.map((product) => [product.sku, product]));
-  const tracker = newTracker(digest.maxItems, hostFacts(input));
-  for (const sku of spokenFor) place(tracker, sku);
+  const run = startRun(input, digest, new Map());
+  for (const sku of spokenFor) place(run, sku);
 
-  return chooseBundle(input.bundles, allowlist, digest, products, tracker);
+  return chooseBundle(run);
 }
 
 export function placeableHeroSkus(blocks: readonly Block[], input: TrackingInput): string[] {
-  const allowlist = buildAllowlist(input);
+  const allowed = inStockSkus(input);
+  const blocked = blockedForPicks(input);
   const skus: string[] = [];
   for (const block of blocks) {
     if (block.kind !== 'hero' || block.sku === null) continue;
-    if (!allowlist.allowed.has(block.sku) || allowlist.blocked.has(block.sku)) continue;
+    if (!allowed.has(block.sku) || blocked.has(block.sku)) continue;
     if (!skus.includes(block.sku)) skus.push(block.sku);
   }
   return skus;
 }
 
-function reconcileBlock(
-  block: Block,
-  allowlist: Allowlist,
-  products: Map<string, Product>,
-  digest: SignalDigest,
-  engaged: ReadonlySet<string>,
-  bundles: readonly Bundle[],
-  tracker: Tracker,
-  ourReasons: ReadonlyMap<string, string>,
-): Block | null {
+function reconcileBlock(block: Block, run: Run): Block | null {
   switch (block.kind) {
     case 'hero': {
-      let sku = block.sku;
-      if (sku !== null) {
-        const rejection = rejectionFor(sku, allowlist, tracker);
-        if (rejection) {
-          tracker.violations.push(rejection);
-          sku = null;
-        } else {
-          place(tracker, sku);
-        }
-      }
-
-      const headline = screenRequired(block.headline, CLAMP.headline, 'hero-headline', tracker);
+      const sku = block.sku === null ? null : takeSlot(block.sku, run);
+      const headline = screenRequired(block.headline, CLAMP.headline, 'hero-headline', run);
       if (headline.length === 0 && sku === null) {
-        tracker.violations.push('empty-block:hero');
+        run.violations.push('empty-block:hero');
         return null;
       }
       return {
         kind: 'hero',
         headline,
-        body: screenClaim(block.body, CLAMP.subheadline, 'hero-body', tracker),
+        body: screenClaim(block.body, CLAMP.subheadline, 'hero-body', run),
         sku,
-        ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'hero-cta', tracker),
+        ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'hero-cta', run),
       };
     }
 
     case 'grid': {
-      const items = reconcileItems(
-        block.items,
-        allowlist,
-        products,
-        digest,
-        engaged,
-        tracker,
-        ourReasons,
-      );
+      const items = reconcileItems(block.items, run);
       if (items.length === 0) {
-        tracker.violations.push('empty-block:grid');
+        run.violations.push('empty-block:grid');
         return null;
       }
       return {
         kind: 'grid',
-        title: screenClaim(block.title, CLAMP.blockTitle, 'grid-title', tracker),
-        columns: Math.min(block.columns, Math.max(2, items.length)) as 2 | 3 | 4,
+        title: screenClaim(block.title, CLAMP.blockTitle, 'grid-title', run),
+        columns: columnsFor(items.length, block.columns),
         items,
       };
     }
 
     case 'carousel': {
-      const items = reconcileItems(
-        block.items,
-        allowlist,
-        products,
-        digest,
-        engaged,
-        tracker,
-        ourReasons,
-      );
+      const items = reconcileItems(block.items, run);
       if (items.length === 0) {
-        tracker.violations.push('empty-block:carousel');
+        run.violations.push('empty-block:carousel');
         return null;
       }
       return {
         kind: 'carousel',
-        title: screenClaim(block.title, CLAMP.blockTitle, 'carousel-title', tracker),
+        title: screenClaim(block.title, CLAMP.blockTitle, 'carousel-title', run),
         items,
       };
     }
 
     case 'banner': {
-      const text = screenRequired(block.text, CLAMP.bannerText, 'banner-text', tracker);
+      const text = screenRequired(block.text, CLAMP.bannerText, 'banner-text', run);
       if (text.length === 0) {
-        tracker.violations.push('empty-block:banner');
+        run.violations.push('empty-block:banner');
         return null;
       }
       return {
         kind: 'banner',
         tone: block.tone,
         text,
-        ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'banner-cta', tracker),
+        ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'banner-cta', run),
       };
     }
 
     case 'copy': {
-      const body = screenRequired(block.body, CLAMP.copyBody, 'copy-body', tracker);
+      const body = screenRequired(block.body, CLAMP.copyBody, 'copy-body', run);
       if (body.length === 0) {
-        tracker.violations.push('empty-block:copy');
+        run.violations.push('empty-block:copy');
         return null;
       }
       return {
         kind: 'copy',
-        title: screenClaim(block.title, CLAMP.blockTitle, 'copy-title', tracker),
+        title: screenClaim(block.title, CLAMP.blockTitle, 'copy-title', run),
         body,
       };
     }
 
     case 'bundle': {
-      const chosen = chooseBundle(bundles, allowlist, digest, products, tracker);
+      const chosen = chooseBundle(run);
       if (!chosen) {
-        tracker.violations.push('no-bundle');
+        run.violations.push('no-bundle');
         return null;
       }
 
-      for (const sku of chosen.skus) place(tracker, sku);
+      for (const sku of chosen.skus) place(run, sku);
       return {
         kind: 'bundle',
-        title: screenClaim(block.title, CLAMP.blockTitle, 'bundle-title', tracker),
-        body: screenClaim(block.body, CLAMP.subheadline, 'bundle-body', tracker),
-        ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'bundle-cta', tracker),
+        title: screenClaim(block.title, CLAMP.blockTitle, 'bundle-title', run),
+        body: screenClaim(block.body, CLAMP.subheadline, 'bundle-body', run),
+        ctaLabel: screenClaim(block.ctaLabel, CLAMP.ctaLabel, 'bundle-cta', run),
         bundleId: chosen.id,
       };
     }
@@ -428,42 +383,30 @@ export function reconcileSpec(
   digest: SignalDigest,
   ourReasons: ReadonlyMap<string, string> = new Map(),
 ): ReconcileResult {
-  const allowlist = buildAllowlist(input);
-  const products = new Map(input.candidates.map((product) => [product.sku, product]));
-  const engaged = engagedCategories(input);
-  const tracker = newTracker(digest.maxItems, hostFacts(input));
+  const run = startRun(input, digest, ourReasons);
 
   if (generated.blocks.length > MAX_BLOCKS) {
-    tracker.violations.push(`too-many-blocks:${generated.blocks.length}`);
+    run.violations.push(`too-many-blocks:${generated.blocks.length}`);
   }
 
   const blocks: Block[] = [];
   for (const block of capBlocks(generated.blocks)) {
-    const reconciled = reconcileBlock(
-      block,
-      allowlist,
-      products,
-      digest,
-      engaged,
-      input.bundles,
-      tracker,
-      ourReasons,
-    );
+    const reconciled = reconcileBlock(block, run);
     if (reconciled !== null) blocks.push(reconciled);
   }
 
   const spec: GeneratedSpec = {
     tone: generated.tone,
-    headline: screenRequired(generated.headline, CLAMP.headline, 'headline', tracker),
-    subheadline: screenClaim(generated.subheadline, CLAMP.subheadline, 'subheadline', tracker),
+    headline: screenRequired(generated.headline, CLAMP.headline, 'headline', run),
+    subheadline: screenClaim(generated.subheadline, CLAMP.subheadline, 'subheadline', run),
     blocks,
-    rationale: screenRequired(generated.rationale, CLAMP.rationale, 'rationale', tracker),
+    rationale: screenRequired(generated.rationale, CLAMP.rationale, 'rationale', run),
   };
 
   const hasProducts = showsAnyProduct(blocks);
-  if (!hasProducts) tracker.violations.push('unusable:no-products');
-  if (spec.headline.length === 0) tracker.violations.push('unusable:no-headline');
+  if (!hasProducts) run.violations.push('unusable:no-products');
+  if (spec.headline.length === 0) run.violations.push('unusable:no-headline');
   const isUsable = hasProducts && spec.headline.length > 0;
 
-  return { spec, isUsable, violations: tracker.violations };
+  return { spec, isUsable, violations: run.violations };
 }

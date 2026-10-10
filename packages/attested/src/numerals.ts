@@ -11,6 +11,7 @@ const OTHER_NUMERAL = '[\\p{No}\\p{Nl}]+';
 
 const SCAN = new RegExp(`${RUN}${MAGNITUDE}|${RUN}|${OTHER_NUMERAL}`, 'gu');
 const GROUPING_MARK = new RegExp(`[${GROUPING_ONLY}]`, 'u');
+const SEPARATOR = new RegExp(`[${SEPARATORS}]`, 'gu');
 
 const IS_DIGIT = /^\p{Nd}$/u;
 const STARTS_DIGIT = /^\p{Nd}/u;
@@ -22,19 +23,20 @@ export interface Numeral {
   kind: 'digits' | 'magnitude' | 'other-numeral';
 }
 
-const zeroOf = new Map<number, number>();
+const runStartOf = new Map<number, number>();
 
 function digitValue(char: string): number {
   const code = char.codePointAt(0) ?? 0;
 
-  let zero = zeroOf.get(code);
-  if (zero === undefined) {
-    zero = code;
-    while (zero > 0 && IS_DIGIT.test(String.fromCodePoint(zero - 1))) zero -= 1;
-    zeroOf.set(code, zero);
+  let runStart = runStartOf.get(code);
+  if (runStart === undefined) {
+    runStart = code;
+    while (runStart > 0 && IS_DIGIT.test(String.fromCodePoint(runStart - 1))) runStart -= 1;
+    runStartOf.set(code, runStart);
   }
 
-  return (code - zero) % 10;
+  const offsetInRun = code - runStart;
+  return offsetInRun % 10;
 }
 
 function toAscii(token: string): string {
@@ -76,21 +78,10 @@ function sameGroupingMark(marks: string[]): boolean {
 }
 
 function formsOf(token: string): string[] {
-  const groups: string[] = [];
-  const marks: string[] = [];
-  let current = '';
-  for (const char of toAscii(token)) {
-    if (SEPARATORS.includes(char)) {
-      groups.push(current);
-      marks.push(char);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  groups.push(current);
-
-  if (marks.length === 0) return [canonical(current, '')];
+  const ascii = toAscii(token);
+  const groups = ascii.split(SEPARATOR);
+  const marks = ascii.match(SEPARATOR) ?? [];
+  if (marks.length === 0) return [canonical(ascii, '')];
 
   const forms: string[] = [];
   const grouped = sameGroupingMark(marks) && isGrouping(groups);
@@ -98,53 +89,36 @@ function formsOf(token: string): string[] {
 
   const whole = groups.slice(0, -1);
   const fraction = groups.at(-1) ?? '';
-  const leading = marks.slice(0, -1);
-  const point = marks.at(-1) ?? '';
+  const groupingMarks = marks.slice(0, -1);
+  const decimalMark = marks.at(-1) ?? '';
 
-  const groupingWins = grouped && leading.length === 0 && fraction.length === 3;
-  if (
-    !groupingWins &&
-    !GROUPING_ONLY.includes(point) &&
-    sameGroupingMark(leading) &&
-    leading[0] !== point &&
-    isGrouping(whole)
-  ) {
-    forms.push(canonical(whole.join(''), fraction));
-  }
+  if (grouped && groupingMarks.length === 0 && fraction.length === 3) return forms;
+  if (GROUPING_ONLY.includes(decimalMark)) return forms;
+  if (!sameGroupingMark(groupingMarks)) return forms;
+  if (groupingMarks[0] === decimalMark) return forms;
+  if (!isGrouping(whole)) return forms;
+
+  forms.push(canonical(whole.join(''), fraction));
   return forms;
 }
 
-function collect(found: Numeral[], token: string): void {
-  if (!STARTS_DIGIT.test(token)) {
-    found.push({ token, forms: [], kind: 'other-numeral' });
-    return;
-  }
-  if (!ENDS_DIGIT.test(token)) {
-    found.push({ token, forms: [], kind: 'magnitude' });
-    return;
-  }
+function numeralsOf(token: string): Numeral[] {
+  if (!STARTS_DIGIT.test(token)) return [{ token, forms: [], kind: 'other-numeral' }];
+  if (!ENDS_DIGIT.test(token)) return [{ token, forms: [], kind: 'magnitude' }];
 
   const forms = formsOf(token);
-  if (forms.length > 0) {
-    found.push({ token, forms, kind: 'digits' });
-    return;
-  }
+  if (forms.length > 0) return [{ token, forms, kind: 'digits' }];
+  if (!GROUPING_MARK.test(token)) return [{ token, forms: [toAscii(token)], kind: 'digits' }];
 
-  if (GROUPING_MARK.test(token)) {
-    for (const part of token.split(GROUPING_MARK)) {
-      if (part.length > 0) collect(found, part);
-    }
-    return;
-  }
-
-  found.push({ token, forms: [toAscii(token)], kind: 'digits' });
+  return token
+    .split(GROUPING_MARK)
+    .filter((part) => part.length > 0)
+    .flatMap((part) => numeralsOf(part));
 }
 
 export function numeralsIn(text: string): Numeral[] {
-  const found: Numeral[] = [];
   const visible = stripMarks(stripInvisible(text));
-  for (const match of visible.matchAll(SCAN)) collect(found, match[0]);
-  return found;
+  return [...visible.matchAll(SCAN)].flatMap((match) => numeralsOf(match[0]));
 }
 
 const BARE_EXPONENT = /^[+-]?\d+(?:\.\d+)?[eE][+-]?\d+$/;

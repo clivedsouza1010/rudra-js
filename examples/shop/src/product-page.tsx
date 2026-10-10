@@ -1,4 +1,4 @@
-import { RudraComponent } from '@rudra-js/react';
+import { RudraComponent, defaultFormatPrice } from '@rudra-js/react';
 import { bundles, catalog, findShopper, generator } from './shop-context';
 import { buildTrackingInput } from './fixtures/tracking-input';
 
@@ -20,11 +20,7 @@ export async function ProductPageContent({
       <article>
         <h1>{product.title}</h1>
         <p>{product.category}</p>
-        <p>
-          {new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency }).format(
-            product.price,
-          )}
-        </p>
+        <p>{defaultFormatPrice(product, 'en-US')}</p>
       </article>
 
       <RudraComponent spec={spec} products={catalog} bundles={bundles} locale="en-US" />

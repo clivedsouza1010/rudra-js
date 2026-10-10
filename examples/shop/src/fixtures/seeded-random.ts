@@ -1,4 +1,4 @@
-export function createSeededRandom(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
 
   return () => {
@@ -7,4 +7,8 @@ export function createSeededRandom(seed: number): () => number {
     drawn = (drawn + Math.imul(drawn ^ (drawn >>> 7), 61 | drawn)) ^ drawn;
     return ((drawn ^ (drawn >>> 14)) >>> 0) / 4_294_967_296;
   };
+}
+
+export function pick<Item>(random: () => number, items: readonly Item[]): Item {
+  return items[Math.floor(random() * items.length)]!;
 }

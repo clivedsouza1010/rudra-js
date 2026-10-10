@@ -10,6 +10,20 @@ break them.
 
 ## [Unreleased]
 
+### Added
+
+- `@rudra-js/attested` exports `foldLookalikes(text, byLook?)`, the part of its
+  phrase normalising that strips hidden characters and folds lookalike letters.
+  `@rudra-js/core` now uses it instead of keeping its own copy, so its peer range
+  on attested is `^0.7.5`.
+
+### Changed
+
+- Cohort cache keys are built from the same digest the model is prompted with,
+  instead of a hand-picked list of its fields. The same shoppers share a key as
+  before, but the key strings are new, so existing cohort cache entries miss
+  once after upgrading.
+
 ## [0.7.4] - 2026-10-08
 
 ### Changed

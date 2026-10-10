@@ -1,12 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { GeneratedSpec } from './component-spec.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
-import {
-  cohortCacheKey,
-  createMemorySpecCache,
-  createNullSpecCache,
-  specCacheKey,
-} from './spec-cache.js';
+import { createMemorySpecCache, createNullSpecCache, specCacheKey } from './spec-cache.js';
 import { buildPrompt } from './model-prompt.js';
 import { parseTrackingInput, type TrackingInput } from './tracking-input.js';
 
@@ -380,8 +375,11 @@ function deeperInput(shopper: { id: string; second: string; views: number }): Tr
   });
 }
 
+const cohortKey = (digest: SignalDigest, skus: readonly string[], provider = A_PROVIDER) =>
+  specCacheKey(toCohortDigest(digest), skus, provider);
+
 const cohortKeyFor = (digest: SignalDigest, provider = A_PROVIDER) =>
-  cohortCacheKey(digest, ['TR-101', 'TR-999'], provider);
+  cohortKey(digest, ['TR-101', 'TR-999'], provider);
 
 describe('a cohort key', () => {
   it('is the same for two shoppers who differ only as individuals', () => {
@@ -421,8 +419,8 @@ describe('a cohort key', () => {
     const first = cohortInput({ id: 'S-0001', search: 'maternity leggings', sku: 'TR-101' });
     const second = cohortInput({ id: 'S-0002', search: 'hiking poles', sku: 'TR-102' });
 
-    expect(cohortCacheKey(buildDigest(first), CANDIDATES, A_PROVIDER)).toBe(
-      cohortCacheKey(buildDigest(second), CANDIDATES, A_PROVIDER),
+    expect(cohortKey(buildDigest(first), CANDIDATES, A_PROVIDER)).toBe(
+      cohortKey(buildDigest(second), CANDIDATES, A_PROVIDER),
     );
     expect(buildPrompt(first, toCohortDigest(buildDigest(first))).user).toBe(
       buildPrompt(second, toCohortDigest(buildDigest(second))).user,
@@ -472,8 +470,8 @@ describe('a cohort key', () => {
     const second = deeperInput({ id: 'S-0002', second: 'BP-300', views: 2 });
     const candidates = ['TR-101', 'TN-200', 'BP-300'];
 
-    expect(cohortCacheKey(buildDigest(first), candidates, A_PROVIDER)).toBe(
-      cohortCacheKey(buildDigest(second), candidates, A_PROVIDER),
+    expect(cohortKey(buildDigest(first), candidates, A_PROVIDER)).toBe(
+      cohortKey(buildDigest(second), candidates, A_PROVIDER),
     );
     expect(buildPrompt(first, toCohortDigest(buildDigest(first))).user).toBe(
       buildPrompt(second, toCohortDigest(buildDigest(second))).user,
@@ -490,20 +488,20 @@ describe('a cohort key', () => {
   });
 
   it('changes when the model is shown different products', () => {
-    expect(cohortCacheKey(cohortDigest(), ['TR-101'], A_PROVIDER)).not.toBe(
-      cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER),
+    expect(cohortKey(cohortDigest(), ['TR-101'], A_PROVIDER)).not.toBe(
+      cohortKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER),
     );
   });
 
   it('changes when the model is shown as many products but different ones', () => {
-    expect(cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER)).not.toBe(
-      cohortCacheKey(cohortDigest(), ['TN-200', 'TN-201'], A_PROVIDER),
+    expect(cohortKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER)).not.toBe(
+      cohortKey(cohortDigest(), ['TN-200', 'TN-201'], A_PROVIDER),
     );
   });
 
   it('does not care what order the products arrive in', () => {
-    expect(cohortCacheKey(cohortDigest(), ['TR-999', 'TR-101'], A_PROVIDER)).toBe(
-      cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER),
+    expect(cohortKey(cohortDigest(), ['TR-999', 'TR-101'], A_PROVIDER)).toBe(
+      cohortKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER),
     );
   });
 
@@ -550,9 +548,9 @@ describe('the prompt is in both keys', () => {
   it('changes the cohort key when the system prompt changes', async () => {
     const changed = await keysUnderChangedPrompt();
 
-    expect(changed.cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER)).not.toBe(
-      cohortKeyFor(cohortDigest(), A_PROVIDER),
-    );
+    expect(
+      changed.specCacheKey(toCohortDigest(cohortDigest()), ['TR-101', 'TR-999'], A_PROVIDER),
+    ).not.toBe(cohortKeyFor(cohortDigest(), A_PROVIDER));
   });
 });
 
@@ -582,8 +580,8 @@ describe('the spec version is in both keys', () => {
   it('changes the cohort key when the spec shape changes', async () => {
     const changed = await keysUnderChangedSpecVersion();
 
-    expect(changed.cohortCacheKey(cohortDigest(), ['TR-101', 'TR-999'], A_PROVIDER)).not.toBe(
-      cohortKeyFor(cohortDigest(), A_PROVIDER),
-    );
+    expect(
+      changed.specCacheKey(toCohortDigest(cohortDigest()), ['TR-101', 'TR-999'], A_PROVIDER),
+    ).not.toBe(cohortKeyFor(cohortDigest(), A_PROVIDER));
   });
 });
