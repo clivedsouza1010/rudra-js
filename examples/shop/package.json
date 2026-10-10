@@ -1,6 +1,6 @@
 {
   "name": "@rudra-js/example-shop",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,9 +10,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@rudra-js/anthropic": "0.7.4",
-    "@rudra-js/core": "0.7.4",
-    "@rudra-js/react": "0.7.4",
+    "@rudra-js/anthropic": "0.7.5",
+    "@rudra-js/core": "0.7.5",
+    "@rudra-js/react": "0.7.5",
     "next": "^16.3.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
