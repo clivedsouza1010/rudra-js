@@ -12,8 +12,8 @@ break them.
 
 ### Changed
 
-- The READMEs and the npm descriptions now say plainly what rudra-js is, an
-  open-source TypeScript library, and what it is not.
+- The READMEs now say plainly what rudra-js is, an open-source TypeScript
+  library, and what it is not. The npm descriptions and keywords name rudra-js.
 
 ## [0.7.5] - 2026-10-10
 

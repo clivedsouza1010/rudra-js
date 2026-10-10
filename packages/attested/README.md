@@ -1,6 +1,10 @@
 # @rudra-js/attested
 
-Part of [rudra-js](https://rudrajs.com), an open-source TypeScript library: a language model designs one product-recommendation block for a page in your shop, rudra-js checks it against your catalog, and React renders it.
+This package is part of [rudra-js](https://rudrajs.com).
+
+rudra-js is an open-source TypeScript library (MIT) you install from npm. A language model designs one product-recommendation block for a page in your shop, rudra-js checks it against your catalog, and React renders it.
+
+It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
 
 Checks model-written product copy against the facts a shop stands behind.
 

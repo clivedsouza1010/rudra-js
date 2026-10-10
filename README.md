@@ -4,7 +4,7 @@ rudra-js is an open-source TypeScript library (MIT) you install from npm. A lang
 
 It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
 
-[Docs](https://rudrajs.com) · [npm](https://www.npmjs.com/package/@rudra-js/core) · [Demo shop](https://demo.rudrajs.com)
+[Docs](https://rudrajs.com/docs) · [npm](https://www.npmjs.com/package/@rudra-js/core) · [Demo shop](https://demo.rudrajs.com/product/RJ-00001?shopper=S-0001)
 
 Every export is documented at **[rudrajs.com](https://rudrajs.com)**, with signatures and field
 tables generated from the published packages.
