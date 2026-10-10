@@ -1,7 +1,10 @@
 # rudra-js
 
-rudra-js gives you recommendation blocks designed by a language model and rendered on the server by
-React, while every product fact comes from your own trusted catalog.
+rudra-js is an open-source TypeScript library (MIT) you install from npm. A language model designs one product-recommendation block for a page in your shop, rudra-js checks it against your catalog, and React renders it.
+
+It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
+
+[Docs](https://rudrajs.com) · [npm](https://www.npmjs.com/package/@rudra-js/core) · [Demo shop](https://demo.rudrajs.com)
 
 Every export is documented at **[rudrajs.com](https://rudrajs.com)**, with signatures and field
 tables generated from the published packages.

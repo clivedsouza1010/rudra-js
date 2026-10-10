@@ -1,13 +1,16 @@
 {
   "name": "@rudra-js/anthropic",
   "version": "0.7.5",
-  "description": "An Anthropic adapter for @rudra-js/core, with no vendor SDK",
+  "description": "Anthropic adapter for rudra-js (@rudra-js/core), with no vendor SDK",
   "keywords": [
+    "rudra-js",
+    "product-recommendations",
     "anthropic",
     "claude",
     "llm",
     "rudra",
-    "server-components"
+    "ecommerce",
+    "typescript"
   ],
   "license": "MIT",
   "author": "Clive Dsouza",

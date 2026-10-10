@@ -1,15 +1,17 @@
 {
   "name": "@rudra-js/core",
   "version": "0.7.5",
-  "description": "The contracts and logic that turn one tracking payload into one renderable component specification",
+  "description": "Core of rudra-js, a TypeScript library for LLM-designed product recommendations: turns one page view into a recommendation spec checked against your catalog",
   "keywords": [
+    "rudra-js",
+    "product-recommendations",
     "llm",
-    "server-components",
     "recommendations",
     "ecommerce",
     "personalization",
     "ssr",
-    "zod"
+    "zod",
+    "typescript"
   ],
   "license": "MIT",
   "author": "Clive Dsouza",
