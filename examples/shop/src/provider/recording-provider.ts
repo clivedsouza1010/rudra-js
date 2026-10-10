@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ComponentProvider, PromptPair, ProviderResult } from '@rudra-js/core';
+import type {
+  ComponentProvider,
+  PromptPair,
+  ProviderRequest,
+  ProviderResult,
+} from '@rudra-js/core';
 
 interface Transcript {
   model: string;
@@ -23,17 +28,14 @@ export function createRecordingProvider(
   inner: ComponentProvider,
   directory: string,
 ): ComponentProvider {
-  const replay = createReplayProvider({ directory, name: inner.name, model: inner.model });
-
   return {
     name: inner.name,
     model: inner.model,
 
     async generate(request) {
       const path = transcriptPath(directory, inner.model, request);
-      if (existsSync(path)) {
-        return replay.generate(request);
-      }
+      const recorded = readRecording(path, request);
+      if (recorded) return recorded;
 
       const result = await inner.generate(request);
 
@@ -63,26 +65,30 @@ export function createReplayProvider(options: {
 
     async generate(request) {
       const path = transcriptPath(options.directory, options.model, request);
+      const recorded = readRecording(path, request);
+      if (recorded) return recorded;
 
-      if (!existsSync(path)) {
-        const message = `no recording for this request at ${path}`;
-        console.warn(message);
-        throw new Error(message);
-      }
-
-      let transcript: Partial<Transcript> | null;
-      try {
-        transcript = JSON.parse(readFileSync(path, 'utf8')) as Partial<Transcript> | null;
-      } catch (cause) {
-        throw new Error(`recording is not valid JSON: ${path}`, { cause });
-      }
-
-      const result = transcript?.result;
-      if (typeof result !== 'object' || result === null) {
-        throw new Error(`the recording at ${path} has no result to replay`);
-      }
-
-      return { ...result, spec: request.schema.parse(result.spec) };
+      const message = `no recording for this request at ${path}`;
+      console.warn(message);
+      throw new Error(message);
     },
   };
+}
+
+function readRecording(path: string, request: ProviderRequest): ProviderResult | null {
+  let transcript: Partial<Transcript> | null;
+  try {
+    transcript = JSON.parse(readFileSync(path, 'utf8')) as Partial<Transcript> | null;
+  } catch (cause) {
+    const code = (cause as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return null;
+    throw new Error(`recording is not valid JSON: ${path}`, { cause });
+  }
+
+  const result = transcript?.result;
+  if (typeof result !== 'object' || result === null) {
+    throw new Error(`the recording at ${path} has no result to replay`);
+  }
+
+  return { ...result, spec: request.schema.parse(result.spec) };
 }

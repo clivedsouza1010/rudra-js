@@ -14,8 +14,8 @@ break them.
 
 - `@rudra-js/attested` exports `foldLookalikes(text, byLook?)`, the part of its
   phrase normalising that strips hidden characters and folds lookalike letters.
-  `@rudra-js/core` now uses it instead of keeping its own copy, so core needs an
-  attested release that has it.
+  `@rudra-js/core` now uses it instead of keeping its own copy, so its peer range
+  on attested is `^0.7.5`.
 
 ### Changed
 
