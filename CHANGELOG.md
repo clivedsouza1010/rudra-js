@@ -15,6 +15,13 @@ break them.
 - The READMEs now say plainly what rudra-js is, an open-source TypeScript
   library, and what it is not. The npm descriptions and keywords name rudra-js.
 
+### Fixed
+
+- The core README said our tests use `createFixedSpecProvider` to exercise the
+  blocks the deterministic component never emits. They don't. It now says what
+  happens instead: a fixed spec still goes through reconciliation, so it needs a
+  headline that survives screening and at least one product on show.
+
 ## [0.7.5] - 2026-10-10
 
 ### Added

@@ -64,8 +64,9 @@ appear, that's why. It isn't your catalog.
 
 Want to render a spec you wrote yourself, still without a model? Pass
 `createFixedSpecProvider(spec)` as the provider and it answers every request with
-that spec. That's how our tests exercise the blocks the deterministic component
-never emits.
+that spec. It still goes through reconciliation, so it needs a headline that
+survives screening and at least one product on show, or you get the
+deterministic component.
 
 ## Options
 
