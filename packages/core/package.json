@@ -1,6 +1,6 @@
 {
   "name": "@rudra-js/core",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "Core of rudra-js, a TypeScript library for LLM-designed product recommendations: turns one page view into a recommendation spec checked against your catalog",
   "keywords": [
     "rudra-js",
@@ -56,10 +56,10 @@
     "zod": "^4.0.0"
   },
   "peerDependencies": {
-    "@rudra-js/attested": "^0.7.5"
+    "@rudra-js/attested": "^0.7.6"
   },
   "devDependencies": {
-    "@rudra-js/attested": "0.7.5",
+    "@rudra-js/attested": "0.7.6",
     "@types/node": "^26.4.1"
   }
 }
