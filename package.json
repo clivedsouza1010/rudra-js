@@ -1,6 +1,6 @@
 {
   "name": "rudra-js",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "private": true,
   "description": "Monorepo for rudra-js, an open-source TypeScript library for LLM-designed product recommendations",
   "license": "MIT",
