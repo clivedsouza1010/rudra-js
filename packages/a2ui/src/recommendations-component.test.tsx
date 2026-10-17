@@ -287,6 +287,20 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
     expect(loadRecommendations).toHaveBeenCalledTimes(1);
   });
 
+  it('does not cancel a load when the agent sends the same hints again', async () => {
+    const { loadRecommendations, finish } = heldLoader();
+
+    const { container, send } = await renderSurface(agentMessages({ currentSku: 'A-1' }), {
+      loadRecommendations,
+    });
+    await settle();
+    await send(componentUpdate({ currentSku: 'A-1' }));
+    await finish('A-1');
+
+    expect(loadRecommendations.mock.calls[0]?.[1].aborted).toBe(false);
+    expect(blockIn(container)).not.toBeNull();
+  });
+
   it('leaves out a bound hint while the data model has no value for it', async () => {
     const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
 
