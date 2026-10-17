@@ -98,8 +98,8 @@ export async function POST(request: Request): Promise<Response> {
   `maxItems`. Anything else is a 400.
 - `fitRecommendationRequest` drops a SKU or category none of your candidates has.
 - Pick candidates on your side, not from the hints. Each new category, `maxItems` or candidate set
-  is a new cohort and a new model call, so rate-limit the endpoint (see
-  [SECURITY.md](https://github.com/clivedsouza1010/rudra-js/blob/main/SECURITY.md)).
+  is a new model call, and with `per-shopper` so is each shopper and each new search, so rate-limit
+  the endpoint (see [SECURITY.md](https://github.com/clivedsouza1010/rudra-js/blob/main/SECURITY.md)).
 - Send back `input.candidates` and `input.bundles`, not your raw catalog.
 
 ### The browser
