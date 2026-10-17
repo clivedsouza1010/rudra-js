@@ -11,12 +11,15 @@ is an open protocol for agents that describe a UI as JSON, and a renderer in you
 from a catalog of components you trust. This package adds one component to that catalog,
 `RudraRecommendations`.
 
-An agent can place the component and say what the shopper is looking at. It can't choose the
-products, write the heading or name a price. Your server picks and words the recommendations with
+An agent can place the component and hint at what the shopper is looking at. It can't choose the
+products, write the block or name a price. Your server picks and words the recommendations with
 `@rudra-js/core`, exactly as it would for a product page, and the browser checks what comes back
 and renders it with `@rudra-js/react`.
 
 It works with version 0.9 of the A2UI protocol, through `@a2ui/react` and `@a2ui/web_core` 0.14.
+
+> **Not on npm yet.** The package is in the repository but hasn't been published, so the install
+> below fails until the first release that includes it.
 
 ## Install
 
@@ -25,7 +28,7 @@ npm install @rudra-js/a2ui @rudra-js/core @rudra-js/react @rudra-js/attested @a2
 ```
 
 Everything but zod is a peer dependency. A2UI keeps one set of surfaces and catalogs per page, and
-React renders one tree, so there can only be one copy of each.
+React renders one tree, so there can only be one copy of each. With pnpm, read [zod](#zod) first.
 
 ## Three pieces
 
@@ -46,19 +49,26 @@ export const agentCatalog = new Catalog(
 );
 ```
 
-Put `agentCatalog.toJson()`, the catalog document, in your agent's prompt, and have it create surfaces with
-`catalogId: agentCatalog.id`. `RUDRA_RECOMMENDATIONS_INSTRUCTIONS` tells the agent what the
-component is for and not to write product facts around it. A2UI leaves a component's own
+Put `agentCatalog.toJson()`, the catalog document, in your agent's prompt, and have it create
+surfaces with `catalogId: agentCatalog.id`. `RUDRA_RECOMMENDATIONS_INSTRUCTIONS` tells the agent
+what the component is for and not to write product facts around it. A2UI leaves a component's own
 description out of the catalog JSON, so the catalog's instructions are where that goes. If your
 catalog has instructions of its own, join the two.
+
+The first `toJson()` logs a few "Recursive reference detected ... Defaulting to any" warnings from
+the JSON Schema generator A2UI uses, one per hint. They come from the function-call form a hint can
+take, and they're harmless: the document still says what each hint accepts.
 
 ### Your endpoint
 
 `shopperFor` and `candidatesFor` stand for the session and catalog code you already have.
+`candidatesFor` has to return at least one product, and the product being looked at belongs among
+them, as in core's quickstart.
 
 ```ts
 import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
 import {
+  fitRecommendationRequest,
   parseRecommendationRequest,
   type RecommendationRequest,
   type RecommendationResult,
@@ -78,10 +88,12 @@ export async function POST(request: Request): Promise<Response> {
   // The agent only hints at what the shopper is looking at. Who the shopper is,
   // what they've done and what you sell all come from your side.
   const shopper = await shopperFor(request);
+  const candidates = await candidatesFor(asked);
+  const hints = fitRecommendationRequest(asked, candidates);
   const input = parseTrackingInput({
     user: { id: shopper.id },
-    context: { surface: 'assistant', locale: shopper.locale, ...asked },
-    candidates: await candidatesFor(asked),
+    context: { surface: 'assistant', locale: shopper.locale, ...hints },
+    candidates,
     signals: shopper.signals,
   });
   const spec = await generator.generate(input);
@@ -94,8 +106,15 @@ export async function POST(request: Request): Promise<Response> {
 A request carries at most four hints: `currentSku`, `currentCategory`, `searchQuery` and
 `maxItems`, each with the bounds it has in core's `renderContextSchema`. `parseRecommendationRequest`
 is strict, so a body that tries to set the shopper, the candidates, the surface or the locale gets
-a 400 instead of quietly reaching your generator. The request comes from a browser, so treat every
-hint as something the shopper could have typed, and a `currentSku` as a SKU that may not be yours.
+a 400 instead of quietly reaching your generator.
+
+The hints come from the agent, and anyone can call your endpoint with any hints at all, so treat
+each one as something a shopper could have typed. `fitRecommendationRequest` keeps a `currentSku`
+or a `currentCategory` only when one of your candidates carries it. That matters for cost as well
+as sense: in core's default cohort mode the category is part of the cache key, so an open-ended set
+of categories would be an open-ended number of model calls. Put a rate limit in front of the
+endpoint too, as the cohort cost note in [SECURITY.md](../../SECURITY.md) asks of any page that can
+cost a model call.
 
 Send back `input.candidates` and `input.bundles`, the parsed rows, not your raw catalog. The
 `provider` is up to you. With `@rudra-js/anthropic` the model writes the wording, and the same
@@ -142,14 +161,19 @@ Feed the processor your agent's messages and render its surfaces with `A2uiSurfa
 
 ## What comes from where
 
-| Set by the agent                    | Set by your server                        | Set by your catalog  |
-| ----------------------------------- | ----------------------------------------- | -------------------- |
-| Where the block goes on the surface | The shopper, their signals, the locale    | Every product title  |
-| `currentSku`, `currentCategory`     | Which products are candidates             | Every price          |
-| `searchQuery`, `maxItems`           | The provider, and so who writes the words | Every image and link |
+| Set by the agent                          | Set by your server                        | Set by your catalog  |
+| ----------------------------------------- | ----------------------------------------- | -------------------- |
+| Where the block goes on the surface       | The shopper, their signals, the locale    | Every product title  |
+| `currentSku`, `currentCategory`, if yours | Which products are candidates             | Every price          |
+| `searchQuery`, `maxItems`                 | The provider, and so who writes the words | Every image and link |
 
-A hint can be a literal or bound to the agent's data model (`{ "path": "/viewing/sku" }`). When a
-bound value changes, the component cancels the load in flight and asks again.
+Each hint can be a literal or bound to the agent's data model (`{ "path": "/viewing/sku" }`).
+
+The hints aren't instructions, but they are words a model reads. A category or a search reaches
+the prompt quoted as data, the way a shopper's own search does, so a hostile or prompt-injected
+agent can try to sway the wording of the block through them, within the limits
+[SECURITY.md](../../SECURITY.md) describes for shopper text. It can't change the products, the
+prices, the images or the links.
 
 The agent can still write anything it likes into its own `Text` components beside the block.
 `RUDRA_RECOMMENDATIONS_INSTRUCTIONS` asks it not to put prices or product facts there, but that's a
@@ -160,25 +184,34 @@ request to a model, not a boundary. The boundary is the block itself.
 - It reads only the four hints. A2UI hands a component every property the agent wrote, so an
   invented `headline` or `price` is there to read; the component never reads it, and it never
   leaves the browser.
-- It leaves out a hint that wouldn't pass `parseRecommendationRequest`, such as an over-long
-  search, and asks with the rest. One bad hint doesn't cost the shopper the whole block.
-- It shows `placeholder` while loading, and nothing by default.
+- It leaves out a hint that wouldn't pass `parseRecommendationRequest`, such as a `maxItems` of 40
+  or an over-long search, and asks with the rest. A2UI checks each hint's type before that, though:
+  a hint that is neither a binding nor the right type, such as a SKU written as a number, gets the
+  agent's whole message refused, the agent's own components included.
+- It waits while a bound hint has no value yet, rather than asking without it and again with it.
+- When a hint changes, it waits 300 ms for it to settle before asking again, so a search bound to a
+  text field asks once the shopper pauses, not once per keystroke. The last block stays up until
+  the new one arrives, and a result for hints that have since changed is dropped.
+- It shows `placeholder` until the first recommendations arrive, and nothing by default.
 - It checks what `loadRecommendations` returns before rendering any of it: the spec against core's
   spec schema, and the products and bundles against `productSchema` and `bundleSchema`. That is
   what keeps a protocol-relative `//elsewhere.example` image off the page.
-- When a load fails, or returns something that fails those checks, it shows nothing and calls
-  `onError` with the reason. It doesn't call it for a load it cancelled itself.
+- When a load fails, a result fails those checks, or the block throws while rendering (from a
+  custom `hrefForSku`, say), it shows nothing in its place and calls `onError` with the reason. The
+  rest of the surface stays. It doesn't call `onError` for a load it cancelled itself.
 - It passes an `AbortSignal` that aborts when the hints change or the component leaves the page.
+- Each `RudraRecommendations` on a surface loads on its own, so an agent that places a dozen asks a
+  dozen times. Your endpoint's rate limit is what bounds that.
 
 ## Where it runs
 
 The component renders in the browser only. A2UI draws its surfaces on the client, and
 `@a2ui/react` can't even be imported where there is no DOM. That's why there are two entry points:
 
-| Import from             | Holds                                                                     | Runs     |
-| ----------------------- | ------------------------------------------------------------------------- | -------- |
-| `@rudra-js/a2ui`        | `createRudraRecommendationsComponent`, the component's name and schema    | Browser  |
-| `@rudra-js/a2ui/server` | `rudraRecommendationsApi`, its instructions, `parseRecommendationRequest` | Anywhere |
+| Import from             | Holds                                                                  | Runs     |
+| ----------------------- | ---------------------------------------------------------------------- | -------- |
+| `@rudra-js/a2ui`        | `createRudraRecommendationsComponent`, the component's name and schema | Browser  |
+| `@rudra-js/a2ui/server` | `rudraRecommendationsApi`, its instructions, and the request functions | Anywhere |
 
 It also means a block placed by an agent isn't in your initial HTML, and a crawler won't see it.
 For a product page, render `RudraComponent` on the server as the
@@ -188,12 +221,38 @@ describes. This package is for the surfaces an agent builds.
 ## zod
 
 A2UI's schemas are zod 3, and a component's schema has to be one too, so this package depends on
-`zod` 3 while the rest of rudra-js uses zod 4. Both can be installed at once, and npm and pnpm put
-each where the package that asked for it finds it. You don't need either one yourself.
+`zod` 3 while the rest of rudra-js uses zod 4. With npm that's all there is to it: npm installs
+both and puts each where the package that asked for it finds it, and you don't need either one
+yourself.
+
+pnpm needs one more step. `@a2ui/react` asks for zod 3 as a peer, and pnpm hands it the zod 4 that
+core brings, so the browser example above stops typechecking (TS2344: `ReactCatalogComponent` does
+not satisfy `ComponentApi`). If your app has no zod of its own, add zod 3 to it:
+
+```sh
+pnpm add zod@^3.25.76
+```
+
+If your app uses zod 4 itself, take the peer away from `@a2ui/react` in a `.pnpmfile.cjs`, and pnpm
+gives it the zod 3 it depends on:
+
+```js
+module.exports = {
+  hooks: {
+    readPackage(manifest) {
+      if (manifest.name === '@a2ui/react') delete manifest.peerDependencies?.zod;
+      return manifest;
+    },
+  },
+};
+```
 
 ## A2UI's declaration files
 
-With `skipLibCheck: false` and `moduleResolution: "nodenext"`, TypeScript reports two errors in
-`@a2ui/web_core` 0.14's own declarations: two relative imports in `src/v0_8/types/types.d.ts` that
-leave off the file extension. They come from A2UI, not from this package, and any project that
-imports `@a2ui/react` sees them. With `skipLibCheck: true` you won't.
+With `skipLibCheck: false`, TypeScript checks A2UI's own declarations as well, and two things in
+them may trip it. They use DOM types, so a server project without `"dom"` in `lib` gets dozens of
+errors from importing `@rudra-js/a2ui/server` alone: the server entry names A2UI's types, and
+those name lit's. And with `"dom"` in `lib` and `moduleResolution: "nodenext"`, two errors remain in
+`@a2ui/web_core` 0.14: two relative imports in `src/v0_8/types/types.d.ts` that leave off the file
+extension. Both come from A2UI, not from this package, and any project that imports
+`@a2ui/web_core` sees them. With `skipLibCheck: true` you won't.

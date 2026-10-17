@@ -6,6 +6,7 @@ export {
 } from './recommendations-api.js';
 
 export {
+  fitRecommendationRequest,
   parseRecommendationRequest,
   type RecommendationRequest,
 } from './recommendation-request.js';

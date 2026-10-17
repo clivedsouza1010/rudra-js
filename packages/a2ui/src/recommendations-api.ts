@@ -26,19 +26,18 @@ const recommendationsPropertiesSchema = z.object({
   searchQuery: CommonSchemas.DynamicString.optional().describe(
     "What the shopper searched for or asked for, in the shopper's own words.",
   ),
-  maxItems: z
-    .number()
-    .int()
-    .min(1)
-    .max(FIELD_LIMITS.maxItems)
-    .optional()
-    .describe('Most products to show. The shop decides when this is left out.'),
+  // A number outside the range is dropped by the component rather than refused here, since A2UI
+  // refuses the agent's whole message, the rest of its interface included, for one bad property.
+  maxItems: CommonSchemas.DynamicNumber.optional().describe(
+    `Most products to show, a whole number from 1 to ${FIELD_LIMITS.maxItems}. The shop decides ` +
+      'when this is left out or out of range.',
+  ),
 });
 
 /**
  * The A2UI definition of the recommendation component: its name and the only properties an
- * agent can set. It holds no rendering code, so it is safe to import on a server, for example to
- * put the component into the catalog JSON an agent is prompted with.
+ * agent can set. It holds no rendering code, so `@rudra-js/a2ui/server` exports it for a server to
+ * put into the catalog an agent is prompted with. The package root needs a DOM.
  */
 export const rudraRecommendationsApi = {
   name: RUDRA_RECOMMENDATIONS_COMPONENT,

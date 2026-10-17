@@ -79,6 +79,14 @@ describe('parseRecommendationResult', () => {
     ['comes from another spec version', (spec: Json) => ({ ...spec, specVersion: '2' })],
     ['has no slot', (spec: Json) => ({ ...spec, slot: undefined })],
     ['names a source core never sets', (spec: Json) => ({ ...spec, source: 'agent' })],
+    ['names an inherited key as its source', (spec: Json) => ({ ...spec, source: 'constructor' })],
+    [
+      'names an inherited key as its degraded reason',
+      (spec: Json) => ({
+        ...spec,
+        degradedReason: 'toString',
+      }),
+    ],
     [
       'gives a degraded reason core never gives',
       (spec: Json) => ({
