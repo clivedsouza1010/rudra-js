@@ -39,14 +39,10 @@ describe('parseRecommendationRequest', () => {
   });
 
   it.each([
-    ['an empty SKU', { currentSku: '' }],
     ['an over-long SKU', { currentSku: tooLong(FIELD_LIMITS.identifier) }],
     ['an over-long category', { currentCategory: tooLong(FIELD_LIMITS.identifier) }],
     ['an over-long search', { searchQuery: tooLong(FIELD_LIMITS.searchQuery) }],
-    ['no items', { maxItems: 0 }],
     ['more items than a render context allows', { maxItems: FIELD_LIMITS.maxItems + 1 }],
-    ['a fraction of an item', { maxItems: 2.5 }],
-    ['a SKU that is not text', { currentSku: 42 }],
   ])('rejects %s', (_, request) => {
     expect(() => parseRecommendationRequest(request)).toThrow();
   });

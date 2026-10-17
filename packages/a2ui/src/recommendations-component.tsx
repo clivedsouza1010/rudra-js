@@ -86,12 +86,10 @@ function useRecommendationResult(
   return state;
 }
 
-interface RenderFailureBoundaryProps {
-  onError: RudraRecommendationsOptions['onError'];
-  children: ReactNode;
-}
-
-class RenderFailureBoundary extends Component<RenderFailureBoundaryProps, { hasFailed: boolean }> {
+class RenderFailureBoundary extends Component<
+  { onError: RudraRecommendationsOptions['onError']; children: ReactNode },
+  { hasFailed: boolean }
+> {
   override state = { hasFailed: false };
 
   static getDerivedStateFromError() {

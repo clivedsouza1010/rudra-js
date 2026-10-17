@@ -130,10 +130,7 @@ async function renderSurface(messages: A2uiMessage[], options: RudraRecommendati
 
 const wait = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 const flush = () => wait(0);
-const settle = async () => {
-  await wait(300);
-  await flush();
-};
+const settle = () => wait(300);
 
 function heldLoader() {
   const resolvers = new Map<string, (result: RecommendationResult) => void>();
@@ -257,7 +254,6 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
 
     await send(dataModelUpdate('/viewing/sku', 'A-2'));
     await send(dataModelUpdate('/viewing/sku', 'A-3'));
-    await flush();
 
     expect(container.querySelector('.loading')).toBeNull();
     expect(blockIn(container)?.textContent).toContain('Chef knife');

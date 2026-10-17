@@ -150,7 +150,7 @@ Give the browser catalog the same id as the agent catalog, because A2UI looks it
 - It checks the result against core's schemas before rendering any of it.
 - It shows `placeholder` until the first load. On a failed load, a bad result or a render error it
   shows nothing and calls `onError`.
-- Each component on a surface loads on its own.
+- Each component on a surface sends its own request.
 
 ## Where it runs
 
