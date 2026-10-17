@@ -46,16 +46,14 @@ afterEach(() => {
 });
 
 describe('the examples in the @rudra-js/a2ui README', () => {
-  const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
+  it('are the code this test runs', () => {
+    const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
+    const run = ['agent-catalog.ts', 'endpoint.ts', 'browser.tsx'].map((file) =>
+      readFileSync(join(import.meta.dirname, file), 'utf8').trim(),
+    );
 
-  it.each(['agent-catalog.ts', 'endpoint.ts', 'browser.tsx'])(
-    'shows %s exactly as it runs',
-    (file) => {
-      const source = readFileSync(join(import.meta.dirname, file), 'utf8').trim();
-
-      expect(codeBlocksIn(readme), 'the README shows code the test does not run').toContain(source);
-    },
-  );
+    expect(codeBlocksIn(readme), 'the README shows code the test does not run').toStrictEqual(run);
+  });
 });
 
 describe('the README endpoint', () => {

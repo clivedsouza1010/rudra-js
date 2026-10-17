@@ -437,14 +437,21 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
   it('renders a bundle from the bundles the result carries', async () => {
     const loadRecommendations: RecommendationLoader = async (request) => {
       const result = await shopResultFor(request);
-      const bundleBlock = {
-        kind: 'bundle' as const,
-        title: 'Cook for friends',
-        body: null,
-        ctaLabel: null,
-        bundleId: 'B-1',
+      return {
+        ...result,
+        spec: {
+          ...result.spec,
+          blocks: [
+            {
+              kind: 'bundle',
+              title: 'Cook for friends',
+              body: null,
+              ctaLabel: null,
+              bundleId: 'B-1',
+            },
+          ],
+        },
       };
-      return { ...result, spec: { ...result.spec, blocks: [bundleBlock] } };
     };
 
     const { container } = await renderSurface(agentMessages({ currentSku: 'A-1' }), {
