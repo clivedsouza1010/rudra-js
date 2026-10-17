@@ -4,7 +4,6 @@ import {
   fitRecommendationRequest,
   parseRecommendationRequest,
   pickRecommendationRequest,
-  type RecommendationRequest,
 } from './recommendation-request.js';
 
 const tooLong = (limit: number) => 'x'.repeat(limit + 1);
@@ -57,14 +56,13 @@ describe('parseRecommendationRequest', () => {
   });
 });
 
-// For a literal hint, what the agent wrote is also what A2UI resolves.
-const pickWritten = (properties: Record<string, unknown>) =>
+const pickLiteral = (properties: Record<string, unknown>) =>
   pickRecommendationRequest(properties, properties);
 
 describe('pickRecommendationRequest', () => {
   it('keeps the hints the agent set', () => {
     expect(
-      pickWritten({ currentSku: 'A-1', currentCategory: 'Cookware', maxItems: 2 }),
+      pickLiteral({ currentSku: 'A-1', currentCategory: 'Cookware', maxItems: 2 }),
     ).toStrictEqual({ currentSku: 'A-1', currentCategory: 'Cookware', maxItems: 2 });
   });
 
@@ -77,11 +75,11 @@ describe('pickRecommendationRequest', () => {
       surface: 'pdp',
     };
 
-    expect(pickWritten(fromAgent)).toStrictEqual({ currentSku: 'A-1' });
+    expect(pickLiteral(fromAgent)).toStrictEqual({ currentSku: 'A-1' });
   });
 
   it('leaves out a hint that would fail on the server, and keeps the rest', () => {
-    const request = pickWritten({
+    const request = pickLiteral({
       currentSku: 'A-1',
       currentCategory: '',
       searchQuery: tooLong(FIELD_LIMITS.searchQuery),
@@ -97,7 +95,7 @@ describe('pickRecommendationRequest', () => {
     ['a fraction of an item', { maxItems: 2.5 }],
     ['a SKU written as a number', { currentSku: 12345 }],
   ])('leaves out %s', (_, properties) => {
-    expect(pickWritten(properties)).toStrictEqual({});
+    expect(pickLiteral(properties)).toStrictEqual({});
   });
 
   it('takes the value A2UI resolved for a bound hint', () => {
@@ -176,11 +174,9 @@ describe('fitRecommendationRequest', () => {
   });
 
   it('returns the four hints and nothing else, whatever else it was handed', () => {
-    const body: unknown = JSON.parse('{"currentSku":"A-1","locale":"xx","surface":"checkout"}');
+    const body = { currentSku: 'A-1', locale: 'xx', surface: 'checkout' };
 
-    expect(fitRecommendationRequest(body as RecommendationRequest, CANDIDATES)).toStrictEqual({
-      currentSku: 'A-1',
-    });
+    expect(fitRecommendationRequest(body, CANDIDATES)).toStrictEqual({ currentSku: 'A-1' });
   });
 
   it('leaves an empty request empty', () => {

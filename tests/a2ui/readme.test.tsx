@@ -1,21 +1,18 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { A2uiSurface } from '@a2ui/react/v0_9';
 import type { A2uiMessage } from '@a2ui/web_core/v0_9';
-import { RUDRA_RECOMMENDATIONS_COMPONENT } from '@rudra-js/a2ui';
 import { agentCatalog } from './agent-catalog.js';
 import { processor } from './browser.js';
 import { POST } from './endpoint.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// Every tracking input the README endpoint builds, to see what reached core.
 const trackingInputs = vi.hoisted((): unknown[] => []);
 vi.mock('@rudra-js/core', async (importOriginal) => {
   const core = await importOriginal<typeof import('@rudra-js/core')>();
@@ -28,8 +25,7 @@ vi.mock('@rudra-js/core', async (importOriginal) => {
   };
 });
 
-// jsdom replaces URL with its own, which fileURLToPath refuses, so this passes it a string.
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const REPO_ROOT = join(import.meta.dirname, '../..');
 const SHOP_ORIGIN = 'https://shop.example';
 
 const between = (text: string, start: string, end: string): string => {
@@ -52,21 +48,9 @@ const post = (body: string) =>
     }),
   );
 
-/** Lets the surface render and the component's load resolve, over a few turns. */
-async function flush(turns = 10): Promise<void> {
-  if (turns === 0) return;
-  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
-  return flush(turns - 1);
-}
-
-/** The component asks once its hints have held still for 300 ms. */
-async function settle() {
-  await act(() => new Promise((resolve) => setTimeout(resolve, 350)));
-  await flush();
-}
-
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('the examples in the @rudra-js/a2ui README', () => {
@@ -124,13 +108,14 @@ describe('the README agent catalog', () => {
       components: Record<string, unknown>;
     };
 
-    expect(schema.components[RUDRA_RECOMMENDATIONS_COMPONENT]).toBeDefined();
-    expect(schema.instructions).toContain(RUDRA_RECOMMENDATIONS_COMPONENT);
+    expect(schema.components['RudraRecommendations']).toBeDefined();
+    expect(schema.instructions).toContain('RudraRecommendations');
   });
 });
 
 describe('the README, end to end', () => {
   it('renders what the agent placed, with the products and prices the endpoint chose', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     vi.stubGlobal('fetch', (url: string, init: RequestInit) =>
       POST(new Request(new URL(url, SHOP_ORIGIN), init)),
     );
@@ -143,7 +128,7 @@ describe('the README, end to end', () => {
           surfaceId: 'chat',
           components: [
             { id: 'root', component: 'Column', children: ['picks'] },
-            { id: 'picks', component: RUDRA_RECOMMENDATIONS_COMPONENT, currentSku: 'A-1' },
+            { id: 'picks', component: 'RudraRecommendations', currentSku: 'A-1' },
           ],
         },
       },
@@ -156,7 +141,7 @@ describe('the README, end to end', () => {
     document.body.append(container);
     const root = createRoot(container);
     await act(async () => root.render(<A2uiSurface surface={surface} />));
-    await settle();
+    await act(() => vi.runAllTimersAsync());
 
     const block = container.querySelector('section.rudra');
     expect(block?.textContent).toContain('Goes with your cart');

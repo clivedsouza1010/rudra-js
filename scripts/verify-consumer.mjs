@@ -145,9 +145,6 @@ function packAndInstall() {
   return { tarballs, shipped };
 }
 
-// npm nests a dependency under the package that asked for it when the root already holds another
-// version, as it does for the zod 3 @rudra-js/a2ui shares with A2UI while core uses zod 4. The
-// consumer gets the same layout, so each package resolves the version it was built against.
 const nestedDependency = (packageName, name) => {
   const path = join(REPO_ROOT, 'packages', packageName, 'node_modules', name);
   return existsSync(path) ? path : null;
@@ -289,28 +286,15 @@ function checkPlantedDefectIsReported(programs) {
   }
 }
 
-// Errors in A2UI's own declarations that any project importing @a2ui/web_core sees under these
-// options. They are named by file and code, so any other error, in A2UI or anywhere, still fails.
-const UPSTREAM_DECLARATION_ERRORS = [
-  // Two relative imports without a file extension, which nodenext refuses.
-  { file: 'node_modules/@a2ui/web_core/src/v0_8/types/types.d.ts', code: 'TS2835' },
-];
-
-const ERROR_LINE = /^(.+)\(\d+,\d+\): error (TS\d+):/;
-
-const isUpstreamError = (line) => {
-  const [, file, code] = ERROR_LINE.exec(line) ?? [];
-  return UPSTREAM_DECLARATION_ERRORS.some(
-    (known) => file?.endsWith(known.file) && code === known.code,
-  );
-};
+const A2UI_MISSING_EXTENSION_ERROR =
+  /node_modules\/@a2ui\/web_core\/src\/v0_8\/types\/types\.d\.ts\(\d+,\d+\): error TS2835:/;
 
 function typecheckOrThrow({ label, config, failure }) {
   const result = typecheck(config);
   if (result.status === 0) return;
 
-  const errors = (result.stdout ?? '').split('\n').filter((line) => ERROR_LINE.test(line));
-  if (errors.length > 0 && errors.every(isUpstreamError)) {
+  const errors = (result.stdout ?? '').split('\n').filter((line) => /error TS\d+:/.test(line));
+  if (errors.length > 0 && errors.every((line) => A2UI_MISSING_EXTENSION_ERROR.test(line))) {
     console.log(`  ${label}: allowed ${errors.length} known errors in A2UI's own declarations`);
     return;
   }

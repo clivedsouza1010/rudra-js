@@ -42,6 +42,7 @@ export {
   TONES,
   blockSchema,
   generatedSpecSchema,
+  parseComponentSpec,
   parseGeneratedSpec,
   productReferenceSchema,
   safeParseGeneratedSpec,

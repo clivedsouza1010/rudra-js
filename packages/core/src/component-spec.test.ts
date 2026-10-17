@@ -7,6 +7,7 @@ import {
   TONES,
   blockSchema,
   generatedSpecSchema,
+  parseComponentSpec,
   productReferenceSchema,
   safeParseGeneratedSpec,
   type Block,
@@ -252,5 +253,42 @@ describe('recommendation basis', () => {
 
     expect(parsed.basis).toBe('most_viewed');
     expect(parsed.reason).toBe('You keep coming back to this');
+  });
+});
+
+describe('parseComponentSpec', () => {
+  const componentSpec = {
+    ...(spec([]) as object),
+    specVersion: '1',
+    slot: 'pdp',
+    source: 'fallback',
+    generatedAt: 0,
+    latencyMs: 0,
+    provider: null,
+    model: null,
+  };
+
+  it('accepts a whole spec, metadata included', () => {
+    expect(parseComponentSpec(componentSpec)).toStrictEqual(componentSpec);
+  });
+
+  it('keeps the reason a degraded spec gives', () => {
+    expect(parseComponentSpec({ ...componentSpec, degradedReason: 'timeout' })).toMatchObject({
+      degradedReason: 'timeout',
+    });
+  });
+
+  it.each([
+    ['comes from another spec version', { specVersion: '2' }],
+    ['has no slot', { slot: undefined }],
+    ['names a source core never sets', { source: 'agent' }],
+    ['names an inherited key as its source', { source: 'constructor' }],
+    ['names an inherited key as its degraded reason', { degradedReason: 'toString' }],
+    ['gives a degraded reason core never gives', { degradedReason: 'because' }],
+    ['has a latency that JSON turned from NaN into null', { latencyMs: null }],
+    ['has a timestamp that is not a number', { generatedAt: 'now' }],
+    ['names its model with a number', { model: 5 }],
+  ])('rejects a spec that %s', (_, change) => {
+    expect(() => parseComponentSpec({ ...componentSpec, ...change })).toThrow();
   });
 });

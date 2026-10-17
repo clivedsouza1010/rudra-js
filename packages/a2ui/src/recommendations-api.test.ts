@@ -2,38 +2,35 @@ import { describe, expect, it } from 'vitest';
 import { Catalog, MessageProcessor, type A2uiMessage } from '@a2ui/web_core/v0_9';
 import { FIELD_LIMITS } from '@rudra-js/core';
 import {
-  RUDRA_RECOMMENDATIONS_COMPONENT,
   RUDRA_RECOMMENDATIONS_INSTRUCTIONS,
   rudraRecommendationsApi,
 } from './recommendations-api.js';
 
 const CATALOG_ID = 'https://shop.example/a2ui/catalog.json';
 
-function agentCatalog() {
-  return new Catalog(CATALOG_ID, 'v0.9', [rudraRecommendationsApi], [], {
-    instructions: RUDRA_RECOMMENDATIONS_INSTRUCTIONS,
-  }).toJson() as {
-    instructions?: string;
-    components: Record<
-      string,
-      { properties: Record<string, Record<string, unknown>>; required?: string[] }
-    >;
-  };
-}
+type CatalogJson = {
+  instructions?: string;
+  components: Record<
+    string,
+    { properties: Record<string, Record<string, unknown>>; required?: string[] }
+  >;
+};
+
+const catalogJson = new Catalog(CATALOG_ID, 'v0.9', [rudraRecommendationsApi], [], {
+  instructions: RUDRA_RECOMMENDATIONS_INSTRUCTIONS,
+}).toJson() as CatalogJson;
+
+const component = catalogJson.components[rudraRecommendationsApi.name];
 
 describe('the component name', () => {
   it('is the one agents and catalogs already use', () => {
-    expect(RUDRA_RECOMMENDATIONS_COMPONENT).toBe('RudraRecommendations');
-    expect(rudraRecommendationsApi.name).toBe(RUDRA_RECOMMENDATIONS_COMPONENT);
+    expect(rudraRecommendationsApi.name).toBe('RudraRecommendations');
   });
 });
 
 describe('the catalog JSON an agent is prompted with', () => {
   it('offers the agent only the hints, with nowhere to put a title, a price or copy', () => {
-    const component = agentCatalog().components[RUDRA_RECOMMENDATIONS_COMPONENT];
-
     expect(component).toMatchObject({ unevaluatedProperties: false });
-    // The document leaves `id` to the common component envelope, so only `component` joins them.
     expect(Object.keys(component?.properties ?? {}).toSorted()).toStrictEqual([
       'component',
       'currentCategory',
@@ -44,41 +41,33 @@ describe('the catalog JSON an agent is prompted with', () => {
   });
 
   it('tells the agent what each hint is for', () => {
-    const { properties } = agentCatalog().components[RUDRA_RECOMMENDATIONS_COMPONENT] ?? {};
-
     for (const hint of ['currentSku', 'currentCategory', 'searchQuery', 'maxItems']) {
-      expect(properties?.[hint]?.description, hint).toEqual(expect.any(String));
+      expect(component?.properties[hint]?.description, hint).toEqual(expect.any(String));
     }
   });
 
   it('lets every hint be bound to the data model', () => {
-    const { properties } = agentCatalog().components[RUDRA_RECOMMENDATIONS_COMPONENT] ?? {};
-
     for (const hint of ['currentSku', 'currentCategory', 'searchQuery', 'maxItems']) {
-      expect(properties?.[hint]?.oneOf, hint).toContainEqual({
+      expect(component?.properties[hint]?.oneOf, hint).toContainEqual({
         $ref: expect.stringMatching(/#\/\$defs\/DataBinding$/),
       });
     }
   });
 
   it('requires no hint, so the agent can place the block with any of them', () => {
-    const component = agentCatalog().components[RUDRA_RECOMMENDATIONS_COMPONENT];
-
     expect(component).toMatchObject({ required: ['component'] });
   });
 
   it('tells the agent the range maxItems takes', () => {
-    const { properties } = agentCatalog().components[RUDRA_RECOMMENDATIONS_COMPONENT] ?? {};
-
-    expect(properties?.maxItems?.description).toContain(`from 1 to ${FIELD_LIMITS.maxItems}`);
+    expect(component?.properties.maxItems?.description).toContain(
+      `from 1 to ${FIELD_LIMITS.maxItems}`,
+    );
   });
 
   it('carries the instructions that tell the agent not to write facts around it', () => {
-    const { instructions } = agentCatalog();
-
-    expect(instructions).toBe(RUDRA_RECOMMENDATIONS_INSTRUCTIONS);
-    expect(instructions).toContain(RUDRA_RECOMMENDATIONS_COMPONENT);
-    expect(instructions).toMatch(/do not write product names, prices/i);
+    expect(catalogJson.instructions).toBe(RUDRA_RECOMMENDATIONS_INSTRUCTIONS);
+    expect(catalogJson.instructions).toContain('RudraRecommendations');
+    expect(catalogJson.instructions).toMatch(/do not write product names, prices/i);
   });
 });
 
@@ -89,7 +78,6 @@ describe('the server entry', () => {
     const server = await import('./server.js');
 
     expect(Object.keys(server).toSorted()).toStrictEqual([
-      'RUDRA_RECOMMENDATIONS_COMPONENT',
       'RUDRA_RECOMMENDATIONS_INSTRUCTIONS',
       'fitRecommendationRequest',
       'parseRecommendationRequest',
@@ -105,7 +93,7 @@ describe('what A2UI does with a hint before the component sees it', () => {
       version: 'v0.9',
       updateComponents: {
         surfaceId: 'chat',
-        components: [{ id: 'root', component: RUDRA_RECOMMENDATIONS_COMPONENT, ...properties }],
+        components: [{ id: 'root', component: 'RudraRecommendations', ...properties }],
       },
     },
   ];

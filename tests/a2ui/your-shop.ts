@@ -1,6 +1,3 @@
-// Stands in for the session and catalog code a shop already has. The README example imports it
-// as `./your-shop.js`.
-
 const CATALOG = [
   { sku: 'A-1', title: 'Cast iron skillet', category: 'Cookware', price: 39, currency: 'USD' },
   { sku: 'A-2', title: 'Enamel dutch oven', category: 'Cookware', price: 89, currency: 'USD' },

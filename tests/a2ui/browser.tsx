@@ -18,7 +18,6 @@ const recommendations = createRudraRecommendationsComponent({
   locale: 'en-US',
 });
 
-// The agent's catalog id, with the component's React implementation in it.
 const shopCatalog = new Catalog<ReactCatalogComponent>(
   'https://shop.example/a2ui/catalog.json',
   'v0.9',

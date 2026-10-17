@@ -193,11 +193,9 @@ same six checks a pull request runs, build included, and then publishes `@rudra-
 `@rudra-js/core`, `@rudra-js/react` and `@rudra-js/anthropic` in that order with
 `npm publish --provenance`.
 
-`@rudra-js/a2ui` isn't in that list yet. Its trusted publisher can't be configured until the name
-exists on npm, so it needs the steps in [What publishing is bound to](#what-publishing-is-bound-to)
-first: a placeholder published by hand, the publisher on npmjs.com, then a step in `release.yml`
-after react, since it declares react and core as peers. Until then a tag leaves it out, and its
-version still moves with the others.
+`@rudra-js/a2ui` isn't in that list yet. It needs a trusted publisher first (see
+[What publishing is bound to](#what-publishing-is-bound-to)), then a step after react. Until then a
+tag skips it, but bump its version with the others.
 
 The order is what an install can satisfy. `@rudra-js/attested` depends on nothing and core declares
 it as a peer, so attested goes first; react and anthropic both declare core as a peer, so core

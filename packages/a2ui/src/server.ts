@@ -1,8 +1,6 @@
 export {
-  RUDRA_RECOMMENDATIONS_COMPONENT,
   RUDRA_RECOMMENDATIONS_INSTRUCTIONS,
   rudraRecommendationsApi,
-  type RudraRecommendationsApi,
 } from './recommendations-api.js';
 
 export {
