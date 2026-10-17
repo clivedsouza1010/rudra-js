@@ -47,7 +47,7 @@ describe('parseRecommendationRequest', () => {
     expect(() => parseRecommendationRequest(request)).toThrow();
   });
 
-  it.each([null, 'A-1', ['A-1']])('rejects a body that is %j', (body) => {
+  it.each([[null], ['A-1'], [['A-1']]])('rejects a body that is %j', (body) => {
     expect(() => parseRecommendationRequest(body)).toThrow();
   });
 });

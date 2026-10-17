@@ -37,8 +37,8 @@ pins its own copy gets two — we checked, and npm 10.9.4 installs the app's
 version at the top and quietly nests ours under `@rudra-js/core` — and the two
 would then disagree about what counts as a claim. As a peer that same pin is an
 `ERESOLVE` you can see and fix. Pin nothing and the tree is identical either
-way: one copy, at the top. One tag publishes every `@rudra-js` package at one
-version, so the ranges here always move together.
+way: one copy, at the top. One tag publishes every `@rudra-js` package on npm
+at one version, so the ranges here always move together.
 
 ## Running without a model
 
