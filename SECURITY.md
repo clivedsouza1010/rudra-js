@@ -19,8 +19,8 @@ long-term support branches, and we don't backport security fixes to earlier `0.x
 ## What this project defends against
 
 rudra-js sits between a host application and a language model, and turns model output into
-server-rendered HTML. Two of its inputs are untrusted in different ways, so the guarantees for each
-differ too.
+server-rendered HTML. Its inputs are untrusted in different ways, so the guarantees for each differ
+too.
 
 **Model output is untrusted, and what constrains it is structural.** We don't ask the model nicely.
 If you can show any of the following, that's a vulnerability:
@@ -61,6 +61,20 @@ a vulnerability:
 - Text from a host payload reaching a prompt in a way that changes the model's instructions instead
   of being read as data.
 - Prototype pollution, or any parsed field silently disappearing instead of being rejected.
+
+**An A2UI agent is untrusted too, and with `@rudra-js/a2ui` all it can do is hint.** The agent
+places `RudraRecommendations` and your server builds the block. A hint that reaches the model is
+quoted as data, like a shopper's search, so an agent can sway the wording no more than a shopper
+can. Any of these is a vulnerability:
+
+- A property the agent sets on the component, other than the four hints, reaching the request the
+  browser sends or the rendered block.
+- A request body that sets the shopper, the signals, the candidates, the surface, the slot or the
+  locale and still gets through `parseRecommendationRequest`.
+- Anything `loadRecommendations` returns reaching the page without passing core's spec, product and
+  bundle schemas first.
+- A `currentSku` or a `currentCategory` that `fitRecommendationRequest` keeps although none of the
+  candidates it was given carries it.
 
 ## How prompt injection is handled
 
@@ -177,14 +191,17 @@ primary model can act. Ours can't.
   model's words. Neither is enforcement.
 
 - **Cohort cost, if a visitor can choose a cohort.** The cohort key is built from `segment`,
-  `surface`, `slot`, `locale`, `maxItems`, whether the shopper is new, the category being browsed
-  and the top category their signals favour. Draw any of those from something a visitor controls —
-  a `locale` copied out of `Accept-Language`, a category read off a URL slug — and one visitor can
-  mint as many cohorts as they have patience for. Each new value is a fresh model call, and the
-  shipped in-memory cache holds 10,000 entries and evicts the oldest, so enough of them also push
-  out the cohorts real shoppers were being served from. Nothing leaks: a cohort prompt carries no
-  shopper text at all. The bill and the latency are the damage. Take those fields from sets you
-  control, and put a rate limit in front of the page.
+  `surface`, `slot`, `locale`, `maxItems`, whether the shopper is new, the category being browsed,
+  the top category their signals favour and the SKUs of the candidates. Draw any of those from
+  something a visitor controls — a `locale` copied out of `Accept-Language`, a category read off a
+  URL slug — and one visitor can mint as many cohorts as they have patience for. Each new value is a
+  fresh model call, and the shipped in-memory cache holds 10,000 entries and evicts the oldest, so
+  enough of them also push out the cohorts real shoppers were being served from. Nothing leaks: a
+  cohort prompt carries no shopper text at all. The bill and the latency are the damage. Take those
+  fields from sets you control, and put a rate limit in front of the page. With `@rudra-js/a2ui`,
+  the agent, or anyone who calls your endpoint, picks the category and `maxItems`, and the agent can
+  place as many components as it likes. `fitRecommendationRequest` drops a category your candidates
+  don't have. Pick candidates on your side, not from a hint, and rate-limit the endpoint too.
 
 - **Instruction disclosure.** A determined injection could get fragments of the instruction half
   echoed back inside a text field. Those instructions are open source and sitting in this repository,
@@ -223,6 +240,10 @@ top of this file.
   the framework makes.
 - **Denial of service through a host's own configuration**, say a generation budget set so high that
   the page blocks. The framework bounds what it can, and a host can always misconfigure it.
+- **What an A2UI agent writes outside the block.** The agent's own components, a `Text` beside the
+  block for instance, are drawn by A2UI from the agent's words. `RUDRA_RECOMMENDATIONS_INSTRUCTIONS`
+  asks the agent not to state prices or product facts there, but that is a request to a model, not
+  a boundary. A2UI's renderers and catalog validation belong to A2UI.
 - Findings from automated scanners with no demonstrated impact on this codebase.
 
 ## Supply chain

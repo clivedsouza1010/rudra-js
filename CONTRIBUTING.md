@@ -143,7 +143,7 @@ npm run typecheck        # includes test files, which the build does not
 npm run lint
 npm run format:check
 npm test
-npm run verify:consumer  # packs all four packages and uses them from outside the repo
+npm run verify:consumer  # packs every package and uses them from outside the repo
 ```
 
 All six run in CI as separate steps, so a failed run names the check that failed.
@@ -154,13 +154,14 @@ Bump the version on a pull request of its own, and merge it. A bump is more than
 fields. One version has to reach every place that names it, or `npm ci` inside the release job
 stops the release on a tag you can't take back:
 
-- `version` in the root manifest, in all four `packages/*/package.json`, and in
+- `version` in the root manifest, in every `packages/*/package.json`, and in
   `examples/shop/package.json`.
-- The peer range each package declares on a sibling — `^0.5.0` becomes `^0.6.0` in
-  `packages/core`, `packages/react` and `packages/anthropic`. Caret on a `0.x` version is
-  patch-only, so leaving one behind publishes four packages that can't be installed together.
-- The exact sibling pin those three carry in `devDependencies`, and the three in
-  `examples/shop`.
+- The peer ranges each package declares on its siblings — `^0.5.0` becomes `^0.6.0` in
+  `packages/core`, `packages/react`, `packages/anthropic` and `packages/a2ui` (two there, core and
+  react). Caret on a `0.x` version is patch-only, so leaving one behind publishes packages that
+  can't be installed together.
+- The exact sibling pins those four carry in `devDependencies` (two in `packages/a2ui`), and the
+  three in `examples/shop`.
 - `package-lock.json`, regenerated with the npm the release installs:
 
   ```sh
@@ -193,6 +194,12 @@ same six checks a pull request runs, build included, and then publishes `@rudra-
 `@rudra-js/core`, `@rudra-js/react` and `@rudra-js/anthropic` in that order with
 `npm publish --provenance`.
 
+`@rudra-js/a2ui` isn't in that list yet. It needs a trusted publisher first (see
+[What publishing is bound to](#what-publishing-is-bound-to)), then a step after react. Until then a
+tag skips it, but bump its version with the others. In the pull request that adds the step, drop the
+"Not on npm yet" notes from the root README's package table and the top of
+`packages/a2ui/README.md`.
+
 The order is what an install can satisfy. `@rudra-js/attested` depends on nothing and core declares
 it as a peer, so attested goes first; react and anthropic both declare core as a peer, so core
 leads them. npm can't publish over a half-finished release, so anything that goes out before a
@@ -200,8 +207,7 @@ failure is public and stuck at a version the next tag can't reuse.
 
 Three steps run before anything is installed, and any one of them stops the release: the tagged
 commit has to be on `main`, it has to be the tip of `main`, and the tag has to equal the `version`
-in `packages/core/package.json`. All four manifests carry the same version and a test enforces
-that, because one tag publishes all four.
+in `packages/core/package.json`. Every package manifest carries that same version.
 
 The tip check is the strict one, and it's strict on purpose. Being on `main` isn't enough: every
 commit after the bump reads the bumped version too, so a tag a few commits back clears the other
@@ -236,14 +242,14 @@ holds the two equal, so you can't move one and leave the other. Bumping it usual
 along: npm 12 declares `^22.22.2 || ^24.15.0 || >=26.0.0`, `.nvmrc` is 22.21.1, and `.npmrc` sets
 `engine-strict=true`, so installing npm 12 on today's Node is a hard refusal.
 
-Run `rehearsal.yml` once you have. It installs the same npm and does a `--dry-run` publish of all
-four packages, so a broken npm shows up there instead of halfway through a release. It doesn't go
+Run `rehearsal.yml` once you have. It installs the same npm and does a `--dry-run` publish of every
+package, so a broken npm shows up there instead of halfway through a release. It doesn't go
 near OIDC, though — no `npm` environment, no `id-token: write`, no `--provenance` — so a green
 rehearsal says packing and the checks are fine, not that the publish will authenticate.
 
 ### What publishing is bound to
 
-There's no npm token anywhere in this repository. Each of the four packages has a trusted
+There's no npm token anywhere in this repository. Each published package has a trusted
 publisher configured on npmjs.com, and each one names three things: this repository, the workflow
 file `release.yml`, and the GitHub environment `npm`. The workflow's `id-token: write` mints an
 OIDC token that npm checks against those three.
@@ -260,7 +266,7 @@ nothing it declares as a peer has to land before it — so an auth failure costs
 possible.
 
 If a publish does half-finish — attested published, core failed — there's nothing to publish by hand
-with. Bump the patch version on all four, merge, and tag again. Don't go hunting for a token to
+with. Bump the patch version on all of them, merge, and tag again. Don't go hunting for a token to
 finish the run: a package whose npmjs.com settings don't require trusted publishing will accept a
 granular one, and you'd end up with a version where some tarballs are attested and some aren't.
 

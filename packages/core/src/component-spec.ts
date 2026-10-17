@@ -99,15 +99,18 @@ export const generatedSpecSchema = z.object({
 export type GeneratedSpec = z.infer<typeof generatedSpecSchema>;
 export type GeneratedSpecResult = z.ZodSafeParseResult<GeneratedSpec>;
 
-export type SpecSource = 'llm' | 'cache' | 'fallback';
+const SPEC_SOURCES = ['llm', 'cache', 'fallback'] as const;
+export type SpecSource = (typeof SPEC_SOURCES)[number];
 
-export type DegradedReason =
-  | 'no-provider'
-  | 'provider-error'
-  | 'timeout'
-  | 'invalid-generation'
-  | 'unusable-on-serve'
-  | 'requested';
+const DEGRADED_REASONS = [
+  'no-provider',
+  'provider-error',
+  'timeout',
+  'invalid-generation',
+  'unusable-on-serve',
+  'requested',
+] as const;
+export type DegradedReason = (typeof DEGRADED_REASONS)[number];
 
 export const SPEC_VERSION = '1' as const;
 
@@ -120,6 +123,22 @@ export interface ComponentSpec extends GeneratedSpec {
   provider: string | null;
   model: string | null;
   degradedReason?: DegradedReason;
+}
+
+const componentSpecSchema = generatedSpecSchema.extend({
+  specVersion: z.literal(SPEC_VERSION),
+  slot: z.string(),
+  source: z.enum(SPEC_SOURCES),
+  generatedAt: z.number(),
+  latencyMs: z.number(),
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+  degradedReason: z.enum(DEGRADED_REASONS).optional(),
+});
+
+export function parseComponentSpec(value: unknown): ComponentSpec {
+  const { degradedReason, ...spec } = componentSpecSchema.parse(value);
+  return degradedReason === undefined ? spec : { ...spec, degradedReason };
 }
 
 export function parseGeneratedSpec(value: unknown): GeneratedSpec {

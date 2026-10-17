@@ -1,0 +1,80 @@
+{
+  "name": "@rudra-js/a2ui",
+  "version": "0.7.6",
+  "description": "A2UI component for rudra-js: lets an A2UI agent place a product-recommendation block whose products, prices and wording come from your shop, not from the agent",
+  "keywords": [
+    "rudra-js",
+    "a2ui",
+    "product-recommendations",
+    "react",
+    "llm",
+    "agents",
+    "generative-ui",
+    "ecommerce",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Clive Dsouza",
+  "homepage": "https://rudrajs.com",
+  "bugs": {
+    "url": "https://github.com/clivedsouza1010/rudra-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clivedsouza1010/rudra-js.git",
+    "directory": "packages/a2ui"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "peerDependencies": {
+    "@a2ui/react": "^0.14.0",
+    "@a2ui/web_core": "^0.14.0",
+    "@rudra-js/core": "^0.7.7",
+    "@rudra-js/react": "^0.7.6",
+    "react": "^18.2.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@a2ui/react": "0.14.0",
+    "@a2ui/web_core": "0.14.0",
+    "@rudra-js/core": "0.7.6",
+    "@rudra-js/react": "0.7.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "jsdom": "^27.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

@@ -92,7 +92,7 @@ const closureOf = (packageName) => {
 };
 
 const link = (into, name, source) => {
-  if (name.includes('/')) mkdirSync(join(into, name.split('/')[0]), { recursive: true });
+  mkdirSync(dirname(join(into, name)), { recursive: true });
   symlinkSync(source, join(into, name), 'dir');
 };
 
@@ -145,14 +145,25 @@ function packAndInstall() {
   return { tarballs, shipped };
 }
 
-function linkThirdParty() {
-  const external = PACKAGES.flatMap((packageName) =>
-    dependencyNames(manifestOf(packageName)),
-  ).filter((name) => !name.startsWith('@rudra-js/'));
+const nestedDependency = (packageName, name) => {
+  const path = join(REPO_ROOT, 'packages', packageName, 'node_modules', name);
+  return existsSync(path) ? path : null;
+};
 
-  for (const name of new Set([...external, ...RENDERER, '@types/react', '@types/react-dom'])) {
-    link(modules, name, join(REPO_ROOT, 'node_modules', name));
+const installedDependency = (packageName, name) =>
+  nestedDependency(packageName, name) ?? join(REPO_ROOT, 'node_modules', name);
+
+function linkThirdParty() {
+  const external = new Set([...RENDERER, '@types/react', '@types/react-dom']);
+  for (const packageName of PACKAGES) {
+    for (const name of dependencyNames(manifestOf(packageName))) {
+      if (name.startsWith('@rudra-js/')) continue;
+      external.add(name);
+      const nested = nestedDependency(packageName, name);
+      if (nested) link(join(modules, '@rudra-js', packageName, 'node_modules'), name, nested);
+    }
   }
+  for (const name of external) link(modules, name, join(REPO_ROOT, 'node_modules', name));
 }
 
 function writeConsumer(fixture, file, specifier) {
@@ -206,7 +217,7 @@ function soloProgram(packageName, tarball, declarations) {
       dependency,
       DIRECTORY_OF.has(dependency)
         ? join(modules, '@rudra-js', DIRECTORY_OF.get(dependency))
-        : join(REPO_ROOT, 'node_modules', dependency),
+        : installedDependency(packageName, dependency),
     );
 
     const types = `@types/${dependency}`;
@@ -269,13 +280,22 @@ function checkPlantedDefectIsReported(programs) {
   }
 }
 
-function typecheckOrThrow({ config, failure }) {
+const A2UI_MISSING_EXTENSION_ERROR =
+  /node_modules\/@a2ui\/web_core\/src\/v0_8\/types\/types\.d\.ts\(\d+,\d+\): error TS2835:/;
+
+function typecheckOrThrow({ label, config, failure }) {
   const result = typecheck(config);
-  if (result.status !== 0) {
-    process.stdout.write(result.stdout ?? '');
-    process.stderr.write(result.stderr ?? '');
-    throw new Error(failure);
+  if (result.status === 0) return;
+
+  const errors = (result.stdout ?? '').split('\n').filter((line) => /error TS\d+:/.test(line));
+  if (errors.length > 0 && errors.every((line) => A2UI_MISSING_EXTENSION_ERROR.test(line))) {
+    console.log(`  ${label}: allowed ${errors.length} known errors in A2UI's own declarations`);
+    return;
   }
+
+  process.stdout.write(result.stdout ?? '');
+  process.stderr.write(result.stderr ?? '');
+  throw new Error(failure);
 }
 
 function mustFail(label, file) {

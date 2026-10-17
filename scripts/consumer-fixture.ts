@@ -10,6 +10,12 @@ import {
 import { RudraComponent, defaultFormatBundlePrice, type ProductCatalog } from '@rudra-js/react';
 import { createAnthropicProvider } from '@rudra-js/anthropic';
 import { verify, type Facts } from '@rudra-js/attested';
+import type { RudraRecommendationsOptions } from '@rudra-js/a2ui';
+import {
+  fitRecommendationRequest,
+  parseRecommendationRequest,
+  rudraRecommendationsApi,
+} from '@rudra-js/a2ui/server';
 
 const products = [
   productSchema.parse({
@@ -113,6 +119,23 @@ if (claim.supported) {
 }
 if (claim.quantity.findings[0]?.token !== '2') {
   throw new Error(`@rudra-js/attested named the wrong token: ${JSON.stringify(claim.quantity)}`);
+}
+
+export const a2uiOptions: RudraRecommendationsOptions = {
+  loadRecommendations: async () => ({ spec, products, bundles }),
+  locale: 'en-US',
+};
+
+if (!rudraRecommendationsApi.schema.safeParse({ currentSku: { path: '/viewing/sku' } }).success) {
+  throw new Error('@rudra-js/a2ui could not parse a data binding with its zod 3 schema');
+}
+
+const fitted = fitRecommendationRequest(
+  parseRecommendationRequest({ currentSku: 'TR-101', currentCategory: 'Not Ours' }),
+  products,
+);
+if (JSON.stringify(fitted) !== '{"currentSku":"TR-101"}') {
+  throw new Error(`@rudra-js/a2ui/server returned ${JSON.stringify(fitted)}`);
 }
 
 const forbidden: string = '__FORBIDDEN_PACKAGE__';
