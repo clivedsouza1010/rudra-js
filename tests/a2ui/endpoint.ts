@@ -21,7 +21,7 @@ export async function POST(request: Request): Promise<Response> {
   // The agent only hints at what the shopper is looking at. Who the shopper is,
   // what they've done and what you sell all come from your side.
   const shopper = await shopperFor(request);
-  const candidates = await candidatesFor(asked);
+  const candidates = await candidatesFor(shopper);
   const hints = fitRecommendationRequest(asked, candidates);
   const input = parseTrackingInput({
     user: { id: shopper.id },

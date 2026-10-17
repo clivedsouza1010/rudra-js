@@ -15,6 +15,19 @@ import { POST } from './endpoint.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+// Every tracking input the README endpoint builds, to see what reached core.
+const trackingInputs = vi.hoisted((): unknown[] => []);
+vi.mock('@rudra-js/core', async (importOriginal) => {
+  const core = await importOriginal<typeof import('@rudra-js/core')>();
+  return {
+    ...core,
+    parseTrackingInput: (value: unknown) => {
+      trackingInputs.push(value);
+      return core.parseTrackingInput(value);
+    },
+  };
+});
+
 // jsdom replaces URL with its own, which fileURLToPath refuses, so this passes it a string.
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const SHOP_ORIGIN = 'https://shop.example';
@@ -40,10 +53,16 @@ const post = (body: string) =>
   );
 
 /** Lets the surface render and the component's load resolve, over a few turns. */
-async function settle(turns = 10): Promise<void> {
+async function flush(turns = 10): Promise<void> {
   if (turns === 0) return;
   await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
-  return settle(turns - 1);
+  return flush(turns - 1);
+}
+
+/** The component asks once its hints have held still for 300 ms. */
+async function settle() {
+  await act(() => new Promise((resolve) => setTimeout(resolve, 350)));
+  await flush();
 }
 
 afterEach(() => {
@@ -77,6 +96,16 @@ describe('the README endpoint', () => {
       'A-2',
       'A-3',
     ]);
+  });
+
+  it('keeps a SKU the shop sells, drops a category it does not, and sets the rest itself', async () => {
+    await post(JSON.stringify({ currentSku: 'A-1', currentCategory: 'Not one of ours' }));
+
+    expect(trackingInputs.at(-1)).toMatchObject({
+      user: { id: 'shopper-1' },
+      context: { surface: 'assistant', locale: 'en-US', currentSku: 'A-1' },
+    });
+    expect(trackingInputs.at(-1)).not.toHaveProperty('context.currentCategory');
   });
 
   it.each([

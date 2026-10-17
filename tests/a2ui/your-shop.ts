@@ -1,5 +1,3 @@
-import type { RecommendationRequest } from '@rudra-js/a2ui/server';
-
 // Stands in for the session and catalog code a shop already has. The README example imports it
 // as `./your-shop.js`.
 
@@ -17,6 +15,6 @@ export async function shopperFor(_request: Request) {
   };
 }
 
-export async function candidatesFor(_asked: RecommendationRequest) {
+export async function candidatesFor(_shopper: { id: string }) {
   return CATALOG;
 }
