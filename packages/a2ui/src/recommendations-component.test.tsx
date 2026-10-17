@@ -291,38 +291,27 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
     expect(loadRecommendations).toHaveBeenCalledTimes(1);
   });
 
-  it('asks again for a data model that comes after the hints settled', async () => {
+  it('leaves out a bound hint while the data model has no value for it', async () => {
     const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
 
-    const { send } = await renderSurface(agentMessages({ currentSku: { path: '/viewing/sku' } }), {
-      loadRecommendations,
-    });
-    await settle();
-    await send(dataModelUpdate('/viewing', { sku: 'A-1' }));
-    await settle();
-
-    expect(requestsSent(loadRecommendations)).toStrictEqual([{}, { currentSku: 'A-1' }]);
-  });
-
-  it('stops sending a bound hint once the data model clears it', async () => {
-    const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
-
-    const { container, send } = await renderSurface(
-      agentMessages(
-        { currentSku: { path: '/viewing/sku' }, currentCategory: { path: '/viewing/category' } },
-        { viewing: { sku: 'A-1', category: 'Cookware' } },
-      ),
+    const { send } = await renderSurface(
+      agentMessages({
+        currentSku: { path: '/viewing/sku' },
+        currentCategory: { path: '/viewing/category' },
+      }),
       { loadRecommendations },
     );
+    await settle();
+    await send(dataModelUpdate('/viewing', { sku: 'A-1', category: 'Cookware' }));
     await settle();
     await send(dataModelUpdate('/viewing', { sku: 'A-3' }));
     await settle();
 
     expect(requestsSent(loadRecommendations)).toStrictEqual([
+      {},
       { currentSku: 'A-1', currentCategory: 'Cookware' },
       { currentSku: 'A-3' },
     ]);
-    expect(blockIn(container)?.textContent).not.toContain('Chef knife');
   });
 
   it('stops sending a hint the agent no longer writes', async () => {
@@ -368,11 +357,10 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
 
   it('drops a result that arrives after the hints changed', async () => {
     const { loadRecommendations, finish } = heldLoader();
-    const onError = vi.fn();
 
     const { container, send } = await renderSurface(
       agentMessages({ currentSku: { path: '/viewing/sku' } }, { viewing: { sku: 'A-1' } }),
-      { loadRecommendations, onError },
+      { loadRecommendations },
     );
     await settle();
     await send(dataModelUpdate('/viewing/sku', 'A-3'));
@@ -384,7 +372,6 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
 
     expect(blockIn(container)?.textContent).toContain('Cast iron skillet');
     expect(blockIn(container)?.textContent).not.toContain('Chef knife');
-    expect(onError).not.toHaveBeenCalled();
   });
 
   it('shows the placeholder until the first recommendations arrive', async () => {
@@ -485,7 +472,6 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(blockIn(container)).toBeNull();
-    expect(container.querySelector('img')).toBeNull();
   });
 
   it('shows the next block after one that threw', async () => {

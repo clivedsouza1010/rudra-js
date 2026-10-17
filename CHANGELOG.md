@@ -24,6 +24,12 @@ break them.
   `parseComponentSpec`. It skips core's `node:crypto` import, so browser code
   can use it.
 
+### Fixed
+
+- `SECURITY.md` listed what a cohort key is built from but left out the
+  candidates' SKUs, which have been part of it since 0.1.0. Each new candidate
+  set is a new model call too.
+
 ## [0.7.6] - 2026-10-10
 
 ### Changed

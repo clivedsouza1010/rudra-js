@@ -56,7 +56,7 @@ function useRecommendationResult(
   const requestKey = JSON.stringify(request);
 
   useEffect(() => {
-    if (requestKey === shownRequestKey.current) return undefined;
+    if (requestKey === shownRequestKey.current) return;
     const controller = new AbortController();
     const asked: RecommendationRequest = JSON.parse(requestKey);
 

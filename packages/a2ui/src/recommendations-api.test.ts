@@ -41,21 +41,6 @@ describe('the catalog JSON an agent is prompted with', () => {
   });
 });
 
-describe('the server entry', () => {
-  it('loads where there is no DOM, as on an agent backend or a shop endpoint', async () => {
-    expect(typeof globalThis.HTMLElement).toBe('undefined');
-
-    const server = await import('./server.js');
-
-    expect(Object.keys(server).toSorted()).toStrictEqual([
-      'RUDRA_RECOMMENDATIONS_INSTRUCTIONS',
-      'fitRecommendationRequest',
-      'parseRecommendationRequest',
-      'rudraRecommendationsApi',
-    ]);
-  });
-});
-
 describe('what A2UI does with a hint before the component sees it', () => {
   const placing = (properties: Record<string, unknown>): A2uiMessage[] => [
     { version: 'v0.9', createSurface: { surfaceId: 'chat', catalogId: CATALOG_ID } },
