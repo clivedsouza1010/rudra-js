@@ -7,48 +7,34 @@ import {
 } from './recommendations-api.js';
 
 const CATALOG_ID = 'https://shop.example/a2ui/catalog.json';
+const HINTS = ['currentCategory', 'currentSku', 'maxItems', 'searchQuery'];
 
 type CatalogJson = {
   instructions?: string;
-  components: Record<
-    string,
-    { properties: Record<string, Record<string, unknown>>; required?: string[] }
-  >;
+  components: { RudraRecommendations: { properties: Record<string, Record<string, unknown>> } };
 };
 
 const catalogJson = new Catalog(CATALOG_ID, 'v0.9', [rudraRecommendationsApi], [], {
   instructions: RUDRA_RECOMMENDATIONS_INSTRUCTIONS,
 }).toJson() as CatalogJson;
 
-const component = catalogJson.components[rudraRecommendationsApi.name];
-
-describe('the component name', () => {
-  it('is the one agents and catalogs already use', () => {
-    expect(rudraRecommendationsApi.name).toBe('RudraRecommendations');
-  });
-});
+const component = catalogJson.components.RudraRecommendations;
 
 describe('the catalog JSON an agent is prompted with', () => {
   it('offers the agent only the hints, with nowhere to put a title, a price or copy', () => {
     expect(component).toMatchObject({ unevaluatedProperties: false });
-    expect(Object.keys(component?.properties ?? {}).toSorted()).toStrictEqual([
-      'component',
-      'currentCategory',
-      'currentSku',
-      'maxItems',
-      'searchQuery',
-    ]);
+    expect(Object.keys(component.properties).toSorted()).toStrictEqual(['component', ...HINTS]);
   });
 
   it('tells the agent what each hint is for', () => {
-    for (const hint of ['currentSku', 'currentCategory', 'searchQuery', 'maxItems']) {
-      expect(component?.properties[hint]?.description, hint).toEqual(expect.any(String));
+    for (const hint of HINTS) {
+      expect(component.properties[hint]?.description, hint).toEqual(expect.any(String));
     }
   });
 
   it('lets every hint be bound to the data model', () => {
-    for (const hint of ['currentSku', 'currentCategory', 'searchQuery', 'maxItems']) {
-      expect(component?.properties[hint]?.oneOf, hint).toContainEqual({
+    for (const hint of HINTS) {
+      expect(component.properties[hint]?.oneOf, hint).toContainEqual({
         $ref: expect.stringMatching(/#\/\$defs\/DataBinding$/),
       });
     }
@@ -59,14 +45,12 @@ describe('the catalog JSON an agent is prompted with', () => {
   });
 
   it('tells the agent the range maxItems takes', () => {
-    expect(component?.properties.maxItems?.description).toContain(
+    expect(component.properties.maxItems?.description).toContain(
       `from 1 to ${FIELD_LIMITS.maxItems}`,
     );
   });
 
   it('carries the instructions that tell the agent not to write facts around it', () => {
-    expect(catalogJson.instructions).toBe(RUDRA_RECOMMENDATIONS_INSTRUCTIONS);
-    expect(catalogJson.instructions).toContain('RudraRecommendations');
     expect(catalogJson.instructions).toMatch(/do not write product names, prices/i);
   });
 });

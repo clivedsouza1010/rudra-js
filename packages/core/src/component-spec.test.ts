@@ -8,6 +8,7 @@ import {
   blockSchema,
   generatedSpecSchema,
   parseComponentSpec,
+  parseGeneratedSpec,
   productReferenceSchema,
   safeParseGeneratedSpec,
   type Block,
@@ -258,7 +259,7 @@ describe('recommendation basis', () => {
 
 describe('parseComponentSpec', () => {
   const componentSpec = {
-    ...(spec([]) as object),
+    ...parseGeneratedSpec(spec([])),
     specVersion: '1',
     slot: 'pdp',
     source: 'fallback',

@@ -23,14 +23,16 @@ npm install @rudra-js/a2ui @rudra-js/core @rudra-js/react @rudra-js/attested @a2
 ```
 
 Everything but zod is a peer dependency, so your app holds one copy of each. On pnpm, read
-[zod](#zod) first.
+[zod](#zod) first. Keep `skipLibCheck: true`. A2UI's declarations need `"dom"` in `lib`, and two of
+their imports have no file extension, which `nodenext` refuses.
 
 ## Three pieces
 
 ### The catalog your agent is prompted with
 
-Put `agentCatalog.toJson()` in your agent's prompt, have it create surfaces with
-`catalogId: agentCatalog.id`, and join your own catalog instructions to these if you have any.
+Put `agentCatalog.toJson()` in your agent's prompt and have it create surfaces with
+`catalogId: agentCatalog.id`. If you have catalog instructions of your own, join them to
+`RUDRA_RECOMMENDATIONS_INSTRUCTIONS`.
 
 ```ts
 import { Catalog } from '@a2ui/web_core/v0_9';
@@ -93,7 +95,7 @@ export async function POST(request: Request): Promise<Response> {
 - `fitRecommendationRequest` drops a SKU or category none of your candidates has.
 - Pick candidates on your side, not from the hints. Each new category, `maxItems` or candidate set
   is a new cohort and a new model call, so rate-limit the endpoint (see
-  [SECURITY.md](../../SECURITY.md)).
+  [SECURITY.md](https://github.com/clivedsouza1010/rudra-js/blob/main/SECURITY.md)).
 - Send back `input.candidates` and `input.bundles`, not your raw catalog.
 
 ### The browser
@@ -128,25 +130,24 @@ const shopCatalog = new Catalog<ReactCatalogComponent>(
 export const processor = new MessageProcessor<ReactCatalogComponent>([shopCatalog]);
 ```
 
-Render the processor's surfaces with `A2uiSurface`. The options take every `RudraComponent` prop
-except `spec`, `products` and `bundles`, plus `placeholder` and `onError`.
+Render the processor's surfaces with `A2uiSurface`. The options take `loadRecommendations`,
+`placeholder`, `onError`, and every `RudraComponent` prop except `spec`, `products` and `bundles`.
 
 ## What comes from where
 
-| Set by the agent                          | Set by your server                        | Set by your catalog  |
-| ----------------------------------------- | ----------------------------------------- | -------------------- |
-| Where the block goes on the surface       | The shopper, their signals, the locale    | Every product title  |
-| `currentSku`, `currentCategory`, if yours | Which products are candidates             | Every price          |
-| `searchQuery`, `maxItems`                 | The provider, and so who writes the words | Every image and link |
+| Set by the agent                                | Set by your server                     | Set by your catalog  |
+| ----------------------------------------------- | -------------------------------------- | -------------------- |
+| Where the block goes on the surface             | The shopper, their signals, the locale | Every product title  |
+| `currentSku`, `currentCategory`, if you sell it | Which products are candidates          | Every price          |
+| `searchQuery`, `maxItems`                       | The model provider                     | Every image and link |
 
 Each hint can be a literal or bound to the agent's data model (`{ "path": "/viewing/sku" }`).
 
-[SECURITY.md](../../SECURITY.md) covers what an agent can and can't influence.
-
 ## What the component does
 
-- It sends only the four hints, and skips one that won't parse or a blank search. A hint of the
-  wrong type, like a numeric SKU, makes A2UI refuse the agent's whole message.
+- It sends only the four hints. It leaves out a blank one, and one the server would turn away,
+  like a `maxItems` of 40. A literal of the wrong type, like a numeric SKU, makes A2UI refuse the
+  agent's whole message.
 - It asks once the hints hold still for 300 ms, and keeps the last block up until the next one
   arrives. `signal` aborts when the hints change or the component unmounts.
 - It checks the result against core's schemas before rendering any of it.
@@ -156,10 +157,9 @@ Each hint can be a literal or bound to the agent's data model (`{ "path": "/view
 
 ## Where it runs
 
-| Import from             | Holds                                                                  | Runs     |
-| ----------------------- | ---------------------------------------------------------------------- | -------- |
-| `@rudra-js/a2ui`        | `createRudraRecommendationsComponent`, the component's name and schema | Browser  |
-| `@rudra-js/a2ui/server` | `rudraRecommendationsApi`, its instructions, and the request functions | Anywhere |
+`@rudra-js/a2ui` holds `createRudraRecommendationsComponent` and its types, and loads only in the
+browser, because `@a2ui/react` needs a DOM. The agent catalog and your endpoint import from
+`@rudra-js/a2ui/server`, which runs anywhere.
 
 A2UI renders on the client, so a crawler won't see a block an agent places. For a product page,
 render `RudraComponent` on the server, as the
@@ -191,8 +191,3 @@ module.exports = {
   },
 };
 ```
-
-## A2UI's declaration files
-
-A2UI's declarations need `"dom"` in `lib`, and two of their relative imports have no file extension,
-which `nodenext` refuses. Keep `skipLibCheck: true`.

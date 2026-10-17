@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { CommonSchemas, type ComponentApi } from '@a2ui/web_core/v0_9';
 import { FIELD_LIMITS } from '@rudra-js/core';
 

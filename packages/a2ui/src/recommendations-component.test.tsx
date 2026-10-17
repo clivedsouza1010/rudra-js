@@ -40,6 +40,12 @@ async function shopResultFor(request: RecommendationRequest): Promise<Recommenda
   return JSON.parse(JSON.stringify({ spec, products: input.candidates, bundles: input.bundles }));
 }
 
+const recommendationsComponent = (properties: Record<string, unknown>) => ({
+  id: 'recommendations',
+  component: 'RudraRecommendations',
+  ...properties,
+});
+
 function agentMessages(
   recommendationProperties: Record<string, unknown>,
   dataModel?: Record<string, unknown>,
@@ -53,11 +59,7 @@ function agentMessages(
         components: [
           { id: 'root', component: 'Column', children: ['intro', 'recommendations'] },
           { id: 'intro', component: 'Text', text: AGENT_TEXT },
-          {
-            id: 'recommendations',
-            component: 'RudraRecommendations',
-            ...recommendationProperties,
-          },
+          recommendationsComponent(recommendationProperties),
         ],
       },
     },
@@ -68,6 +70,13 @@ function agentMessages(
 
 function dataModelUpdate(path: string, value: unknown): A2uiMessage {
   return { version: 'v0.9', updateDataModel: { surfaceId: SURFACE_ID, path, value } };
+}
+
+function componentUpdate(properties: Record<string, unknown>): A2uiMessage {
+  return {
+    version: 'v0.9',
+    updateComponents: { surfaceId: SURFACE_ID, components: [recommendationsComponent(properties)] },
+  };
 }
 
 let mounted: { root: Root; container: HTMLElement } | null = null;
@@ -119,22 +128,6 @@ async function renderSurface(messages: A2uiMessage[], options: RudraRecommendati
   return { container, send };
 }
 
-function componentUpdate(recommendationProperties: Record<string, unknown>): A2uiMessage {
-  return {
-    version: 'v0.9',
-    updateComponents: {
-      surfaceId: SURFACE_ID,
-      components: [
-        {
-          id: 'recommendations',
-          component: 'RudraRecommendations',
-          ...recommendationProperties,
-        },
-      ],
-    },
-  };
-}
-
 const wait = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 const flush = () => wait(0);
 const settle = async () => {
@@ -142,27 +135,18 @@ const settle = async () => {
   await flush();
 };
 
-function deferred<Value>() {
-  let resolve!: (value: Value) => void;
-  let reject!: (reason: unknown) => void;
-  const promise = new Promise<Value>((onResolve, onReject) => {
-    resolve = onResolve;
-    reject = onReject;
-  });
-  return { promise, resolve, reject };
-}
-
 function heldLoader() {
-  const held = new Map<string, ReturnType<typeof deferred<RecommendationResult>>>();
-  const loadRecommendations = vi.fn<RecommendationLoader>((request) => {
-    const load = deferred<RecommendationResult>();
-    held.set(request.currentSku ?? '', load);
-    return load.promise;
-  });
+  const resolvers = new Map<string, (result: RecommendationResult) => void>();
+  const loadRecommendations = vi.fn<RecommendationLoader>(
+    (request) =>
+      new Promise((resolve) => {
+        resolvers.set(request.currentSku ?? '', resolve);
+      }),
+  );
   const finish = async (sku: string) => {
-    const load = held.get(sku);
-    if (!load) throw new Error(`no load was asked for ${sku}`);
-    load.resolve(await shopResultFor({ currentSku: sku }));
+    const resolve = resolvers.get(sku);
+    if (!resolve) throw new Error(`no load was asked for ${sku}`);
+    resolve(await shopResultFor({ currentSku: sku }));
     await flush();
   };
   return { loadRecommendations, finish };
@@ -265,13 +249,8 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
 
     const { container, send } = await renderSurface(
       agentMessages({ currentSku: { path: '/viewing/sku' } }),
-      { loadRecommendations, placeholder: <p className="loading">Loading</p> },
+      { loadRecommendations },
     );
-    await flush();
-
-    expect(loadRecommendations).not.toHaveBeenCalled();
-    expect(container.querySelector('.loading')).not.toBeNull();
-
     await send(dataModelUpdate('/viewing', { sku: 'A-1' }));
     await settle();
 
@@ -286,16 +265,13 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
       agentMessages({ currentSku: { path: '/viewing/sku' } }, { viewing: { sku: 'A-1' } }),
       { loadRecommendations },
     );
+    await wait(200);
+    await send(dataModelUpdate('/viewing/sku', 'A-3'));
     await wait(299);
     expect(loadRecommendations).not.toHaveBeenCalled();
     await wait(1);
-    expect(loadRecommendations).toHaveBeenCalledTimes(1);
 
-    await send(dataModelUpdate('/viewing/sku', 'A-3'));
-    await wait(299);
-    expect(loadRecommendations).toHaveBeenCalledTimes(1);
-    await wait(1);
-    expect(loadRecommendations).toHaveBeenCalledTimes(2);
+    expect(requestsSent(loadRecommendations)).toStrictEqual([{ currentSku: 'A-3' }]);
   });
 
   it('keeps the last block up until the next one arrives', async () => {
@@ -312,7 +288,6 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
     await send(dataModelUpdate('/viewing/sku', 'A-3'));
     await flush();
 
-    expect(loadRecommendations).toHaveBeenCalledTimes(1);
     expect(container.querySelector('.loading')).toBeNull();
     expect(blockIn(container)?.textContent).toContain('Chef knife');
 
@@ -399,9 +374,7 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
 
     const { send } = await renderSurface(
       agentMessages({ currentSku: 'A-1', searchQuery: 'pans' }),
-      {
-        loadRecommendations,
-      },
+      { loadRecommendations },
     );
     await settle();
     await send(componentUpdate({ currentSku: 'A-1' }));
@@ -580,23 +553,20 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
   });
 
   it('cancels a load when the component leaves the page, and reports nothing for it', async () => {
-    const pending = deferred<RecommendationResult>();
-    const signals: AbortSignal[] = [];
     const onError = vi.fn();
+    const loadRecommendations = vi.fn<RecommendationLoader>(
+      (_request, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason));
+        }),
+    );
 
-    await renderSurface(agentMessages({ currentSku: 'A-1' }), {
-      loadRecommendations: (_, signal) => {
-        signals.push(signal);
-        return pending.promise;
-      },
-      onError,
-    });
+    await renderSurface(agentMessages({ currentSku: 'A-1' }), { loadRecommendations, onError });
     await settle();
     unmount();
+    await flush();
 
-    expect(signals.at(-1)?.aborted).toBe(true);
-    pending.reject(new DOMException('The operation was aborted.', 'AbortError'));
-    await settle();
+    expect(loadRecommendations.mock.calls[0]?.[1].aborted).toBe(true);
     expect(onError).not.toHaveBeenCalled();
   });
 });

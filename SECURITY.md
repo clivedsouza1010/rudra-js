@@ -199,9 +199,9 @@ primary model can act. Ours can't.
   enough of them also push out the cohorts real shoppers were being served from. Nothing leaks: a
   cohort prompt carries no shopper text at all. The bill and the latency are the damage. Take those
   fields from sets you control, and put a rate limit in front of the page. With `@rudra-js/a2ui`,
-  an agent, or anyone who calls your endpoint, picks the category and `maxItems`, and can place as
-  many components as it likes. `fitRecommendationRequest` drops a category your candidates don't
-  have; don't pick candidates from a hint, and rate-limit the endpoint.
+  the agent, or anyone who calls your endpoint, picks the category and `maxItems`, and the agent can
+  place as many components as it likes. `fitRecommendationRequest` drops a category your candidates
+  don't have. Pick candidates on your side, not from a hint, and rate-limit the endpoint too.
 
 - **Instruction disclosure.** A determined injection could get fragments of the instruction half
   echoed back inside a text field. Those instructions are open source and sitting in this repository,

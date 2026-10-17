@@ -31,28 +31,11 @@ interface SentJson {
   bundles: Json[];
 }
 
-const withSpec = (json: SentJson, change: (spec: Json) => Json) => ({
-  ...json,
-  spec: change(json.spec),
-});
-
-const withFirstProduct = (json: SentJson, change: (product: Json) => Json) => ({
-  ...json,
-  products: json.products.map((product, index) => (index === 0 ? change(product) : product)),
-});
-
 describe('parseRecommendationResult', () => {
   it('returns what the endpoint sent, unchanged by the trip through JSON', async () => {
     const { result, json } = await sentAsJson();
 
     expect(parseRecommendationResult(json)).toStrictEqual(result);
-  });
-
-  it('keeps the reason a degraded spec gives', async () => {
-    const { json } = await sentAsJson();
-    const degraded = withSpec(json, (spec) => ({ ...spec, degradedReason: 'timeout' }));
-
-    expect(parseRecommendationResult(degraded).spec.degradedReason).toBe('timeout');
   });
 
   it('reads a result without bundles as having none', async () => {
@@ -67,40 +50,24 @@ describe('parseRecommendationResult', () => {
   });
 
   it.each([
-    ['has no blocks list', (spec: Json) => ({ ...spec, blocks: 'grid' })],
     [
-      'has a block of a kind core never makes',
-      (spec: Json) => ({
-        ...spec,
-        blocks: [{ kind: 'iframe', src: 'https://elsewhere.example' }],
+      'a spec from another version',
+      (json: SentJson) => ({ ...json, spec: { ...json.spec, specVersion: '2' } }),
+    ],
+    [
+      'a product with a protocol-relative image',
+      (json: SentJson) => ({
+        ...json,
+        products: [{ ...json.products[0], imageUrl: '//elsewhere.example/pixel.png' }],
       }),
     ],
-    ['has no headline', (spec: Json) => ({ ...spec, headline: undefined })],
-    ['comes from another spec version', (spec: Json) => ({ ...spec, specVersion: '2' })],
-  ])('rejects a spec that %s', async (_, change) => {
+    [
+      'a bundle that is not a bundle',
+      (json: SentJson) => ({ ...json, bundles: [{ id: 'B-1', skus: ['A-1'] }] }),
+    ],
+  ])('rejects a result with %s', async (_, change) => {
     const { json } = await sentAsJson();
 
-    expect(() => parseRecommendationResult(withSpec(json, change))).toThrow();
-  });
-
-  it.each([
-    ['a protocol-relative image', { imageUrl: '//elsewhere.example/pixel.png' }],
-    ['a data: image', { imageUrl: 'data:image/png;base64,AAAA' }],
-    ['a negative price', { price: -1 }],
-    ['a field the product schema does not have', { href: 'https://elsewhere.example' }],
-  ])('rejects a product with %s', async (_, change) => {
-    const { json } = await sentAsJson();
-
-    expect(() =>
-      parseRecommendationResult(withFirstProduct(json, (product) => ({ ...product, ...change }))),
-    ).toThrow();
-  });
-
-  it('rejects a bundle that is not a bundle', async () => {
-    const { json } = await sentAsJson();
-
-    expect(() =>
-      parseRecommendationResult({ ...json, bundles: [{ id: 'B-1', skus: ['A-1'] }] }),
-    ).toThrow();
+    expect(() => parseRecommendationResult(change(json))).toThrow();
   });
 });

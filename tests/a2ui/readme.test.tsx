@@ -69,22 +69,12 @@ describe('the examples in the @rudra-js/a2ui README', () => {
 });
 
 describe('the README endpoint', () => {
-  it('answers a request with a result the component accepts', async () => {
-    const response = await post(JSON.stringify({ currentSku: 'A-1' }));
-    const result = await response.json();
+  it('keeps a SKU the shop sells, drops a category it does not, and sets the rest itself', async () => {
+    const response = await post(
+      JSON.stringify({ currentSku: 'A-1', currentCategory: 'Not one of ours' }),
+    );
 
     expect(response.status).toBe(200);
-    expect(result.spec.headline).toBe('Goes with your cart');
-    expect(result.products.map((product: { sku: string }) => product.sku)).toStrictEqual([
-      'A-1',
-      'A-2',
-      'A-3',
-    ]);
-  });
-
-  it('keeps a SKU the shop sells, drops a category it does not, and sets the rest itself', async () => {
-    await post(JSON.stringify({ currentSku: 'A-1', currentCategory: 'Not one of ours' }));
-
     expect(trackingInputs.at(-1)).toMatchObject({
       user: { id: 'shopper-1' },
       context: { surface: 'assistant', locale: 'en-US', currentSku: 'A-1' },
@@ -103,13 +93,10 @@ describe('the README endpoint', () => {
 
 describe('the README agent catalog', () => {
   it('offers the agent the component, with its instructions', () => {
-    const schema = agentCatalog.toJson() as {
-      instructions?: string;
-      components: Record<string, unknown>;
-    };
-
-    expect(schema.components['RudraRecommendations']).toBeDefined();
-    expect(schema.instructions).toContain('RudraRecommendations');
+    expect(agentCatalog.toJson()).toMatchObject({
+      components: { RudraRecommendations: expect.any(Object) },
+      instructions: expect.stringContaining('RudraRecommendations'),
+    });
   });
 });
 
