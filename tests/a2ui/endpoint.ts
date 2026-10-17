@@ -1,6 +1,7 @@
 // --- endpoint ---
 import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
 import {
+  fitRecommendationRequest,
   parseRecommendationRequest,
   type RecommendationRequest,
   type RecommendationResult,
@@ -20,10 +21,12 @@ export async function POST(request: Request): Promise<Response> {
   // The agent only hints at what the shopper is looking at. Who the shopper is,
   // what they've done and what you sell all come from your side.
   const shopper = await shopperFor(request);
+  const candidates = await candidatesFor(asked);
+  const hints = fitRecommendationRequest(asked, candidates);
   const input = parseTrackingInput({
     user: { id: shopper.id },
-    context: { surface: 'assistant', locale: shopper.locale, ...asked },
-    candidates: await candidatesFor(asked),
+    context: { surface: 'assistant', locale: shopper.locale, ...hints },
+    candidates,
     signals: shopper.signals,
   });
   const spec = await generator.generate(input);

@@ -289,7 +289,7 @@ function checkPlantedDefectIsReported(programs) {
   }
 }
 
-// Errors in A2UI's own declarations that any project importing @a2ui/react sees under these
+// Errors in A2UI's own declarations that any project importing @a2ui/web_core sees under these
 // options. They are named by file and code, so any other error, in A2UI or anywhere, still fails.
 const UPSTREAM_DECLARATION_ERRORS = [
   // Two relative imports without a file extension, which nodenext refuses.

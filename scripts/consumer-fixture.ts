@@ -13,6 +13,7 @@ import { verify, type Facts } from '@rudra-js/attested';
 import type { RudraRecommendationsOptions } from '@rudra-js/a2ui';
 import {
   RUDRA_RECOMMENDATIONS_COMPONENT,
+  fitRecommendationRequest,
   parseRecommendationRequest,
   rudraRecommendationsApi,
 } from '@rudra-js/a2ui/server';
@@ -150,6 +151,10 @@ try {
 }
 if (!isRefused) {
   throw new Error('parseRecommendationRequest accepted a request that sets the candidates');
+}
+const fitted = fitRecommendationRequest({ ...asked, currentCategory: 'Not Ours' }, products);
+if (fitted.currentSku !== 'TR-101' || fitted.currentCategory !== undefined) {
+  throw new Error(`fitRecommendationRequest returned ${JSON.stringify(fitted)}`);
 }
 
 const forbidden: string = '__FORBIDDEN_PACKAGE__';
