@@ -45,8 +45,8 @@ type ErrorListener = ((error: unknown) => void) | undefined;
 
 /**
  * How long the hints have to hold still before the component asks, the first time as well. A data
- * model that arrives in the agent's next message is in the first request, and a search bound to a
- * text field asks once the shopper pauses rather than once per keystroke.
+ * model that arrives within this time of the components is in the first request, and a search
+ * bound to a text field asks once the shopper pauses rather than once per keystroke.
  */
 export const HINT_SETTLE_MS = 300;
 

@@ -28,9 +28,9 @@ export function parseRecommendationRequest(value: unknown): RecommendationReques
 }
 
 /**
- * Keeps a `currentSku` or a `currentCategory` only when one of your candidates carries it, so put
- * the product being looked at among them, as core's quickstart does. Both hints come from the
- * agent, or from whoever called your endpoint. In core's default cohort mode a category is part of
+ * Keeps a `currentSku` or a `currentCategory` only when one of your candidates carries it. Both
+ * hints come from the agent, or from whoever called your endpoint. A SKU none of your candidates
+ * has could never be on the block anyway, which is all core's cohort mode uses it for. In core's default cohort mode a category is part of
  * the cache key and of the prompt, so an open-ended set of categories is an open-ended number of
  * model calls; a category none of your products has is one nobody needs. It returns the four hints
  * and nothing else, whatever else the object it was given holds.
@@ -53,6 +53,10 @@ export function fitRecommendationRequest(
   };
 }
 
+// A cleared search box writes an empty string into the data model; that is no search at all.
+const isBlank = (value: unknown): boolean =>
+  value === undefined || (typeof value === 'string' && value.trim() === '');
+
 /**
  * Builds a request in the browser from the hints the agent currently writes on the component,
  * taking each one's value as A2UI resolved it. A2UI hands a component every property the agent
@@ -69,7 +73,7 @@ export function pickRecommendationRequest(
   for (const [field, schema] of Object.entries(recommendationRequestSchema.shape)) {
     if (!Object.hasOwn(written, field)) continue;
     const checked = schema.safeParse(resolved[field as RecommendationHint]);
-    if (checked.success && checked.data !== undefined) request[field] = checked.data;
+    if (checked.success && !isBlank(checked.data)) request[field] = checked.data;
   }
   // Every field in it has just passed its own part of the schema.
   return request as RecommendationRequest;

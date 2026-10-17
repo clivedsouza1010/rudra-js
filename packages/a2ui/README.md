@@ -62,8 +62,8 @@ take, and they're harmless: the document still says what each hint accepts.
 ### Your endpoint
 
 `shopperFor` and `candidatesFor` stand for the session and catalog code you already have.
-`candidatesFor` has to return at least one product, and the product being looked at belongs among
-them, as in core's quickstart.
+`candidatesFor` has to return at least one product. The candidates come from your side, such as a
+merchandising set or your catalog, not from the agent's hints.
 
 ```ts
 import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
@@ -113,9 +113,13 @@ each one as something a shopper could have typed. `fitRecommendationRequest` kee
 or a `currentCategory` only when one of your candidates carries it, and returns the four hints and
 nothing else. That matters for cost as well as sense. In core's default cohort mode the category,
 `maxItems` and the set of candidate SKUs are all part of the cache key, so an open-ended set of any
-of them is an open-ended number of model calls. That's why the example picks candidates for the
-shopper rather than for the hints: pick them from a search or a SKU, and every distinct value is a
-new cohort. Put a rate limit in front of the endpoint too, as the cohort cost note in
+of them is an open-ended number of model calls. That's why the example picks candidates on your
+side rather than from the hints: pick them from a search or a SKU, and every distinct value is a
+new cohort. Dropping a `currentSku` none of your candidates has costs nothing in cohort mode, since
+core only uses it there to keep that product off the block, and a product that isn't a candidate
+can't be on it. With `generation: 'per-shopper'` it also tells the model what the shopper is
+looking at; to keep that, add the product to the candidates after looking it up in your own
+catalog. Put a rate limit in front of the endpoint too, as the cohort cost note in
 [SECURITY.md](../../SECURITY.md) asks of any page that can cost a model call.
 
 Send back `input.candidates` and `input.bundles`, the parsed rows, not your raw catalog. The
@@ -193,10 +197,11 @@ request to a model, not a boundary. The boundary is the block itself.
   or an over-long search, and asks with the rest. A2UI checks each hint's type before that, though:
   a hint that is neither a binding nor the right type, such as a SKU written as a number, gets the
   agent's whole message refused, the agent's own components included.
-- It asks once the hints have held still for 300 ms, the first time too. A data model that comes
-  in the agent's next message makes it into the first request, and a search bound to a text field
-  asks once the shopper pauses, not once per keystroke. A bound hint with no value, yet or any
-  more, is left out of the request.
+- It asks once the hints have held still for 300 ms, the first time too. A data model the agent
+  sends within 300 ms of the components, as one sent right after them usually is, makes it into
+  the first request; one that comes later means a second request once it has settled. A search
+  bound to a text field asks once the shopper pauses, not once per keystroke. A bound hint with no
+  value, yet or any more, is left out of the request, and so is an empty or blank search.
 - When the hints change, the last block stays up until the new one arrives, and a result for hints
   that have since changed is dropped. If the hints come back to the ones on screen, it doesn't ask
   again.

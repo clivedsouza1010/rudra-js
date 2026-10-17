@@ -106,6 +106,18 @@ describe('pickRecommendationRequest', () => {
     ).toStrictEqual({ currentSku: 'A-1' });
   });
 
+  it.each(['', '   '])('leaves out a search of %j, as a cleared search box writes', (search) => {
+    expect(
+      pickRecommendationRequest(
+        { currentSku: 'A-1', searchQuery: { path: '/q' } },
+        {
+          currentSku: 'A-1',
+          searchQuery: search,
+        },
+      ),
+    ).toStrictEqual({ currentSku: 'A-1' });
+  });
+
   it('leaves out a binding the data model has not filled in', () => {
     expect(
       pickRecommendationRequest(

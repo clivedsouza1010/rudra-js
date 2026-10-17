@@ -377,6 +377,39 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
     expect(loadRecommendations).toHaveBeenCalledTimes(1);
   });
 
+  it('does not ask again when a bound search is typed and cleared', async () => {
+    const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
+
+    const { send } = await renderSurface(
+      agentMessages({ currentSku: 'A-1', searchQuery: { path: '/search' } }),
+      { loadRecommendations },
+    );
+    await settle();
+    await send(dataModelUpdate('/search', 'pan'));
+    await send(dataModelUpdate('/search', ''));
+    await settle();
+
+    expect(loadRecommendations.mock.calls.map(([request]) => request)).toStrictEqual([
+      { currentSku: 'A-1' },
+    ]);
+  });
+
+  it('asks again for a data model that comes after the hints settled', async () => {
+    const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
+
+    const { send } = await renderSurface(agentMessages({ currentSku: { path: '/viewing/sku' } }), {
+      loadRecommendations,
+    });
+    await settle();
+    await send(dataModelUpdate('/viewing', { sku: 'A-1' }));
+    await settle();
+
+    expect(loadRecommendations.mock.calls.map(([request]) => request)).toStrictEqual([
+      {},
+      { currentSku: 'A-1' },
+    ]);
+  });
+
   it('asks without a bound hint that loses its value, instead of keeping the old block', async () => {
     const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
 
