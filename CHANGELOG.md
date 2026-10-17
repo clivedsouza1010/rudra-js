@@ -10,6 +10,8 @@ break them.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-17
+
 ### Added
 
 - `@rudra-js/a2ui`, a new package. An [A2UI](https://a2ui.org) agent can place a
@@ -729,7 +731,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.6...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.6...v0.8.0
 [0.7.6]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.3...v0.7.4
