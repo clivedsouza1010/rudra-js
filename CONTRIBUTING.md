@@ -156,11 +156,12 @@ stops the release on a tag you can't take back:
 
 - `version` in the root manifest, in every `packages/*/package.json`, and in
   `examples/shop/package.json`.
-- The peer range each package declares on a sibling — `^0.5.0` becomes `^0.6.0` in
-  `packages/core`, `packages/react`, `packages/anthropic` and `packages/a2ui`. Caret on a `0.x`
-  version is patch-only, so leaving one behind publishes packages that can't be installed together.
-- The exact sibling pin those four carry in `devDependencies`, and the three in
-  `examples/shop`.
+- The peer ranges each package declares on its siblings — `^0.5.0` becomes `^0.6.0` in
+  `packages/core`, `packages/react`, `packages/anthropic` and `packages/a2ui` (two there, core and
+  react). Caret on a `0.x` version is patch-only, so leaving one behind publishes packages that
+  can't be installed together.
+- The exact sibling pins those four carry in `devDependencies` (two in `packages/a2ui`), and the
+  three in `examples/shop`.
 - `package-lock.json`, regenerated with the npm the release installs:
 
   ```sh

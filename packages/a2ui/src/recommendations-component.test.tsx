@@ -37,7 +37,7 @@ async function shopResultFor(request: RecommendationRequest): Promise<Recommenda
     bundles: BUNDLES,
   });
   const spec = await createComponentGenerator({ provider: null }).generate(input);
-  return JSON.parse(JSON.stringify({ spec, products: input.candidates, bundles: input.bundles }));
+  return { spec, products: input.candidates, bundles: input.bundles };
 }
 
 const recommendationsComponent = (properties: Record<string, unknown>) => ({
@@ -409,21 +409,10 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
   it('renders a bundle from the bundles the result carries', async () => {
     const loadRecommendations: RecommendationLoader = async (request) => {
       const result = await shopResultFor(request);
-      return {
-        ...result,
-        spec: {
-          ...result.spec,
-          blocks: [
-            {
-              kind: 'bundle',
-              title: 'Cook for friends',
-              body: null,
-              ctaLabel: null,
-              bundleId: 'B-1',
-            },
-          ],
-        },
-      };
+      result.spec.blocks = [
+        { kind: 'bundle', title: 'Cook for friends', body: null, ctaLabel: null, bundleId: 'B-1' },
+      ];
+      return result;
     };
 
     const { container } = await renderSurface(agentMessages({ currentSku: 'A-1' }), {

@@ -19,8 +19,8 @@ long-term support branches, and we don't backport security fixes to earlier `0.x
 ## What this project defends against
 
 rudra-js sits between a host application and a language model, and turns model output into
-server-rendered HTML. Two of its inputs are untrusted in different ways, so the guarantees for each
-differ too.
+server-rendered HTML. Its inputs are untrusted in different ways, so the guarantees for each differ
+too.
 
 **Model output is untrusted, and what constrains it is structural.** We don't ask the model nicely.
 If you can show any of the following, that's a vulnerability:
