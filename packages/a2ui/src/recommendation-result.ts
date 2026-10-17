@@ -1,11 +1,5 @@
-import {
-  bundleSchema,
-  parseComponentSpec,
-  productSchema,
-  type Bundle,
-  type ComponentSpec,
-  type Product,
-} from '@rudra-js/core';
+import { bundleSchema, parseComponentSpec, productSchema } from '@rudra-js/core/schemas';
+import type { Bundle, ComponentSpec, Product } from '@rudra-js/core';
 
 export interface RecommendationResult {
   spec: ComponentSpec;
@@ -21,6 +15,6 @@ export function parseRecommendationResult(value: unknown): RecommendationResult 
   return {
     spec: parseComponentSpec(spec),
     products: productSchema.array().parse(products),
-    bundles: bundles === undefined ? [] : bundleSchema.array().parse(bundles),
+    bundles: bundleSchema.array().default([]).parse(bundles),
   };
 }

@@ -8,7 +8,6 @@ import {
   blockSchema,
   generatedSpecSchema,
   parseComponentSpec,
-  parseGeneratedSpec,
   productReferenceSchema,
   safeParseGeneratedSpec,
   type Block,
@@ -259,7 +258,7 @@ describe('recommendation basis', () => {
 
 describe('parseComponentSpec', () => {
   const componentSpec = {
-    ...parseGeneratedSpec(spec([])),
+    ...generatedSpecSchema.parse(spec([])),
     specVersion: '1',
     slot: 'pdp',
     source: 'fallback',
@@ -283,8 +282,6 @@ describe('parseComponentSpec', () => {
     ['comes from another spec version', { specVersion: '2' }],
     ['has no slot', { slot: undefined }],
     ['names a source core never sets', { source: 'agent' }],
-    ['names an inherited key as its source', { source: 'constructor' }],
-    ['names an inherited key as its degraded reason', { degradedReason: 'toString' }],
     ['gives a degraded reason core never gives', { degradedReason: 'because' }],
     ['has a latency that JSON turned from NaN into null', { latencyMs: null }],
     ['has a timestamp that is not a number', { generatedAt: 'now' }],

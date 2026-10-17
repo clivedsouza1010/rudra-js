@@ -1,4 +1,5 @@
-import { renderContextSchema, type Product } from '@rudra-js/core';
+import { renderContextSchema } from '@rudra-js/core/schemas';
+import type { Product } from '@rudra-js/core';
 
 export interface RecommendationRequest {
   currentSku?: string | undefined;

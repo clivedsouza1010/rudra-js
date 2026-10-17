@@ -204,9 +204,8 @@ failure is public and stuck at a version the next tag can't reuse.
 
 Three steps run before anything is installed, and any one of them stops the release: the tagged
 commit has to be on `main`, it has to be the tip of `main`, and the tag has to equal the `version`
-in `packages/core/package.json`. All the package manifests carry the same version, because one tag
-publishes every package `release.yml` lists and the rest move with them. Nothing checks that for
-you, so go through the list above.
+in `packages/core/package.json`. Every package manifest carries that same version. Nothing checks
+it for you, so go through the list above.
 
 The tip check is the strict one, and it's strict on purpose. Being on `main` isn't enough: every
 commit after the bump reads the bumped version too, so a tag a few commits back clears the other

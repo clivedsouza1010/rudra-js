@@ -53,6 +53,8 @@ The first `toJson()` logs one "Recursive reference detected" warning per hint. I
 ### Your endpoint
 
 `shopperFor` and `candidatesFor` stand for the session and catalog code you already have.
+`provider: null` calls no model, so pass your own provider. In the default cohort mode the model
+never sees `searchQuery`, so the agent's search only counts with `generation: 'per-shopper'`.
 
 ```ts
 import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
@@ -135,13 +137,10 @@ Render the processor's surfaces with `A2uiSurface`. The options take `loadRecomm
 
 ## What comes from where
 
-| Set by the agent                                | Set by your server                     | Set by your catalog  |
-| ----------------------------------------------- | -------------------------------------- | -------------------- |
-| Where the block goes on the surface             | The shopper, their signals, the locale | Every product title  |
-| `currentSku`, `currentCategory`, if you sell it | Which products are candidates          | Every price          |
-| `searchQuery`, `maxItems`                       | The model provider                     | Every image and link |
-
-Each hint can be a literal or bound to the agent's data model (`{ "path": "/viewing/sku" }`).
+The agent picks where the block goes and sets the hints. Each hint can be a literal or bound to
+the agent's data model (`{ "path": "/viewing/sku" }`). Your server picks the shopper and their
+signals, the locale, the candidates and the model. Every title, price, image and link comes from
+your catalog.
 
 ## What the component does
 

@@ -56,37 +56,30 @@ describe('parseRecommendationRequest', () => {
   });
 });
 
-const pickLiteral = (properties: Record<string, unknown>) =>
-  pickRecommendationRequest(properties, properties);
-
 describe('pickRecommendationRequest', () => {
   it('leaves out a hint that would fail on the server, and keeps the rest', () => {
-    const request = pickLiteral({
+    const written = {
       currentSku: 'A-1',
       currentCategory: '',
       searchQuery: tooLong(FIELD_LIMITS.searchQuery),
       maxItems: FIELD_LIMITS.maxItems + 1,
-    });
+    };
+    const request = pickRecommendationRequest(written, written);
 
     expect(request).toStrictEqual({ currentSku: 'A-1' });
     expect(parseRecommendationRequest(request)).toStrictEqual(request);
   });
 
   it.each([
-    ['maxItems written as text', { maxItems: '4' }],
-    ['a fraction of an item', { maxItems: 2.5 }],
-    ['a SKU written as a number', { currentSku: 12345 }],
-  ])('leaves out %s', (_, properties) => {
-    expect(pickLiteral(properties)).toStrictEqual({});
-  });
-
-  it.each(['', '   '])('leaves out a search of %j, as a cleared search box writes', (search) => {
+    ['currentSku', 12345],
+    ['maxItems', '4'],
+    ['maxItems', 2.5],
+    ['searchQuery', ''],
+    ['searchQuery', '   '],
+  ])('leaves out a %s whose binding resolves to %j', (hint, value) => {
     expect(
-      pickRecommendationRequest(
-        { currentSku: 'A-1', searchQuery: { path: '/q' } },
-        { currentSku: 'A-1', searchQuery: search },
-      ),
-    ).toStrictEqual({ currentSku: 'A-1' });
+      pickRecommendationRequest({ [hint]: { path: '/hint' } }, { [hint]: value }),
+    ).toStrictEqual({});
   });
 });
 

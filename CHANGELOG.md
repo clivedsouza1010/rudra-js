@@ -19,6 +19,9 @@ break them.
   on npm yet.
 - `parseComponentSpec` in `@rudra-js/core`, which checks a whole
   `ComponentSpec`, metadata included.
+- `@rudra-js/core/schemas`, which carries the schemas, `FIELD_LIMITS` and
+  `parseComponentSpec` without core's `node:crypto` import, so browser code can
+  check data with them.
 
 ## [0.7.6] - 2026-10-10
 

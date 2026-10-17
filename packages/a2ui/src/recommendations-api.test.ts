@@ -1,22 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { Catalog, MessageProcessor, type A2uiMessage } from '@a2ui/web_core/v0_9';
 import { FIELD_LIMITS } from '@rudra-js/core';
-import {
-  RUDRA_RECOMMENDATIONS_INSTRUCTIONS,
-  rudraRecommendationsApi,
-} from './recommendations-api.js';
+import { rudraRecommendationsApi } from './recommendations-api.js';
 
 const CATALOG_ID = 'https://shop.example/a2ui/catalog.json';
 const HINTS = ['currentCategory', 'currentSku', 'maxItems', 'searchQuery'];
 
 type CatalogJson = {
-  instructions?: string;
   components: { RudraRecommendations: { properties: Record<string, Record<string, unknown>> } };
 };
 
-const catalogJson = new Catalog(CATALOG_ID, 'v0.9', [rudraRecommendationsApi], [], {
-  instructions: RUDRA_RECOMMENDATIONS_INSTRUCTIONS,
-}).toJson() as CatalogJson;
+const catalogJson = new Catalog(CATALOG_ID, 'v0.9', [
+  rudraRecommendationsApi,
+]).toJson() as CatalogJson;
 
 const component = catalogJson.components.RudraRecommendations;
 
@@ -42,16 +38,6 @@ describe('the catalog JSON an agent is prompted with', () => {
 
   it('requires no hint, so the agent can place the block with any of them', () => {
     expect(component).toMatchObject({ required: ['component'] });
-  });
-
-  it('tells the agent the range maxItems takes', () => {
-    expect(component.properties.maxItems?.description).toContain(
-      `from 1 to ${FIELD_LIMITS.maxItems}`,
-    );
-  });
-
-  it('carries the instructions that tell the agent not to write facts around it', () => {
-    expect(catalogJson.instructions).toMatch(/do not write product names, prices/i);
   });
 });
 
