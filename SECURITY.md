@@ -62,6 +62,17 @@ a vulnerability:
   of being read as data.
 - Prototype pollution, or any parsed field silently disappearing instead of being rejected.
 
+**An A2UI agent is untrusted as well, and in `@rudra-js/a2ui` all it can do is hint.** The agent
+places the `RudraRecommendations` component and says what the shopper is looking at; your server
+generates the block. Any of these is a vulnerability:
+
+- A property the agent sets on the component, other than the four hints, reaching the request the
+  browser sends or the rendered block.
+- A request body that `parseRecommendationRequest` accepts while it sets the shopper, the signals,
+  the candidates, the surface, the slot or the locale.
+- Anything `loadRecommendations` returns reaching the page without passing core's spec, product and
+  bundle schemas first.
+
 ## How prompt injection is handled
 
 Shopper text reaches a language model here, so the [OWASP LLM Prompt Injection Prevention Cheat
@@ -223,6 +234,10 @@ top of this file.
   the framework makes.
 - **Denial of service through a host's own configuration**, say a generation budget set so high that
   the page blocks. The framework bounds what it can, and a host can always misconfigure it.
+- **What an A2UI agent writes outside the block.** The agent's own components, a `Text` beside the
+  block for instance, are drawn by A2UI from the agent's words. `RUDRA_RECOMMENDATIONS_INSTRUCTIONS`
+  asks the agent not to state prices or product facts there, but that is a request to a model, not
+  a boundary. A2UI's renderers and catalog validation belong to A2UI.
 - Findings from automated scanners with no demonstrated impact on this codebase.
 
 ## Supply chain

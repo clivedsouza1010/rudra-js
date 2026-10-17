@@ -10,6 +10,16 @@ break them.
 
 ## [Unreleased]
 
+### Added
+
+- `@rudra-js/a2ui`, a new package that puts the recommendation block inside the interfaces an
+  [A2UI](https://a2ui.org) agent builds. The agent places a `RudraRecommendations` component and
+  can hint at what the shopper is looking at: a SKU, a category, a search and how many items.
+  Nothing else it writes reaches the block. Your endpoint generates the block with core, and the
+  browser checks what comes back against core's schemas before `RudraComponent` renders it. It
+  supports version 0.9 of the A2UI protocol through `@a2ui/react` and `@a2ui/web_core` 0.14. It
+  isn't on npm yet: the release workflow publishes it once it has a trusted publisher there.
+
 ## [0.7.6] - 2026-10-10
 
 ### Changed

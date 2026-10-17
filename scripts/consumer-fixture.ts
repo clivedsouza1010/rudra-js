@@ -10,6 +10,12 @@ import {
 import { RudraComponent, defaultFormatBundlePrice, type ProductCatalog } from '@rudra-js/react';
 import { createAnthropicProvider } from '@rudra-js/anthropic';
 import { verify, type Facts } from '@rudra-js/attested';
+import type { RudraRecommendationsOptions } from '@rudra-js/a2ui';
+import {
+  RUDRA_RECOMMENDATIONS_COMPONENT,
+  parseRecommendationRequest,
+  rudraRecommendationsApi,
+} from '@rudra-js/a2ui/server';
 
 const products = [
   productSchema.parse({
@@ -113,6 +119,37 @@ if (claim.supported) {
 }
 if (claim.quantity.findings[0]?.token !== '2') {
   throw new Error(`@rudra-js/attested named the wrong token: ${JSON.stringify(claim.quantity)}`);
+}
+
+// The root of @rudra-js/a2ui needs a DOM, as @a2ui/react does, so here it is reached for its types
+// only. Its server entry has to load and work in plain Node.
+const a2uiOptions: RudraRecommendationsOptions = {
+  loadRecommendations: async () => ({ spec, products, bundles }),
+  locale: 'en-US',
+};
+if (typeof a2uiOptions.loadRecommendations !== 'function') {
+  throw new Error('@rudra-js/a2ui options lost their loader');
+}
+
+if (rudraRecommendationsApi.name !== RUDRA_RECOMMENDATIONS_COMPONENT) {
+  throw new Error(`@rudra-js/a2ui names its component ${rudraRecommendationsApi.name}`);
+}
+if (!rudraRecommendationsApi.schema.safeParse({ currentSku: { path: '/viewing/sku' } }).success) {
+  throw new Error('@rudra-js/a2ui could not parse a data binding with its own zod 3 schema');
+}
+
+const asked = parseRecommendationRequest({ currentSku: 'TR-101', maxItems: 2 });
+if (asked.currentSku !== 'TR-101' || asked.maxItems !== 2) {
+  throw new Error(`parseRecommendationRequest returned ${JSON.stringify(asked)}`);
+}
+let isRefused = false;
+try {
+  parseRecommendationRequest({ candidates: [] });
+} catch {
+  isRefused = true;
+}
+if (!isRefused) {
+  throw new Error('parseRecommendationRequest accepted a request that sets the candidates');
 }
 
 const forbidden: string = '__FORBIDDEN_PACKAGE__';
