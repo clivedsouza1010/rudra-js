@@ -118,12 +118,13 @@ straight away._
 
 ## Packages
 
-| Package                                     | What it does                                                                                                                           |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| [`@rudra-js/core`](packages/core)           | The contracts and logic that turn one tracking payload into one renderable component specification, screened with `@rudra-js/attested` |
-| [`@rudra-js/react`](packages/react)         | Renders that specification with React, on the server or in the browser                                                                 |
-| [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API, and is the only package that makes a billed call                                                           |
-| [`@rudra-js/attested`](packages/attested)   | Checks model-written copy against the facts a shop stands behind, with no dependencies                                                 |
+| Package                                     | What it does                                                                                                                                          |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@rudra-js/core`](packages/core)           | The contracts and logic that turn one tracking payload into one renderable component specification, screened with `@rudra-js/attested`                |
+| [`@rudra-js/react`](packages/react)         | Renders that specification with React, on the server or in the browser                                                                                |
+| [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API, and is the only package that makes a billed call                                                                          |
+| [`@rudra-js/attested`](packages/attested)   | Checks model-written copy against the facts a shop stands behind, with no dependencies                                                                |
+| [`@rudra-js/a2ui`](packages/a2ui)           | Lets an [A2UI](https://a2ui.org) agent place the block in the interfaces it builds, without picking the products or writing the block. Not on npm yet |
 
 ## Development
 
@@ -144,7 +145,7 @@ npm run typecheck    # includes test files, which the build does not
 npm run lint
 npm run format:check
 npm test
-npm run verify:consumer   # packs all four packages and uses them from outside the repo
+npm run verify:consumer   # packs every package and uses them from outside the repo
 ```
 
 To see what each generation mode costs under a stub model, run

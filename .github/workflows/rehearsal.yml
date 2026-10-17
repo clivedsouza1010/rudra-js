@@ -36,4 +36,7 @@ jobs:
         working-directory: packages/react
 
       - run: npm publish --dry-run --access public
+        working-directory: packages/a2ui
+
+      - run: npm publish --dry-run --access public
         working-directory: packages/anthropic

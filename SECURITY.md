@@ -62,6 +62,21 @@ a vulnerability:
   of being read as data.
 - Prototype pollution, or any parsed field silently disappearing instead of being rejected.
 
+**An A2UI agent is untrusted as well, and in `@rudra-js/a2ui` all it can do is hint.** The agent
+places the `RudraRecommendations` component and says what the shopper is looking at; your server
+generates the block. A hint that reaches the model gets there the way a shopper's search does,
+quoted as data, so an agent has the reach over the block's wording that the next section describes
+for shopper text, and no more. Any of these is a vulnerability:
+
+- A property the agent sets on the component, other than the four hints, reaching the request the
+  browser sends or the rendered block.
+- A request body that `parseRecommendationRequest` accepts while it sets the shopper, the signals,
+  the candidates, the surface, the slot or the locale.
+- Anything `loadRecommendations` returns reaching the page without passing core's spec, product and
+  bundle schemas first.
+- A `currentSku` or a `currentCategory` that `fitRecommendationRequest` keeps although none of the
+  candidates it was given carries it.
+
 ## How prompt injection is handled
 
 Shopper text reaches a language model here, so the [OWASP LLM Prompt Injection Prevention Cheat
@@ -177,14 +192,18 @@ primary model can act. Ours can't.
   model's words. Neither is enforcement.
 
 - **Cohort cost, if a visitor can choose a cohort.** The cohort key is built from `segment`,
-  `surface`, `slot`, `locale`, `maxItems`, whether the shopper is new, the category being browsed
-  and the top category their signals favour. Draw any of those from something a visitor controls —
-  a `locale` copied out of `Accept-Language`, a category read off a URL slug — and one visitor can
-  mint as many cohorts as they have patience for. Each new value is a fresh model call, and the
-  shipped in-memory cache holds 10,000 entries and evicts the oldest, so enough of them also push
-  out the cohorts real shoppers were being served from. Nothing leaks: a cohort prompt carries no
-  shopper text at all. The bill and the latency are the damage. Take those fields from sets you
-  control, and put a rate limit in front of the page.
+  `surface`, `slot`, `locale`, `maxItems`, whether the shopper is new, the category being browsed,
+  the top category their signals favour and the SKUs of the candidates. Draw any of those from
+  something a visitor controls — a `locale` copied out of `Accept-Language`, a category read off a
+  URL slug — and one visitor can mint as many cohorts as they have patience for. Each new value is a
+  fresh model call, and the shipped in-memory cache holds 10,000 entries and evicts the oldest, so
+  enough of them also push out the cohorts real shoppers were being served from. Nothing leaks: a
+  cohort prompt carries no shopper text at all. The bill and the latency are the damage. Take those
+  fields from sets you control, and put a rate limit in front of the page. A recommendation endpoint
+  for `@rudra-js/a2ui` takes its category and `maxItems` from an agent, or from whoever calls it,
+  and an agent can place as many components as it likes. `fitRecommendationRequest` keeps a
+  category only when one of your candidates has it. Candidates picked from a hint are a new key for
+  every value of it, and the rate limit is still yours.
 
 - **Instruction disclosure.** A determined injection could get fragments of the instruction half
   echoed back inside a text field. Those instructions are open source and sitting in this repository,
@@ -223,6 +242,10 @@ top of this file.
   the framework makes.
 - **Denial of service through a host's own configuration**, say a generation budget set so high that
   the page blocks. The framework bounds what it can, and a host can always misconfigure it.
+- **What an A2UI agent writes outside the block.** The agent's own components, a `Text` beside the
+  block for instance, are drawn by A2UI from the agent's words. `RUDRA_RECOMMENDATIONS_INSTRUCTIONS`
+  asks the agent not to state prices or product facts there, but that is a request to a model, not
+  a boundary. A2UI's renderers and catalog validation belong to A2UI.
 - Findings from automated scanners with no demonstrated impact on this codebase.
 
 ## Supply chain

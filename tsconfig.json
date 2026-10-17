@@ -12,6 +12,9 @@
     },
     {
       "path": "packages/attested"
+    },
+    {
+      "path": "packages/a2ui"
     }
   ]
 }
