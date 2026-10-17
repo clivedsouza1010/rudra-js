@@ -92,7 +92,7 @@ const closureOf = (packageName) => {
 };
 
 const link = (into, name, source) => {
-  if (name.includes('/')) mkdirSync(join(into, name.split('/')[0]), { recursive: true });
+  mkdirSync(dirname(join(into, name)), { recursive: true });
   symlinkSync(source, join(into, name), 'dir');
 };
 
@@ -145,13 +145,33 @@ function packAndInstall() {
   return { tarballs, shipped };
 }
 
+// npm nests a dependency under the package that asked for it when the root already holds another
+// version, as it does for the zod 3 @rudra-js/a2ui shares with A2UI while core uses zod 4. The
+// consumer gets the same layout, so each package resolves the version it was built against.
+const nestedDependency = (packageName, name) => {
+  const path = join(REPO_ROOT, 'packages', packageName, 'node_modules', name);
+  return existsSync(path) ? path : null;
+};
+
+const installedDependency = (packageName, name) =>
+  nestedDependency(packageName, name) ?? join(REPO_ROOT, 'node_modules', name);
+
+const isExternal = (name) => !name.startsWith('@rudra-js/');
+
 function linkThirdParty() {
   const external = PACKAGES.flatMap((packageName) =>
     dependencyNames(manifestOf(packageName)),
-  ).filter((name) => !name.startsWith('@rudra-js/'));
+  ).filter(isExternal);
 
   for (const name of new Set([...external, ...RENDERER, '@types/react', '@types/react-dom'])) {
     link(modules, name, join(REPO_ROOT, 'node_modules', name));
+  }
+
+  for (const packageName of PACKAGES) {
+    for (const name of dependencyNames(manifestOf(packageName)).filter(isExternal)) {
+      const nested = nestedDependency(packageName, name);
+      if (nested) link(join(modules, '@rudra-js', packageName, 'node_modules'), name, nested);
+    }
   }
 }
 
@@ -206,7 +226,7 @@ function soloProgram(packageName, tarball, declarations) {
       dependency,
       DIRECTORY_OF.has(dependency)
         ? join(modules, '@rudra-js', DIRECTORY_OF.get(dependency))
-        : join(REPO_ROOT, 'node_modules', dependency),
+        : installedDependency(packageName, dependency),
     );
 
     const types = `@types/${dependency}`;
@@ -269,13 +289,35 @@ function checkPlantedDefectIsReported(programs) {
   }
 }
 
-function typecheckOrThrow({ config, failure }) {
+// Errors in A2UI's own declarations that any project importing @a2ui/react sees under these
+// options. They are named by file and code, so any other error, in A2UI or anywhere, still fails.
+const UPSTREAM_DECLARATION_ERRORS = [
+  // Two relative imports without a file extension, which nodenext refuses.
+  { file: 'node_modules/@a2ui/web_core/src/v0_8/types/types.d.ts', code: 'TS2835' },
+];
+
+const ERROR_LINE = /^(.+)\(\d+,\d+\): error (TS\d+):/;
+
+const isUpstreamError = (line) => {
+  const [, file, code] = ERROR_LINE.exec(line) ?? [];
+  return UPSTREAM_DECLARATION_ERRORS.some(
+    (known) => file?.endsWith(known.file) && code === known.code,
+  );
+};
+
+function typecheckOrThrow({ label, config, failure }) {
   const result = typecheck(config);
-  if (result.status !== 0) {
-    process.stdout.write(result.stdout ?? '');
-    process.stderr.write(result.stderr ?? '');
-    throw new Error(failure);
+  if (result.status === 0) return;
+
+  const errors = (result.stdout ?? '').split('\n').filter((line) => ERROR_LINE.test(line));
+  if (errors.length > 0 && errors.every(isUpstreamError)) {
+    console.log(`  ${label}: allowed ${errors.length} known errors in A2UI's own declarations`);
+    return;
   }
+
+  process.stdout.write(result.stdout ?? '');
+  process.stderr.write(result.stderr ?? '');
+  throw new Error(failure);
 }
 
 function mustFail(label, file) {
