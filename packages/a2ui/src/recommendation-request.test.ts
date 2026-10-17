@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { FIELD_LIMITS } from '@rudra-js/core';
 import {
   fitRecommendationRequest,
-  isAwaitingBoundHint,
   parseRecommendationRequest,
   pickRecommendationRequest,
+  type RecommendationRequest,
 } from './recommendation-request.js';
 
 const tooLong = (limit: number) => 'x'.repeat(limit + 1);
@@ -57,10 +57,14 @@ describe('parseRecommendationRequest', () => {
   });
 });
 
+// For a literal hint, what the agent wrote is also what A2UI resolves.
+const pickWritten = (properties: Record<string, unknown>) =>
+  pickRecommendationRequest(properties, properties);
+
 describe('pickRecommendationRequest', () => {
   it('keeps the hints the agent set', () => {
     expect(
-      pickRecommendationRequest({ currentSku: 'A-1', currentCategory: 'Cookware', maxItems: 2 }),
+      pickWritten({ currentSku: 'A-1', currentCategory: 'Cookware', maxItems: 2 }),
     ).toStrictEqual({ currentSku: 'A-1', currentCategory: 'Cookware', maxItems: 2 });
   });
 
@@ -73,11 +77,11 @@ describe('pickRecommendationRequest', () => {
       surface: 'pdp',
     };
 
-    expect(pickRecommendationRequest(fromAgent)).toStrictEqual({ currentSku: 'A-1' });
+    expect(pickWritten(fromAgent)).toStrictEqual({ currentSku: 'A-1' });
   });
 
   it('leaves out a hint that would fail on the server, and keeps the rest', () => {
-    const request = pickRecommendationRequest({
+    const request = pickWritten({
       currentSku: 'A-1',
       currentCategory: '',
       searchQuery: tooLong(FIELD_LIMITS.searchQuery),
@@ -93,13 +97,31 @@ describe('pickRecommendationRequest', () => {
     ['a fraction of an item', { maxItems: 2.5 }],
     ['a SKU written as a number', { currentSku: 12345 }],
   ])('leaves out %s', (_, properties) => {
-    expect(pickRecommendationRequest(properties)).toStrictEqual({});
+    expect(pickWritten(properties)).toStrictEqual({});
   });
 
-  it('leaves out a binding the data model never filled in', () => {
+  it('takes the value A2UI resolved for a bound hint', () => {
     expect(
-      pickRecommendationRequest({ currentSku: undefined, currentCategory: { path: '/x' } }),
+      pickRecommendationRequest({ currentSku: { path: '/viewing/sku' } }, { currentSku: 'A-1' }),
+    ).toStrictEqual({ currentSku: 'A-1' });
+  });
+
+  it('leaves out a binding the data model has not filled in', () => {
+    expect(
+      pickRecommendationRequest(
+        { currentSku: { path: '/viewing/sku' } },
+        { currentSku: undefined },
+      ),
     ).toStrictEqual({});
+  });
+
+  it('leaves out a hint the agent no longer writes, though A2UI still holds its last value', () => {
+    expect(
+      pickRecommendationRequest(
+        { currentSku: 'A-2' },
+        { currentSku: 'A-2', searchQuery: 'pans', maxItems: 2 },
+      ),
+    ).toStrictEqual({ currentSku: 'A-2' });
   });
 });
 
@@ -132,29 +154,24 @@ describe('fitRecommendationRequest', () => {
     ).toStrictEqual({});
   });
 
+  it('keeps a SKU it knows while dropping a category it does not, and the other way round', () => {
+    expect(
+      fitRecommendationRequest({ currentSku: 'A-1', currentCategory: 'Toys' }, CANDIDATES),
+    ).toStrictEqual({ currentSku: 'A-1' });
+    expect(
+      fitRecommendationRequest({ currentSku: 'TOY-9', currentCategory: 'Knives' }, CANDIDATES),
+    ).toStrictEqual({ currentCategory: 'Knives' });
+  });
+
+  it('returns the four hints and nothing else, whatever else it was handed', () => {
+    const body: unknown = JSON.parse('{"currentSku":"A-1","locale":"xx","surface":"checkout"}');
+
+    expect(fitRecommendationRequest(body as RecommendationRequest, CANDIDATES)).toStrictEqual({
+      currentSku: 'A-1',
+    });
+  });
+
   it('leaves an empty request empty', () => {
     expect(fitRecommendationRequest({}, CANDIDATES)).toStrictEqual({});
-  });
-});
-
-describe('isAwaitingBoundHint', () => {
-  it('waits while a bound hint has no value', () => {
-    expect(isAwaitingBoundHint({ currentSku: { path: '/viewing/sku' } }, {})).toBe(true);
-  });
-
-  it('waits while a hint computed by a function has no value', () => {
-    expect(isAwaitingBoundHint({ searchQuery: { call: 'formatString' } }, {})).toBe(true);
-  });
-
-  it('stops waiting once the binding has a value, even one the request leaves out', () => {
-    expect(isAwaitingBoundHint({ currentSku: { path: '/viewing/sku' } }, { currentSku: '' })).toBe(
-      false,
-    );
-  });
-
-  it('never waits for a literal, or for a property that is not a hint', () => {
-    expect(isAwaitingBoundHint({ currentSku: 'A-1', headline: { path: '/headline' } }, {})).toBe(
-      false,
-    );
   });
 });

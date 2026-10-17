@@ -15,8 +15,8 @@ break them.
 - `@rudra-js/a2ui`, a new package that puts the recommendation block inside the interfaces an
   [A2UI](https://a2ui.org) agent builds. The agent places a `RudraRecommendations` component and
   can hint at what the shopper is looking at: a SKU, a category, a search and how many items.
-  The hints reach the prompt quoted as data, like a shopper's search, and nothing else the agent
-  writes reaches the block. Your endpoint parses the hints with `parseRecommendationRequest`,
+  A hint that reaches the prompt is quoted as data, like a shopper's search, and nothing else the
+  agent writes reaches the block. Your endpoint parses the hints with `parseRecommendationRequest`,
   keeps only a SKU and a category its candidates carry with `fitRecommendationRequest`, and
   generates the block with core. The browser checks what comes back against core's schemas before
   `RudraComponent` renders it. It

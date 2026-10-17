@@ -1,10 +1,19 @@
-import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import { createComponentImplementation, type ReactComponentImplementation } from '@a2ui/react/v0_9';
+import type { ComponentModel } from '@a2ui/web_core/v0_9';
 import { RudraComponent, type RudraComponentProps } from '@rudra-js/react';
 import { rudraRecommendationsApi } from './recommendations-api.js';
 import {
-  isAwaitingBoundHint,
   pickRecommendationRequest,
+  type RecommendationHint,
   type RecommendationRequest,
 } from './recommendation-request.js';
 import { parseRecommendationResult, type RecommendationResult } from './recommendation-result.js';
@@ -23,7 +32,7 @@ export interface RudraRecommendationsOptions extends Omit<
   'spec' | 'products' | 'bundles'
 > {
   loadRecommendations: RecommendationLoader;
-  /** Shown until the first recommendations arrive. Nothing is shown by default. */
+  /** Shown until the first load finishes. Nothing is shown by default, or after a failure. */
   placeholder?: ReactNode;
   /**
    * Told about a load that failed, a result that isn't a recommendation result, or a block that
@@ -35,15 +44,16 @@ export interface RudraRecommendationsOptions extends Omit<
 type ErrorListener = ((error: unknown) => void) | undefined;
 
 /**
- * How long a change of hints settles before the component asks again, so a search bound to a text
- * field asks once the shopper pauses rather than once per keystroke. The first load doesn't wait.
+ * How long the hints have to hold still before the component asks, the first time as well. A data
+ * model that arrives in the agent's next message is in the first request, and a search bound to a
+ * text field asks once the shopper pauses rather than once per keystroke.
  */
-export const RELOAD_DELAY_MS = 300;
+export const HINT_SETTLE_MS = 300;
 
 type LoadState =
   | { status: 'loading' }
   | { status: 'failed' }
-  | { status: 'ready'; result: RecommendationResult; requestKey: string };
+  | { status: 'ready'; result: RecommendationResult; loadNumber: number };
 
 const LOADING: LoadState = { status: 'loading' };
 
@@ -56,50 +66,66 @@ async function loadResult(
 }
 
 /**
- * Loads a result for the request, and again whenever the request changes. The last result stays
- * on screen until the next one arrives, and a result for a request that has since changed is
- * dropped.
+ * The properties the agent writes on the component, kept current as it rewrites them. A2UI only
+ * re-renders a component when a resolved value changes, so this listens to the model itself.
+ */
+function useWrittenProperties(model: ComponentModel): Readonly<Record<string, unknown>> {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const subscription = model.onUpdated.subscribe(onChange);
+      return () => subscription.unsubscribe();
+    },
+    [model],
+  );
+  return useSyncExternalStore(subscribe, () => model.properties);
+}
+
+/**
+ * Loads a result for the request once it has held still, and again whenever it changes. The last
+ * result stays on screen until the next one arrives, and a result for a request that has since
+ * changed is dropped. A failed load shows nothing until the request changes.
  */
 function useRecommendationResult(
   request: RecommendationRequest,
-  isAwaitingHints: boolean,
   loadRecommendations: RecommendationLoader,
   onError: ErrorListener,
 ): LoadState {
   const [state, setState] = useState<LoadState>(LOADING);
-  const hasRequested = useRef(false);
+  const shownRequestKey = useRef<string | null>(null);
+  const loadCount = useRef(0);
 
   // The binder hands over new props on every render, so the request is compared by value.
   const requestKey = JSON.stringify(request);
 
   useEffect(() => {
-    if (isAwaitingHints) return undefined;
+    // The hints changed and came back to the ones the block on screen was loaded for.
+    if (requestKey === shownRequestKey.current) return undefined;
 
     const controller = new AbortController();
     const asked: RecommendationRequest = JSON.parse(requestKey);
 
-    const timer = setTimeout(
-      () => {
-        hasRequested.current = true;
-        loadResult(loadRecommendations, asked, controller.signal).then(
-          (result) => {
-            if (!controller.signal.aborted) setState({ status: 'ready', result, requestKey });
-          },
-          (error: unknown) => {
-            if (controller.signal.aborted) return;
-            setState({ status: 'failed' });
-            onError?.(error);
-          },
-        );
-      },
-      hasRequested.current ? RELOAD_DELAY_MS : 0,
-    );
+    const timer = setTimeout(() => {
+      loadResult(loadRecommendations, asked, controller.signal).then(
+        (result) => {
+          if (controller.signal.aborted) return;
+          shownRequestKey.current = requestKey;
+          loadCount.current += 1;
+          setState({ status: 'ready', result, loadNumber: loadCount.current });
+        },
+        (error: unknown) => {
+          if (controller.signal.aborted) return;
+          shownRequestKey.current = null;
+          setState({ status: 'failed' });
+          onError?.(error);
+        },
+      );
+    }, HINT_SETTLE_MS);
 
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [requestKey, isAwaitingHints, loadRecommendations, onError]);
+  }, [requestKey, loadRecommendations, onError]);
 
   return state;
 }
@@ -131,8 +157,8 @@ class RenderFailureBoundary extends Component<RenderFailureBoundaryProps, { hasF
 }
 
 interface RecommendationsViewProps {
-  request: RecommendationRequest;
-  isAwaitingHints: boolean;
+  model: ComponentModel;
+  resolved: Partial<Record<RecommendationHint, unknown>>;
   loadRecommendations: RecommendationLoader;
   onError: ErrorListener;
   placeholder: ReactNode;
@@ -140,14 +166,16 @@ interface RecommendationsViewProps {
 }
 
 function RecommendationsView({
-  request,
-  isAwaitingHints,
+  model,
+  resolved,
   loadRecommendations,
   onError,
   placeholder,
   renderProps,
 }: RecommendationsViewProps) {
-  const state = useRecommendationResult(request, isAwaitingHints, loadRecommendations, onError);
+  const written = useWrittenProperties(model);
+  const request = pickRecommendationRequest(written, resolved);
+  const state = useRecommendationResult(request, loadRecommendations, onError);
 
   switch (state.status) {
     case 'loading':
@@ -156,8 +184,8 @@ function RecommendationsView({
       return null;
     case 'ready':
       return (
-        // Keyed by request, so a new result gets a fresh boundary.
-        <RenderFailureBoundary key={state.requestKey} onError={onError}>
+        // Keyed by load, so each new result gets a boundary that hasn't failed.
+        <RenderFailureBoundary key={state.loadNumber} onError={onError}>
           <RudraComponent
             {...renderProps}
             spec={state.result.spec}
@@ -188,8 +216,8 @@ export function createRudraRecommendationsComponent({
 }: RudraRecommendationsOptions): ReactComponentImplementation {
   return createComponentImplementation(rudraRecommendationsApi, ({ props, context }) => (
     <RecommendationsView
-      request={pickRecommendationRequest(props)}
-      isAwaitingHints={isAwaitingBoundHint(context.componentModel.properties, props)}
+      model={context.componentModel}
+      resolved={props}
       loadRecommendations={loadRecommendations}
       onError={onError}
       placeholder={placeholder}

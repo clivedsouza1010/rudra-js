@@ -32,53 +32,45 @@ export function parseRecommendationRequest(value: unknown): RecommendationReques
  * the product being looked at among them, as core's quickstart does. Both hints come from the
  * agent, or from whoever called your endpoint. In core's default cohort mode a category is part of
  * the cache key and of the prompt, so an open-ended set of categories is an open-ended number of
- * model calls; a category none of your products has is one nobody needs.
+ * model calls; a category none of your products has is one nobody needs. It returns the four hints
+ * and nothing else, whatever else the object it was given holds.
  */
 export function fitRecommendationRequest(
   request: RecommendationRequest,
   candidates: readonly Pick<Product, 'sku' | 'category'>[],
 ): RecommendationRequest {
-  const { currentSku, currentCategory, ...otherHints } = request;
+  const { currentSku, currentCategory, searchQuery, maxItems } = request;
   const isCandidateSku = candidates.some((candidate) => candidate.sku === currentSku);
   const isCandidateCategory = candidates.some(
     (candidate) => candidate.category === currentCategory,
   );
 
   return {
-    ...otherHints,
     ...(currentSku !== undefined && isCandidateSku ? { currentSku } : {}),
     ...(currentCategory !== undefined && isCandidateCategory ? { currentCategory } : {}),
+    ...(searchQuery !== undefined ? { searchQuery } : {}),
+    ...(maxItems !== undefined ? { maxItems } : {}),
   };
 }
 
 /**
- * Builds a request in the browser from what the agent set. It reads only the fields a request
- * has, so a property the agent invented, such as a headline or a price, never leaves the browser.
- * A value that wouldn't pass `parseRecommendationRequest` is left out, so one bad hint doesn't
- * cost the shopper the whole block.
+ * Builds a request in the browser from the hints the agent currently writes on the component,
+ * taking each one's value as A2UI resolved it. A2UI hands a component every property the agent
+ * wrote, and keeps a value after the agent stops writing it, so this reads only the hint fields,
+ * and only those still in `written`. An invented headline or price never leaves the browser. A
+ * value that wouldn't pass `parseRecommendationRequest` is left out, so one bad hint doesn't cost
+ * the shopper the whole block.
  */
 export function pickRecommendationRequest(
-  properties: Partial<Record<RecommendationHint, unknown>>,
+  written: Readonly<Record<string, unknown>>,
+  resolved: Partial<Record<RecommendationHint, unknown>>,
 ): RecommendationRequest {
   const request: Record<string, unknown> = {};
   for (const [field, schema] of Object.entries(recommendationRequestSchema.shape)) {
-    const checked = schema.safeParse(properties[field as RecommendationHint]);
+    if (!Object.hasOwn(written, field)) continue;
+    const checked = schema.safeParse(resolved[field as RecommendationHint]);
     if (checked.success && checked.data !== undefined) request[field] = checked.data;
   }
   // Every field in it has just passed its own part of the schema.
   return request as RecommendationRequest;
-}
-
-/**
- * Whether a hint the agent bound to its data model, or to a function, has no value yet. The
- * component waits for it rather than asking without it and then asking again.
- */
-export function isAwaitingBoundHint(
-  written: Readonly<Record<string, unknown>>,
-  resolved: Partial<Record<RecommendationHint, unknown>>,
-): boolean {
-  return Object.keys(recommendationRequestSchema.shape).some((field) => {
-    const isBound = typeof written[field] === 'object' && written[field] !== null;
-    return isBound && resolved[field as RecommendationHint] === undefined;
-  });
 }

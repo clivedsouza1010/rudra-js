@@ -88,7 +88,7 @@ export async function POST(request: Request): Promise<Response> {
   // The agent only hints at what the shopper is looking at. Who the shopper is,
   // what they've done and what you sell all come from your side.
   const shopper = await shopperFor(request);
-  const candidates = await candidatesFor(asked);
+  const candidates = await candidatesFor(shopper);
   const hints = fitRecommendationRequest(asked, candidates);
   const input = parseTrackingInput({
     user: { id: shopper.id },
@@ -104,17 +104,19 @@ export async function POST(request: Request): Promise<Response> {
 ```
 
 A request carries at most four hints: `currentSku`, `currentCategory`, `searchQuery` and
-`maxItems`, each with the bounds it has in core's `renderContextSchema`. `parseRecommendationRequest`
-is strict, so a body that tries to set the shopper, the candidates, the surface or the locale gets
+`maxItems`, each with the bounds it has in core's `renderContextSchema`.
+`parseRecommendationRequest` is strict, so a body that tries to set the shopper, the candidates, the surface or the locale gets
 a 400 instead of quietly reaching your generator.
 
 The hints come from the agent, and anyone can call your endpoint with any hints at all, so treat
 each one as something a shopper could have typed. `fitRecommendationRequest` keeps a `currentSku`
-or a `currentCategory` only when one of your candidates carries it. That matters for cost as well
-as sense: in core's default cohort mode the category is part of the cache key, so an open-ended set
-of categories would be an open-ended number of model calls. Put a rate limit in front of the
-endpoint too, as the cohort cost note in [SECURITY.md](../../SECURITY.md) asks of any page that can
-cost a model call.
+or a `currentCategory` only when one of your candidates carries it, and returns the four hints and
+nothing else. That matters for cost as well as sense. In core's default cohort mode the category,
+`maxItems` and the set of candidate SKUs are all part of the cache key, so an open-ended set of any
+of them is an open-ended number of model calls. That's why the example picks candidates for the
+shopper rather than for the hints: pick them from a search or a SKU, and every distinct value is a
+new cohort. Put a rate limit in front of the endpoint too, as the cohort cost note in
+[SECURITY.md](../../SECURITY.md) asks of any page that can cost a model call.
 
 Send back `input.candidates` and `input.bundles`, the parsed rows, not your raw catalog. The
 `provider` is up to you. With `@rudra-js/anthropic` the model writes the wording, and the same
@@ -169,11 +171,13 @@ Feed the processor your agent's messages and render its surfaces with `A2uiSurfa
 
 Each hint can be a literal or bound to the agent's data model (`{ "path": "/viewing/sku" }`).
 
-The hints aren't instructions, but they are words a model reads. A category or a search reaches
-the prompt quoted as data, the way a shopper's own search does, so a hostile or prompt-injected
-agent can try to sway the wording of the block through them, within the limits
-[SECURITY.md](../../SECURITY.md) describes for shopper text. It can't change the products, the
-prices, the images or the links.
+The hints aren't instructions, but some of them are words a model reads, quoted as data the way a
+shopper's own search is. In core's default cohort mode that's only the category, and after
+`fitRecommendationRequest` it's one of your own. The SKU only keeps that product off the block, and
+the search changes nothing unless your endpoint uses it. With `generation: 'per-shopper'` the SKU
+and the search reach the prompt too, so a hostile or prompt-injected agent can try to sway the
+wording of the block through them, within the limits [SECURITY.md](../../SECURITY.md) describes for
+shopper text. It can't change the products, the prices, the images or the links.
 
 The agent can still write anything it likes into its own `Text` components beside the block.
 `RUDRA_RECOMMENDATIONS_INSTRUCTIONS` asks it not to put prices or product facts there, but that's a
@@ -181,18 +185,23 @@ request to a model, not a boundary. The boundary is the block itself.
 
 ## What the component does
 
-- It reads only the four hints. A2UI hands a component every property the agent wrote, so an
+- It reads only the four hints, and only the ones the agent still writes. A2UI hands a component
+  every property the agent wrote, and keeps a value after the agent stops writing it, so an
   invented `headline` or `price` is there to read; the component never reads it, and it never
   leaves the browser.
 - It leaves out a hint that wouldn't pass `parseRecommendationRequest`, such as a `maxItems` of 40
   or an over-long search, and asks with the rest. A2UI checks each hint's type before that, though:
   a hint that is neither a binding nor the right type, such as a SKU written as a number, gets the
   agent's whole message refused, the agent's own components included.
-- It waits while a bound hint has no value yet, rather than asking without it and again with it.
-- When a hint changes, it waits 300 ms for it to settle before asking again, so a search bound to a
-  text field asks once the shopper pauses, not once per keystroke. The last block stays up until
-  the new one arrives, and a result for hints that have since changed is dropped.
-- It shows `placeholder` until the first recommendations arrive, and nothing by default.
+- It asks once the hints have held still for 300 ms, the first time too. A data model that comes
+  in the agent's next message makes it into the first request, and a search bound to a text field
+  asks once the shopper pauses, not once per keystroke. A bound hint with no value, yet or any
+  more, is left out of the request.
+- When the hints change, the last block stays up until the new one arrives, and a result for hints
+  that have since changed is dropped. If the hints come back to the ones on screen, it doesn't ask
+  again.
+- It shows `placeholder` until the first load finishes, and nothing by default. After a failed
+  load it shows nothing until the hints change.
 - It checks what `loadRecommendations` returns before rendering any of it: the spec against core's
   spec schema, and the products and bundles against `productSchema` and `bundleSchema`. That is
   what keeps a protocol-relative `//elsewhere.example` image off the page.
