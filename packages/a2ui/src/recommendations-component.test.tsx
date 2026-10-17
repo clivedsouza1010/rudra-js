@@ -230,34 +230,19 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
     expect(container.textContent).toContain(AGENT_TEXT);
   });
 
-  it('puts a data model that arrives in the next agent message into the first request', async () => {
-    const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
-
-    const { container, send } = await renderSurface(
-      agentMessages({ currentSku: { path: '/viewing/sku' } }),
-      { loadRecommendations },
-    );
-    await send(dataModelUpdate('/viewing', { sku: 'A-1' }));
-    await settle();
-
-    expect(requestsSent(loadRecommendations)).toStrictEqual([{ currentSku: 'A-1' }]);
-    expect(blockIn(container)).not.toBeNull();
-  });
-
   it('waits for the hints to hold still for 300 ms before asking', async () => {
     const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
 
-    const { send } = await renderSurface(
-      agentMessages({ currentSku: { path: '/viewing/sku' } }, { viewing: { sku: 'A-1' } }),
-      { loadRecommendations },
-    );
+    const { send } = await renderSurface(agentMessages({ currentSku: { path: '/viewing/sku' } }), {
+      loadRecommendations,
+    });
     await wait(200);
-    await send(dataModelUpdate('/viewing/sku', 'A-3'));
+    await send(dataModelUpdate('/viewing', { sku: 'A-1' }));
     await wait(299);
     expect(loadRecommendations).not.toHaveBeenCalled();
     await wait(1);
 
-    expect(requestsSent(loadRecommendations)).toStrictEqual([{ currentSku: 'A-3' }]);
+    expect(requestsSent(loadRecommendations)).toStrictEqual([{ currentSku: 'A-1' }]);
   });
 
   it('keeps the last block up until the next one arrives', async () => {

@@ -139,18 +139,12 @@ Give the browser catalog the same id as the agent catalog, because A2UI looks it
 `loadRecommendations`, `placeholder`, `onError`, and every `RudraComponent` prop except `spec`,
 `products` and `bundles`.
 
-## What comes from where
-
-The agent picks where the block goes and sets the hints. Each hint can be a literal or bound to
-the agent's data model (`{ "path": "/viewing/sku" }`). Your server picks the shopper and their
-signals, the locale, the candidates and the model. Every title, price, image and link comes from
-your catalog.
-
 ## What the component does
 
-- It sends only the four hints. It leaves out a blank one, and one the server would turn away,
-  like a `maxItems` of 40. A literal of the wrong type, like a numeric SKU, makes A2UI refuse the
-  agent's whole message.
+- It reads each hint as a literal or from the agent's data model (`{ "path": "/viewing/sku" }`),
+  and sends only the four. It leaves out a blank one, and one the server would turn away, like a
+  `maxItems` of 40. A literal of the wrong type, like a numeric SKU, makes A2UI refuse the agent's
+  whole message.
 - It asks once the hints hold still for 300 ms, and keeps the last block up until the next one
   arrives. `signal` aborts when the hints change or the component unmounts.
 - It checks the result against core's schemas before rendering any of it.

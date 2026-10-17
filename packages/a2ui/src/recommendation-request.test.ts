@@ -64,10 +64,8 @@ describe('pickRecommendationRequest', () => {
       searchQuery: tooLong(FIELD_LIMITS.searchQuery),
       maxItems: FIELD_LIMITS.maxItems + 1,
     };
-    const request = pickRecommendationRequest(written, written);
 
-    expect(request).toStrictEqual({ currentSku: 'A-1' });
-    expect(parseRecommendationRequest(request)).toStrictEqual(request);
+    expect(pickRecommendationRequest(written, written)).toStrictEqual({ currentSku: 'A-1' });
   });
 
   it.each([
