@@ -196,7 +196,9 @@ same six checks a pull request runs, build included, and then publishes `@rudra-
 
 `@rudra-js/a2ui` isn't in that list yet. It needs a trusted publisher first (see
 [What publishing is bound to](#what-publishing-is-bound-to)), then a step after react. Until then a
-tag skips it, but bump its version with the others.
+tag skips it, but bump its version with the others. In the pull request that adds the step, drop the
+"Not on npm yet" notes from the root README's package table and the top of
+`packages/a2ui/README.md`.
 
 The order is what an install can satisfy. `@rudra-js/attested` depends on nothing and core declares
 it as a peer, so attested goes first; react and anthropic both declare core as a peer, so core
