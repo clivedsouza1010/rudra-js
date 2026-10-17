@@ -30,10 +30,10 @@ export function parseRecommendationRequest(value: unknown): RecommendationReques
 /**
  * Keeps a `currentSku` or a `currentCategory` only when one of your candidates carries it. Both
  * hints come from the agent, or from whoever called your endpoint. A SKU none of your candidates
- * has could never be on the block anyway, which is all core's cohort mode uses it for. In core's default cohort mode a category is part of
- * the cache key and of the prompt, so an open-ended set of categories is an open-ended number of
- * model calls; a category none of your products has is one nobody needs. It returns the four hints
- * and nothing else, whatever else the object it was given holds.
+ * has could never be on the block anyway, which is all core's cohort mode uses it for. In that
+ * mode a category is part of the cache key and of the prompt, so an open-ended set of categories
+ * is an open-ended number of model calls; a category none of your products has is one nobody
+ * needs. It returns the four hints and nothing else, whatever else the object it was given holds.
  */
 export function fitRecommendationRequest(
   request: RecommendationRequest,
