@@ -1,4 +1,3 @@
-// --- endpoint ---
 import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
 import {
   fitRecommendationRequest,
@@ -32,4 +31,3 @@ export async function POST(request: Request): Promise<Response> {
   const result: RecommendationResult = { spec, products: input.candidates, bundles: input.bundles };
   return Response.json(result);
 }
-// --- end endpoint ---

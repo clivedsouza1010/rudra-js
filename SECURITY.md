@@ -69,8 +69,8 @@ can. Any of these is a vulnerability:
 
 - A property the agent sets on the component, other than the four hints, reaching the request the
   browser sends or the rendered block.
-- A request body that `parseRecommendationRequest` accepts while it sets the shopper, the signals,
-  the candidates, the surface, the slot or the locale.
+- A request body that sets the shopper, the signals, the candidates, the surface, the slot or the
+  locale and still gets through `parseRecommendationRequest`.
 - Anything `loadRecommendations` returns reaching the page without passing core's spec, product and
   bundle schemas first.
 - A `currentSku` or a `currentCategory` that `fitRecommendationRequest` keeps although none of the

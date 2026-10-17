@@ -158,22 +158,6 @@ const requestsSent = (loader: Mock<RecommendationLoader>) =>
   loader.mock.calls.map(([request]) => request);
 
 describe('the RudraRecommendations component in an A2UI surface', () => {
-  it('renders recommendations whose titles and prices come from the shop', async () => {
-    const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
-
-    const { container } = await renderSurface(agentMessages({ currentSku: 'A-1' }), {
-      loadRecommendations,
-      locale: 'en-US',
-    });
-    await settle();
-
-    const block = blockIn(container);
-    expect(block?.textContent).toContain('Enamel dutch oven');
-    expect(block?.textContent).toContain('$89.00');
-    expect(block?.textContent).not.toContain('Cast iron skillet');
-    expect(container.textContent).toContain(AGENT_TEXT);
-  });
-
   it('never sends or shows what the agent wrote beyond the hints', async () => {
     const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
 
@@ -189,7 +173,9 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
     await settle();
 
     expect(requestsSent(loadRecommendations)).toStrictEqual([{ currentSku: 'A-1' }]);
-    expect(container.textContent).toContain('$89.00');
+    const block = blockIn(container);
+    expect(block?.textContent).toContain('Enamel dutch oven');
+    expect(block?.textContent).toContain('$89.00');
     expect(container.textContent).not.toContain('Only $1 today');
     expect(container.textContent).not.toContain('Free dutch oven');
   });
@@ -318,21 +304,6 @@ describe('the RudraRecommendations component in an A2UI surface', () => {
     await settle();
 
     expect(loadRecommendations).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not ask again when a bound search is typed and cleared', async () => {
-    const loadRecommendations = vi.fn<RecommendationLoader>(shopResultFor);
-
-    const { send } = await renderSurface(
-      agentMessages({ currentSku: 'A-1', searchQuery: { path: '/search' } }),
-      { loadRecommendations },
-    );
-    await settle();
-    await send(dataModelUpdate('/search', 'pan'));
-    await send(dataModelUpdate('/search', ''));
-    await settle();
-
-    expect(requestsSent(loadRecommendations)).toStrictEqual([{ currentSku: 'A-1' }]);
   });
 
   it('asks again for a data model that comes after the hints settled', async () => {

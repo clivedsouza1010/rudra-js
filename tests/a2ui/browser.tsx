@@ -1,4 +1,3 @@
-// --- browser ---
 import type { ReactCatalogComponent } from '@a2ui/react/v0_9';
 import { Catalog, MessageProcessor } from '@a2ui/web_core/v0_9';
 import { basicCatalog } from '@a2ui/web_core/v0_9/basic_catalog';
@@ -26,4 +25,3 @@ const shopCatalog = new Catalog<ReactCatalogComponent>(
 );
 
 export const processor = new MessageProcessor<ReactCatalogComponent>([shopCatalog]);
-// --- end browser ---

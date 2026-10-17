@@ -153,23 +153,17 @@ const nestedDependency = (packageName, name) => {
 const installedDependency = (packageName, name) =>
   nestedDependency(packageName, name) ?? join(REPO_ROOT, 'node_modules', name);
 
-const isExternal = (name) => !name.startsWith('@rudra-js/');
-
 function linkThirdParty() {
-  const external = PACKAGES.flatMap((packageName) =>
-    dependencyNames(manifestOf(packageName)),
-  ).filter(isExternal);
-
-  for (const name of new Set([...external, ...RENDERER, '@types/react', '@types/react-dom'])) {
-    link(modules, name, join(REPO_ROOT, 'node_modules', name));
-  }
-
+  const external = new Set([...RENDERER, '@types/react', '@types/react-dom']);
   for (const packageName of PACKAGES) {
-    for (const name of dependencyNames(manifestOf(packageName)).filter(isExternal)) {
+    for (const name of dependencyNames(manifestOf(packageName))) {
+      if (name.startsWith('@rudra-js/')) continue;
+      external.add(name);
       const nested = nestedDependency(packageName, name);
       if (nested) link(join(modules, '@rudra-js', packageName, 'node_modules'), name, nested);
     }
   }
+  for (const name of external) link(modules, name, join(REPO_ROOT, 'node_modules', name));
 }
 
 function writeConsumer(fixture, file, specifier) {

@@ -23,8 +23,10 @@ npm install @rudra-js/a2ui @rudra-js/core @rudra-js/react @rudra-js/attested @a2
 ```
 
 Everything but zod is a peer dependency, so your app holds one copy of each. On pnpm, read
-[zod](#zod) first. Keep `skipLibCheck: true`. A2UI's declarations need `"dom"` in `lib`, and two of
-their imports have no file extension, which `nodenext` refuses.
+[zod](#zod) first.
+
+Keep `skipLibCheck: true`. Without it, A2UI's own declarations fail to typecheck: they need `"dom"`
+in `lib`, and two of their imports have no file extension, which `nodenext` refuses.
 
 ## Three pieces
 
@@ -132,8 +134,10 @@ const shopCatalog = new Catalog<ReactCatalogComponent>(
 export const processor = new MessageProcessor<ReactCatalogComponent>([shopCatalog]);
 ```
 
-Render the processor's surfaces with `A2uiSurface`. The options take `loadRecommendations`,
-`placeholder`, `onError`, and every `RudraComponent` prop except `spec`, `products` and `bundles`.
+Give the browser catalog the same id as the agent catalog, because A2UI looks it up by the
+`catalogId` the agent sends. Render the processor's surfaces with `A2uiSurface`. The options take
+`loadRecommendations`, `placeholder`, `onError`, and every `RudraComponent` prop except `spec`,
+`products` and `bundles`.
 
 ## What comes from where
 
@@ -158,7 +162,9 @@ your catalog.
 
 `@rudra-js/a2ui` holds `createRudraRecommendationsComponent` and its types, and loads only in the
 browser, because `@a2ui/react` needs a DOM. The agent catalog and your endpoint import from
-`@rudra-js/a2ui/server`, which runs anywhere.
+`@rudra-js/a2ui/server`, which runs anywhere. In Next.js a `'use client'` file still runs on the
+server for the first render, so load the one that imports `@rudra-js/a2ui` from a client component
+with `next/dynamic` and `ssr: false`.
 
 A2UI renders on the client, so a crawler won't see a block an agent places. For a product page,
 render `RudraComponent` on the server, as the

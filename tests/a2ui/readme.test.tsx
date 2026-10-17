@@ -28,14 +28,6 @@ vi.mock('@rudra-js/core', async (importOriginal) => {
 const REPO_ROOT = join(import.meta.dirname, '../..');
 const SHOP_ORIGIN = 'https://shop.example';
 
-const between = (text: string, start: string, end: string): string => {
-  const from = text.indexOf(start);
-  const to = text.indexOf(end, from + start.length);
-  expect(from, `${start} is missing`).toBeGreaterThan(-1);
-  expect(to, `${end} is missing`).toBeGreaterThan(from);
-  return text.slice(from + start.length, to).trim();
-};
-
 const codeBlocksIn = (markdown: string): string[] =>
   [...markdown.matchAll(/^```tsx?\n([\s\S]*?)^```$/gm)].map((match) => (match[1] ?? '').trim());
 
@@ -54,18 +46,16 @@ afterEach(() => {
 });
 
 describe('the examples in the @rudra-js/a2ui README', () => {
-  it.each([
-    ['agent-catalog.ts', 'agent catalog'],
-    ['endpoint.ts', 'endpoint'],
-    ['browser.tsx', 'browser'],
-  ])('shows %s exactly as it runs', (file, marker) => {
-    const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
-    const source = readFileSync(join(REPO_ROOT, 'tests/a2ui', file), 'utf8');
+  const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
 
-    const run = between(source, `// --- ${marker} ---`, `// --- end ${marker} ---`);
+  it.each(['agent-catalog.ts', 'endpoint.ts', 'browser.tsx'])(
+    'shows %s exactly as it runs',
+    (file) => {
+      const source = readFileSync(join(import.meta.dirname, file), 'utf8').trim();
 
-    expect(codeBlocksIn(readme), 'the README shows code the test does not run').toContain(run);
-  });
+      expect(codeBlocksIn(readme), 'the README shows code the test does not run').toContain(source);
+    },
+  );
 });
 
 describe('the README endpoint', () => {
