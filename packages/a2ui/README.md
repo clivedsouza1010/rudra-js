@@ -13,8 +13,6 @@ builds the block with `@rudra-js/core`, and the browser renders it with `@rudra-
 
 It works with version 0.9 of the A2UI protocol, through `@a2ui/react` and `@a2ui/web_core` 0.14.
 
-> **Not on npm yet.** The install below fails until the first release that includes it.
-
 ## Install
 
 ```sh

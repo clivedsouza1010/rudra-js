@@ -10,6 +10,12 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- `@rudra-js/a2ui` is published to npm from this release on. The release
+  workflow publishes it right after `@rudra-js/react`, since it needs both core
+  and react.
+
 ## [0.8.0] - 2026-10-17
 
 ### Added
