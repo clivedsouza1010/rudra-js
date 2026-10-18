@@ -12,10 +12,11 @@ break them.
 
 ### Fixed
 
-- The a2ui README's install command failed with `ERESOLVE` in an app already on
-  an older `@rudra-js/core`, because npm keeps the range a bare name already
-  has. It now asks for `@latest` on the `@rudra-js` packages, so one command
-  works in a new app, an existing one and an upgrade.
+- The a2ui README's install command failed with `ERESOLVE` in an app on an
+  older `@rudra-js/core` or A2UI, because for a bare name npm stays inside the
+  range the app's `package.json` already has. It now asks for `@latest` on the
+  `@rudra-js` packages, `@rudra-js/anthropic` included when the app has it, and
+  for 0.14 on the `@a2ui` ones.
 
 ## [0.8.1] - 2026-10-18
 
