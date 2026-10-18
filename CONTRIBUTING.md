@@ -223,18 +223,24 @@ token itself.
 Trusted publishing also needs Node 22.14 or newer. That's higher than the `>=22.12` floor the
 packages declare, and higher than npm's own `>=22.9`. Both workflows take their Node from `.nvmrc`,
 which is why `.nvmrc` names an exact version and not the `22` line: `22` lets the runner pick
-whatever 22.x it has cached, and that could be older than 22.14. So a test fails if `.nvmrc` drops
-below 22.14. Without it, the first sign of trouble is a release that cannot publish, on a tag you
-cannot reuse.
+whatever 22.x it has cached, and that could be older than 22.14. Nothing checks that `.nvmrc` stays
+at 22.14 or above. Let it drop and the first sign of trouble is a release that cannot publish, on a
+tag you cannot reuse.
 
 We pin npm to one version rather than a range because npm is the thing doing the publishing, and a
 publisher that changes under you between two releases is not something you want to find out about
 during one.
 
-Nothing watches this pin against what npm releases, so bump it by hand — in both files. A test
-holds the two equal, so you can't move one and leave the other. Bumping it usually drags `.nvmrc`
-along: npm 12 declares `^22.22.2 || ^24.15.0 || >=26.0.0`, `.nvmrc` is 22.21.1, and `.npmrc` sets
-`engine-strict=true`, so installing npm 12 on today's Node is a hard refusal.
+Nothing watches this pin against what npm releases, so bump it by hand — in both files. Nothing
+checks that the two match either, so look before you merge:
+
+```sh
+grep -n 'npm@' .github/workflows/release.yml .github/workflows/rehearsal.yml
+```
+
+Bumping it usually drags `.nvmrc` along: npm 12 declares `^22.22.2 || ^24.15.0 || >=26.0.0`,
+`.nvmrc` is 22.21.1, and `.npmrc` sets `engine-strict=true`, so installing npm 12 on today's Node is
+a hard refusal.
 
 Run `rehearsal.yml` once you have. It installs the same npm and does a `--dry-run` publish of every
 package, so a broken npm shows up there instead of halfway through a release. It doesn't go
