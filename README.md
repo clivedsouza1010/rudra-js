@@ -124,7 +124,7 @@ straight away._
 | [`@rudra-js/react`](packages/react)         | Renders that specification with React, on the server or in the browser                                                                 |
 | [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API, and is the only package that makes a billed call                                                           |
 | [`@rudra-js/attested`](packages/attested)   | Checks model-written copy against the facts a shop stands behind, with no dependencies                                                 |
-| [`@rudra-js/a2ui`](packages/a2ui)           | Lets an [A2UI](https://a2ui.org) agent place the block; your server still picks the products. Not on npm yet                           |
+| [`@rudra-js/a2ui`](packages/a2ui)           | Lets an [A2UI](https://a2ui.org) agent place the block; your server still picks the products.                                          |
 
 ## Development
 

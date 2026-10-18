@@ -45,4 +45,7 @@ jobs:
         working-directory: packages/react
 
       - run: npm publish --provenance --access public
+        working-directory: packages/a2ui
+
+      - run: npm publish --provenance --access public
         working-directory: packages/anthropic

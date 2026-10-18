@@ -191,18 +191,12 @@ git push origin v0.5.1
 
 A `v*` tag starts [`.github/workflows/release.yml`](.github/workflows/release.yml). It runs the
 same six checks a pull request runs, build included, and then publishes `@rudra-js/attested`,
-`@rudra-js/core`, `@rudra-js/react` and `@rudra-js/anthropic` in that order with
+`@rudra-js/core`, `@rudra-js/react`, `@rudra-js/a2ui` and `@rudra-js/anthropic` in that order with
 `npm publish --provenance`.
-
-`@rudra-js/a2ui` isn't in that list yet. It needs a trusted publisher first (see
-[What publishing is bound to](#what-publishing-is-bound-to)), then a step after react. Until then a
-tag skips it, but bump its version with the others. In the pull request that adds the step, drop the
-"Not on npm yet" notes from the root README's package table and the top of
-`packages/a2ui/README.md`.
 
 The order is what an install can satisfy. `@rudra-js/attested` depends on nothing and core declares
 it as a peer, so attested goes first; react and anthropic both declare core as a peer, so core
-leads them. npm can't publish over a half-finished release, so anything that goes out before a
+leads them, and a2ui declares both core and react, so it follows react. npm can't publish over a half-finished release, so anything that goes out before a
 failure is public and stuck at a version the next tag can't reuse.
 
 Three steps run before anything is installed, and any one of them stops the release: the tagged
