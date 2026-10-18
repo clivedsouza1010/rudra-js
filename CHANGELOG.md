@@ -10,6 +10,13 @@ break them.
 
 ## [Unreleased]
 
+### Fixed
+
+- The a2ui README's install command failed with `ERESOLVE` in an app already on
+  an older `@rudra-js/core`, because npm keeps the range a bare name already
+  has. It now asks for `@latest` on the `@rudra-js` packages, so one command
+  works in a new app, an existing one and an upgrade.
+
 ## [0.8.1] - 2026-10-18
 
 ### Changed

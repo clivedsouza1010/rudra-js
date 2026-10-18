@@ -16,11 +16,17 @@ It works with version 0.9 of the A2UI protocol, through `@a2ui/react` and `@a2ui
 ## Install
 
 ```sh
-npm install @rudra-js/a2ui @rudra-js/core @rudra-js/react @rudra-js/attested @a2ui/react @a2ui/web_core react react-dom
+npm install @rudra-js/a2ui@latest @rudra-js/core@latest @rudra-js/react@latest @rudra-js/attested@latest @a2ui/react @a2ui/web_core react react-dom
 ```
 
-Everything but zod is a peer dependency, so your app holds one copy of each. On pnpm, read
-[zod](#zod) first.
+Run the same command in a new app, in one that already uses rudra-js, and to upgrade. Every
+`@rudra-js` package is published at one version, and this one needs core and react at its own. A
+bare name keeps the range your `package.json` already has, so without `@latest` an app on an older
+core gets an `ERESOLVE`. `react` and `react-dom` have no `@latest`, so a React 18 app stays on 18.
+
+Everything but zod is a peer dependency, so your app holds one copy of each. npm and pnpm add
+peers for you, but naming them puts them in your `package.json`. Yarn doesn't, so there you need
+the whole list. On pnpm, read [zod](#zod) first.
 
 Keep `skipLibCheck: true`. Without it, A2UI's own declarations fail to typecheck: they need `"dom"`
 in `lib`, and two of their imports have no file extension, which `nodenext` refuses.
