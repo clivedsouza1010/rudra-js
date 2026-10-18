@@ -1,6 +1,6 @@
 {
   "name": "@rudra-js/anthropic",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Anthropic adapter for rudra-js (@rudra-js/core), with no vendor SDK",
   "keywords": [
     "rudra-js",
@@ -52,10 +52,10 @@
     "zod": "^4.6.7"
   },
   "peerDependencies": {
-    "@rudra-js/core": "^0.8.0"
+    "@rudra-js/core": "^0.8.1"
   },
   "devDependencies": {
-    "@rudra-js/core": "0.8.0",
+    "@rudra-js/core": "0.8.1",
     "@types/node": "^26.4.1"
   }
 }

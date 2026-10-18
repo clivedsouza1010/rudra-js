@@ -10,6 +10,8 @@ break them.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-18
+
 ### Changed
 
 - `@rudra-js/a2ui` is published to npm from this release on. The release
@@ -737,7 +739,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.0...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.6...v0.8.0
 [0.7.6]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.4...v0.7.5
