@@ -56,6 +56,21 @@ describe('the examples in the @rudra-js/a2ui README', () => {
   });
 });
 
+describe('the README install command', () => {
+  it.each(['@a2ui/react', '@a2ui/web_core'])(
+    'asks for the %s release the package peers on',
+    (name) => {
+      const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
+      const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
+        readFileSync(join(REPO_ROOT, 'packages/a2ui/package.json'), 'utf8'),
+      );
+      const release = readme.match(new RegExp(`^npm install .*${name}@(\\S+)`, 'm'))?.[1];
+
+      expect(`^${release}.0`).toBe(manifest.peerDependencies[name]);
+    },
+  );
+});
+
 describe('the README endpoint', () => {
   it('keeps a SKU the shop sells, drops a category it does not, and sets the rest itself', async () => {
     const response = await post(

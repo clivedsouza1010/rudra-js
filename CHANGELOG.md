@@ -16,7 +16,8 @@ break them.
   older `@rudra-js/core` or A2UI, because for a bare name npm stays inside the
   range the app's `package.json` already has. It now asks for `@latest` on the
   `@rudra-js` packages, `@rudra-js/anthropic` included when the app has it, and
-  for 0.14 on the `@a2ui` ones.
+  `@0.14` on the `@a2ui` ones. A test keeps that `@0.14` on the release the
+  package peers on.
 
 ## [0.8.1] - 2026-10-18
 
