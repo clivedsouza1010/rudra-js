@@ -31,9 +31,10 @@ break them.
 - Three gaps in the claim screen, in core and attested. Greek accents stayed
   on, so a shop's banned phrase `ευκαιρία` missed `ΕΥΚΑΙΡΙΑ`; accents on Greek
   letters are now dropped, and Latin ones are kept as before. A Greek phrase
-  that ends on an accented vowel now follows the whole-word rule, as one ending
-  on a plain vowel already did, so `φθηνό` no longer catches `φθηνότερο`; list
-  that form too. `Ѡ`, `Ϙ`, `Ϗ` and `Ͳ` weren't folded, so "LOѠ STOCK", "GOING
+  that starts or ends on ά, έ, ί, ό or ύ (with or without dialytika) now follows
+  the whole-word rule, as one on α, ε, ι, ο or υ already did, so `φθηνό` no
+  longer catches `φθηνότερο` and `άνετο` no longer catches `πολυάνετο`; list
+  those forms too. `Ѡ`, `Ϙ`, `Ϗ` and `Ͳ` weren't folded, so "LOѠ STOCK", "GOING
   ϘUICK", "IN STOCϏ" and "IN SͲOCK" got through; the by-look reading now takes
   them as w, q, k and t. And `Ӏ` written for an l next to another look-alike
   capital ("seӀӀiΝg fast") passed both readings. Both screens now add a third,
