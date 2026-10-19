@@ -174,7 +174,10 @@ allowance refuses to cross it. Spaces are dropped from both sides before
 matching, so `送料 無料` still
 reads as `送料無料`. A phrase whose first or last character is an ASCII letter or
 digit will not match glued inside a longer word, so `cheap` misses `cheapskate`,
-but a trailing `s` is allowed, so `discount` catches `discounts`.
+but a trailing `s` is allowed, so `discount` catches `discounts`. The rule reads
+the folded letters, so a Greek phrase that starts or ends on a letter folded to
+Latin is held to it too: `φθηνό` misses `φθηνότερο`. List each form you want
+caught.
 
 ## The result
 

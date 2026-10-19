@@ -196,8 +196,9 @@ function foldChars(text: string, table: Record<string, string>): string {
 export function foldLookalikes(text: string, byLook = false): string {
   const compatible = foldChars(stripInvisible(text), BEFORE_NFKC).normalize('NFKC');
   const cased = byLook ? foldChars(compatible, CAPITALS) : compatible;
-  const unaccented = cased.toLowerCase().normalize('NFD').replace(GREEK_MARKS, '$1');
-  const lowered = stripMarks(unaccented.normalize('NFC'));
+  const lowered = stripMarks(
+    cased.toLowerCase().normalize('NFD').replace(GREEK_MARKS, '$1').normalize('NFC'),
+  );
   return foldChars(lowered, CONFUSABLES);
 }
 

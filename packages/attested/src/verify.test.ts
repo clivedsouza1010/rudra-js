@@ -421,6 +421,14 @@ describe('verify — the wording layer', () => {
     ).toBe(true);
   });
 
+  it('holds a Greek phrase that ends on an accented vowel to the whole-word rule', () => {
+    const text = 'Φθηνότερο από ποτέ';
+    expect(verify(text, { values: [], bannedPhrases: ['φθηνό'] }).wording.supported).toBe(true);
+    expect(
+      verify(text, { values: [], bannedPhrases: ['φθηνό', 'φθηνότερο'] }).wording.supported,
+    ).toBe(false);
+  });
+
   it('keeps the built-in list when the host adds one', () => {
     expect(verify('selling fast', { values: [], bannedPhrases: ['nur noch'] }).supported).toBe(
       false,

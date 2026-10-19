@@ -17,7 +17,8 @@ break them.
   dwell time or scores moved used to cost a second model call for the same
   prompt; now they share the cached one. Shoppers otherwise share a key exactly
   when they did before. A key changes when its digest has a dwell time or a
-  category, cohort keys included, so those entries miss once after upgrading.
+  category the shopper leans towards, cohort keys included, so those entries
+  miss once after upgrading.
 
 ### Fixed
 
@@ -29,12 +30,15 @@ break them.
   package peers on.
 - Three gaps in the claim screen, in core and attested. Greek accents stayed
   on, so a shop's banned phrase `ευκαιρία` missed `ΕΥΚΑΙΡΙΑ`; accents on Greek
-  letters are now dropped, and Latin ones are kept as before. `Ѡ`, `Ϙ`, `Ϗ` and
-  `Ͳ` weren't folded, so "LOѠ STOCK", "GOING ϘUICK", "IN STOCϏ" and "IN SͲOCK"
-  got through; the by-look reading now takes them as w, q, k and t. And `Ӏ`
-  written for an l next to another look-alike capital ("seӀӀiΝg fast") passed
-  both readings. Both screens now add a third, by look with `Ӏ` as l, and skip
-  any reading that comes out the same as one already done.
+  letters are now dropped, and Latin ones are kept as before. A Greek phrase
+  that ends on an accented vowel now follows the whole-word rule, as one ending
+  on a plain vowel already did, so `φθηνό` no longer catches `φθηνότερο`; list
+  that form too. `Ѡ`, `Ϙ`, `Ϗ` and `Ͳ` weren't folded, so "LOѠ STOCK", "GOING
+  ϘUICK", "IN STOCϏ" and "IN SͲOCK" got through; the by-look reading now takes
+  them as w, q, k and t. And `Ӏ` written for an l next to another look-alike
+  capital ("seӀӀiΝg fast") passed both readings. Both screens now add a third,
+  by look with `Ӏ` as l, and skip any reading that comes out the same as one
+  already done.
 
 ## [0.8.1] - 2026-10-18
 
