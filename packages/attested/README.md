@@ -169,7 +169,7 @@ handful of Cyrillic and Greek letters that render as Latin ones are folded to
 Latin. Accents are composed before anything is dropped, so `café` keeps its `é`
 while an overline, which composes with nothing, cannot hide `free` from its own
 entry. Greek letters lose their accents, so `ΕΥΚΑΙΡΙΑ` matches `ευκαιρία`.
-Words told apart only by their accent read as one, so `προσφορά` also catches
+Greek words told apart only by their accent read as one, so `προσφορά` also catches
 `πρόσφορα`. A line break stays a line break: matching reads through it, and
 only an allowance refuses to cross it. Spaces are dropped from both sides
 before matching, so `送料 無料` still
