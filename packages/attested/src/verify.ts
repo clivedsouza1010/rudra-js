@@ -158,10 +158,12 @@ function isCaught(scans: Indexed[], phrase: string, forgiven: Span[]): boolean {
 
 function checkWording(text: string, prepared: PreparedFacts): LayerReport {
   const { banned, allowed } = prepared;
-  const plain = normalisePhrasing(text);
-  const byLook = normalisePhrasing(text, true);
-  const scans =
-    byLook === plain ? [indexPhrasing(plain)] : [indexPhrasing(plain), indexPhrasing(byLook)];
+  const readings = new Set([
+    normalisePhrasing(text),
+    normalisePhrasing(text, true),
+    normalisePhrasing(text.replaceAll('\u04C0', '\u04CF'), true),
+  ]);
+  const scans = [...readings].map((reading) => indexPhrasing(reading));
 
   const forgiven = forgivenInEitherReading(scans, allowed);
 

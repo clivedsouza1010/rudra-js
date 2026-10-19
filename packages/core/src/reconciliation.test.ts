@@ -1483,7 +1483,13 @@ describe('a claim spelled in characters the patterns do not expect', () => {
     { hidden: 'a capital lunate sigma', reason: 'IN STO\u03F9K in your size' },
     { hidden: 'a Greek capital nu', reason: 'I\u039D STOCK in your size' },
     { hidden: 'a mathematical capital nu', reason: 'I\u{1D6B4} STOCK in your size' },
+    { hidden: 'a Greek kai symbol', reason: 'IN STOC\u03CF in your size' },
+    { hidden: 'a Greek archaic sampi', reason: 'IN S\u0372OCK in your size' },
     { hidden: 'a palochka for an l', reason: 'se\u04C0\u04C0ing fast in your size' },
+    {
+      hidden: 'a palochka for an l beside a Greek capital',
+      reason: 'se\u04C0\u04C0i\u039Dg fast in your size',
+    },
     { hidden: 'a blank-rendering Hangul letter', reason: 'in st\u3164ock in your size' },
     { hidden: 'a combining mark', reason: 'in sto\u0305ck in your size' },
     { hidden: 'a control character', reason: 'in st\u0008ock in your size' },
@@ -1499,6 +1505,11 @@ describe('a claim spelled in characters the patterns do not expect', () => {
       expect(disguisedKindFor(row.reason)).toBe('stock');
     });
   }
+
+  it('drops a wording claim hidden behind a Cyrillic omega or a Greek koppa', () => {
+    expect(disguisedKindFor('LO\u0460 STOCK in your size')).toBe('wording');
+    expect(disguisedKindFor('GOING \u03D8UICK in your size')).toBe('wording');
+  });
 
   it('drops a discount claim hidden behind a Greek look-alike', () => {
     expect(reasonFor('20% \u03BFff for the rest of the week')).toBeNull();
@@ -1526,6 +1537,12 @@ describe('a claim spelled in characters the patterns do not expect', () => {
 
   it('renders honest copy exactly as the model wrote it', () => {
     const reason = '\uFF33uper light for long days';
+
+    expect(reasonFor(reason)).toBe(reason);
+  });
+
+  it('renders honest copy with a palochka and a Greek capital as written', () => {
+    const reason = '\u04C0\u039D YOUR SIZE';
 
     expect(reasonFor(reason)).toBe(reason);
   });

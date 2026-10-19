@@ -172,6 +172,10 @@ const CAPITALS: Record<string, string> = {
   Ϻ: 'm',
   Ϝ: 'f',
   Ԍ: 'g',
+  Ѡ: 'w',
+  Ϙ: 'q',
+  Ϗ: 'k',
+  Ͳ: 't',
 };
 
 const BEFORE_NFKC: Record<string, string> = {
@@ -180,6 +184,8 @@ const BEFORE_NFKC: Record<string, string> = {
 };
 
 const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
+
+const GREEK_MARKS = /(?<=\p{Script=Greek})[\p{Mn}\p{Me}]+/gu;
 
 function foldChars(text: string, table: Record<string, string>): string {
   let folded = '';
@@ -190,7 +196,8 @@ function foldChars(text: string, table: Record<string, string>): string {
 export function foldLookalikes(text: string, byLook = false): string {
   const compatible = foldChars(stripInvisible(text), BEFORE_NFKC).normalize('NFKC');
   const cased = byLook ? foldChars(compatible, CAPITALS) : compatible;
-  const lowered = stripMarks(cased.toLowerCase().normalize('NFC'));
+  const unaccented = cased.toLowerCase().normalize('NFD').replace(GREEK_MARKS, '');
+  const lowered = stripMarks(unaccented.normalize('NFC'));
   return foldChars(lowered, CONFUSABLES);
 }
 

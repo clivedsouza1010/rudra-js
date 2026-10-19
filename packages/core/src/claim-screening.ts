@@ -114,7 +114,16 @@ function kindIn(reading: string): string | null {
 }
 
 function claimIn(text: string): string | null {
-  return kindIn(foldLookalikes(text)) ?? kindIn(foldLookalikes(text, true));
+  const readings = new Set([
+    foldLookalikes(text),
+    foldLookalikes(text, true),
+    foldLookalikes(text.replaceAll('\u04C0', '\u04CF'), true),
+  ]);
+  for (const reading of readings) {
+    const kind = kindIn(reading);
+    if (kind !== null) return kind;
+  }
+  return null;
 }
 
 export function unbackedClaim(

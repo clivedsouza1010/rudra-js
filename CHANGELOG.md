@@ -10,6 +10,15 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- The cache key leaves out view dwell time (`dwellMs`) and category affinity
+  scores, which never reach the prompt. In per-shopper mode a shopper whose
+  dwell time or scores moved used to cost a second model call for the same
+  prompt; now they share the cached one. Shoppers otherwise share a key exactly
+  when they did before, but every key string is new, cohort keys included, so
+  existing entries miss once after upgrading.
+
 ### Fixed
 
 - The a2ui README's install command failed with `ERESOLVE` in an app on an
@@ -18,6 +27,14 @@ break them.
   `@rudra-js` packages, `@rudra-js/anthropic` included when the app has it, and
   `@0.14` on the `@a2ui` ones. A test keeps that `@0.14` on the release the
   package peers on.
+- Three gaps in the claim screen, in core and attested. Greek accents stayed
+  on, so a shop's banned phrase `ευκαιρία` missed `ΕΥΚΑΙΡΙΑ`; accents on Greek
+  letters are now dropped, and Latin ones are kept as before. `Ѡ`, `Ϙ`, `Ϗ` and
+  `Ͳ` weren't folded, so "LOѠ STOCK", "GOING ϘUICK", "IN STOCϏ" and "IN SͲOCK"
+  got through; the by-look reading now takes them as w, q, k and t. And `Ӏ`
+  written for an l next to another look-alike capital ("seӀӀiΝg fast") passed
+  both readings. Both screens now add a third, by look with `Ӏ` as l, and skip
+  any reading that comes out the same as one already done.
 
 ## [0.8.1] - 2026-10-18
 

@@ -3,7 +3,11 @@ import type { GeneratedSpec } from './component-spec.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import { createMemorySpecCache, createNullSpecCache, specCacheKey } from './spec-cache.js';
 import { buildPrompt } from './model-prompt.js';
-import { parseTrackingInput, type TrackingInput } from './tracking-input.js';
+import {
+  parseTrackingInput,
+  type TrackingInput,
+  type TrackingInputDraft,
+} from './tracking-input.js';
 
 const GENERATED: GeneratedSpec = {
   tone: 'neutral',
@@ -15,37 +19,40 @@ const GENERATED: GeneratedSpec = {
 
 const SPEC = { spec: GENERATED, generatedAt: 1_700_000_000_000 };
 
+function richInput(signals: TrackingInputDraft['signals'] = {}): TrackingInput {
+  return parseTrackingInput({
+    user: { id: 'shopper-1', segment: 'endurance', isReturning: true },
+    context: {
+      surface: 'pdp',
+      slot: 'rail',
+      currentSku: 'TR-104',
+      currentCategory: 'Trail Running',
+      searchQuery: 'hydration vest',
+      locale: 'en-GB',
+      maxItems: 3,
+    },
+    signals: {
+      likes: [{ sku: 'TR-102' }],
+      dislikes: [{ sku: 'OW-303' }],
+      lastPurchased: [{ sku: 'TR-101' }],
+      cart: [{ sku: 'CP-401' }],
+      mostViewed: [{ sku: 'TR-104', views: 7, dwellMs: 9000 }],
+      recentSearches: ['hydration vest'],
+      interactions: [{ type: 'size_guide_opened' }],
+      ...signals,
+    },
+    candidates: [
+      { sku: 'TR-102', title: 'Switchback', category: 'Trail Running', price: 174 },
+      { sku: 'TR-104', title: 'Ridgeline', category: 'Trail Running', price: 139 },
+      { sku: 'CP-401', title: 'Gel', category: 'Nutrition', price: 3 },
+      { sku: 'OW-303', title: 'Shell', category: 'Outerwear', price: 210 },
+      { sku: 'TR-101', title: 'Fell', category: 'Trail Running', price: 120 },
+    ],
+  });
+}
+
 function richDigest(): SignalDigest {
-  return buildDigest(
-    parseTrackingInput({
-      user: { id: 'shopper-1', segment: 'endurance', isReturning: true },
-      context: {
-        surface: 'pdp',
-        slot: 'rail',
-        currentSku: 'TR-104',
-        currentCategory: 'Trail Running',
-        searchQuery: 'hydration vest',
-        locale: 'en-GB',
-        maxItems: 3,
-      },
-      signals: {
-        likes: [{ sku: 'TR-102' }],
-        dislikes: [{ sku: 'OW-303' }],
-        lastPurchased: [{ sku: 'TR-101' }],
-        cart: [{ sku: 'CP-401' }],
-        mostViewed: [{ sku: 'TR-104', views: 7, dwellMs: 9000 }],
-        recentSearches: ['hydration vest'],
-        interactions: [{ type: 'size_guide_opened' }],
-      },
-      candidates: [
-        { sku: 'TR-102', title: 'Switchback', category: 'Trail Running', price: 174 },
-        { sku: 'TR-104', title: 'Ridgeline', category: 'Trail Running', price: 139 },
-        { sku: 'CP-401', title: 'Gel', category: 'Nutrition', price: 3 },
-        { sku: 'OW-303', title: 'Shell', category: 'Outerwear', price: 210 },
-        { sku: 'TR-101', title: 'Fell', category: 'Trail Running', price: 120 },
-      ],
-    }),
-  );
+  return buildDigest(richInput());
 }
 
 const SKUS = ['TR-102', 'TR-104'];
@@ -84,7 +91,7 @@ function somethingElse(value: unknown): unknown {
   return 'changed';
 }
 
-describe('the cache key covers the whole digest', () => {
+describe('the cache key covers every field of the digest', () => {
   it('is exercised against every field the digest has', () => {
     expect(Object.keys(richDigest()).toSorted()).toEqual([...EVERY_DIGEST_FIELD].toSorted());
   });
@@ -102,6 +109,28 @@ describe('the cache key covers the whole digest', () => {
 
   it('hashes down to 32 hex characters', () => {
     expect(keyFor(richDigest())).toMatch(/^[0-9a-f]{32}$/);
+  });
+});
+
+describe('the cache key leaves out what the prompt never reads', () => {
+  it.each([
+    ['dwell time', { mostViewed: [{ sku: 'TR-104', views: 7, dwellMs: 12_000 }] }],
+    ['an affinity score', { likes: [{ sku: 'TR-102', weight: 0.5 }] }],
+  ])('gives one key when only %s differs', (_label, signals) => {
+    const original = richInput();
+    const changed = richInput(signals);
+
+    expect(buildDigest(changed)).not.toEqual(buildDigest(original));
+    expect(buildPrompt(changed, buildDigest(changed)).user).toBe(
+      buildPrompt(original, buildDigest(original)).user,
+    );
+    expect(keyFor(buildDigest(changed))).toBe(keyFor(buildDigest(original)));
+  });
+
+  it('still gives a new key when a view count differs', () => {
+    const changed = richInput({ mostViewed: [{ sku: 'TR-104', views: 8, dwellMs: 9000 }] });
+
+    expect(keyFor(buildDigest(changed))).not.toBe(keyFor(richDigest()));
   });
 });
 
