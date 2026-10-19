@@ -113,6 +113,9 @@ Before you send real shopper traffic, read
 That adapter is one option, not the only one. Any model can sit behind the small interface described
 in [Any provider](packages/core#any-provider).
 
+If an [A2UI](https://a2ui.org) agent builds your pages, add [`@rudra-js/a2ui`](packages/a2ui) too.
+Its README has the install line, since it needs two A2UI packages of its own.
+
 _We run the code block above as a test on every commit, so if a change breaks it, CI catches it
 straight away._
 
