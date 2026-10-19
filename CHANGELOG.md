@@ -16,8 +16,8 @@ break them.
   scores, which never reach the prompt. In per-shopper mode a shopper whose
   dwell time or scores moved used to cost a second model call for the same
   prompt; now they share the cached one. Shoppers otherwise share a key exactly
-  when they did before, but every key string is new, cohort keys included, so
-  existing entries miss once after upgrading.
+  when they did before. A key changes when its digest has a dwell time or a
+  category, cohort keys included, so those entries miss once after upgrading.
 
 ### Fixed
 

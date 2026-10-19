@@ -114,11 +114,10 @@ function kindIn(reading: string): string | null {
 }
 
 function claimIn(text: string): string | null {
-  const readings = new Set([
-    foldLookalikes(text),
-    foldLookalikes(text, true),
-    foldLookalikes(text.replaceAll('\u04C0', '\u04CF'), true),
-  ]);
+  const readings = new Set([foldLookalikes(text), foldLookalikes(text, true)]);
+  if (text.includes('\u04C0')) {
+    readings.add(foldLookalikes(text.replaceAll('\u04C0', '\u04CF'), true));
+  }
   for (const reading of readings) {
     const kind = kindIn(reading);
     if (kind !== null) return kind;

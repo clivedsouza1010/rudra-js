@@ -127,10 +127,11 @@ describe('the cache key leaves out what the prompt never reads', () => {
     expect(keyFor(buildDigest(changed))).toBe(keyFor(buildDigest(original)));
   });
 
-  it('still gives a new key when a view count differs', () => {
-    const changed = richInput({ mostViewed: [{ sku: 'TR-104', views: 8, dwellMs: 9000 }] });
-
-    expect(keyFor(buildDigest(changed))).not.toBe(keyFor(richDigest()));
+  it.each([
+    ['a view count', { mostViewed: [{ sku: 'TR-104', views: 8, dwellMs: 9000 }] }],
+    ['a viewed SKU', { mostViewed: [{ sku: 'TR-102', views: 7, dwellMs: 9000 }] }],
+  ])('still gives a new key when %s differs', (_label, signals) => {
+    expect(keyFor(buildDigest(richInput(signals)))).not.toBe(keyFor(richDigest()));
   });
 });
 
