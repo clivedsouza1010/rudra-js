@@ -18,6 +18,12 @@ break them.
   `@rudra-js` packages, `@rudra-js/anthropic` included when the app has it, and
   `@0.14` on the `@a2ui` ones. A test keeps that `@0.14` on the release the
   package peers on.
+- The react and anthropic READMEs' install commands had the same problem: in an
+  app on an older `@rudra-js/core` they failed with `ERESOLVE`, and run again
+  to upgrade they left every package where it was. They now ask for `@latest`
+  on the `@rudra-js` packages and say to add the app's other `@rudra-js`
+  packages the same way. The react README also says Yarn moves a bare `react`
+  to its latest version.
 
 ## [0.8.1] - 2026-10-18
 

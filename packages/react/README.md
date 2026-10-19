@@ -22,8 +22,16 @@ still reads it.
 ## Install
 
 ```sh
-npm install @rudra-js/react @rudra-js/core @rudra-js/attested react
+npm install @rudra-js/react@latest @rudra-js/core@latest @rudra-js/attested@latest react
 ```
+
+Run the same command in a new app, in one that already uses rudra-js, and to upgrade. If your app
+has `@rudra-js/anthropic` or `@rudra-js/a2ui`, add them to the command with `@latest` too. The
+`@rudra-js` packages are published together, and each one's peer ranges on the others start at its
+own version. For a bare name npm stays inside the range your `package.json` already has, so without
+`@latest` an app on an older core can get an `ERESOLVE`. `react` carries no version, so npm and
+pnpm keep a React 18 app on 18. Yarn moves a bare name to its latest version, so leave `react` out
+there if your app already has React.
 
 Both `@rudra-js/core` and `react` are peer dependencies. The specification you pass in comes from
 your copy of core, and the elements this renders have to come from the same React your app renders.

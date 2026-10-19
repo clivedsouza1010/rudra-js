@@ -18,8 +18,15 @@ This adapter is documented at [rudrajs.com](https://rudrajs.com/docs#createAnthr
 ## Install
 
 ```sh
-npm install @rudra-js/anthropic @rudra-js/core @rudra-js/attested
+npm install @rudra-js/anthropic@latest @rudra-js/core@latest @rudra-js/attested@latest
 ```
+
+Run the same command in a new app, in one that already uses rudra-js, and to
+upgrade. If your app has `@rudra-js/react` or `@rudra-js/a2ui`, add them to the
+command with `@latest` too. The `@rudra-js` packages are published together,
+and each one's peer ranges on the others start at its own version. For a bare
+name npm stays inside the range your `package.json` already has, so without
+`@latest` an app on an older core can get an `ERESOLVE`.
 
 ```ts
 import { createAnthropicProvider } from '@rudra-js/anthropic';
