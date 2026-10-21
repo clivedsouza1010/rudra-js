@@ -135,7 +135,7 @@ function isInside(spans: Span[], hit: Span): boolean {
   return false;
 }
 
-function forgivenInEitherReading(scans: Indexed[], allowed: readonly string[]): Span[] {
+function forgivenInAnyReading(scans: Indexed[], allowed: readonly string[]): Span[] {
   const forgiven: Span[] = [];
   for (const scan of scans) {
     for (const phrase of allowed) {
@@ -158,12 +158,13 @@ function isCaught(scans: Indexed[], phrase: string, forgiven: Span[]): boolean {
 
 function checkWording(text: string, prepared: PreparedFacts): LayerReport {
   const { banned, allowed } = prepared;
-  const plain = normalisePhrasing(text);
-  const byLook = normalisePhrasing(text, true);
-  const scans =
-    byLook === plain ? [indexPhrasing(plain)] : [indexPhrasing(plain), indexPhrasing(byLook)];
+  const readings = new Set([normalisePhrasing(text), normalisePhrasing(text, true)]);
+  if (text.includes('\u04C0')) {
+    readings.add(normalisePhrasing(text.replaceAll('\u04C0', '\u04CF'), true));
+  }
+  const scans = [...readings].map((reading) => indexPhrasing(reading));
 
-  const forgiven = forgivenInEitherReading(scans, allowed);
+  const forgiven = forgivenInAnyReading(scans, allowed);
 
   const findings: Finding[] = [];
   for (const phrase of banned) {
