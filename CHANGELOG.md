@@ -18,11 +18,11 @@ break them.
   `@rudra-js` packages, `@rudra-js/anthropic` included when the app has it, and
   `@0.14` on the `@a2ui` ones. A test keeps that `@0.14` on the release the
   package peers on.
-- The react and anthropic READMEs' install commands had the same problem: in an
-  app on an older `@rudra-js/core` they failed with `ERESOLVE`, and when run
-  again to upgrade they stayed inside the ranges the app already had. They now
-  ask for `@latest` on the `@rudra-js` packages and say to add the app's other
-  `@rudra-js` packages the same way.
+- The install commands in the react, anthropic and core READMEs and the root
+  README had the same problem: in an app on an older `@rudra-js/core` they
+  failed with `ERESOLVE` or, when run again to upgrade, stayed inside the
+  ranges the app already had. They now ask for `@latest` on the `@rudra-js`
+  packages and say to add the app's other `@rudra-js` packages the same way.
 - The react README's command named `react` without `react-dom`, so in a React
   19 app npm could move `react` to a newer release than `react-dom`, and React
   then refuses to load `react-dom`. It names both now, and says Yarn moves a

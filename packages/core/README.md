@@ -17,8 +17,15 @@ Every export of this package is documented at [rudrajs.com](https://rudrajs.com/
 ## Install
 
 ```sh
-npm install @rudra-js/core @rudra-js/attested
+npm install @rudra-js/core@latest @rudra-js/attested@latest
 ```
+
+Run the same command in a new app, in one that already uses rudra-js, and to
+upgrade. If your app has `@rudra-js/react`, `@rudra-js/anthropic` or
+`@rudra-js/a2ui`, add them to the command with `@latest` too: each one's peer
+range on core starts at its own version. For a bare name npm stays inside the
+range your `package.json` already has, so without `@latest` an app on an older
+core stays where it is.
 
 `zod` is a dependency, so you don't need it yourself. The public API of this
 package _is_ zod schemas, and an app on any zod 4 shares one copy with it. An

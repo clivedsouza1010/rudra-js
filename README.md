@@ -49,8 +49,14 @@ You don't need an API key to get going. Leave the provider out and you'll get th
 component, which is a fully supported setting and the right one until you've settled on a model.
 
 ```sh
-npm install @rudra-js/core @rudra-js/react @rudra-js/attested
+npm install @rudra-js/core@latest @rudra-js/react@latest @rudra-js/attested@latest
 ```
+
+Run the same command in a new app, in one that already uses rudra-js, and to upgrade. If your app
+has `@rudra-js/anthropic` or `@rudra-js/a2ui`, add them to the command with `@latest` too. The
+`@rudra-js` packages are published together, and each one's peer ranges on the others start at its
+own version. For a bare name npm stays inside the range your `package.json` already has, so without
+`@latest` an app on an older core can get an `ERESOLVE`.
 
 A quick heads-up: every package here lives under the `@rudra-js` scope. The unscoped `rudra-js`
 package on npm belongs to someone else, so make sure you include the `@`.
