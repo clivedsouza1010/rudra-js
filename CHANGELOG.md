@@ -22,7 +22,8 @@ break them.
   README had the same problem: in an app on an older `@rudra-js/core` they
   failed with `ERESOLVE` or, when run again to upgrade, stayed inside the
   ranges the app already had. They now ask for `@latest` on the `@rudra-js`
-  packages and say to add the app's other `@rudra-js` packages the same way.
+  packages, say to add the app's other `@rudra-js` packages the same way, and
+  point an app that has `@rudra-js/a2ui` to that package's install line.
 - The react README's command named `react` without `react-dom`, so in a React
   19 app npm could move `react` to a newer release than `react-dom`, and React
   then refuses to load `react-dom`. It names both now, and says Yarn moves a

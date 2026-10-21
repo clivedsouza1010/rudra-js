@@ -53,7 +53,8 @@ npm install @rudra-js/core@latest @rudra-js/react@latest @rudra-js/attested@late
 ```
 
 Run the same command in a new app, in one that already uses rudra-js, and to upgrade. If your app
-has `@rudra-js/anthropic` or `@rudra-js/a2ui`, add them to the command with `@latest` too. The
+has `@rudra-js/anthropic`, add it to the command with `@latest` too. If it has `@rudra-js/a2ui`, use
+the install line in that package's README instead, since it also names the two A2UI packages. The
 `@rudra-js` packages are published together, and each one's peer ranges on the others start at its
 own version. For a bare name npm stays inside the range your `package.json` already has, so without
 `@latest` an app on an older core can get an `ERESOLVE`.
