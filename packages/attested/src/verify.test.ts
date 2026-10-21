@@ -335,6 +335,25 @@ describe('verify — the wording layer', () => {
     }
   });
 
+  it('catches a phrase spelled with the rarer look-alike capitals', () => {
+    for (const text of ['LO\u0460 STOCK', 'GOING \u03D8UICK', 'IN STOC\u03CF', 'IN S\u0372OCK']) {
+      expect(verify(text, NOTHING).wording.supported, text).toBe(false);
+    }
+  });
+
+  it('catches a palochka written for an l beside a Greek capital', () => {
+    expect(verify('se\u04C0\u04C0i\u039Dg fast', NOTHING).wording.supported).toBe(false);
+  });
+
+  it('reads that palochka as an l for an allowance too', () => {
+    const facts = { values: [], allowedPhrases: ['last few miles'] };
+    expect(verify('the \u04C0ast few \u039Ciles', facts).wording.supported).toBe(true);
+  });
+
+  it('leaves honest copy with a palochka and a Greek capital alone', () => {
+    expect(verify('\u04C0\u039D YOUR SIZE', NOTHING).wording.supported).toBe(true);
+  });
+
   it('lets an allowed phrase in capitals stand behind the banned one inside it', () => {
     const facts = {
       values: [],
@@ -388,7 +407,25 @@ describe('verify — the wording layer', () => {
       verify('Τιμή ευκαιρίας', { values: [], bannedPhrases: ['ευκαιρία'] }).wording.supported,
     ).toBe(false);
     expect(
+      verify('ΤΙΜΗ ΕΥΚΑΙΡΙΑΣ', { values: [], bannedPhrases: ['ευκαιρία'] }).wording.supported,
+    ).toBe(false);
+    expect(
       verify('БҮГІН ҒАНА', { values: [], bannedPhrases: ['бүгін ғана'] }).wording.supported,
+    ).toBe(false);
+  });
+
+  it('leaves ordinary Greek copy alone', () => {
+    expect(verify('Άνετο και ελαφρύ για μεγάλες διαδρομές', NOTHING).wording.supported).toBe(true);
+    expect(
+      verify('Ο ΚΑΙΡΟΣ ΕΙΝΑΙ ΚΑΛΟΣ', { values: [], bannedPhrases: ['ευκαιρία'] }).wording.supported,
+    ).toBe(true);
+  });
+
+  it('holds a Greek phrase that ends on an accented vowel to the whole-word rule', () => {
+    const text = 'Φθηνότερο από ποτέ';
+    expect(verify(text, { values: [], bannedPhrases: ['φθηνό'] }).wording.supported).toBe(true);
+    expect(
+      verify(text, { values: [], bannedPhrases: ['φθηνό', 'φθηνότερο'] }).wording.supported,
     ).toBe(false);
   });
 

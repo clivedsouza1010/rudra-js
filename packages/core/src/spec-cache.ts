@@ -96,6 +96,14 @@ function canonicalise(value: unknown): string {
 
 const PROMPT_FINGERPRINT = createHash('sha256').update(SYSTEM_PROMPT).digest('hex').slice(0, 16);
 
+function withoutDwellAndScores(digest: SignalDigest) {
+  return {
+    ...digest,
+    topViewed: digest.topViewed.map(({ dwellMs: _dwellMs, ...view }) => view),
+    categoryAffinity: digest.categoryAffinity.map(({ score: _score, ...affinity }) => affinity),
+  };
+}
+
 export function specCacheKey(
   digest: SignalDigest,
   candidateSkus: readonly string[],
@@ -105,7 +113,7 @@ export function specCacheKey(
     specVersion: SPEC_VERSION,
     prompt: PROMPT_FINGERPRINT,
     provider,
-    digest,
+    digest: withoutDwellAndScores(digest),
     candidates: candidateSkus.toSorted(),
   });
 

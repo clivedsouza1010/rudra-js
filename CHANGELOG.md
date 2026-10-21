@@ -10,6 +10,16 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- The cache key leaves out view dwell time (`dwellMs`) and category affinity
+  scores, which never reach the prompt. In per-shopper mode a shopper whose
+  dwell time or scores moved used to cost a second model call for the same
+  prompt; now they share the cached one. Shoppers otherwise share a key exactly
+  when they did before. A key changes when its digest has a dwell time or a
+  category the shopper leans towards (the category being browsed counts too),
+  cohort keys included, so those entries miss once after upgrading.
+
 ### Fixed
 
 - The a2ui README's install command failed with `ERESOLVE` in an app on an
@@ -28,6 +38,19 @@ break them.
   19 app npm could move `react` to a newer release than `react-dom`, and React
   then refuses to load `react-dom`. It names both now, and says Yarn moves a
   bare name to its latest version.
+- Three gaps in the claim screen, in core and attested. Greek accents stayed on,
+  so a shop's banned phrase `ευκαιρία` missed `ΕΥΚΑΙΡΙΑ`; accents on Greek
+  letters are now dropped, and Latin ones are kept as before. Greek words told
+  apart only by their accent now read as one, so `προσφορά` also catches
+  `πρόσφορα`. A Greek phrase that starts or ends on ά, έ, ί, ό or ύ (with or
+  without dialytika) now follows the whole-word rule, as one on α, ε, ι, ο or υ
+  already did, so `φθηνό` no longer catches `φθηνότερο` and `άνετο` no longer
+  catches `πολυάνετο`; list those forms too. `Ѡ`, `Ϙ`, `Ϗ` and `Ͳ` weren't
+  folded, so "LOѠ STOCK", "GOING ϘUICK", "IN STOCϏ" and "IN SͲOCK" got through;
+  the by-look reading now takes them as w, q, k and t. And `Ӏ` written for an l
+  next to another look-alike capital ("seӀӀiΝg fast") passed both readings. Both
+  screens now add a third, by look with `Ӏ` as l, and skip any reading that
+  comes out the same as one already done.
 
 ## [0.8.1] - 2026-10-18
 

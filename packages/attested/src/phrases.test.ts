@@ -23,6 +23,15 @@ describe('normalisePhrasing', () => {
     expect(normalisePhrasing('U\u0301ltimas unidades')).toBe('últimas unidades');
   });
 
+  it('drops the accents on Greek letters, so Greek capitals read like the lowercase', () => {
+    expect(normalisePhrasing('ΕΥΚΑΙΡΙΑ')).toBe(normalisePhrasing('ευκαιρία'));
+    expect(normalisePhrasing('ΠΡΟΙΟΝ')).toBe(normalisePhrasing('προϊόν'));
+  });
+
+  it('keeps the accents on letters that are not Greek', () => {
+    expect(normalisePhrasing('Café, чай, ευκαιρία')).toBe('café, чaй, eukaipia');
+  });
+
   it('drops invisible characters', () => {
     expect(normalisePhrasing('F\u00adree delivery')).toBe('free delivery');
     expect(normalisePhrasing('in\u200bstock')).toBe('instock');
@@ -108,6 +117,10 @@ describe('normalisePhrasing', () => {
       ['\u03FA', 'm'],
       ['\u0474', 'v'],
       ['\u050C', 'g'],
+      ['\u0460', 'w'],
+      ['\u03D8', 'q'],
+      ['\u03CF', 'k'],
+      ['\u0372', 't'],
     ];
     for (const [written, latin] of capitals) {
       const label = `U+${written.codePointAt(0)?.toString(16)}`;
