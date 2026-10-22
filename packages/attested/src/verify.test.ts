@@ -285,6 +285,26 @@ describe('verify — the wording layer', () => {
     ]);
   });
 
+  it('catches both claims in the example shop recording', () => {
+    const held = "Four packs, ordered by how well they've held up for other shoppers.";
+    const picks = 'The first two are the strongest all-round picks.';
+
+    expect(tokensOf(verify(held, NOTHING).wording.findings)).toEqual(['other shoppers']);
+    expect(tokensOf(verify(picks, NOTHING).wording.findings)).toEqual(['strongest all round pick']);
+  });
+
+  it('catches the US spelling of the strongest all-round pick', () => {
+    const picks = 'The first two are the strongest all-around picks.';
+
+    expect(tokensOf(verify(picks, NOTHING).wording.findings)).toEqual([
+      'strongest all around pick',
+    ]);
+  });
+
+  it('leaves an all-round pick that ranks nothing alone', () => {
+    expect(verify('A good all-round pick for day hikes.', NOTHING).wording.supported).toBe(true);
+  });
+
   it('catches the near-misses a reworded denylist entry used to walk past', () => {
     const rewordings = [
       'Ships free.',

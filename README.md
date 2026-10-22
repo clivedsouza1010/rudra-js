@@ -16,7 +16,7 @@ are simply no fields for it to invent a price, a product name, an image, or a li
 referenced only by SKU, and only from the list you provide. In the default mode, the products shown
 in a grid or carousel are chosen per request from that list, not by the model.
 
-![The example shop's product page. The heading, the order, the highlighting and the paragraph are the model's. Every title, price and image is the shop's.](docs/demo.png)
+![The example shop's product page. The heading and the highlighting are the model's. The products, their order and the line under each are core's picks, and every title, price and image is the shop's.](docs/demo.png)
 
 `@rudra-js/react` turns that specification into markup, reading the title, price, image, and link
 from your catalog as the page is served. Whatever the model wrote is rendered as escaped text.
