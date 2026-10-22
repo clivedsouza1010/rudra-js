@@ -22,13 +22,24 @@ still reads it.
 ## Install
 
 ```sh
-npm install @rudra-js/react @rudra-js/core @rudra-js/attested react
+npm install @rudra-js/react@latest @rudra-js/core@latest @rudra-js/attested@latest react react-dom
 ```
+
+Run the same command in a new app, in one that already uses rudra-js, and to upgrade. If your app
+has `@rudra-js/anthropic`, add it to the command with `@latest` too. If it has `@rudra-js/a2ui`, use
+the install line in that package's README instead, since it also names the two A2UI packages. The
+`@rudra-js` packages are published together, and each one's peer ranges on the others start at its
+own version. For a bare name npm stays inside the range your `package.json` already has, so without
+`@latest` an app on an older core can get an `ERESOLVE`. `react` and `react-dom` carry no version,
+so npm and pnpm keep a React 18 app on 18. Name both: npm moves each to the newest release in its
+range, and React 19 won't load `react-dom` at a different version from `react`.
 
 Both `@rudra-js/core` and `react` are peer dependencies. The specification you pass in comes from
 your copy of core, and the elements this renders have to come from the same React your app renders.
 With two copies of either, you'd get a spec that fails its own type check, or a component tree React
 refuses to render. `@rudra-js/attested` is core's peer: npm and pnpm add it for you, Yarn doesn't.
+Yarn does move a bare name to its latest version, so leave out `react` and `react-dom` if your app
+already has React.
 
 ```tsx
 import { RudraComponent } from '@rudra-js/react';
