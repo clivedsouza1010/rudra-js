@@ -23,11 +23,12 @@ npm install @rudra-js/core@latest @rudra-js/attested@latest
 Run the same command in a new app, in one that already uses rudra-js, and to
 upgrade. If your app has `@rudra-js/react` or `@rudra-js/anthropic`, add them
 to the command with `@latest` too: each one's peer range on core covers only
-its own minor release, and npm only warns when one is left behind on a core it
-doesn't support. If it has `@rudra-js/a2ui`, use the install line in that
-package's README instead, since it also names the two A2UI packages. For a bare
-name npm stays inside the range your `package.json` already has, so without
-`@latest` an app on an older core never leaves the minor release it's on.
+its own minor release. Leave one behind and npm only warns, but the next
+`npm install` or `npm ci` fails with `ERESOLVE`. If it has `@rudra-js/a2ui`, use
+the install line in that package's README instead, since it also names the two
+A2UI packages. For a bare name npm stays inside the range your `package.json`
+already has, so without `@latest` an app on an older core never leaves the minor
+release it's on.
 
 `zod` is a dependency, so you don't need it yourself. The public API of this
 package _is_ zod schemas, and an app on any zod 4 shares one copy with it. An
