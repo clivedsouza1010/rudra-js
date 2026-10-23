@@ -2045,6 +2045,19 @@ describe('a claim in a field that cannot be empty', () => {
     expect(result.violations).toContain('empty-block:copy');
   });
 
+  it('drops the copy block the example shop recorded', () => {
+    const body =
+      "Four packs, ordered by how well they've held up for other shoppers. The first two are the strongest all-round picks; the last two lean toward insulated and waterproof builds if you have a specific trip in mind.";
+
+    const result = reconcile(
+      specWith([PRODUCT_GRID, { kind: 'copy', title: 'Where to start', body }]),
+    );
+
+    expect(result.spec.blocks.map((block) => block.kind)).toEqual(['grid']);
+    expect(result.violations).toContain('unverifiable-claim:wording:copy-body');
+    expect(result.violations).toContain('empty-block:copy');
+  });
+
   it('drops a hero whose headline makes a claim and has no product', () => {
     const result = reconcile(
       specWith([

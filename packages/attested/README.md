@@ -114,7 +114,7 @@ English-first, and every result it produces says so:
 
 ```ts
 verify('Selling fast', { values: [] }).wording;
-// { supported: false, strength: 'best-effort', checked: 122, findings: [...] }
+// { supported: false, strength: 'best-effort', checked: 125, findings: [...] }
 ```
 
 The list also carries generic environmental claims — "eco-friendly", "carbon

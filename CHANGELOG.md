@@ -19,6 +19,14 @@ break them.
   when they did before. A key changes when its digest has a dwell time or a
   category the shopper leans towards (the category being browsed counts too),
   cohort keys included, so those entries miss once after upgrading.
+- The claim screen catches more of the example shop's own recorded copy. "other
+  shoppers", as in "how well they've held up for other shoppers", was the
+  product rating said another way, and the prompt already says never to state
+  one. "strongest all round pick", as in "the strongest all-round picks", ranks
+  products by that rating, and "strongest all around pick" covers the US
+  spelling. A plain "all-round pick" still passes. The demo's product page now
+  drops that copy paragraph and keeps its grid. The list grows from 122 to 125
+  phrases.
 
 ### Fixed
 
