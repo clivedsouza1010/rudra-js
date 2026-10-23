@@ -13,7 +13,7 @@
     "@rudra-js/anthropic": "0.8.1",
     "@rudra-js/core": "0.8.1",
     "@rudra-js/react": "0.8.1",
-    "next": "^16.4.0",
+    "next": "^16.4.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
