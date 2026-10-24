@@ -6,8 +6,7 @@ It is not a hosted platform, a visual or low-code app builder, or a workspace yo
 
 [Docs](https://rudrajs.com/docs) · [npm](https://www.npmjs.com/package/@rudra-js/core) · [Demo shop](https://demo.rudrajs.com/product/RJ-00001?shopper=S-0001)
 
-Every export is documented at **[rudrajs.com](https://rudrajs.com)**, with signatures and field
-tables generated from the published packages.
+The guides and the API reference are at **[rudrajs.com](https://rudrajs.com)**.
 
 If a language model writes raw HTML, it can hallucinate a fake price or a product you don't sell
 onto your page. So rudra-js never lets the model write HTML. Instead it returns a specification
@@ -86,10 +85,10 @@ const catalog = [
 
 async function recommendations() {
   // Passing no provider means no API key and no spend.
-  // You get a reliable, deterministic component.
+  // Core builds the block itself, and the same input always gives the same block.
   const generator = createComponentGenerator({ provider: null });
 
-  // Parsing fills in what you left out and strips anything that doesn't belong.
+  // Parsing fills in what you left out and rejects anything that doesn't belong.
   // Always pass the parsed candidates to the renderer, not your raw objects.
   const input = parseTrackingInput({
     user: { id: 'shopper-1' },
@@ -211,7 +210,7 @@ ever hold demo shoppers and demo catalogs.
 
 ## Getting help
 
-- **The API reference** — every export, at [rudrajs.com](https://rudrajs.com).
+- **The docs**: guides and the API reference at [rudrajs.com](https://rudrajs.com).
 - **Questions and ideas** — come and talk in
   [Discussions](https://github.com/clivedsouza1010/rudra-js/discussions).
 - **Bugs** — open an [issue](https://github.com/clivedsouza1010/rudra-js/issues/new/choose).
