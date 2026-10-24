@@ -16,7 +16,7 @@ async function recommendations() {
   // Core builds the block itself, and the same input always gives the same block.
   const generator = createComponentGenerator({ provider: null });
 
-  // Parsing fills in what you left out and strips anything that doesn't belong.
+  // Parsing fills in what you left out and rejects anything that doesn't belong.
   // Always pass the parsed candidates to the renderer, not your raw objects.
   const input = parseTrackingInput({
     user: { id: 'shopper-1' },
