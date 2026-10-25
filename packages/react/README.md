@@ -10,7 +10,7 @@ Renders a component specification from
 [`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core) with React
 18 or 19.
 
-The renderer and its registry are documented at [rudrajs.com](https://rudrajs.com/docs#RudraComponent).
+The renderer and its registry are documented at rudrajs.com: [`RudraComponent`](https://rudrajs.com/reference/react/RudraComponent) and [`extendRegistry`](https://rudrajs.com/reference/react/extendRegistry).
 
 The components are plain functions with no hooks, state or effects. They work with
 `renderToString`, in a client-rendered app, and as Server Components in a setup that supports them,

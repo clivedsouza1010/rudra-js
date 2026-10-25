@@ -8,7 +8,7 @@ It is not a hosted platform, a visual or low-code app builder, or a workspace yo
 
 Checks model-written product copy against the facts a shop stands behind.
 
-Both entry points are documented at [rudrajs.com](https://rudrajs.com/docs#verify).
+Both entry points are documented at rudrajs.com: [`verify`](https://rudrajs.com/reference/attested/verify) and [`verifyFields`](https://rudrajs.com/reference/attested/verifyFields).
 
 Zero dependencies, no node builtins, no I/O. It is one pure function over text
 and facts, so it runs in Node, in an edge runtime and in a browser, and it drops
