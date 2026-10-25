@@ -2,34 +2,36 @@
 
 This package is part of [rudra-js](https://rudrajs.com).
 
-rudra-js is an open-source TypeScript library (MIT) you install from npm. A language model designs one product-recommendation block for a page in your shop, rudra-js checks it against your catalog, and React renders it.
+rudra-js is an open-source TypeScript library (MIT) you install from npm. A
+language model designs one product-recommendation block for a page in your shop,
+rudra-js checks it against your catalog, and React renders it.
 
-It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
+It is not a hosted platform, a visual or low-code app builder, or a workspace
+you sign up for.
 
-Checks model-written product copy against the facts a shop stands behind.
+This package checks model-written product copy against the facts your shop
+stands behind.
 
-Both entry points are documented at rudrajs.com: [`verify`](https://rudrajs.com/reference/attested/verify) and [`verifyFields`](https://rudrajs.com/reference/attested/verifyFields).
+The reference for both functions is on rudrajs.com:
+[`verify`](https://rudrajs.com/reference/attested/verify) and
+[`verifyFields`](https://rudrajs.com/reference/attested/verifyFields).
 
-Zero dependencies, no node builtins, no I/O. It is one pure function over text
-and facts, so it runs in Node, in an edge runtime and in a browser, and it drops
-in after anything that writes copy — json-render, the Vercel AI SDK, a raw
-`fetch` to a model, your own template.
+It's a pure function over text and facts. It has no dependencies and does no
+I/O. It uses no Node built-ins either, so it runs in a browser or an edge
+runtime as well as in Node. Drop it in after anything that writes copy:
+json-render, the Vercel AI SDK, a raw `fetch` to a model, or your own template.
 
 ## The guarantee
 
 **When `quantity.supported` is true, every numeral in the text is one you
-supplied — and a numeral the reader cannot read counts as a failure, not a
-pass.**
+supplied. A numeral the package can't read counts as a failure.**
 
-That is the whole promise, and it is a promise about numerals, not about
-sentences. It does not say the sentence around the number is true: a price you
-supplied can still be written as a sales figure. It says nothing at all about
-`wording.supported`, which is a denylist over an open set and carries
-`strength: 'best-effort'` on every result for that reason.
+That's the whole promise, and it covers numerals only. It doesn't say the
+sentence around a number is true. It says nothing about `wording.supported`.
 
-Everything the guarantee leaves open is listed under
-[What it cannot catch](#what-it-cannot-catch). Nothing there is a bug queued for
-later; it is the shape of what a closed check over digits can promise.
+The gaps it leaves are listed under
+[What it cannot catch](#what-it-cannot-catch). None of them is a bug waiting for
+a fix.
 
 ## Install
 
@@ -49,136 +51,144 @@ result.quantity.findings;
 
 ## The two layers
 
-They are checked separately and reported separately, because only one of them is
-a proof.
+`verify` checks two layers and reports each one separately. Layer one,
+quantities, is a proof. Layer two, wording, is best-effort.
 
-### Layer one — quantities. This is the provable half.
+### Layer one: quantities
 
-Every run of digits in the text has to be a value you supplied. Not "does this
-read like a bad phrase" but "is this number one the shop stands behind". The set
-of digits in a string is closed and checkable, and it does not care what
-language the sentence is in.
+Layer one finds every run of digits in the text and checks it against the values
+you supplied. It works the same whatever language the sentence is in.
 
 ```ts
 verify('Nur noch 2 übrig', { values: [39] }).quantity.supported; // false
 verify('4,8 von 5', { values: [4.8, 5] }).quantity.supported; // true
 ```
 
-It is crude on purpose and it errs toward rejection. `"Only 2 left"` is
-unsupported unless you supplied a fact carrying 2, even though 2 is also the
-number of colourways. A false rejection costs a duller sentence; a false
-acceptance costs a fabricated claim.
+It leans toward rejecting. `"Only 2 left"` fails unless you supplied a fact
+carrying 2, even when 2 is also the number of colourways. A wrong rejection
+costs you a duller sentence. A wrong pass costs you a made-up claim.
 
-**What it reads.** Bare integers and decimals, both decimal separators (`4.8`
-and `4,8`), currency symbols attached or detached, percentages, and any Unicode
-decimal digit — Eastern Arabic `٤٫٨`, Devanagari `४.८` and mathematical `𝟰.𝟴`
-all read as 4.8. Grouping is read in the Western (`12,345,678`), Indian
-(`1,29,999`), space (`1 299`, including the no-break and narrow no-break spaces)
-and Swiss (`1'299`) shapes.
+**What it reads.**
 
-**How an ambiguous mark is decided.** One dot or comma with exactly three digits
-behind it is grouping, never a decimal point. `1,299` and `1.299` both read as
-1299 and nothing else, which is why a rating of 4.8 cannot stand behind a
-written `4.800` and a stock count of 12 cannot stand behind `12.000`. Where
-grouping is impossible the decimal reading survives, so `1234,567` is still
-1234.567. Where the two marks differ the last one is the decimal point, so
-`1.299,50` is 1299.5.
+- Whole numbers and decimals.
+- Both decimal separators: `4.8` and `4,8`.
+- Currency symbols, attached or detached.
+- Percentages.
+- Any Unicode decimal digit. Eastern Arabic `٤٫٨`, Devanagari `४.८` and
+  mathematical `𝟰.𝟴` all read as 4.8.
+- Digit grouping in the Western (`12,345,678`), Indian (`1,29,999`), space
+  (`1 299`) and Swiss (`1'299`) shapes. The space shape also accepts the
+  no-break and narrow no-break spaces.
 
-**What it refuses to read.** Three things become findings rather than passes:
+**How it reads a dot or a comma.**
 
-- A numeric character that is not a decimal digit — `½`, `²`, `②`, `Ⅲ`. These
-  render as numbers and carry a value the reader has no way to check.
-- A magnitude mark glued to a run — `4.8万`, `12M`, `4.8k`. The digits may be
-  yours; the multiplier is not.
-- A run no locale reads as a number — `24.12.2026`, `3.14.15`. These are
-  supported only by a fact written exactly the same way.
+- One dot or comma with exactly three digits after it is grouping, never a
+  decimal point. `1,299` and `1.299` both read as 1299 and nothing else. So a
+  rating of 4.8 can't back a written `4.800`, and a stock count of 12 can't back
+  `12.000`.
+- Where grouping is impossible, the decimal reading stands. `1234,567` is
+  1234.567.
+- Where the two marks differ, the last one is the decimal point. `1.299,50` is
+  1299.5.
 
-Characters that take no room on the page are dropped before any of this, so a
-zero-width space, a soft hyphen, a variation selector, a backspace or a
-combining overline cannot split `213` into a `2` and a `13` that happen to be
-supported separately. That class is every format character, every
-default-ignorable code point, every control character and every mark that hangs
-on the character before it — a rule over the whole of Unicode rather than a list
-someone kept up to date.
+**What it refuses to read.** Layer one reports these as findings:
+
+- A numeric character that isn't a decimal digit, like `½`, `²`, `②` or `Ⅲ`.
+  These show up on the page as numbers, and the package has no way to check the
+  value they carry.
+- A magnitude mark glued to a run of digits, like `4.8万`, `12M` or `4.8k`. The
+  digits may be yours. The multiplier isn't.
+- A run no locale reads as a number, like `24.12.2026` or `3.14.15`. Only a fact
+  written exactly the same way backs it.
+
+Before any of this, layer one drops characters that take no room on the page. So
+a zero-width space, a soft hyphen, a variation selector, a backspace or a
+combining overline can't split `213` into a `2` and a `13` that you happen to
+have supplied separately. The rule works from Unicode's own categories, so it
+covers all of Unicode with no hand-kept list. It drops:
+
+- every format character
+- every default-ignorable code point
+- every control character except tabs and line breaks
+- every mark that attaches to the character before it
 
 A character that does take room still separates two numbers. A tab, a line break
-and a Devanagari matra all leave a gap the shopper can see, so `"Only 2\n3 left"`
-is two numbers and a fact of 23 does not stand behind it.
+and a Devanagari matra all leave a gap the shopper can see. So
+`"Only 2\n3 left"` is two numbers, and a fact of 23 doesn't back it.
 
-### Layer two — wording. This is the best-effort half.
+### Layer two: wording
 
-Claims with no number in them: "cheap", "bargain", "on sale", "best-selling",
-"selling fast", "in stock", "free delivery", "trending". There is no value to
-check, so there is nothing to invert. It stays a denylist, it stays open and
-English-first, and every result it produces says so:
+Layer two looks for claims with no number in them: "cheap", "bargain", "on
+sale", "best-selling", "selling fast", "in stock", "free delivery", "trending".
+There's no value to check, so this layer is a denylist, a list of banned
+phrases. Every result it gives carries `strength: 'best-effort'`:
 
 ```ts
 verify('Selling fast', { values: [] }).wording;
 // { supported: false, strength: 'best-effort', checked: 125, findings: [...] }
 ```
 
-The list also carries generic environmental claims — "eco-friendly", "carbon
-neutral", "sustainable". Under EU Directive 2024/825, applied through each
-country's own law from 27 September 2026, a generic environmental claim is
+The list also covers generic environmental claims, like "eco-friendly", "carbon
+neutral" and "sustainable". EU Directive 2024/825 applies through each country's
+own law from 27 September 2026. Under it, a generic environmental claim is
 unfair unless the trader can show recognised excellent environmental
-performance, and a "neutral" claim based on offsetting is unfair outright. The
-list leaves out the bare word "green", which is too often a colour.
+performance. A "neutral" claim based on offsetting is unfair outright. The list
+leaves out the bare word "green", because it's too often a colour.
 
-Add your own for your own language, and name the wording you stand behind:
+Add phrases for your own language, and name the wording you stand behind:
 
 ```ts
 verify('Nur noch wenige', { values: [], bannedPhrases: ['nur noch'] });
 verify('In stock, ships today', { values: [], allowedPhrases: ['in stock'] });
 ```
 
-`bannedPhrases` is added to the built-in list. `allowedPhrases` works on the
-text, not on the list: **where one of your phrases appears, a banned claim
-sitting wholly inside it is not reported, and the same words elsewhere in the
-copy still are.** So `['back in stock']` clears `"Back in stock"` and still
-catches the `in stock` in `"Only 2 in stock, selling fast"`. `checked` is the
-whole list either way, because nothing leaves it.
+`bannedPhrases` adds to the built-in list. `allowedPhrases` works on the text,
+not on the list. **Where one of your allowed phrases appears, a banned claim
+sitting wholly inside it isn't reported. The same words elsewhere in the copy
+still are.** So `['back in stock']` clears `"Back in stock"` but still catches
+the `in stock` in `"Only 2 in stock, selling fast"`. `checked` counts the whole
+list either way, because an allowance removes nothing from it.
 
-Without an allowance a denylist bans the truthful disclosure as hard as the
-fabricated one, and a shop that genuinely offers free shipping cannot say so.
-Three things are worth knowing before you write one:
+Without an allowance, the denylist bans a true statement as hard as a made-up
+one. A shop that really offers free shipping couldn't say so. Before you write
+an allowance, know this:
 
-- **Containment runs one way.** Allowing `in stock` does not clear
-  `back in stock`, which claims a restock on top of it.
-- **Allowances do not compose, and they do not join.**
-  `['sold', 'out']` leaves `sold out` caught, and `['back in', 'stock']` leaves
-  both `in stock` and `back in stock` caught.
-- **An allowance forgives whatever nests inside it, including entries added in a
-  later version.** `['in stock and ready to ship']` forgives nothing extra
-  today; the day `ready to ship` joins the list, that allowance silences it
-  wherever your sentence appears. Keep them tight.
-- **An allowance does not cross a line break.** The denylist reads straight
-  through one, so `"Free\n\nshipping"` is still caught, but an allowance will
-  not bridge it. The model picks where the paragraph breaks fall, and
-  `"We do not offer"` above a horizontal rule, with the free shipping claim
-  below it, is two things a shopper reads apart. The two rules pull opposite
-  ways on purpose: the denylist catches more, the allowance forgives less, and
-  both err toward reporting.
+- **A shorter allowance doesn't clear a longer claim.** Allowing `in stock`
+  doesn't clear `back in stock`, which also claims a restock.
+- **Allowances don't combine, and they don't join up.** `['sold', 'out']` leaves
+  `sold out` caught. `['back in', 'stock']` leaves both `in stock` and
+  `back in stock` caught.
+- **An allowance forgives whatever sits inside it, including phrases added to
+  the list in a later version.** `['in stock and ready to ship']` forgives
+  nothing extra today. The day `ready to ship` joins the list, that allowance
+  silences it wherever your sentence appears. Keep allowances tight.
+- **An allowance doesn't cross a line break.** The denylist reads straight
+  through one, so `"Free\n\nshipping"` is still caught. An allowance won't
+  bridge it. The model decides where paragraph breaks fall. A shopper reads
+  `"We do not offer"` above a horizontal rule and a free shipping claim below it
+  as two separate things. Both rules lean toward reporting a claim.
 
-It is also the way around negation. The list matches substrings, so
-`"there is no sale on this product"` reads as a sale claim; allow `no sale` and
-that sentence passes while a `sale` later in the same text still fails.
+Before matching, layer two folds the copy and the phrases into one plain form:
 
-Matching is case-insensitive. Hyphens become spaces, accents are composed,
-fullwidth forms are folded, characters that take no room are dropped, and a
-handful of Cyrillic and Greek letters that render as Latin ones are folded to
-Latin. Accents are composed before anything is dropped, so `café` keeps its `é`
-while an overline, which composes with nothing, cannot hide `free` from its own
-entry. Greek letters lose their accents, so `ΕΥΚΑΙΡΙΑ` matches `ευκαιρία`.
-Greek words told apart only by their accent read as one, so `προσφορά` also catches
-`πρόσφορα`. A line break stays a line break: matching reads through it, and
-only an allowance refuses to cross it. Spaces are dropped from both sides
-before matching, so `送料 無料` still
-reads as `送料無料`. A phrase whose first or last character is an ASCII letter or
-digit will not match glued inside a longer word, so `cheap` misses `cheapskate`,
-but a trailing `s` is allowed, so `discount` catches `discounts`. The rule reads
-the folded letters, so a Greek phrase that starts or ends on a letter folded to
-Latin is held to it too: `φθηνό` misses `φθηνότερο`. List each form you want
-caught.
+- Case is ignored.
+- Hyphens become spaces.
+- Accents are composed, so `café` keeps its `é`. This happens before anything is
+  dropped. An overline composes with nothing, so it gets dropped and can't hide
+  `free` from its own entry.
+- Fullwidth forms are folded to their normal-width versions.
+- Characters that take no room are dropped.
+- A handful of Cyrillic and Greek letters that look like Latin ones are folded
+  to Latin.
+- Greek letters lose their accents, so `ΕΥΚΑΙΡΙΑ` matches `ευκαιρία`. Greek
+  words told apart only by their accent read as one, so `προσφορά` also catches
+  `πρόσφορα`.
+- Spaces are dropped, so `送料 無料` still reads as `送料無料`.
+
+A phrase that starts or ends with an ASCII letter or digit won't match glued
+inside a longer word. So `cheap` misses `cheapskate`. A trailing `s` is allowed,
+so `discount` catches `discounts`. This word-gap rule reads the folded letters.
+So a Greek phrase that starts or ends on a letter folded to Latin is held to it
+too: `φθηνό` misses `φθηνότερο`. List each form you want caught.
 
 ## The result
 
@@ -203,11 +213,10 @@ interface Finding {
 }
 ```
 
-`checked` says how much the layer actually looked at. `quantity.checked === 0`
-means the text held no numeral and layer one proved nothing about it — which is
-the honest reading of `"Only two left"`, and no assertion you can write on the
-result will turn that into a catch. Layer one counts the numerals it refuses to
-read, so `"Only ② left"` is a finding rather than a silent zero.
+`checked` tells you how much a layer actually looked at. When `quantity.checked`
+is 0, the text held no numeral and layer one proved nothing about it. Layer one
+counts the numerals it refuses to read, so `"Only ② left"` gives a finding
+instead of a silent zero.
 
 ## Facts
 
@@ -219,54 +228,46 @@ interface Facts {
 }
 ```
 
-`values` is a flat list, not a typed one. Write them however they are written in
-your own system — `39`, `'$1,299.00'`, `'4,8'`, `'ships 13 March'` — and every
-numeral in each one becomes a supported value.
+`values` is one flat list with no types. Write each value the way your own
+system writes it, like `39`, `'$1,299.00'`, `'4,8'` or `'ships 13 March'`. Every
+numeral in each value becomes a supported value.
 
-A number is laid out in positional notation first, whatever `String` would have
-made of it, so a fact of `1e21` stands behind
-`'1,000,000,000,000,000,000,000'` and behind neither `1` nor `21`. A string
-whose whole content is a number in exponent notation is laid out the same way:
-`String`, `JSON.stringify`, a spreadsheet export and an API that writes 64-bit
-values as strings all produce one, and none of those is you choosing the digits.
-Any other string is read exactly as you typed it, so `'SKU AX-220e5'` still
-mints 220 and 5.
+A number is written out in plain digits first, whatever `String` would have made
+of it. So a fact of `1e21` backs `'1,000,000,000,000,000,000,000'` and backs
+neither `1` nor `21`. A string that holds nothing but a number in exponent
+notation is written out the same way. `String`, `JSON.stringify`, spreadsheet
+exports and APIs that write 64-bit values as strings all produce such strings.
+You didn't pick those digits. Any other string is read exactly as
+you typed it, so `'SKU AX-220e5'` still supplies 220 and 5.
 
-An exponent that would lay out past a thousand digits stands behind no numeral at
-all, and the length is weighed before any of it is written. `'1e1000'` is no
-product fact under any reading, so it is refused at the limit rather than laid
-out. The limit is what stops the far end: `'1e2000000000'` is twelve characters,
-and writing its run out would cost more memory than the process has. Every finite
-JavaScript number fits well inside the limit — the longest is `5e-324`, at 326
+A number in exponent notation that would run past a thousand digits when written
+out backs no numeral at all.
+The package checks the length before it writes anything out. `'1e1000'` isn't a
+product fact under any reading, so it hits the limit and is refused. The limit
+stops the extreme cases. `'1e2000000000'` is twelve characters, but writing it
+out would take more memory than the process has. Every finite
+JavaScript number fits well inside the limit. The longest is `5e-324`, at 326
 characters.
 
-Past 2^53 a number has lost its exact digits before it ever reaches here —
-`JSON.parse` turns `9007199254740993` into `...92` — so hand a long id over as a
-bigint or as a string. A null or undefined field stands behind no numeral rather
-than throwing, so one empty field does not take the whole call down. Anything
-else is read through `String()` and mints whatever digits that produces, which
-for a `Date` is the day, the year and every digit of the clock — so a `listedAt`
-handed straight through is the hazard named under **What it cannot catch**, not
-an ignored field.
+Past 2^53, a number has lost its exact digits before it ever reaches this
+package. `JSON.parse` turns `9007199254740993` into `...92`. Pass a long id as a
+bigint or a string.
 
-Flat rather than typed (money, count, rating, date) because typing only helps if
-the extractor can classify a token in the text, and it cannot. The `2` in
-`"Only 2 left"` and the `2` in `"2 year warranty"` are the same two characters;
-telling them apart means understanding the sentence, in whatever language it was
-written, which is the problem this package exists to stop relying on. Typed
-facts would also need an "unclassified, so skip it" branch, and that branch is a
-hole. A flat set has no hole: every numeral is checked against every value.
+A null or undefined field backs no numeral and doesn't throw, so one empty field
+doesn't break the whole call. Anything else is read through `String()` and
+supplies whatever digits that gives. For a `Date`, that's the day, the year and
+every digit of the clock. So a `listedAt` passed straight through isn't ignored.
+It's one of the hazards under [What it cannot catch](#what-it-cannot-catch).
 
-The cost is real and it is stated under **What it cannot catch**. Two things
-follow from it that are worth doing:
+That section also lists what a flat list costs you. Two habits keep the cost
+down:
 
-- **Supply only numbers you are happy to see anywhere.** A SKU of `AT-2199` in
-  `values` makes `"Was $2,199"` a supported sentence. A listing date makes its
-  day number a supported sales figure. If a number in your record is not a fact
-  about the product a shopper would read, leave it out.
-- **`values` is a trust boundary.** On a marketplace the product title is
-  written by the seller, not by you. Putting it in `values` hands the model
-  every number the seller chose to type. Supply fields you author.
+- **Only supply numbers you're happy to see anywhere.** A SKU of `AT-2199` in
+  `values` makes `"Was $2,199"` a supported sentence. If a number in your record
+  isn't a fact about the product that a shopper would read, leave it out.
+- **Treat `values` as a trust boundary.** On a marketplace, the seller writes
+  the product title, not you. Putting it in `values` hands the model every
+  number the seller chose to type. Supply only fields you write.
 
 ## Many fields, one product
 
@@ -283,103 +284,99 @@ result.fields; // [{ field, result }, ...] in the order the fields were given
 result.acrossFields; // the wording layer over every field read as one
 ```
 
-The facts are read once and reused. A card renders its fields next to each
-other, and the model picks the field boundaries, so
-`{ badge: 'Free', delivery: 'delivery on every order' }` is one sentence to a
-shopper while neither field carries it alone. `acrossFields` reads the joined
-text and counts toward `supported`.
+The facts are read once and reused for every field. A card shows its fields next
+to each other, and the model picks where one field ends and the next begins. So
+`{ badge: 'Free', delivery: 'delivery on every order' }` reads as one sentence
+to a shopper, though neither field carries the claim alone. `acrossFields`
+checks the joined text, and it counts toward `supported`.
 
 ## What it cannot catch
 
-This is the honest list.
-
 ### Claims with a number in them
 
-- **A number that is real but means something else.** This is the largest hole
-  in the provable half. A flat fact set proves the number came from you, not
-  that the sentence uses it correctly. Supply a price of 39 and `"39 sold in the
-last hour"`, `"Save $39 today"` and `"Under $39"` all pass. Supply a rating
-  scale of 5 and `"Only 5 left"` passes. Supply a rating of 4.8 and a German
-  `"nur 4,80 €"` passes as a price, because 4.80 and 4.8 are one number.
+- **A number that is real but means something else.** This is the biggest gap in
+  layer one. Supply a price of 39, and `"39 sold in the last hour"`,
+  `"Save $39 today"` and `"Under $39"` all pass. Supply a rating scale of 5, and
+  `"Only 5 left"` passes. Supply a rating of 4.8, and a German `"nur 4,80 €"`
+  passes as a price, because 4.80 and 4.8 are the same number.
 - **Numbers written as words, in any script.** `"Only two left"` has no digit in
-  it, so layer one never sees it. Neither does `残り二点`, where 二 is a
-  character rather than a digit, nor Arabic `قطعتين`, where "two" is the noun's
-  dual ending and there is no numeral at all. `quantity.checked` is 0 for all
-  three, and that is the only signal you get.
-- **Magnitudes written as words.** `4.8万` and `12M` are caught. `4,8 Millionen`,
-  `4.8 millions`, `4,8 mil`, `4.8 लाख` and `٤٫٨ مليون` are not — a word list is
-  the denylist this package exists to get away from.
-- **The unit on the number.** `￥39.99` against a price of $39.99 passes: the
-  digits are yours and the currency symbol is not a digit. So does
+  it, so layer one never sees it. Layer one also misses `残り二点`, where 二 is a
+  character rather than a digit. It misses Arabic `قطعتين` too, where "two" is
+  the noun's dual ending and there is no numeral at all. `quantity.checked` is 0
+  for all three, and that's the only signal you get.
+- **Magnitudes written as words.** The multiplier in `4,8 Millionen`,
+  `4.8 millions`, `4,8 mil`, `4.8 लाख` or `٤٫٨ مليون` isn't caught.
+- **The unit on the number.** `￥39.99` passes against a price of $39.99, because
+  the digits are yours and the currency symbol isn't a digit. So does
   `"39,99 Cent"`. Layer one checks the number, never what it is a number of.
 - **A number your facts happen to contain.** A fact of `'2026-09-13'` makes
-  2026, 9 and 13 supported everywhere in the text, including as a stock count.
-- **Where in the text a token was.** A finding names the token, not its offset.
+  2026, 9 and 13 supported anywhere in the text, including as a stock count.
+- **Where in the text a token was.** A finding names the token but not its
+  position.
 
 ### Claims with no number in them
 
-- **Wording, in general.** Layer two is a denylist over an infinite set. A
-  careful rewording gets past it — `"Half of what it was"` for half price,
-  `"送料は無料"` with a particle dropped in. Entries are added as they are found,
-  and the list will never be finished.
+- **Wording, in general.** There are endless ways to word a claim, and a list
+  can't hold them all. A careful rewording gets past layer two, like
+  `"Half of what it was"` for half price, or `"送料は無料"` with a particle dropped
+  in. Entries are added as they're found, and the list will never be finished.
 - **Your language, until you give it one.** Every built-in phrase is English.
   `"Gratis Versand"`, `"Livraison offerte"` and `"شحن مجاني"` all pass by
-  default. `bannedPhrases` is the answer, and it is your list to keep.
-- **Negation.** The list matches substrings, so `"there is no sale on this
-product"` is caught as a sale claim on its own. There is no rule that reads the
-  `no`; `allowedPhrases: ['no sale']` is the way out, and it is narrow by
-  design — a `sale` elsewhere in the same text still fails.
-- **A character that folds into your allowance.** An allowance is matched
-  against normalised copy, so anything that folds to those words counts as those
-  words. Allow `no sale` and `"№ SALE"` passes, because U+2116 folds to `no`;
-  a superscript `ⁿᵒ` does the same. The shopper reads the numero sign as
-  decoration and the verifier reads it as a word. Keep allowances tight and
-  written the way a shop really writes them.
-- **A letter glued to the end of a phrase.** `"FREE SHIPPINGᵃ see terms"` is not
-  reported. The superscript folds to an `a`, which glues to `shipping`, and the
+  default. Add them with `bannedPhrases`. That list is yours to keep.
+- **Negation.** The list matches substrings, so
+  `"there is no sale on this product"` is caught as a sale claim. No rule reads
+  the `no`. `allowedPhrases: ['no sale']` lets that sentence pass. That
+  allowance is narrow, so a `sale` elsewhere in the same text still fails.
+- **A character that folds into your allowance.** Allowances match the copy
+  after the folding described under layer two. Anything that folds to your words
+  counts as your words. Allow `no sale` and `"№ SALE"` passes, because U+2116
+  folds to `no`. A superscript `ⁿᵒ` does the same. The shopper reads the numero
+  sign as decoration, but the package reads it as a word. Write allowances the
+  way a shop really writes them.
+- **A letter glued to the end of a phrase.** `"FREE SHIPPINGᵃ see terms"` isn't
+  reported. The superscript folds to an `a`, which glues onto `shipping`. The
   word-gap rule that stops `cheap` matching `cheapskate` then treats the whole
-  thing as a longer word. It holds for every entry on the list, and a footnote
+  thing as a longer word. This holds for every entry on the list. A footnote
   marker is exactly how a real shop writes one.
 
 ### Preconditions the package cannot check for you
 
 - **The text you check has to be the text you render.** `verify` sees a string.
-  If anything downstream decodes it — an HTML sink turning `&half;` into ½, or
-  `&#50;` into a 2 — then the string that was checked and the string on the page
-  are different documents, and the guarantee covers the first one.
+  Something downstream may decode it, like an HTML sink turning `&half;` into ½
+  or `&#50;` into a 2. Then the string you checked and the string on the page
+  are different documents. The guarantee covers only the one you checked.
 - **The font has to agree with Unicode about what renders as nothing.** The
-  layer drops what Unicode marks as taking no room. Where a font gives one of
-  those a visible glyph the two disagree, and U+3164 HANGUL FILLER is the one
-  people really paste as a blank: the layer reads `"1<U+3164>3"` as 13, and a
-  font that widens it shows the shopper `1 3`.
-- **Everything that is not a number or a phrase.** A claim about materials,
-  compatibility, a certification, a warranty condition or a person is entirely
-  out of scope.
+  package drops what Unicode marks as taking no room. Where a font gives one of
+  those characters a visible glyph, the two disagree. U+3164 HANGUL FILLER is
+  the one people really paste as a blank. Layer one reads `"1<U+3164>3"` as 13,
+  while a font that widens it shows the shopper `1 3`.
+- **Everything that isn't a number or a phrase.** A claim about materials,
+  compatibility, a certification, a warranty condition or a person is out of
+  scope.
 
 ## What it over-rejects
 
-The guarantee errs toward rejection, and that has a bill:
+Leaning toward rejection has a cost:
 
-- **Every incidental number has to be in `values`.** A VAT rate, a size, a care
-  temperature, a spec number, a support phone number, a founding year, the
-  denominator of a rating scale. None of them are claims, all of them are
-  digits, and copy mentioning one you did not supply is rejected.
-- **A three-digit tail is always grouping.** `1.299 kg` reads as 1299, so a
-  genuine three-decimal number — a weight, or a price in a currency with three
-  decimal places — cannot be written with a dot or a comma. Supply it, and write
-  it, the same way.
-- **Numeric characters that are not digits are refused outright.** `2 m²` and
-  `½ inch` fail, along with the `②` and `Ⅲ` the rule is there to stop.
+- **Every incidental number has to be in `values`.** That means a VAT rate, a
+  size, a care temperature, a number from the product specification, a support
+  phone number, a founding year, the denominator of a rating scale. None of them
+  are claims, but all of them are digits. Copy that mentions one you didn't
+  supply is rejected.
+- **Three digits after a dot or comma are always grouping.** A real
+  three-decimal number, like a weight or a price in a currency with three
+  decimal places, can't be written with a dot or a comma. `1.299 kg` reads
+  as 1299. Supply it and write it the same way.
+- **Numeric characters that aren't digits are refused outright.** `2 m²` and
+  `½ inch` fail.
 - **A magnitude letter glued to a digit is refused.** `4K display` fails.
-  `4 K display` and `1kg` do not, because a letter followed by another letter is
+  `4 K display` and `1kg` don't, because a letter followed by another letter is
   a unit, not a multiplier.
-- **A run no locale reads as a number needs its exact spelling.** `24.12.2026`
-  is supported by a fact of `'24.12.2026'` and by nothing else.
-- **Scientific notation in the copy is unsupported by construction.** A fact of
-  `1e-7` is laid out as `0.0000001`, and the text `"1e-7 g"` reads as the two
-  numerals 1 and 7, so the two never meet. `"0.0000001 g"` passes. This is the
-  bill for laying facts out positionally, and a lab or bulk-goods shop that
-  prints the value the way its own data prints it pays it.
+- **Scientific notation in the copy can never be supported.** A fact of `1e-7`
+  is written out as `0.0000001`, and the text `"1e-7 g"` reads as the two
+  numerals 1 and 7, so the two never meet. `"0.0000001 g"` passes. That's the
+  cost of writing facts out in plain digits. It falls on a lab or bulk-goods
+  shop that prints a value the way its own data prints it.
 
 ## Licence
 

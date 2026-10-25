@@ -10,8 +10,23 @@ break them.
 
 ## [Unreleased]
 
+### Changed
+
+- The READMEs are rewritten in plain words, the way the docs site was. They
+  say the same things: every fact, default, limit and warning is still there,
+  and every code block is unchanged. Repeated sentences and notes on why the
+  library was built a certain way are gone, and words like "cohort" and "spec"
+  are explained where they first appear.
+
 ### Fixed
 
+- The root README's Getting started didn't mention Cache Components, which
+  new Next.js apps turn on. With it on, the build stops with "Next.js
+  encountered the unstable value `Date.now()` while prerendering". It now says
+  to create the app with `--no-cache-components`, or to remove
+  `cacheComponents` and `partialPrefetching` from `next.config.ts`.
+- The root README sent questions to GitHub Discussions, which is turned off,
+  so the link was a 404. Questions now go to Issues.
 - The anthropic, attested, core and react READMEs linked to anchors on
   `rudrajs.com/docs`, which the rebuilt docs site no longer has, so the links
   landed on the reference index. They now go to each package's own reference

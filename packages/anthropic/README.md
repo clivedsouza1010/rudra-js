@@ -6,11 +6,11 @@ rudra-js is an open-source TypeScript library (MIT) you install from npm. A lang
 
 It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
 
-An Anthropic adapter for
-[`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core)'s
-`ComponentProvider`.
+This package plugs Anthropic's models into
+[`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core)
+as a `ComponentProvider`.
 
-This adapter is documented at [rudrajs.com](https://rudrajs.com/reference/anthropic/createAnthropicProvider).
+Its docs are at [rudrajs.com](https://rudrajs.com/reference/anthropic/createAnthropicProvider).
 
 > Anthropic and Claude are trademarks of Anthropic, PBC. This package is an
 > independent adapter and is not affiliated with or endorsed by Anthropic.
@@ -21,13 +21,15 @@ This adapter is documented at [rudrajs.com](https://rudrajs.com/reference/anthro
 npm install @rudra-js/anthropic@latest @rudra-js/core@latest @rudra-js/attested@latest
 ```
 
-Run the same command in a new app, in one that already uses rudra-js, and to
-upgrade. If your app has `@rudra-js/react`, add it to the command with `@latest`
-too. If it has `@rudra-js/a2ui`, use the install line in that package's README
-instead, since it also names the two A2UI packages. The `@rudra-js` packages are
-published together, and each one's peer ranges on the others start at its own
-version. For a bare name npm stays inside the range your `package.json` already
-has, so without `@latest` an app on an older core can get an `ERESOLVE`.
+Use this same command in a new app or in one that already uses rudra-js. Use it
+to upgrade too. If your app has `@rudra-js/react`, add it to the command with
+`@latest` too. If it has `@rudra-js/a2ui`, use the install line in that
+package's README instead. That line also names the two A2UI packages.
+
+The `@rudra-js` packages are released together. Each one's peer dependency
+ranges on the others start at its own version. When you give npm a package name
+with no version, it stays inside the range your `package.json` already has. So
+without `@latest`, an app on an older core can get an `ERESOLVE` error.
 
 ```ts
 import { createAnthropicProvider } from '@rudra-js/anthropic';
@@ -37,38 +39,42 @@ const provider = createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY
 const generator = createComponentGenerator({ provider });
 ```
 
-`model` defaults to `claude-sonnet-5`, and `thinking` defaults to
-`{ type: 'disabled' }`.
+`model` defaults to `claude-sonnet-5`. `thinking` defaults to
+`{ type: 'disabled' }`. `maxTokens` and `baseUrl` are optional too.
 
-Both of those come from the same constraint. Generation runs on the request
-path, inside `modelTimeoutMs`, which core defaults to 1500ms. A model that
-reasons before it answers won't finish in time. Sonnet 5 reasons by default
-when `thinking` is left out, so it's the leaving out that would break the
-budget, not the choice of model.
+Generation runs while the page request waits, inside core's `modelTimeoutMs`.
+That defaults to 1500ms. A model that reasons before it answers won't finish in
+that time. Sonnet 5 reasons by default when the request leaves `thinking` out.
+So the `thinking` default is what keeps Sonnet 5 inside the time limit.
 
-Want a different model? Pass `model` to pin one, and raise `modelTimeoutMs` to
-match while you're there. A quick heads-up on `thinking`: some models reject an
-explicit `{ type: 'disabled' }` and reason whatever you do. Pass
-`thinking: null` for those and we'll send no `thinking` field at all. Our
-example shop pins `claude-opus-5` and gives `modelTimeoutMs` a full 60 seconds,
-which is a demo talking, not a production setting.
+To use another model, pass `model`, and raise `modelTimeoutMs` to match. Some
+models reject an explicit `{ type: 'disabled' }` and reason whatever you send.
+For those, pass `thinking: null`, and the adapter sends no `thinking` field at
+all. The example shop in this repo pins `claude-opus-5` and gives
+`modelTimeoutMs` 60 seconds. That's a demo setting. Don't use it in production.
 
-The adapter asks the model to answer by calling its tool rather than forcing the
+The adapter asks the model to answer by calling its tool. It doesn't force the
 call, because Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 reject a
-forced tool call. So a model can answer in plain text instead. That reply is
-turned down like any other that doesn't fit, you get the fallback component, and
-the event's `error` in `onEvent` says
-`anthropic returned no emit_component_spec tool use`. Those four models also
-reject `thinking: { type: 'disabled' }`, so pass `thinking: null` with them, and
-raise `modelTimeoutMs`, since they'll reason before they answer.
+forced tool call. So a model can answer in plain text instead. The adapter
+rejects that reply, the same as any reply that doesn't fit. You get the
+fallback, which is the block core builds without a model. The event's `error`
+in `onEvent` says `anthropic returned no emit_component_spec tool use`.
 
-`maxTokens` and `baseUrl` are optional too.
+Those four models also reject `thinking: { type: 'disabled' }`, so pass
+`thinking: null` with them.
+
+You can pass your own `fetch`. This package's tests do that to stand in for a
+network call.
+
+The adapter builds the tool schema it sends the model from the `schema` on the
+`ProviderRequest`. That's the schema `@rudra-js/core` defines. This package
+keeps no copy of its own.
 
 ### An identity-linked key needs a workspace
 
-A key you made against your identity rather than inside a workspace belongs to
-you across several of them. The API can't tell which one a request is acting in,
-so it answers:
+An identity-linked key is one you made against your own identity, outside any
+workspace. It belongs to you across several workspaces. The API can't tell which
+one a request acts in, so it answers with this error:
 
 ```
 400 invalid_request_error — anthropic-workspace-id is required when
@@ -84,58 +90,67 @@ createAnthropicProvider({
 });
 ```
 
-`fetch` is injectable. That's how our test suite stands in for a network call.
-
-The tool schema we send the model is derived from the `schema` on the
-`ProviderRequest`, the same schema `@rudra-js/core` defines. We don't keep a
-copy here. A second copy would be a second vocabulary, and then the reconciler
-enforces one thing while the model is told another.
-
 ## Data handling
 
-Each generation is one POST to `https://api.anthropic.com/v1/messages`. Set
-`baseUrl` and it goes to that host instead, whether that's a proxy, a gateway,
-or a region-specific endpoint you have.
+Each generation sends one POST to `https://api.anthropic.com/v1/messages`. Set
+`baseUrl` to send it to another host instead. That can be a proxy or a gateway.
+It can also be a region-specific endpoint you have.
 
-What's in that request is listed under **What the model sees** in the
-[`@rudra-js/core` README](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core#what-the-model-sees).
-Read it before you send real shopper traffic. Neither mode sends `user.id`. In
-cohort mode, the default, the request can still be personal data: it names the
-category that shopper leans towards most, says whether they have any history,
-carries any `segment` you gave them as you wrote it, and lists candidates you
-may have picked or ordered just for them. In per-shopper mode it also carries
-the product that shopper is looking at, their current and recent searches,
-whether they're returning, their likes, dislikes, purchases, basket, most-viewed
-products, the categories they lean towards and interaction counts.
+The [`@rudra-js/core` README](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core#what-the-model-sees)
+lists what goes in that request, under **What the model sees**. Read it before
+you send real shopper traffic.
+
+In cohort mode, the default, shoppers who look alike share one generated block.
+Each shopper's own products are filled in per request. Per-shopper mode
+generates for each shopper. Neither mode sends `user.id`.
+
+A cohort-mode request can still be personal data. It carries:
+
+- the name of the category that shopper leans towards most
+- whether they have any history
+- any `segment` you gave them, as you wrote it
+- the candidate products, which you may have picked or ordered just for them
+
+A per-shopper request also carries:
+
+- the product that shopper is looking at
+- their current and recent searches
+- whether they're returning
+- their likes, dislikes and purchases
+- their basket
+- their most-viewed products
+- the categories they lean towards
+- interaction counts
 
 If your shop is in the EU or the UK, or sells to shoppers there, you're the one
-sending personal data out. You'll need a data processing agreement with whoever
-receives it, and a transfer mechanism if they're outside the EU or the UK, even
-when your shop is outside them too.
+sending personal data out. You need a data processing agreement (DPA) with
+whoever receives it. If the receiver is outside the EU or the UK, you also need a
+transfer mechanism. That holds even when your shop is outside the EU and the UK.
 
-Call Anthropic with a key from your own Anthropic account and the receiver is
-Anthropic. Its data processing addendum is part of its Commercial Terms, makes
-Anthropic your processor and includes the transfer clauses. Your shop is
-Anthropic's customer. A proxy you run yourself that forwards to Anthropic
+If you call Anthropic with a key from your own Anthropic account, the receiver is
+Anthropic. Anthropic's data processing addendum is part of its Commercial Terms.
+It makes Anthropic your processor and includes the transfer clauses. Your shop
+is Anthropic's customer. A proxy you run yourself that forwards to Anthropic
 doesn't change that.
 
 If you point `baseUrl` at a gateway or platform run by someone other than you or
 Anthropic, its operator sees every request and the `apiKey` you pass. If that's
-a key from your own Anthropic account, Anthropic is still your processor and the
-operator is another one, so you need a DPA with the operator as well. If the
-platform issued the key, Anthropic says the platform's terms govern that use:
-you're the platform's customer, and its DPA is the one that covers you.
+a key from your own Anthropic account, Anthropic is still your processor. The
+operator is a second processor, so you need a DPA with the operator as well. If
+the platform issued the key, Anthropic says the platform's terms govern that
+use. You're the platform's customer, and the platform's DPA is the one that
+covers you.
 
-This package is a piece of code in the middle, and it _isn't_ a party to
-anything.
+This package is a piece of code in the middle. It _isn't_ a party to anything.
 
-When the API answers with an error, the `Error` we throw carries the status code
-and the vendor's error category, like `anthropic responded 400
-(invalid_request_error)`. We leave the vendor's own message out. It quotes the
-request back, and in rudra-js the request can hold a shopper's search
-terms, which an adopter's `console.error(error)` would then write to a log. A
-test in `anthropic-provider.test.ts` puts a search term in that message and
-asserts it does not reach the thrown error.
+When the API answers with an error, the adapter throws an `Error` that carries
+the status code and Anthropic's error category, like
+`anthropic responded 400 (invalid_request_error)`. It leaves out Anthropic's own
+error message. That message quotes the request back. The request can hold a
+shopper's search terms. If the adapter kept the message, a `console.error(error)`
+in your app would write those terms to a log. A test in
+`anthropic-provider.test.ts` puts a search term in that message and checks that
+it doesn't reach the thrown error.
 
 ## Licence
 
