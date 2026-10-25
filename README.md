@@ -38,7 +38,7 @@ never runs JavaScript still reads it.
 On our 500-shopper benchmark, the default mode makes 460 model calls per 1,000 page views.
 Generating for every shopper would make 1,000.
 
-> **Status: `0.8.2`, early.** It installs and it works. The Getting started below runs as a test on
+> **Status: `0.8.3`, early.** It installs and it works. The Getting started below runs as a test on
 > every commit. The public API might still change between minor versions before `1.0`. The
 > changelog says when it does.
 

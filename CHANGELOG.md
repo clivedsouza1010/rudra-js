@@ -10,6 +10,8 @@ break them.
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-10-24
+
 ### Changed
 
 - The READMEs are rewritten in plain words, the way the docs site was. They
@@ -813,7 +815,8 @@ The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
   - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
     by id, and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.2...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.7.6...v0.8.0
