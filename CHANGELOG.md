@@ -10,6 +10,13 @@ break them.
 
 ## [Unreleased]
 
+### Fixed
+
+- The anthropic, attested, core and react READMEs linked to anchors on
+  `rudrajs.com/docs`, which the rebuilt docs site no longer has, so the links
+  landed on the reference index. They now go to each package's own reference
+  pages, and core's no longer says every export is documented there.
+
 ## [0.8.2] - 2026-10-22
 
 ### Changed

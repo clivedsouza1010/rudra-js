@@ -12,7 +12,7 @@ specification for the recommendations on that page, written by your model or
 built without one, and checked against those products. There's no React in it.
 `@rudra-js/react` turns the specification into markup.
 
-Every export of this package is documented at [rudrajs.com](https://rudrajs.com/docs).
+The guides and the API reference are at [rudrajs.com](https://rudrajs.com).
 
 ## Install
 
