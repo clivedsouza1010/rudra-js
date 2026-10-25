@@ -6,18 +6,21 @@ rudra-js is an open-source TypeScript library (MIT) you install from npm. A lang
 
 It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
 
-Renders a component specification from
-[`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core) with React
-18 or 19.
+This package renders a component spec with React 18 or 19. The spec is the description of the block
+that [`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core)
+generates.
 
-The renderer and its registry are documented at rudrajs.com: [`RudraComponent`](https://rudrajs.com/reference/react/RudraComponent) and [`extendRegistry`](https://rudrajs.com/reference/react/extendRegistry).
+The reference for [`RudraComponent`](https://rudrajs.com/reference/react/RudraComponent) and [`extendRegistry`](https://rudrajs.com/reference/react/extendRegistry) is on rudrajs.com.
 
-The components are plain functions with no hooks, state or effects. They work with
-`renderToString`, in a client-rendered app, and as Server Components in a setup that supports them,
-such as the Next.js App Router. Rendered on the server, the
-recommendation area arrives in the initial HTML response and needs no client JavaScript, so it never
-pops in the way a client-fetched recommendation rail does, and a crawler that doesn't run JavaScript
-still reads it.
+The components are plain functions with no hooks, state or effects. You can render them:
+
+- with `renderToString`
+- in a client-rendered app
+- as Server Components, in a setup that supports them, such as the Next.js App Router
+
+Rendered on the server, the recommendations arrive in the initial HTML response and need no client
+JavaScript. They never pop in late the way a client-fetched recommendation rail does. A crawler that
+doesn't run JavaScript still reads them.
 
 ## Install
 
@@ -25,21 +28,28 @@ still reads it.
 npm install @rudra-js/react@latest @rudra-js/core@latest @rudra-js/attested@latest react react-dom
 ```
 
-Run the same command in a new app, in one that already uses rudra-js, and to upgrade. If your app
-has `@rudra-js/anthropic`, add it to the command with `@latest` too. If it has `@rudra-js/a2ui`, use
-the install line in that package's README instead, since it also names the two A2UI packages. The
-`@rudra-js` packages are published together, and each one's peer ranges on the others start at its
-own version. For a bare name npm stays inside the range your `package.json` already has, so without
-`@latest` an app on an older core can get an `ERESOLVE`. `react` and `react-dom` carry no version,
-so npm and pnpm keep a React 18 app on 18. Name both: npm moves each to the newest release in its
-range, and React 19 won't load `react-dom` at a different version from `react`.
+Use this same command to install and to upgrade, whether or not your app already uses rudra-js.
 
-Both `@rudra-js/core` and `react` are peer dependencies. The specification you pass in comes from
-your copy of core, and the elements this renders have to come from the same React your app renders.
-With two copies of either, you'd get a spec that fails its own type check, or a component tree React
-refuses to render. `@rudra-js/attested` is core's peer: npm and pnpm add it for you, Yarn doesn't.
-Yarn does move a bare name to its latest version, so leave out `react` and `react-dom` if your app
-already has React.
+- If your app has `@rudra-js/anthropic`, add it to the command with `@latest` too.
+- If your app has `@rudra-js/a2ui`, use the install line in that package's README instead. It also
+  names the two A2UI packages.
+
+Keep `@latest` on every `@rudra-js` package. The packages are published together. Each one's peer
+ranges on the others start at its own version. With a bare name, npm stays inside the range your
+`package.json` already has. So without `@latest`, an app on an older core can get an `ERESOLVE`.
+
+Leave `react` and `react-dom` without a version. Then npm and pnpm keep a React 18 app on 18. Do name
+both of them, so npm moves each one to the newest release in its range. React 19 won't load a
+`react-dom` at a different version from `react`.
+
+`@rudra-js/core` and `react` are peer dependencies. The spec you pass in comes from your copy of core.
+The elements this package renders have to come from the same React your app renders. With two copies
+of core, the spec fails its own type check. With two copies of React, React refuses to render the
+component tree.
+
+`@rudra-js/attested` is core's peer dependency. npm and pnpm add it for you. Yarn doesn't. Yarn does
+move a bare name to its latest version, so with Yarn, leave `react` and `react-dom` out of the command
+if your app already has React.
 
 ```tsx
 import { RudraComponent } from '@rudra-js/react';
@@ -51,9 +61,8 @@ import { RudraComponent } from '@rudra-js/react';
 
 ## What comes from where
 
-A rendered component rests on this split. The model decides how things are arranged and what the
-words are. Every fact about a product is read from your catalog as the page is served, and whatever
-the model wrote is rendered as escaped text.
+The model decides how the block is laid out and what the words say. Every fact about a product is
+read from your catalog when the page is served. Whatever the model wrote is rendered as escaped text.
 
 | Decided by the model                                                | Decided by your catalog |
 | ------------------------------------------------------------------- | ----------------------- |
@@ -61,40 +70,41 @@ the model wrote is rendered as escaped text.
 | Tone, headline, the words in each block                             | Every price             |
 | Only in per-shopper mode: which products, and how each is described | Every image and link    |
 
-In the default cohort mode core fills in the products, their order and the reason under each,
-per request, and a badge the model wrote gets dropped. The model picks those only under
-`generation: 'per-shopper'`. In either mode it still chooses the product a hero names. You'll find
-the full split in
+The default is cohort mode, where shoppers who look alike share one spec. In cohort mode, core
+fills in the products and their order for each request. It also writes the reason under each product.
+It drops any badge the model wrote. Under `generation: 'per-shopper'`, the model makes those picks
+itself. In both modes, the model chooses the product a hero names. The full split is in
 [What the model decides, by mode](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core#what-the-model-decides-by-mode).
 
-The specification has no field carrying a title, a price, an image or a URL. Product facts are
-resolved at render time from `products`, keyed by a SKU reconciliation has already checked.
+The spec has no field for a title, a price, an image or a URL. The component looks up each product in
+`products` by a SKU that core has already checked.
 
-**Validate `products` with `productSchema` from `@rudra-js/core`**, the same schema your candidates
-already passed. This prop is a second way for data to reach the page. `imageUrl` lands in an
-`<img src>`, and `productSchema` is what rejects a protocol-relative `//evil.example/pixel.png` or a `data:` URL.
-It reads a path the way a browser does, so `/\evil.example/pixel.png` and the same trick written
-with a tab or a newline in it are rejected too — each one resolves to someone else's host. React
-neutralises a `javascript:` URL by itself, but not any of those. And if a price isn't a finite
-number, it throws. A product that looks free is worse than a stack trace.
+**Validate `products` with `productSchema` from `@rudra-js/core`**, the same schema the candidate
+products you sent to core already passed. This prop is a second way for data to reach the page.
 
-A row flagged `isInStock: false` counts as a row that isn't there. Cards for it are dropped, a hero
-loses its link, and a bundle with one sold-out member disappears — the same as if you'd left the
-row out. Core only ever names a product that was in stock in the payload, but this catalog is read
-later and may be the fresher of the two.
+`imageUrl` ends up in an `<img src>`. `productSchema` rejects a protocol-relative URL such as
+`//evil.example/pixel.png`, and it rejects a `data:` URL. It reads a path the way a browser does, so it
+also rejects `/\evil.example/pixel.png` and the same trick written with a tab or a newline in it. A
+browser resolves each of these to someone else's host. React blocks a `javascript:` URL on its own,
+but none of these.
+
+If a price isn't a finite number, rendering throws an error.
+
+A row with `isInStock: false` counts as a row that isn't there. Its cards are dropped. A hero that
+names it loses its link. A bundle with it as a member disappears. Core only names products that were
+in stock in the data you sent it. This catalog is read later, so it may be the fresher of the two.
 
 ## Styling
 
-We ship no CSS. A stylesheet of ours would only fight whatever your site already has. So out of the
-box the block renders as a run-on line — every card element is inline, so a card's parts sit on one
-line with spaces between them, and nothing separates one card from the next. That's the starting
-point you style from.
+This package ships no CSS. Unstyled, the block renders as one run-on line. Every card element is
+inline, so a card's parts sit on one line with spaces between them. Nothing separates one card from
+the next. You style it from there.
 
-Check out `examples/shop/public/demo-styles.css`. It's a working stylesheet written against nothing
-but the table below, so copy it as a starting point rather than as a supported API. The example shop applies it by default, and `?styles=off`
-shows you the raw markup.
+For a working stylesheet, see `examples/shop/public/demo-styles.css`. It uses nothing but the classes
+in the table below. Copy it as a starting point. It isn't a supported API. The example shop applies
+it by default, and `?styles=off` shows you the raw markup.
 
-Every element we emit carries a class. Here's all of them:
+Every element the component renders carries a class. Here is the full list:
 
 | Where          | Classes                                                                                                                                                                                                    |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -107,24 +117,29 @@ Every element we emit carries a class. Here's all of them:
 | A bundle       | `.rudra-bundle`, `.rudra-bundle__label`, `.rudra-bundle__title`, `.rudra-bundle__body`, `.rudra-bundle__items`, `.rudra-bundle__item`, `.rudra-bundle__link`, `.rudra-bundle__price`, `.rudra-bundle__cta` |
 | A product card | `.rudra-card`, `.rudra-card--featured`, `.rudra-card__image`, `.rudra-card__body`, `.rudra-card__title`, `.rudra-card__price`, `.rudra-card__reason`, `.rudra-card__badge`                                 |
 
-A few notes on those. `.rudra__rationale` only appears under `hasDiagnostics`.
-`.rudra-bundle__label` is your own name for the set, so it shows up only for a bundle you gave a
-`label`. And `className` is added alongside `rudra`, _never_ in place of it, so the child classes
-keep working.
+A few notes on those:
 
-`.rudra-carousel__track` is meant to scroll horizontally, so give it `overflow-x: auto`. Nothing
-here uses JavaScript to scroll it for you. `.rudra-card--featured` is applied alongside
-`.rudra-card`, so write `.rudra-card--featured { ... }` after the base rule and let it layer on top.
+- `.rudra__rationale` appears only under `hasDiagnostics`.
+- `.rudra-bundle__label` holds your own name for the set. It shows up only for a bundle you gave a
+  `label`.
+- Your `className` is added alongside `rudra`, never in place of it, so the child classes keep
+  working.
+- `.rudra-carousel__track` is meant to scroll horizontally, so give it `overflow-x: auto`. No
+  JavaScript scrolls it for you.
+- `.rudra-card--featured` is applied alongside `.rudra-card`. Write the `.rudra-card--featured { ... }`
+  rule after the base rule so it layers on top.
 
-`.rudra-banner__cta` and `.rudra-bundle__cta` are plain text, not links or buttons, because there is
-nothing for them to do. Don't style them as buttons unless a renderer of your own wraps them in one.
-The hero's call to action sits inside the product link, so that one is clickable. Every card in a
-carousel is a link, so tabbing through them scrolls the track, which keeps it usable by keyboard
-even with the scrollbar hidden.
+`.rudra-banner__cta` and `.rudra-bundle__cta` are plain text, not links or buttons. Don't style
+them as buttons unless a renderer of your own wraps them in one. The hero's call to action sits inside
+the product link, so that one is clickable.
+
+Every card in a carousel is a link. Tabbing through the cards scrolls the track, so the carousel
+works by keyboard even with the scrollbar hidden.
 
 ### Attributes
 
-The same markup carries what the model decided, so you can hang styling or analytics off it.
+The markup also carries what the model decided. You can hang styling or analytics off these
+attributes.
 
 | Attribute                | On                             | Value                                                      |
 | ------------------------ | ------------------------------ | ---------------------------------------------------------- |
@@ -136,8 +151,8 @@ The same markup carries what the model decided, so you can hang styling or analy
 | `data-rudra-sku`         | a card, hero link, bundle item | The product, for click attribution                         |
 | `data-rudra-basis`       | a card                         | Why the product was picked: `most_viewed`, `popular`, …    |
 
-We leave `data-rudra-source` public so you can read hit rate and fallback share straight off a
-rendered page. Anything more specific than that appears only under `hasDiagnostics`, because it
+`data-rudra-source` is always there, so you can read the cache hit rate and the fallback share
+straight off a rendered page. Anything more specific appears only under `hasDiagnostics`, because it
 tells a visitor what you run and when it's failing:
 
 | Attribute               | On          | Value                                                                                                                  |
@@ -149,9 +164,8 @@ tells a visitor what you run and when it's failing:
 
 ## Replacing a renderer
 
-Swap any block for your own design-system component. The model isn't involved and the specification
-doesn't change, so it gains nothing here. It still picks from the same fixed vocabulary it always
-did.
+Swap any block's renderer for a component from your own design system. Only the drawing changes. The
+spec, and the block kinds the model picks from, stay the same.
 
 ```tsx
 import { RudraComponent, extendRegistry } from '@rudra-js/react';
@@ -164,63 +178,62 @@ const registry = extendRegistry({
 ```
 
 A grid, carousel or bundle block with nothing left in your catalog is dropped before any renderer
-runs — yours as well as ours. The component has to decide whether to draw the wrapper and its
-headline at all, and the only way to decide is to ask each block first. Hero, banner and copy always
-reach the renderer, since they don't depend on the catalog.
+runs, yours or ours. The rest of the blocks still render. Hero, banner and copy blocks don't
+depend on the catalog, so they always reach the renderer.
 
 ## Props
 
-| Prop                | Notes                                                                                                                                                                                         |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `spec`              | Required. From `@rudra-js/core`.                                                                                                                                                              |
-| `products`          | Required. A list of products, or anything keyed by SKU. See below, and the warning above.                                                                                                     |
-| `bundles`           | The sets your shop sells together. Only needed if a spec can carry a bundle block.                                                                                                            |
-| `registry`          | Replace some or all block renderers.                                                                                                                                                          |
-| `hrefForSku`        | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                                    |
-| `formatPrice`       | Defaults to `Intl.NumberFormat`, which knows how many decimal places each currency wants. It formats products, not bundles.                                                                   |
-| `formatBundlePrice` | The same for a bundle's own price, in the currency the shop put on the set. The set's price and its currency come from the same object, so members priced in another currency change nothing. |
-| `locale`            | Punctuates prices. Defaults to the **server's** locale, which is rarely the shopper's, so pass it if you serve more than one.                                                                 |
-| `hasDiagnostics`    | Adds the provider, the model name, the latency and the model's own reasoning to the markup. Off by default, since it tells a visitor which model you use and when it's failing.               |
-| `className`         | Added alongside `rudra`.                                                                                                                                                                      |
+| Prop                | Notes                                                                                                                                                                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spec`              | Required. From `@rudra-js/core`.                                                                                                                                                                                                               |
+| `products`          | Required. A list of products, or anything keyed by SKU. See below, and the `productSchema` warning above.                                                                                                                                      |
+| `bundles`           | The sets your shop sells together. Only needed if a spec can carry a bundle block.                                                                                                                                                             |
+| `registry`          | Replaces some or all of the block renderers.                                                                                                                                                                                                   |
+| `hrefForSku`        | Defaults to `/product/{sku}`, URL-encoded.                                                                                                                                                                                                     |
+| `formatPrice`       | Formats product prices, not bundle prices. Defaults to `Intl.NumberFormat`, which knows how many decimal places each currency wants.                                                                                                           |
+| `formatBundlePrice` | Formats a bundle's own price, in the currency the shop put on the set. Defaults to `Intl.NumberFormat`, like `formatPrice`. The price and its currency come from the same bundle object, so members priced in another currency change nothing. |
+| `locale`            | Sets how prices are punctuated. Defaults to the **server's** locale, which is rarely the shopper's. Pass it if you serve more than one locale.                                                                                                 |
+| `hasDiagnostics`    | Adds the provider, the model name, the latency and the model's own reasoning to the markup. Off by default.                                                                                                                                    |
+| `className`         | Added alongside `rudra`.                                                                                                                                                                                                                       |
 
 ### What `products` may be
 
-A list of products, or anything keyed by SKU that answers `get(sku)` and `has(sku)`. A `Map` does
-it, and so does your own index. The renderers only ever call `get`, and `has` is how we tell a keyed
-catalog from a list, so if your catalog is too big to copy into a `Map` on every request, hand over
-a view of your own store instead. The prop is typed as a `ReadonlyMap`, so in TypeScript either
-implement `ReadonlyMap` or cast with `as unknown as ReadonlyMap<string, Product>`.
+`products` is a list of products, or anything keyed by SKU that answers `get(sku)` and `has(sku)`. A
+`Map` works, and so does your own index. The renderers only ever call `get`. `has` is how the
+component tells a keyed catalog from a list. If your catalog is too big to copy into a `Map` on every
+request, pass a view of your own store instead. The prop is typed as a `ReadonlyMap`, so in
+TypeScript either implement `ReadonlyMap` or cast with `as unknown as ReadonlyMap<string, Product>`.
 
-We look for those two methods rather than for `instanceof Map`, which is per-realm. A `Map` arriving
-from a worker or a `node:vm` sandbox is a perfectly good catalog and fails `instanceof` anyway.
+A `Map` from a worker or a `node:vm` sandbox works too, even though it fails `instanceof Map`.
 
-Anything that is neither a list nor keyed gets refused on the spot, with an error naming the prop.
-That's a `Set` of products, a plain object, or a `Map` that has been through JSON. Better a loud
-error than a quietly empty recommendation area.
+Anything that is neither a list nor keyed is refused on the spot, with an error that names the prop.
+That means a `Set` of products, a plain object, or a `Map` that has been through JSON.
 
 When there's nothing left to show, the component renders nothing at all. That covers a spec with no
-blocks, and one whose every product has left your catalog since it was generated. A single block
-goes the same way on its own: it drops out and the rest of the component carries on without it. An
-empty recommendation area, or a headline over an empty box, takes up space and tells the shopper the
-page is broken.
+blocks, and a spec whose products have all left your catalog since it was generated.
 
 ### What `bundles` is
 
-The sets your shop sells together, the same way `products` is your catalog. The model only asks for
-a bundle block. It never invents one, and it _never_ sees a price.
+`bundles` lists the sets your shop sells together, the same way `products` is your catalog. The
+model only asks for a bundle block. It never invents a set, and it never sees a price.
 
-You offer the sets, and core picks which one fills each block. That happens inside
-`reconcileSpec` as the page is served, after the spec was generated rather than before, and it goes on what this
-shopper has in their basket, has looked at, or is browsing right now. The spec then carries the id
-it picked. This prop supplies the rest: that set's members, its price, the currency that price is
-in, and your name for it, so the component has something to draw.
+You offer the sets, and core picks which one fills each bundle block. It does this in `reconcileSpec`
+as the page is served, after the spec was generated. It goes by what this shopper has in their
+basket, has looked at, or is browsing right now. The spec then carries the id of the set core picked.
+This prop supplies the rest, so the component has something to draw: the set's members, its price,
+the currency of that price, and your name for it.
 
 **Validate `bundles` with `bundleSchema` from `@rudra-js/core`, and pass the same list you sent to
-`parseTrackingInput`.** Core already checked that list — every member in stock, none of them
-disliked, none of them the product being looked at, no repeats, and the whole set inside the item
-budget — and then hands the renderer nothing but the id it chose. Pass a stale or different list
-here and you'll draw a set none of those checks ever saw, under an id that was proved against
-another one.
+`parseTrackingInput`.** Core checked that list before it picked a set:
+
+- every member is in stock
+- no member is one the shopper disliked
+- no member is the product the shopper is viewing
+- no product shows up twice
+- the whole set fits in what's left of `context.maxItems`, the most products the component may show
+
+Core then hands the renderer only the id it chose. Pass a stale or different list here and you'll
+draw a set none of those checks saw, under an id that was checked against another list.
 
 ## Licence
 
