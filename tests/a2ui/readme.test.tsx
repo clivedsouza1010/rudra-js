@@ -67,9 +67,9 @@ describe('the README install commands', () => {
       const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
         readFileSync(join(REPO_ROOT, 'packages/a2ui/package.json'), 'utf8'),
       );
-      const releases = [...readme.matchAll(new RegExp(`^npm install .*${name}@(\\S+)`, 'gm'))].map(
-        (match) => `^${match[1]}.0`,
-      );
+      const releases = [
+        ...readme.matchAll(new RegExp(`^npm install .*${name}(?:@(\\S+))?(?= |$)`, 'gm')),
+      ].map((match) => `^${match[1]}.0`);
 
       expect(releases.length, name).toBeGreaterThan(0);
       expect(new Set(releases)).toStrictEqual(new Set([manifest.peerDependencies[name]]));
@@ -77,16 +77,23 @@ describe('the README install commands', () => {
   );
 
   it('let a server without React load the server entry', () => {
+    const react = '/^(react|react-dom|@a2ui\\/react|@rudra-js\\/react)(\\/|$)/';
     const blockReact = [
       'export async function resolve(specifier, context, next) {',
-      '  if (/^(react|react-dom|@a2ui\\/react|@rudra-js\\/react)(\\/|$)/.test(specifier)) {',
+      `  if (${react}.test(specifier)) {`,
       "    throw new Error('the server entry imported ' + specifier);",
       '  }',
       '  return next(specifier, context);',
       '}',
     ].join('\n');
     const script = [
-      "import { register } from 'node:module';",
+      "import Module, { register } from 'node:module';",
+      // A require() inside a CommonJS module skips the resolve hook, so block it here too.
+      'const resolveFilename = Module._resolveFilename;',
+      'Module._resolveFilename = function (request, ...rest) {',
+      `  if (${react}.test(request)) throw new Error('the server entry imported ' + request);`,
+      '  return resolveFilename.call(this, request, ...rest);',
+      '};',
       `register('data:text/javascript,' + encodeURIComponent(${JSON.stringify(blockReact)}));`,
       "const server = await import('@rudra-js/a2ui/server');",
       'console.log(typeof server.buildRecommendationMessages);',

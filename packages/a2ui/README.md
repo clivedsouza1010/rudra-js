@@ -11,7 +11,7 @@ adds one component, `RudraRecommendations`, to the catalog your A2UI renderer dr
 places it and passes hints about what the shopper is looking at. Your server still picks the
 products and builds the block with `@rudra-js/core`. The browser renders it with `@rudra-js/react`.
 For Flutter, Angular or any other renderer, your server can send the block as A2UI messages
-instead, as [other renderers](#flutter-angular-and-other-renderers) describes.
+instead. See [Flutter, Angular and other renderers](#flutter-angular-and-other-renderers).
 
 It works with version 0.9 of the A2UI protocol, using `@a2ui/react` and `@a2ui/web_core` 0.14.
 
@@ -214,39 +214,42 @@ export function messagesFor(result: RecommendationResult, locale: string) {
 ```
 
 In [your endpoint](#your-endpoint), return `Response.json(messagesFor(result, shopper.locale))`
-instead of `result`. The other two pieces are for React only: leave `rudraRecommendationsApi` out
-of your agent's catalog, because only a React renderer can draw `RudraRecommendations`.
+instead of `result`. Skip the other two pieces, which are for React only, and leave
+`rudraRecommendationsApi` out of your agent's catalog.
 
 Your app can call the endpoint with the four hints and give the messages it gets back to its A2UI
 renderer. Or your agent's code can call it and pass the messages on to the client unchanged. Then
 the call has to carry the shopper's session, because `shopperFor` reads the shopper from the
-request. Keep the model away from the messages and from the block's surface, as
+request. The first way is the safer one. Either way, keep the model away from the messages and
+from the block's surface, as
 [SECURITY.md](https://github.com/clivedsouza1010/rudra-js/blob/main/SECURITY.md) explains.
 
 - The messages create the surface named `surfaceId` and fill it. To show a new block there, send
   `deleteSurface` for it first. When nothing in the block can be shown, you get no messages.
 - Grids and carousels show two cards to a row. The basic catalog can't fit cards to the screen, and
-  it has no track that scrolls.
+  its `List` doesn't scroll on every renderer.
 - Each product card is a button that opens the product's page. `hrefForSku` builds the link,
   `/product/<sku>` by default. `shopUrl` resolves that link and any relative image URL, because a
-  native app has no page to resolve them against. A link or an image that is empty or doesn't end
-  up `http` or `https` throws.
+  native app has no page to resolve them against. A product whose image URL is empty or only
+  spaces shows no image. A link that is empty, or a link or an image that doesn't end up `http` or
+  `https`, throws.
 - Prices are formatted on your server, for `locale`. Pass `formatPrice` and `formatBundlePrice` to
   format them yourself.
 - All text uses a heading or caption style, never body. Renderers read body text as Markdown, and
   Flutter's `genui` reads every style that way. So square brackets become parentheses and line
   breaks become spaces, and no text can load an image or open a link. `genui` still shows a bare
-  `https://` or `www.` address as a link that does nothing, and text that starts with a Markdown
-  marker such as `# ` or `- ` as Markdown.
+  `https://` or `www.` address, an email address or a `<...>` link as a link that does nothing, and
+  text that starts with a Markdown marker such as `# ` or `- ` as Markdown.
 - The rationale and how the block was generated are never sent.
 - Flutter's `genui` knows the basic catalog by its id from 0.10.3. For 0.8 to 0.10.2, pass
   `catalogId: 'https://a2ui.org/specification/v0_9/basic_catalog.json'`. On Android 11 and later,
   the app has to declare `https` links under `<queries>` in its manifest, or a tap on a card does
   nothing.
 - On `@a2ui/angular` 0.13, register the `BasicCatalog` from `@a2ui/angular/v0_9`, because the one
-  from `@a2ui/angular` has the v1.0 id. Set `useUniversalComponents: true` in its config too.
-  Without it, a click on a card does nothing, and each card tries to open its link in a new tab as
-  soon as it renders. Don't send these messages to an Angular 0.13 app without that setting.
+  from `@a2ui/angular` has the v1.0 id. Pass `useUniversalComponents: true` to `provideA2Ui` too,
+  next to `catalogs`. Without it, a click on a card does nothing, and each card tries to open its
+  link in a new tab as soon as it renders. Don't send these messages to an Angular 0.13 app without
+  that setting.
 
 ## zod
 

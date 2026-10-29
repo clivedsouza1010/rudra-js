@@ -17,10 +17,11 @@ break them.
   Flutter, Angular and other A2UI renderers can show the block without
   `RudraRecommendations` or React. It formats prices on your server and links
   each product card to its page with `openUrl`. Grids and carousels show two
-  cards to a row. It refuses a link or an image that is empty or isn't `http`
-  or `https`. It keeps every text in heading and caption styles, with square
-  brackets turned into parentheses and line breaks into spaces, so a renderer
-  that reads Markdown can't load an image or open a link from it.
+  cards to a row. It refuses a link that is empty, and a link or an image that
+  isn't `http` or `https`. It keeps every text in heading and caption styles,
+  with square brackets turned into parentheses and line breaks into spaces, so
+  no text can load an image. Flutter's `genui` reads every style as Markdown,
+  so it shows a URL or an email address in text as a link that does nothing.
 
 ### Changed
 

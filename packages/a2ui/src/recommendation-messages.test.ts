@@ -98,6 +98,7 @@ function componentsOf(messages: A2uiMessage[]): SentComponent[] {
 
 function describeComponent(component: SentComponent): string {
   const weight = component['weight'] === undefined ? '' : ` weight ${component['weight']}`;
+  const align = component['align'] === undefined ? '' : ` align ${component['align']}`;
   switch (component['component']) {
     case 'Text':
       return `${component['variant']} ${component['text']}`;
@@ -105,8 +106,12 @@ function describeComponent(component: SentComponent): string {
       return `image ${component['url']}`;
     case 'Button':
       return `${component['variant']} link to ${component['action'].functionCall.args.url}`;
+    case 'Row':
+      return `row${align}`;
     case 'Column':
-      return component['children'].length === 0 ? `empty column${weight}` : `column${weight}`;
+      return component['children'].length === 0
+        ? `empty column${align}${weight}`
+        : `column${align}${weight}`;
     default:
       return `${String(component['component']).toLowerCase()}${weight}`;
   }
@@ -169,7 +174,7 @@ describe('buildRecommendationMessages', () => {
       'column',
       '  h2 Goes with your cart',
       '  caption Picked from what you have',
-      '  column',
+      '  column align start',
       '    caption Tested.',
     ]);
   });
@@ -185,10 +190,10 @@ describe('buildRecommendationMessages', () => {
     expect(blockOutline(messagesFor([grid]))).toStrictEqual([
       '  column',
       '    h3 More cookware',
-      '    row',
+      '    row align start',
       '      card weight 1',
       '        borderless link to https://shop.example/product/A-1',
-      '          column',
+      '          column align start',
       '            image https://shop.example/images/a-1.jpg',
       '            caption New',
       '            h5 Cast iron skillet',
@@ -196,29 +201,29 @@ describe('buildRecommendationMessages', () => {
       '            caption Goes with your cart',
       '      card weight 1',
       '        borderless link to https://shop.example/product/A-2',
-      '          column',
+      '          column align start',
       '            image https://cdn.example/a-2.jpg',
       '            h5 Enamel dutch oven',
       '            h5 $89.00',
-      '    row',
+      '    row align start',
       '      card weight 1',
       '        borderless link to https://shop.example/product/A-3',
-      '          column',
+      '          column align start',
       '            h5 Chef knife',
       '            h5 $55.00',
       '      empty column weight 1',
     ]);
   });
 
-  it('lays a carousel out the same way, because the basic catalog has no track that scrolls', () => {
+  it('lays a carousel out the same way, because a horizontal List does not scroll on every renderer', () => {
     const carousel: Block = { kind: 'carousel', title: null, items: [item('A-3')] };
 
     expect(blockOutline(messagesFor([carousel]))).toStrictEqual([
       '  column',
-      '    row',
+      '    row align start',
       '      card weight 1',
       '        borderless link to https://shop.example/product/A-3',
-      '          column',
+      '          column align start',
       '            h5 Chef knife',
       '            h5 $55.00',
       '      empty column weight 1',
@@ -227,12 +232,12 @@ describe('buildRecommendationMessages', () => {
 
   it('shows a hero with its words and a card linking to its product', () => {
     expect(blockOutline(messagesFor([EVERY_KIND[0] as Block]))).toStrictEqual([
-      '  column',
+      '  column align start',
       '    h3 A pan for life',
       '    caption Heats evenly',
       '    card',
       '      borderless link to https://shop.example/product/A-1',
-      '        column',
+      '        column align start',
       '          h4 Cast iron skillet',
       '          h5 $39.00',
       '          h5 Shop',
@@ -248,16 +253,19 @@ describe('buildRecommendationMessages', () => {
       ctaLabel: 'Shop',
     };
 
-    expect(blockOutline(messagesFor([hero]))).toStrictEqual(['  column', '    h3 Back soon']);
+    expect(blockOutline(messagesFor([hero]))).toStrictEqual([
+      '  column align start',
+      '    h3 Back soon',
+    ]);
   });
 
   it('shows a banner in a card and a copy block as text', () => {
     expect(blockOutline(messagesFor(EVERY_KIND.slice(3, 5)))).toStrictEqual([
       '  card',
-      '    column',
+      '    column align start',
       '      h5 Free returns',
       '      h5 See how',
-      '  column',
+      '  column align start',
       '    h3 Why cast iron',
       '    caption Each piece is tested.',
     ]);
@@ -266,11 +274,11 @@ describe('buildRecommendationMessages', () => {
   it('shows a bundle with its label and words, a link to each member, its price and call to action', () => {
     expect(blockOutline(messagesFor([EVERY_KIND[5] as Block]))).toStrictEqual([
       '  card',
-      '    column',
+      '    column align start',
       '      h3 Cookware set',
       '      h4 Better together',
       '      caption Cook anything',
-      '      column',
+      '      column align start',
       '        borderless link to https://shop.example/product/A-1',
       '          h5 Cast iron skillet',
       '        borderless link to https://shop.example/product/A-2',
@@ -278,6 +286,22 @@ describe('buildRecommendationMessages', () => {
       '      h5 $110.00',
       '      h5 Add set',
     ]);
+  });
+
+  it('labels a bundle member with its SKU when its title is only spaces', () => {
+    const products = CATALOG.map((product) =>
+      product.sku === 'A-2' ? { ...product, sku: '[A-2]', title: '  ' } : product,
+    );
+    const messages = buildRecommendationMessages(
+      {
+        spec: specWith([EVERY_KIND[5] as Block]),
+        products,
+        bundles: [{ ...(BUNDLES[0] as Bundle), skus: ['A-1', '[A-2]'] }],
+      },
+      { surfaceId: SURFACE_ID, shopUrl: SHOP_URL },
+    );
+
+    expect(blockOutline(messages)).toContain('          h5 (A-2)');
   });
 
   it.each<[string, Block]>([
@@ -312,7 +336,10 @@ describe('buildRecommendationMessages', () => {
   ])('leaves out %s', (_, block) => {
     const messages = messagesFor([block, { kind: 'copy', title: null, body: 'Still here.' }]);
 
-    expect(blockOutline(messages)).toStrictEqual(['  column', '    caption Still here.']);
+    expect(blockOutline(messages)).toStrictEqual([
+      '  column align start',
+      '    caption Still here.',
+    ]);
   });
 
   it('leaves out a sold-out or missing card and keeps the rest of its grid', () => {
@@ -325,10 +352,10 @@ describe('buildRecommendationMessages', () => {
 
     expect(blockOutline(messagesFor([grid]))).toStrictEqual([
       '  column',
-      '    row',
+      '    row align start',
       '      card weight 1',
       '        borderless link to https://shop.example/product/A-3',
-      '          column',
+      '          column align start',
       '            h5 Chef knife',
       '            h5 $55.00',
       '      empty column weight 1',
@@ -359,6 +386,18 @@ describe('buildRecommendationMessages', () => {
     expect(outline(messages)).toContain('            h5 1.234,50\u00a0€');
   });
 
+  it('falls back to the currency and the number when Intl cannot format for the locale', () => {
+    const messages = buildRecommendationMessages(
+      {
+        spec: specWith([{ kind: 'carousel', title: null, items: [item('A-3')] }]),
+        products: CATALOG,
+      },
+      { surfaceId: SURFACE_ID, shopUrl: SHOP_URL, locale: 'en_US' },
+    );
+
+    expect(blockOutline(messages)).toContain('            h5 USD 55');
+  });
+
   it('uses the price formatters and the link builder it is given', () => {
     const messages = buildRecommendationMessages(
       { spec: specWith([EVERY_KIND[5] as Block]), products: CATALOG, bundles: BUNDLES },
@@ -373,11 +412,11 @@ describe('buildRecommendationMessages', () => {
 
     expect(blockOutline(messages)).toStrictEqual([
       '  card',
-      '    column',
+      '    column align start',
       '      h3 Cookware set',
       '      h4 Better together',
       '      caption Cook anything',
-      '      column',
+      '      column align start',
       '        borderless link to https://shop.example/store/items/A-1',
       '          h5 Cast iron skillet',
       '        borderless link to https://other.example/A-2',
@@ -387,8 +426,8 @@ describe('buildRecommendationMessages', () => {
     ]);
   });
 
-  it('shows no image for a product whose image URL is empty, as React does', () => {
-    const products = withProduct('A-3', { imageUrl: '' });
+  it.each(['', '   '])('shows no image for a product whose image URL is %j', (imageUrl) => {
+    const products = withProduct('A-3', { imageUrl });
 
     expect(
       blockOutline(
@@ -434,6 +473,12 @@ describe('buildRecommendationMessages', () => {
     ],
     ['an empty link', { hrefForSku: () => ' ' }, CATALOG, /the link for SKU A-3 is empty/],
     [
+      'a link that is not a string',
+      { hrefForSku: () => new URL('https://shop.example/a-3') as unknown as string },
+      CATALOG,
+      /the link for SKU A-3 is not a string/,
+    ],
+    [
       'an image on another scheme',
       {},
       withProduct('A-3', { imageUrl: 'javascript:alert(1)' }),
@@ -468,7 +513,7 @@ describe('buildRecommendationMessages', () => {
     const blocks: Block[] = [
       {
         kind: 'carousel',
-        title: 'One\n\ntwo\rthree\u2028four\u2029five\u0085six\tseven',
+        title: 'One\n\ntwo\rthree\u2028four\u2029five\u0085six\tseven\veight\fnine',
         items: [item('A-1', '![b](https://evil.example/b.png)')],
       },
       {
@@ -482,21 +527,21 @@ describe('buildRecommendationMessages', () => {
 
     expect(blockOutline(messagesFor(blocks, products))).toStrictEqual([
       '  column',
-      '    h3 One two three four five six seven',
-      '    row',
+      '    h3 One two three four five six seven eight nine',
+      '    row align start',
       '      card weight 1',
       '        borderless link to https://shop.example/product/A-1',
-      '          column',
+      '          column align start',
       '            image https://shop.example/images/a-1.jpg',
       '            h5 Cast iron skillet',
       '            h5 $39.00',
       '            caption !(b)(https://evil.example/b.png)',
       '      empty column weight 1',
       '  card',
-      '    column',
+      '    column align start',
       '      h3 Cookware set',
       '      caption (Free)(https://evil.example)',
-      '      column',
+      '      column align start',
       '        borderless link to https://shop.example/product/A-1',
       '          h5 Cast iron skillet',
       '        borderless link to https://shop.example/product/A-2',

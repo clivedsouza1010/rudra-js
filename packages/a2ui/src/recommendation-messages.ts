@@ -33,7 +33,8 @@ interface OpenUrlAction {
 type BasicComponent =
   | { id: string; component: 'Text'; text: string; variant: TextVariant }
   | { id: string; component: 'Image'; url: string; fit: 'cover'; variant: 'mediumFeature' }
-  | { id: string; component: 'Column' | 'Row'; children: string[]; align: 'start'; weight?: number }
+  | { id: string; component: 'Row'; children: string[]; align: 'start' }
+  | { id: string; component: 'Column'; children: string[]; align?: 'start'; weight?: number }
   | { id: string; component: 'Card'; child: string; weight?: number }
   | {
       id: string;
@@ -93,9 +94,8 @@ function defaultFormatBundlePrice(bundle: Bundle, locale: string | undefined): s
 }
 
 function toWebUrl(value: unknown, base: string | undefined, name: string): string {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new TypeError(`${name} is empty`);
-  }
+  if (typeof value !== 'string') throw new TypeError(`${name} is not a string`);
+  if (value.trim() === '') throw new TypeError(`${name} is empty`);
   let url: URL;
   try {
     url = new URL(value, base);
@@ -139,6 +139,14 @@ function addColumn(context: BuildContext, id: string, children: readonly (string
   return context.add({ id, component: 'Column', align: 'start', children: present(children) });
 }
 
+function addFullWidthColumn(
+  context: BuildContext,
+  id: string,
+  children: readonly (string | undefined)[],
+) {
+  return context.add({ id, component: 'Column', children: present(children) });
+}
+
 function addLink(context: BuildContext, id: string, sku: string, child: string): string {
   const url = context.linkFor(sku);
   return context.add({
@@ -168,7 +176,7 @@ function addLinkedCard(
 
 function addProductCard(context: BuildContext, id: string, card: SellableCard): string {
   const { reference, product } = card;
-  const image = product.imageUrl
+  const image = product.imageUrl?.trim()
     ? context.add({
         id: `${id}_image`,
         component: 'Image',
@@ -215,7 +223,6 @@ function addCardRows(
         context.add({
           id: `${rowId}_space${row.length}`,
           component: 'Column',
-          align: 'start',
           children: [],
           weight: 1,
         }),
@@ -223,7 +230,7 @@ function addCardRows(
     }
     rows.push(context.add({ id: rowId, component: 'Row', align: 'start', children: row }));
   }
-  return addColumn(context, id, [addText(context, `${id}_title`, title, 'h3'), ...rows]);
+  return addFullWidthColumn(context, id, [addText(context, `${id}_title`, title, 'h3'), ...rows]);
 }
 
 function addHero(context: BuildContext, id: string, block: HeroBlock): string | undefined {
@@ -347,7 +354,7 @@ export function buildRecommendationMessages(
   );
   if (blocks.length === 0) return [];
 
-  addColumn(context, 'root', [
+  addFullWidthColumn(context, 'root', [
     addText(context, 'headline', result.spec.headline, 'h2'),
     addText(context, 'subheadline', result.spec.subheadline, 'caption'),
     ...blocks,
