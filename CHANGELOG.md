@@ -16,17 +16,21 @@ break them.
   recommendation result into A2UI messages that use only the basic catalog, so
   Flutter, Angular and other A2UI renderers can show the block without
   `RudraRecommendations` or React. It formats prices on your server and links
-  each product card to its page with `openUrl`. It refuses a link or an image
-  that isn't `http` or `https`, and it keeps every text in heading and caption
-  styles with square brackets turned into parentheses, so a renderer that reads
-  Markdown can't turn it into a link or an image.
+  each product card to its page with `openUrl`. Grids and carousels show two
+  cards to a row. It refuses a link or an image that is empty or isn't `http`
+  or `https`. It keeps every text in heading and caption styles, with square
+  brackets turned into parentheses and line breaks into spaces, so a renderer
+  that reads Markdown can't load an image or open a link from it.
 
 ### Changed
 
 - `@a2ui/react`, `@rudra-js/react` and `react` are optional peers of
   `@rudra-js/a2ui` now, so a server that only builds messages doesn't install
-  React. The browser component still needs them, and the README's install line
-  still names them.
+  React. npm and pnpm no longer install those three for you. If your app uses
+  `createRudraRecommendationsComponent` and its `package.json` doesn't list
+  them, add them. Otherwise a fresh install, or `npm ci --omit=optional`,
+  leaves them out and `@rudra-js/a2ui` fails to load. The README's install
+  command already lists them.
 
 ## [0.8.3] - 2026-10-24
 

@@ -84,6 +84,9 @@ const messagesFor = (blocks: Block[], products: Product[] = CATALOG) =>
     { surfaceId: SURFACE_ID, shopUrl: SHOP_URL, locale: 'en-US' },
   );
 
+const withProduct = (sku: string, change: Partial<Product>) =>
+  CATALOG.map((product) => (product.sku === sku ? { ...product, ...change } : product));
+
 type SentComponent = Record<string, any>;
 
 function componentsOf(messages: A2uiMessage[]): SentComponent[] {
@@ -94,6 +97,7 @@ function componentsOf(messages: A2uiMessage[]): SentComponent[] {
 }
 
 function describeComponent(component: SentComponent): string {
+  const weight = component['weight'] === undefined ? '' : ` weight ${component['weight']}`;
   switch (component['component']) {
     case 'Text':
       return `${component['variant']} ${component['text']}`;
@@ -101,12 +105,10 @@ function describeComponent(component: SentComponent): string {
       return `image ${component['url']}`;
     case 'Button':
       return `${component['variant']} link to ${component['action'].functionCall.args.url}`;
-    case 'Card':
-      return component['weight'] === undefined ? 'card' : `card weight ${component['weight']}`;
-    case 'List':
-      return `${component['direction']} list`;
+    case 'Column':
+      return component['children'].length === 0 ? `empty column${weight}` : `column${weight}`;
     default:
-      return String(component['component']).toLowerCase();
+      return `${String(component['component']).toLowerCase()}${weight}`;
   }
 }
 
@@ -129,11 +131,22 @@ const blockOutline = (messages: A2uiMessage[]) => outline(messages).slice(3);
 
 const EVERY_KIND: Block[] = [
   { kind: 'hero', headline: 'A pan for life', body: 'Heats evenly', sku: 'A-1', ctaLabel: 'Shop' },
-  { kind: 'grid', title: 'More cookware', columns: 2, items: [item('A-2'), item('A-3')] },
+  {
+    kind: 'grid',
+    title: 'More cookware',
+    columns: 2,
+    items: [item('A-2', 'Goes with your cart', 'New'), item('A-3')],
+  },
   { kind: 'carousel', title: null, items: [item('A-3')] },
-  { kind: 'banner', tone: 'info', text: 'Free returns', ctaLabel: null },
-  { kind: 'copy', title: null, body: 'Each piece is tested.' },
-  { kind: 'bundle', title: 'Better together', body: null, ctaLabel: 'Add set', bundleId: 'B-1' },
+  { kind: 'banner', tone: 'info', text: 'Free returns', ctaLabel: 'See how' },
+  { kind: 'copy', title: 'Why cast iron', body: 'Each piece is tested.' },
+  {
+    kind: 'bundle',
+    title: 'Better together',
+    body: 'Cook anything',
+    ctaLabel: 'Add set',
+    bundleId: 'B-1',
+  },
 ];
 
 describe('buildRecommendationMessages', () => {
@@ -161,11 +174,11 @@ describe('buildRecommendationMessages', () => {
     ]);
   });
 
-  it('lays a grid out in rows of its column count, each card a link to its product', () => {
+  it('lays a grid out two cards to a row, whatever its columns, each card a link to its product', () => {
     const grid: Block = {
       kind: 'grid',
       title: 'More cookware',
-      columns: 2,
+      columns: 4,
       items: [item('A-1', 'Goes with your cart', 'New'), item('A-2'), item('A-3')],
     };
 
@@ -178,58 +191,55 @@ describe('buildRecommendationMessages', () => {
       '          column',
       '            image https://shop.example/images/a-1.jpg',
       '            caption New',
-      '            h4 Cast iron skillet',
+      '            h5 Cast iron skillet',
       '            h5 $39.00',
       '            caption Goes with your cart',
       '      card weight 1',
       '        borderless link to https://shop.example/product/A-2',
       '          column',
       '            image https://cdn.example/a-2.jpg',
-      '            h4 Enamel dutch oven',
+      '            h5 Enamel dutch oven',
       '            h5 $89.00',
       '    row',
       '      card weight 1',
       '        borderless link to https://shop.example/product/A-3',
       '          column',
-      '            h4 Chef knife',
+      '            h5 Chef knife',
       '            h5 $55.00',
+      '      empty column weight 1',
     ]);
   });
 
-  it('shows a carousel as a horizontal list of cards with no weight', () => {
-    const carousel: Block = { kind: 'carousel', title: null, items: [item('A-3'), item('A-2')] };
+  it('lays a carousel out the same way, because the basic catalog has no track that scrolls', () => {
+    const carousel: Block = { kind: 'carousel', title: null, items: [item('A-3')] };
 
     expect(blockOutline(messagesFor([carousel]))).toStrictEqual([
       '  column',
-      '    horizontal list',
-      '      card',
+      '    row',
+      '      card weight 1',
       '        borderless link to https://shop.example/product/A-3',
       '          column',
-      '            h4 Chef knife',
+      '            h5 Chef knife',
       '            h5 $55.00',
-      '      card',
-      '        borderless link to https://shop.example/product/A-2',
-      '          column',
-      '            image https://cdn.example/a-2.jpg',
-      '            h4 Enamel dutch oven',
-      '            h5 $89.00',
+      '      empty column weight 1',
     ]);
   });
 
-  it('shows a hero with its words and one link holding the title, price and call to action', () => {
+  it('shows a hero with its words and a card linking to its product', () => {
     expect(blockOutline(messagesFor([EVERY_KIND[0] as Block]))).toStrictEqual([
       '  column',
       '    h3 A pan for life',
       '    caption Heats evenly',
-      '    primary link to https://shop.example/product/A-1',
-      '      column',
-      '        h4 Cast iron skillet',
-      '        h5 $39.00',
-      '        h5 Shop',
+      '    card',
+      '      borderless link to https://shop.example/product/A-1',
+      '        column',
+      '          h4 Cast iron skillet',
+      '          h5 $39.00',
+      '          h5 Shop',
     ]);
   });
 
-  it("keeps a hero's words but drops its link when its product can't be sold", () => {
+  it("keeps a hero's words but drops its card when its product can't be sold", () => {
     const hero: Block = {
       kind: 'hero',
       headline: 'Back soon',
@@ -242,28 +252,24 @@ describe('buildRecommendationMessages', () => {
   });
 
   it('shows a banner in a card and a copy block as text', () => {
-    const blocks: Block[] = [
-      { kind: 'banner', tone: 'promo', text: 'Free returns', ctaLabel: 'See how' },
-      { kind: 'copy', title: 'Why cast iron', body: 'It lasts.' },
-    ];
-
-    expect(blockOutline(messagesFor(blocks))).toStrictEqual([
+    expect(blockOutline(messagesFor(EVERY_KIND.slice(3, 5)))).toStrictEqual([
       '  card',
       '    column',
       '      h5 Free returns',
       '      h5 See how',
       '  column',
       '    h3 Why cast iron',
-      '    caption It lasts.',
+      '    caption Each piece is tested.',
     ]);
   });
 
-  it('shows a bundle with its label, a link to each member, its price and call to action', () => {
+  it('shows a bundle with its label and words, a link to each member, its price and call to action', () => {
     expect(blockOutline(messagesFor([EVERY_KIND[5] as Block]))).toStrictEqual([
       '  card',
       '    column',
       '      h3 Cookware set',
       '      h4 Better together',
+      '      caption Cook anything',
       '      column',
       '        borderless link to https://shop.example/product/A-1',
       '          h5 Cast iron skillet',
@@ -286,6 +292,10 @@ describe('buildRecommendationMessages', () => {
     [
       'a hero with no words and a sold-out product',
       { kind: 'hero', headline: '', body: null, sku: 'A-4', ctaLabel: 'Shop' },
+    ],
+    [
+      'a hero whose words are only spaces',
+      { kind: 'hero', headline: '   ', body: ' ', sku: null, ctaLabel: null },
     ],
     [
       'a bundle with a sold-out member',
@@ -319,8 +329,9 @@ describe('buildRecommendationMessages', () => {
       '      card weight 1',
       '        borderless link to https://shop.example/product/A-3',
       '          column',
-      '            h4 Chef knife',
+      '            h5 Chef knife',
       '            h5 $55.00',
+      '      empty column weight 1',
     ]);
   });
 
@@ -344,8 +355,8 @@ describe('buildRecommendationMessages', () => {
       { surfaceId: SURFACE_ID, shopUrl: SHOP_URL, locale: 'de-DE' },
     );
 
-    expect(outline(messages)).toContain('      h5 110,00 $');
-    expect(outline(messages)).toContain('            h5 1.234,50 €');
+    expect(outline(messages)).toContain('      h5 110,00\u00a0$');
+    expect(outline(messages)).toContain('            h5 1.234,50\u00a0€');
   });
 
   it('uses the price formatters and the link builder it is given', () => {
@@ -365,6 +376,7 @@ describe('buildRecommendationMessages', () => {
       '    column',
       '      h3 Cookware set',
       '      h4 Better together',
+      '      caption Cook anything',
       '      column',
       '        borderless link to https://shop.example/store/items/A-1',
       '          h5 Cast iron skillet',
@@ -375,65 +387,121 @@ describe('buildRecommendationMessages', () => {
     ]);
   });
 
+  it('shows no image for a product whose image URL is empty, as React does', () => {
+    const products = withProduct('A-3', { imageUrl: '' });
+
+    expect(
+      blockOutline(
+        messagesFor([{ kind: 'carousel', title: null, items: [item('A-3')] }], products),
+      ),
+    ).not.toContainEqual(expect.stringContaining('image'));
+  });
+
+  it('encodes the SKU in the default link, so it stays under /product/', () => {
+    const sku = '../A 3#x';
+    const products = [{ ...(CATALOG[2] as Product), sku }];
+
+    expect(
+      blockOutline(messagesFor([{ kind: 'carousel', title: null, items: [item(sku)] }], products)),
+    ).toContain('        borderless link to https://shop.example/product/..%2FA%203%23x');
+  });
+
   it.each([
-    ['a shop URL with no scheme', { shopUrl: 'shop.example' }, /the shop URL is not a URL/],
-    ['a shop URL that is a path', { shopUrl: '/store' }, /the shop URL is not a URL/],
+    [
+      'a shop URL with no scheme',
+      { shopUrl: 'shop.example' },
+      CATALOG,
+      /the shop URL is not a URL/,
+    ],
+    ['a shop URL that is a path', { shopUrl: '/store' }, CATALOG, /the shop URL is not a URL/],
     [
       'a shop URL on another scheme',
       { shopUrl: 'ftp://shop.example' },
+      CATALOG,
       /the shop URL is not an http/,
     ],
     [
       'a link on another scheme',
       { hrefForSku: () => 'javascript:alert(1)' },
+      CATALOG,
       /the link for SKU A-3 is not an http/,
     ],
     [
       'a link to an app',
       { hrefForSku: () => 'intent://shop#Intent;end' },
+      CATALOG,
       /the link for SKU A-3 is not an http/,
     ],
-  ])('refuses %s', (_, options, message) => {
+    ['an empty link', { hrefForSku: () => ' ' }, CATALOG, /the link for SKU A-3 is empty/],
+    [
+      'an image on another scheme',
+      {},
+      withProduct('A-3', { imageUrl: 'javascript:alert(1)' }),
+      /the image for SKU A-3 is not an http/,
+    ],
+    [
+      'an image written inline',
+      {},
+      withProduct('A-3', { imageUrl: 'data:image/png;base64,AA' }),
+      /the image for SKU A-3 is not an http/,
+    ],
+  ])('refuses %s', (_, options, products, message) => {
     const build = () =>
       buildRecommendationMessages(
-        {
-          spec: specWith([{ kind: 'carousel', title: null, items: [item('A-3')] }]),
-          products: CATALOG,
-        },
+        { spec: specWith([{ kind: 'carousel', title: null, items: [item('A-3')] }]), products },
         { surfaceId: SURFACE_ID, shopUrl: SHOP_URL, ...options },
       );
 
     expect(build).toThrow(message);
   });
 
-  it('refuses a price that is not a number rather than show it', () => {
-    const products = CATALOG.map((product) => ({ ...product, price: Number.NaN }));
+  it('refuses a price that is not a finite number rather than show it', () => {
+    const products = withProduct('A-3', { price: Number.POSITIVE_INFINITY });
 
     expect(() =>
       messagesFor([{ kind: 'carousel', title: null, items: [item('A-3')] }], products),
-    ).toThrow(/price for SKU A-3 is NaN, not a number/);
+    ).toThrow(/price for SKU A-3 is Infinity, not a finite number/);
   });
 
-  it('turns brackets into parentheses and line breaks into spaces, so no text becomes a link or an image', () => {
-    const products = CATALOG.map((product) =>
-      product.sku === 'A-3' ? { ...product, title: '![x](https://evil.example/p.png)' } : product,
-    );
-    const carousel: Block = {
-      kind: 'carousel',
-      title: 'Line one\n\n# Line two',
-      items: [item('A-3', '[Free](https://evil.example)', null)],
-    };
+  it('turns brackets into parentheses and every kind of line break into a space', () => {
+    const products = withProduct('A-2', { title: '[x](https://evil.example)\r# y' });
+    const blocks: Block[] = [
+      {
+        kind: 'carousel',
+        title: 'One\n\ntwo\rthree\u2028four\u2029five\u0085six\tseven',
+        items: [item('A-1', '![b](https://evil.example/b.png)')],
+      },
+      {
+        kind: 'bundle',
+        title: null,
+        body: '[Free](https://evil.example)',
+        ctaLabel: null,
+        bundleId: 'B-1',
+      },
+    ];
 
-    expect(blockOutline(messagesFor([carousel], products))).toStrictEqual([
+    expect(blockOutline(messagesFor(blocks, products))).toStrictEqual([
       '  column',
-      '    h3 Line one # Line two',
-      '    horizontal list',
-      '      card',
-      '        borderless link to https://shop.example/product/A-3',
+      '    h3 One two three four five six seven',
+      '    row',
+      '      card weight 1',
+      '        borderless link to https://shop.example/product/A-1',
       '          column',
-      '            h4 !(x)(https://evil.example/p.png)',
-      '            h5 $55.00',
-      '            caption (Free)(https://evil.example)',
+      '            image https://shop.example/images/a-1.jpg',
+      '            h5 Cast iron skillet',
+      '            h5 $39.00',
+      '            caption !(b)(https://evil.example/b.png)',
+      '      empty column weight 1',
+      '  card',
+      '    column',
+      '      h3 Cookware set',
+      '      caption (Free)(https://evil.example)',
+      '      column',
+      '        borderless link to https://shop.example/product/A-1',
+      '          h5 Cast iron skillet',
+      '        borderless link to https://shop.example/product/A-2',
+      '          h5 (x)(https://evil.example) # y',
+      '      h5 $110.00',
     ]);
   });
 

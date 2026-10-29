@@ -4,9 +4,7 @@ import type {
   Block,
   Bundle,
   BundleBlock,
-  CarouselBlock,
   CopyBlock,
-  GridBlock,
   HeroBlock,
   Product,
   ProductReference,
@@ -24,6 +22,7 @@ export interface RecommendationMessagesOptions {
 }
 
 const BASIC_CATALOG_ID = 'https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json';
+const CARDS_PER_ROW = 2;
 
 type TextVariant = 'h2' | 'h3' | 'h4' | 'h5' | 'caption';
 
@@ -34,14 +33,13 @@ interface OpenUrlAction {
 type BasicComponent =
   | { id: string; component: 'Text'; text: string; variant: TextVariant }
   | { id: string; component: 'Image'; url: string; fit: 'cover'; variant: 'mediumFeature' }
-  | { id: string; component: 'Column' | 'Row'; children: string[]; align: 'start' }
-  | { id: string; component: 'List'; children: string[]; direction: 'horizontal'; align: 'start' }
+  | { id: string; component: 'Column' | 'Row'; children: string[]; align: 'start'; weight?: number }
   | { id: string; component: 'Card'; child: string; weight?: number }
   | {
       id: string;
       component: 'Button';
       child: string;
-      variant: 'borderless' | 'primary';
+      variant: 'borderless';
       action: OpenUrlAction;
     };
 
@@ -53,6 +51,11 @@ interface BuildContext {
   readonly formatPrice: (product: Product) => string;
   readonly formatBundlePrice: (bundle: Bundle) => string;
   readonly add: (component: BasicComponent) => string;
+}
+
+interface SellableCard {
+  reference: ProductReference;
+  product: Product;
 }
 
 function defaultHrefForSku(sku: string): string {
@@ -71,19 +74,28 @@ function formatMoney(price: number, currency: string, locale: string | undefined
 
 function defaultFormatPrice(product: Product, locale: string | undefined): string {
   if (!Number.isFinite(product.price)) {
-    throw new TypeError(`price for SKU ${product.sku} is ${String(product.price)}, not a number`);
+    throw new TypeError(
+      `price for SKU ${product.sku} is ${String(product.price)}, not a finite number — ` +
+        'catalog objects must satisfy productSchema from @rudra-js/core',
+    );
   }
   return formatMoney(product.price, product.currency, locale);
 }
 
 function defaultFormatBundlePrice(bundle: Bundle, locale: string | undefined): string {
   if (!Number.isFinite(bundle.price)) {
-    throw new TypeError(`price for bundle ${bundle.id} is ${String(bundle.price)}, not a number`);
+    throw new TypeError(
+      `price for bundle ${bundle.id} is ${String(bundle.price)}, not a finite number — ` +
+        'bundle objects must satisfy bundleSchema from @rudra-js/core',
+    );
   }
   return formatMoney(bundle.price, bundle.currency, locale);
 }
 
-function toWebUrl(value: string, base: string | undefined, name: string): string {
+function toWebUrl(value: unknown, base: string | undefined, name: string): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new TypeError(`${name} is empty`);
+  }
   let url: URL;
   try {
     url = new URL(value, base);
@@ -98,7 +110,7 @@ function toWebUrl(value: string, base: string | undefined, name: string): string
 
 function plainText(value: string): string {
   return value
-    .replace(/[\t\n\v\f\r \u2028\u2029]+/g, ' ')
+    .replace(/[\t\n\v\f\r \u0085\u2028\u2029]+/g, ' ')
     .trim()
     .replaceAll('[', '(')
     .replaceAll(']', ')');
@@ -127,45 +139,25 @@ function addColumn(context: BuildContext, id: string, children: readonly (string
   return context.add({ id, component: 'Column', align: 'start', children: present(children) });
 }
 
-function addLink(
+function addLink(context: BuildContext, id: string, sku: string, child: string): string {
+  const url = context.linkFor(sku);
+  return context.add({
+    id,
+    component: 'Button',
+    child,
+    variant: 'borderless',
+    action: { functionCall: { call: 'openUrl', args: { url }, returnType: 'void' } },
+  });
+}
+
+function addLinkedCard(
   context: BuildContext,
   id: string,
   sku: string,
-  child: string,
-  variant: 'borderless' | 'primary',
-): string {
-  const url = context.linkFor(sku);
-  const action: OpenUrlAction = {
-    functionCall: { call: 'openUrl', args: { url }, returnType: 'void' },
-  };
-  return context.add({ id, component: 'Button', child, variant, action });
-}
-
-function addProductCard(
-  context: BuildContext,
-  id: string,
-  reference: ProductReference,
-  product: Product,
+  children: readonly (string | undefined)[],
   weight: number | undefined,
 ): string {
-  const image =
-    product.imageUrl === undefined
-      ? undefined
-      : context.add({
-          id: `${id}_image`,
-          component: 'Image',
-          url: toWebUrl(product.imageUrl, context.shopUrl, `the image for SKU ${product.sku}`),
-          fit: 'cover',
-          variant: 'mediumFeature',
-        });
-  const body = addColumn(context, `${id}_body`, [
-    image,
-    addText(context, `${id}_badge`, reference.badge, 'caption'),
-    addText(context, `${id}_title`, product.title, 'h4'),
-    addText(context, `${id}_price`, context.formatPrice(product), 'h5'),
-    addText(context, `${id}_reason`, reference.reason, 'caption'),
-  ]);
-  const link = addLink(context, `${id}_link`, product.sku, body, 'borderless');
+  const link = addLink(context, `${id}_link`, sku, addColumn(context, `${id}_body`, children));
   return context.add({
     id,
     component: 'Card',
@@ -174,50 +166,64 @@ function addProductCard(
   });
 }
 
-function sellableCards(context: BuildContext, items: readonly ProductReference[]) {
-  return items.flatMap((reference) => {
+function addProductCard(context: BuildContext, id: string, card: SellableCard): string {
+  const { reference, product } = card;
+  const image = product.imageUrl
+    ? context.add({
+        id: `${id}_image`,
+        component: 'Image',
+        url: toWebUrl(product.imageUrl, context.shopUrl, `the image for SKU ${product.sku}`),
+        fit: 'cover',
+        variant: 'mediumFeature',
+      })
+    : undefined;
+  return addLinkedCard(
+    context,
+    id,
+    product.sku,
+    [
+      image,
+      addText(context, `${id}_badge`, reference.badge, 'caption'),
+      addText(context, `${id}_title`, product.title, 'h5'),
+      addText(context, `${id}_price`, context.formatPrice(product), 'h5'),
+      addText(context, `${id}_reason`, reference.reason, 'caption'),
+    ],
+    1,
+  );
+}
+
+function addCardRows(
+  context: BuildContext,
+  id: string,
+  title: string | null,
+  items: readonly ProductReference[],
+): string | undefined {
+  const cards = items.flatMap((reference) => {
     const product = sellableProduct(context, reference.sku);
     return product ? [{ reference, product }] : [];
   });
-}
-
-function addGrid(context: BuildContext, id: string, block: GridBlock): string | undefined {
-  const cards = sellableCards(context, block.items);
   if (cards.length === 0) return undefined;
 
   const rows: string[] = [];
-  for (let start = 0; start < cards.length; start += block.columns) {
+  for (let start = 0; start < cards.length; start += CARDS_PER_ROW) {
+    const rowId = `${id}_row${rows.length}`;
     const row = cards
-      .slice(start, start + block.columns)
-      .map(({ reference, product }, offset) =>
-        addProductCard(context, `${id}_item${start + offset}`, reference, product, 1),
+      .slice(start, start + CARDS_PER_ROW)
+      .map((card, offset) => addProductCard(context, `${id}_item${start + offset}`, card));
+    while (row.length < CARDS_PER_ROW) {
+      row.push(
+        context.add({
+          id: `${rowId}_space${row.length}`,
+          component: 'Column',
+          align: 'start',
+          children: [],
+          weight: 1,
+        }),
       );
-    rows.push(
-      context.add({
-        id: `${id}_row${rows.length}`,
-        component: 'Row',
-        align: 'start',
-        children: row,
-      }),
-    );
+    }
+    rows.push(context.add({ id: rowId, component: 'Row', align: 'start', children: row }));
   }
-  return addColumn(context, id, [addText(context, `${id}_title`, block.title, 'h3'), ...rows]);
-}
-
-function addCarousel(context: BuildContext, id: string, block: CarouselBlock): string | undefined {
-  const cards = sellableCards(context, block.items);
-  if (cards.length === 0) return undefined;
-
-  const track = context.add({
-    id: `${id}_track`,
-    component: 'List',
-    direction: 'horizontal',
-    align: 'start',
-    children: cards.map(({ reference, product }, index) =>
-      addProductCard(context, `${id}_item${index}`, reference, product, undefined),
-    ),
-  });
-  return addColumn(context, id, [addText(context, `${id}_title`, block.title, 'h3'), track]);
+  return addColumn(context, id, [addText(context, `${id}_title`, title, 'h3'), ...rows]);
 }
 
 function addHero(context: BuildContext, id: string, block: HeroBlock): string | undefined {
@@ -227,16 +233,16 @@ function addHero(context: BuildContext, id: string, block: HeroBlock): string | 
   if (!headline && !body && !product) return undefined;
 
   const link = product
-    ? addLink(
+    ? addLinkedCard(
         context,
-        `${id}_link`,
+        `${id}_product`,
         product.sku,
-        addColumn(context, `${id}_link_body`, [
-          addText(context, `${id}_title`, product.title, 'h4'),
-          addText(context, `${id}_price`, context.formatPrice(product), 'h5'),
-          addText(context, `${id}_cta`, block.ctaLabel, 'h5'),
-        ]),
-        'primary',
+        [
+          addText(context, `${id}_product_title`, product.title, 'h4'),
+          addText(context, `${id}_product_price`, context.formatPrice(product), 'h5'),
+          addText(context, `${id}_product_cta`, block.ctaLabel, 'h5'),
+        ],
+        undefined,
       )
     : undefined;
   return addColumn(context, id, [headline, body, link]);
@@ -279,10 +285,9 @@ function addBundle(context: BuildContext, id: string, block: BundleBlock): strin
         context.add({
           id: `${id}_item${index}_title`,
           component: 'Text',
-          text: plainText(product.title),
+          text: plainText(product.title) || plainText(product.sku),
           variant: 'h5',
         }),
-        'borderless',
       ),
     ),
   );
@@ -302,9 +307,8 @@ function addBlock(context: BuildContext, id: string, block: Block): string | und
     case 'hero':
       return addHero(context, id, block);
     case 'grid':
-      return addGrid(context, id, block);
     case 'carousel':
-      return addCarousel(context, id, block);
+      return addCardRows(context, id, block.title, block.items);
     case 'banner':
       return addBanner(context, id, block);
     case 'copy':

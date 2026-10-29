@@ -77,14 +77,18 @@ can. Any of these is a vulnerability:
   candidates it was given carries it.
 
 **The basic-catalog messages carry the block itself.** `buildRecommendationMessages` writes the
-block's words, prices and links into A2UI messages, so whatever forwards them can change them. Pass
-them from your agent's code to the client unchanged, never through the model. Any of these is a
-vulnerability:
+block's words, prices and links into A2UI messages, so whatever forwards them can change them, and
+so can any later message for the same surface. The ids are fixed, so a model that writes its own
+A2UI can replace a card's link or price by sending a component with the same id. With an agent
+you don't trust, have your app call the endpoint itself and render the messages where the agent's
+stream can't reach. Otherwise pass them from your agent's code to the client unchanged, never
+through the model, use a `surfaceId` the model is never told, and drop any message from the model
+for that surface. Any of these is a vulnerability:
 
 - Text from the spec or the catalog reaching the messages as anything other than a heading or
   caption `Text`, or with a square bracket or a line break still in it.
-- A link or an image URL in the messages that isn't `http` or `https`, or a link that comes from
-  anywhere but `hrefForSku`.
+- A link or an image URL in the messages that is empty or isn't `http` or `https`, or a link that
+  comes from anywhere but `hrefForSku`.
 - The rationale, the provider, the model or any other generation detail reaching the messages.
 
 ## How prompt injection is handled

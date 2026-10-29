@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act } from 'react';
@@ -9,7 +10,7 @@ import { A2uiSurface } from '@a2ui/react/v0_9';
 import { MessageProcessor, STRICT_VALIDATION, type A2uiMessage } from '@a2ui/web_core/v0_9';
 import { basicCatalog } from '@a2ui/web_core/v0_9/basic_catalog';
 import { agentCatalog } from './agent-catalog.js';
-import { messagesFor } from './basic-catalog.js';
+import { messagesFor } from './other-renderers.js';
 import { processor } from './browser.js';
 import { POST } from './endpoint.js';
 
@@ -50,27 +51,54 @@ afterEach(() => {
 describe('the examples in the @rudra-js/a2ui README', () => {
   it('are the code this test runs', () => {
     const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
-    const run = ['agent-catalog.ts', 'endpoint.ts', 'browser.tsx', 'basic-catalog.ts'].map((file) =>
-      readFileSync(join(import.meta.dirname, file), 'utf8').trim(),
+    const run = ['agent-catalog.ts', 'endpoint.ts', 'browser.tsx', 'other-renderers.ts'].map(
+      (file) => readFileSync(join(import.meta.dirname, file), 'utf8').trim(),
     );
 
     expect(codeBlocksIn(readme), 'the README shows code the test does not run').toStrictEqual(run);
   });
 });
 
-describe('the README install command', () => {
+describe('the README install commands', () => {
   it.each(['@a2ui/react', '@a2ui/web_core'])(
-    'asks for the %s release the package peers on',
+    'ask for the %s release the package peers on',
     (name) => {
       const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
       const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
         readFileSync(join(REPO_ROOT, 'packages/a2ui/package.json'), 'utf8'),
       );
-      const release = readme.match(new RegExp(`^npm install .*${name}@(\\S+)`, 'm'))?.[1];
+      const releases = [...readme.matchAll(new RegExp(`^npm install .*${name}@(\\S+)`, 'gm'))].map(
+        (match) => `^${match[1]}.0`,
+      );
 
-      expect(`^${release}.0`).toBe(manifest.peerDependencies[name]);
+      expect(releases.length, name).toBeGreaterThan(0);
+      expect(new Set(releases)).toStrictEqual(new Set([manifest.peerDependencies[name]]));
     },
   );
+
+  it('let a server without React load the server entry', () => {
+    const blockReact = [
+      'export async function resolve(specifier, context, next) {',
+      '  if (/^(react|react-dom|@a2ui\\/react|@rudra-js\\/react)(\\/|$)/.test(specifier)) {',
+      "    throw new Error('the server entry imported ' + specifier);",
+      '  }',
+      '  return next(specifier, context);',
+      '}',
+    ].join('\n');
+    const script = [
+      "import { register } from 'node:module';",
+      `register('data:text/javascript,' + encodeURIComponent(${JSON.stringify(blockReact)}));`,
+      "const server = await import('@rudra-js/a2ui/server');",
+      'console.log(typeof server.buildRecommendationMessages);',
+    ].join('\n');
+    const run = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(run.stderr).not.toContain('the server entry imported');
+    expect(run.stdout.trim()).toBe('function');
+  });
 });
 
 describe('the README endpoint', () => {

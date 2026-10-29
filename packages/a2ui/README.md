@@ -30,7 +30,11 @@ already has. Without `@latest`, an app on an older core can get an `ERESOLVE` er
 and `react-dom` have no version, so npm and pnpm keep a React 18 app on 18.
 
 Everything except zod is a peer dependency, so your app holds one copy of each. npm and pnpm
-install peers for you. List them anyway, because your code imports most of them itself.
+install `@rudra-js/core`, `@rudra-js/attested` and `@a2ui/web_core` for you, but not `@a2ui/react`,
+`@rudra-js/react` or `react`. Those three are optional, so a server that only builds
+[messages for other renderers](#flutter-angular-and-other-renderers) can leave React out. The
+browser component can't load without them, so keep them in the command. List the rest anyway,
+because your code imports most of them itself.
 pnpm only lets your code import what your `package.json` names. Yarn doesn't install peers, so on Yarn you
 need the whole list. Yarn also moves a name with no version to its latest release. So on Yarn, if your app
 already has React, leave out `react` and `react-dom`. On pnpm, read [zod](#zod) first.
@@ -195,6 +199,8 @@ no React needs only these:
 npm install @rudra-js/a2ui@latest @rudra-js/core@latest @rudra-js/attested@latest @a2ui/web_core@0.14
 ```
 
+If your server has `@rudra-js/anthropic`, add `@rudra-js/anthropic@latest` to that command too.
+
 ```ts
 import { buildRecommendationMessages, type RecommendationResult } from '@rudra-js/a2ui/server';
 
@@ -208,27 +214,39 @@ export function messagesFor(result: RecommendationResult, locale: string) {
 ```
 
 In [your endpoint](#your-endpoint), return `Response.json(messagesFor(result, shopper.locale))`
-instead of `result`. Your agent's code sends the endpoint the same four hints and passes the
-messages it gets back to the client unchanged. Or your app calls the endpoint itself and hands the
-messages to its own A2UI surface.
+instead of `result`. The other two pieces are for React only: leave `rudraRecommendationsApi` out
+of your agent's catalog, because only a React renderer can draw `RudraRecommendations`.
+
+Your app can call the endpoint with the four hints and give the messages it gets back to its A2UI
+renderer. Or your agent's code can call it and pass the messages on to the client unchanged. Then
+the call has to carry the shopper's session, because `shopperFor` reads the shopper from the
+request. Keep the model away from the messages and from the block's surface, as
+[SECURITY.md](https://github.com/clivedsouza1010/rudra-js/blob/main/SECURITY.md) explains.
 
 - The messages create the surface named `surfaceId` and fill it. To show a new block there, send
   `deleteSurface` for it first. When nothing in the block can be shown, you get no messages.
+- Grids and carousels show two cards to a row. The basic catalog can't fit cards to the screen, and
+  it has no track that scrolls.
 - Each product card is a button that opens the product's page. `hrefForSku` builds the link,
   `/product/<sku>` by default. `shopUrl` resolves that link and any relative image URL, because a
-  native app has no page to resolve them against. A link or an image that doesn't end up `http` or
-  `https` throws.
+  native app has no page to resolve them against. A link or an image that is empty or doesn't end
+  up `http` or `https` throws.
 - Prices are formatted on your server, for `locale`. Pass `formatPrice` and `formatBundlePrice` to
   format them yourself.
-- Every text uses a heading or caption style, never body. Renderers read body text as Markdown, and
-  Flutter's reads every style that way. So square brackets become parentheses and line breaks
-  become spaces, and no text can turn into a link or an image.
+- All text uses a heading or caption style, never body. Renderers read body text as Markdown, and
+  Flutter's `genui` reads every style that way. So square brackets become parentheses and line
+  breaks become spaces, and no text can load an image or open a link. `genui` still shows a bare
+  `https://` or `www.` address as a link that does nothing, and text that starts with a Markdown
+  marker such as `# ` or `- ` as Markdown.
 - The rationale and how the block was generated are never sent.
 - Flutter's `genui` knows the basic catalog by its id from 0.10.3. For 0.8 to 0.10.2, pass
   `catalogId: 'https://a2ui.org/specification/v0_9/basic_catalog.json'`. On Android 11 and later,
   the app has to declare `https` links under `<queries>` in its manifest, or a tap on a card does
   nothing.
-- `@a2ui/angular` 0.13 opens a card's link only with `useUniversalComponents: true` in its config.
+- On `@a2ui/angular` 0.13, register the `BasicCatalog` from `@a2ui/angular/v0_9`, because the one
+  from `@a2ui/angular` has the v1.0 id. Set `useUniversalComponents: true` in its config too.
+  Without it, a click on a card does nothing, and each card tries to open its link in a new tab as
+  soon as it renders. Don't send these messages to an Angular 0.13 app without that setting.
 
 ## zod
 
