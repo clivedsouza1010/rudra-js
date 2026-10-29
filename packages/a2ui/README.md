@@ -10,6 +10,8 @@ This package puts that block inside the interfaces an [A2UI](https://a2ui.org) a
 adds one component, `RudraRecommendations`, to the catalog your A2UI renderer draws from. The agent
 places it and passes hints about what the shopper is looking at. Your server still picks the
 products and builds the block with `@rudra-js/core`. The browser renders it with `@rudra-js/react`.
+For Flutter, Angular or any other renderer, your server can send the block as A2UI messages
+instead, as [other renderers](#flutter-angular-and-other-renderers) describes.
 
 It works with version 0.9 of the A2UI protocol, using `@a2ui/react` and `@a2ui/web_core` 0.14.
 
@@ -182,6 +184,51 @@ A2UI renders in the browser, so a crawler won't see a block an agent places. For
 render `RudraComponent` on the server, as the
 [`@rudra-js/react` README](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/react)
 describes.
+
+## Flutter, Angular and other renderers
+
+`RudraRecommendations` needs a React renderer. For any other A2UI renderer, build the block on your
+server as A2UI messages that use only the basic catalog, which every renderer ships. A server with
+no React needs only these:
+
+```sh
+npm install @rudra-js/a2ui@latest @rudra-js/core@latest @rudra-js/attested@latest @a2ui/web_core@0.14
+```
+
+```ts
+import { buildRecommendationMessages, type RecommendationResult } from '@rudra-js/a2ui/server';
+
+export function messagesFor(result: RecommendationResult, locale: string) {
+  return buildRecommendationMessages(result, {
+    surfaceId: 'rudra_recommendations',
+    shopUrl: 'https://shop.example',
+    locale,
+  });
+}
+```
+
+In [your endpoint](#your-endpoint), return `Response.json(messagesFor(result, shopper.locale))`
+instead of `result`. Your agent's code sends the endpoint the same four hints and passes the
+messages it gets back to the client unchanged. Or your app calls the endpoint itself and hands the
+messages to its own A2UI surface.
+
+- The messages create the surface named `surfaceId` and fill it. To show a new block there, send
+  `deleteSurface` for it first. When nothing in the block can be shown, you get no messages.
+- Each product card is a button that opens the product's page. `hrefForSku` builds the link,
+  `/product/<sku>` by default. `shopUrl` resolves that link and any relative image URL, because a
+  native app has no page to resolve them against. A link or an image that doesn't end up `http` or
+  `https` throws.
+- Prices are formatted on your server, for `locale`. Pass `formatPrice` and `formatBundlePrice` to
+  format them yourself.
+- Every text uses a heading or caption style, never body. Renderers read body text as Markdown, and
+  Flutter's reads every style that way. So square brackets become parentheses and line breaks
+  become spaces, and no text can turn into a link or an image.
+- The rationale and how the block was generated are never sent.
+- Flutter's `genui` knows the basic catalog by its id from 0.10.3. For 0.8 to 0.10.2, pass
+  `catalogId: 'https://a2ui.org/specification/v0_9/basic_catalog.json'`. On Android 11 and later,
+  the app has to declare `https` links under `<queries>` in its manifest, or a tap on a card does
+  nothing.
+- `@a2ui/angular` 0.13 opens a card's link only with `useUniversalComponents: true` in its config.
 
 ## zod
 

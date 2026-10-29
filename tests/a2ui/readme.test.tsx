@@ -6,8 +6,10 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { A2uiSurface } from '@a2ui/react/v0_9';
-import type { A2uiMessage } from '@a2ui/web_core/v0_9';
+import { MessageProcessor, STRICT_VALIDATION, type A2uiMessage } from '@a2ui/web_core/v0_9';
+import { basicCatalog } from '@a2ui/web_core/v0_9/basic_catalog';
 import { agentCatalog } from './agent-catalog.js';
+import { messagesFor } from './basic-catalog.js';
 import { processor } from './browser.js';
 import { POST } from './endpoint.js';
 
@@ -48,7 +50,7 @@ afterEach(() => {
 describe('the examples in the @rudra-js/a2ui README', () => {
   it('are the code this test runs', () => {
     const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
-    const run = ['agent-catalog.ts', 'endpoint.ts', 'browser.tsx'].map((file) =>
+    const run = ['agent-catalog.ts', 'endpoint.ts', 'browser.tsx', 'basic-catalog.ts'].map((file) =>
       readFileSync(join(import.meta.dirname, file), 'utf8').trim(),
     );
 
@@ -140,5 +142,26 @@ describe('the README, end to end', () => {
 
     act(() => root.unmount());
     container.remove();
+  });
+});
+
+describe('the README messages for other renderers', () => {
+  it('carry the block the endpoint built, on the basic catalog, with links into the shop', async () => {
+    const response = await post(JSON.stringify({ currentSku: 'A-1' }));
+    const messages = messagesFor(await response.json(), 'en-US');
+    const basicProcessor = new MessageProcessor([basicCatalog], undefined, {
+      validationConfig: STRICT_VALIDATION,
+    });
+
+    expect(() => basicProcessor.processMessages(messages)).not.toThrow();
+    const sent = JSON.stringify(messages);
+    for (const expected of [
+      'Goes with your cart',
+      'Chef knife',
+      '$55.00',
+      'https://shop.example/product/A-3',
+    ]) {
+      expect(sent).toContain(expected);
+    }
   });
 });

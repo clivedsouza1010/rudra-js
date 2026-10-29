@@ -76,6 +76,17 @@ can. Any of these is a vulnerability:
 - A `currentSku` or a `currentCategory` that `fitRecommendationRequest` keeps although none of the
   candidates it was given carries it.
 
+**The basic-catalog messages carry the block itself.** `buildRecommendationMessages` writes the
+block's words, prices and links into A2UI messages, so whatever forwards them can change them. Pass
+them from your agent's code to the client unchanged, never through the model. Any of these is a
+vulnerability:
+
+- Text from the spec or the catalog reaching the messages as anything other than a heading or
+  caption `Text`, or with a square bracket or a line break still in it.
+- A link or an image URL in the messages that isn't `http` or `https`, or a link that comes from
+  anywhere but `hrefForSku`.
+- The rationale, the provider, the model or any other generation detail reaching the messages.
+
 ## How prompt injection is handled
 
 Shopper text reaches a language model here, so the [OWASP LLM Prompt Injection Prevention Cheat

@@ -9,4 +9,9 @@ export {
   type RecommendationRequest,
 } from './recommendation-request.js';
 
+export {
+  buildRecommendationMessages,
+  type RecommendationMessagesOptions,
+} from './recommendation-messages.js';
+
 export type { RecommendationResult } from './recommendation-result.js';
