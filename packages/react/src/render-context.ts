@@ -33,8 +33,8 @@ function formatMoney(price: number, currency: string, locale?: string): string {
 export function defaultFormatPrice(product: Product, locale?: string): string {
   if (!Number.isFinite(product.price)) {
     throw new TypeError(
-      `price for SKU ${product.sku} is ${String(product.price)}, not a finite number — ` +
-        'catalog objects must satisfy productSchema from @rudra-js/core',
+      `price for SKU ${product.sku} is ${String(product.price)}, not a finite number. ` +
+        'Catalog objects must satisfy productSchema from @rudra-js/core',
     );
   }
   return formatMoney(product.price, product.currency, locale);
@@ -43,8 +43,8 @@ export function defaultFormatPrice(product: Product, locale?: string): string {
 export function defaultFormatBundlePrice(bundle: Bundle, locale?: string): string {
   if (!Number.isFinite(bundle.price)) {
     throw new TypeError(
-      `price for bundle ${bundle.id} is ${String(bundle.price)}, not a finite number — ` +
-        'bundle objects must satisfy bundleSchema from @rudra-js/core',
+      `price for bundle ${bundle.id} is ${String(bundle.price)}, not a finite number. ` +
+        'Bundle objects must satisfy bundleSchema from @rudra-js/core',
     );
   }
   return formatMoney(bundle.price, bundle.currency, locale);

@@ -87,7 +87,7 @@ const messagesFor = (blocks: Block[], products: Product[] = CATALOG) =>
 const withProduct = (sku: string, change: Partial<Product>) =>
   CATALOG.map((product) => (product.sku === sku ? { ...product, ...change } : product));
 
-type SentComponent = Record<string, any>;
+type SentComponent = Record<string, unknown>;
 
 function componentsOf(messages: A2uiMessage[]): SentComponent[] {
   for (const message of messages) {
@@ -96,20 +96,27 @@ function componentsOf(messages: A2uiMessage[]): SentComponent[] {
   return [];
 }
 
+function childrenOf(component: SentComponent): string[] {
+  if (Array.isArray(component['children'])) return component['children'] as string[];
+  return typeof component['child'] === 'string' ? [component['child']] : [];
+}
+
 function describeComponent(component: SentComponent): string {
-  const weight = component['weight'] === undefined ? '' : ` weight ${component['weight']}`;
-  const align = component['align'] === undefined ? '' : ` align ${component['align']}`;
+  const weight = component['weight'] === undefined ? '' : ` weight ${String(component['weight'])}`;
+  const align = component['align'] === undefined ? '' : ` align ${String(component['align'])}`;
   switch (component['component']) {
     case 'Text':
-      return `${component['variant']} ${component['text']}`;
+      return `${String(component['variant'])} ${String(component['text'])}`;
     case 'Image':
-      return `image ${component['url']}`;
-    case 'Button':
-      return `${component['variant']} link to ${component['action'].functionCall.args.url}`;
+      return `image ${String(component['url'])}`;
+    case 'Button': {
+      const action = component['action'] as { functionCall: { args: { url: string } } };
+      return `${String(component['variant'])} link to ${action.functionCall.args.url}`;
+    }
     case 'Row':
       return `row${align}`;
     case 'Column':
-      return component['children'].length === 0
+      return childrenOf(component).length === 0
         ? `empty column${align}${weight}`
         : `column${align}${weight}`;
     default:
@@ -124,35 +131,45 @@ function outline(messages: A2uiMessage[]): string[] {
     const component = byId.get(id);
     if (!component) throw new Error(`no component has the id ${id}`);
     lines.push(`${'  '.repeat(depth)}${describeComponent(component)}`);
-    const children: string[] = component['children'] ?? [component['child']].filter(Boolean);
-    for (const child of children) visit(child, depth + 1);
+    for (const child of childrenOf(component)) visit(child, depth + 1);
   };
   visit('root', 0);
   if (lines.length !== byId.size) throw new Error('some components are not reachable from root');
   return lines;
 }
 
-const blockOutline = (messages: A2uiMessage[]) => outline(messages).slice(3);
+const HEADER = ['column', '  h2 Goes with your cart', '  caption Picked from what you have'];
 
-const EVERY_KIND: Block[] = [
-  { kind: 'hero', headline: 'A pan for life', body: 'Heats evenly', sku: 'A-1', ctaLabel: 'Shop' },
-  {
-    kind: 'grid',
-    title: 'More cookware',
-    columns: 2,
-    items: [item('A-2', 'Goes with your cart', 'New'), item('A-3')],
-  },
-  { kind: 'carousel', title: null, items: [item('A-3')] },
-  { kind: 'banner', tone: 'info', text: 'Free returns', ctaLabel: 'See how' },
-  { kind: 'copy', title: 'Why cast iron', body: 'Each piece is tested.' },
-  {
-    kind: 'bundle',
-    title: 'Better together',
-    body: 'Cook anything',
-    ctaLabel: 'Add set',
-    bundleId: 'B-1',
-  },
-];
+function blockOutline(messages: A2uiMessage[]): string[] {
+  const lines = outline(messages);
+  expect(lines.slice(0, HEADER.length)).toStrictEqual(HEADER);
+  return lines.slice(HEADER.length);
+}
+
+const HERO: Block = {
+  kind: 'hero',
+  headline: 'A pan for life',
+  body: 'Heats evenly',
+  sku: 'A-1',
+  ctaLabel: 'Shop',
+};
+const GRID: Block = {
+  kind: 'grid',
+  title: 'More cookware',
+  columns: 2,
+  items: [item('A-2', 'Goes with your cart', 'New'), item('A-3')],
+};
+const CAROUSEL: Block = { kind: 'carousel', title: null, items: [item('A-3')] };
+const BANNER: Block = { kind: 'banner', tone: 'info', text: 'Free returns', ctaLabel: 'See how' };
+const COPY: Block = { kind: 'copy', title: 'Why cast iron', body: 'Each piece is tested.' };
+const BUNDLE: Block = {
+  kind: 'bundle',
+  title: 'Better together',
+  body: 'Cook anything',
+  ctaLabel: 'Add set',
+  bundleId: 'B-1',
+};
+const EVERY_KIND = [HERO, GRID, CAROUSEL, BANNER, COPY, BUNDLE];
 
 describe('buildRecommendationMessages', () => {
   it('creates a surface on the basic catalog and fills it with a tree A2UI accepts', () => {
@@ -171,9 +188,7 @@ describe('buildRecommendationMessages', () => {
 
   it('heads the block with its headline and subheadline', () => {
     expect(outline(messagesFor([{ kind: 'copy', title: null, body: 'Tested.' }]))).toStrictEqual([
-      'column',
-      '  h2 Goes with your cart',
-      '  caption Picked from what you have',
+      ...HEADER,
       '  column align start',
       '    caption Tested.',
     ]);
@@ -216,9 +231,7 @@ describe('buildRecommendationMessages', () => {
   });
 
   it('lays a carousel out the same way, because a horizontal List does not scroll on every renderer', () => {
-    const carousel: Block = { kind: 'carousel', title: null, items: [item('A-3')] };
-
-    expect(blockOutline(messagesFor([carousel]))).toStrictEqual([
+    expect(blockOutline(messagesFor([CAROUSEL]))).toStrictEqual([
       '  column',
       '    row align start',
       '      card weight 1',
@@ -231,7 +244,7 @@ describe('buildRecommendationMessages', () => {
   });
 
   it('shows a hero with its words and a card linking to its product', () => {
-    expect(blockOutline(messagesFor([EVERY_KIND[0] as Block]))).toStrictEqual([
+    expect(blockOutline(messagesFor([HERO]))).toStrictEqual([
       '  column align start',
       '    h3 A pan for life',
       '    caption Heats evenly',
@@ -260,7 +273,7 @@ describe('buildRecommendationMessages', () => {
   });
 
   it('shows a banner in a card and a copy block as text', () => {
-    expect(blockOutline(messagesFor(EVERY_KIND.slice(3, 5)))).toStrictEqual([
+    expect(blockOutline(messagesFor([BANNER, COPY]))).toStrictEqual([
       '  card',
       '    column align start',
       '      h5 Free returns',
@@ -272,7 +285,7 @@ describe('buildRecommendationMessages', () => {
   });
 
   it('shows a bundle with its label and words, a link to each member, its price and call to action', () => {
-    expect(blockOutline(messagesFor([EVERY_KIND[5] as Block]))).toStrictEqual([
+    expect(blockOutline(messagesFor([BUNDLE]))).toStrictEqual([
       '  card',
       '    column align start',
       '      h3 Cookware set',
@@ -294,7 +307,7 @@ describe('buildRecommendationMessages', () => {
     );
     const messages = buildRecommendationMessages(
       {
-        spec: specWith([EVERY_KIND[5] as Block]),
+        spec: specWith([BUNDLE]),
         products,
         bundles: [{ ...(BUNDLES[0] as Bundle), skus: ['A-1', '[A-2]'] }],
       },
@@ -372,10 +385,7 @@ describe('buildRecommendationMessages', () => {
   it('formats prices on the server, for the locale it is given', () => {
     const messages = buildRecommendationMessages(
       {
-        spec: specWith([
-          EVERY_KIND[5] as Block,
-          { kind: 'carousel', title: null, items: [item('A-3')] },
-        ]),
+        spec: specWith([BUNDLE, CAROUSEL]),
         products: CATALOG.map((product) => ({ ...product, price: 1234.5, currency: 'EUR' })),
         bundles: BUNDLES,
       },
@@ -388,10 +398,7 @@ describe('buildRecommendationMessages', () => {
 
   it('falls back to the currency and the number when Intl cannot format for the locale', () => {
     const messages = buildRecommendationMessages(
-      {
-        spec: specWith([{ kind: 'carousel', title: null, items: [item('A-3')] }]),
-        products: CATALOG,
-      },
+      { spec: specWith([CAROUSEL]), products: CATALOG },
       { surfaceId: SURFACE_ID, shopUrl: SHOP_URL, locale: 'en_US' },
     );
 
@@ -400,7 +407,7 @@ describe('buildRecommendationMessages', () => {
 
   it('uses the price formatters and the link builder it is given', () => {
     const messages = buildRecommendationMessages(
-      { spec: specWith([EVERY_KIND[5] as Block]), products: CATALOG, bundles: BUNDLES },
+      { spec: specWith([CAROUSEL, BUNDLE]), products: CATALOG, bundles: BUNDLES },
       {
         surfaceId: SURFACE_ID,
         shopUrl: 'https://shop.example/store/',
@@ -411,6 +418,14 @@ describe('buildRecommendationMessages', () => {
     );
 
     expect(blockOutline(messages)).toStrictEqual([
+      '  column',
+      '    row align start',
+      '      card weight 1',
+      '        borderless link to https://other.example/A-3',
+      '          column align start',
+      '            h5 Chef knife',
+      '            h5 price of A-3',
+      '      empty column weight 1',
       '  card',
       '    column align start',
       '      h3 Cookware set',
@@ -429,11 +444,9 @@ describe('buildRecommendationMessages', () => {
   it.each(['', '   '])('shows no image for a product whose image URL is %j', (imageUrl) => {
     const products = withProduct('A-3', { imageUrl });
 
-    expect(
-      blockOutline(
-        messagesFor([{ kind: 'carousel', title: null, items: [item('A-3')] }], products),
-      ),
-    ).not.toContainEqual(expect.stringContaining('image'));
+    expect(blockOutline(messagesFor([CAROUSEL], products))).not.toContainEqual(
+      expect.stringContaining('image'),
+    );
   });
 
   it('encodes the SKU in the default link, so it stays under /product/', () => {
@@ -493,7 +506,7 @@ describe('buildRecommendationMessages', () => {
   ])('refuses %s', (_, options, products, message) => {
     const build = () =>
       buildRecommendationMessages(
-        { spec: specWith([{ kind: 'carousel', title: null, items: [item('A-3')] }]), products },
+        { spec: specWith([CAROUSEL]), products },
         { surfaceId: SURFACE_ID, shopUrl: SHOP_URL, ...options },
       );
 
@@ -503,9 +516,23 @@ describe('buildRecommendationMessages', () => {
   it('refuses a price that is not a finite number rather than show it', () => {
     const products = withProduct('A-3', { price: Number.POSITIVE_INFINITY });
 
-    expect(() =>
-      messagesFor([{ kind: 'carousel', title: null, items: [item('A-3')] }], products),
-    ).toThrow(/price for SKU A-3 is Infinity, not a finite number/);
+    expect(() => messagesFor([CAROUSEL], products)).toThrow(
+      /price for SKU A-3 is Infinity, not a finite number/,
+    );
+  });
+
+  it('refuses a bundle price that is not a finite number rather than show it', () => {
+    const build = () =>
+      buildRecommendationMessages(
+        {
+          spec: specWith([BUNDLE]),
+          products: CATALOG,
+          bundles: [{ ...(BUNDLES[0] as Bundle), price: Number.NaN }],
+        },
+        { surfaceId: SURFACE_ID, shopUrl: SHOP_URL },
+      );
+
+    expect(build).toThrow(/price for bundle B-1 is NaN, not a finite number/);
   });
 
   it('turns brackets into parentheses and every kind of line break into a space', () => {
@@ -547,6 +574,36 @@ describe('buildRecommendationMessages', () => {
       '        borderless link to https://shop.example/product/A-2',
       '          h5 (x)(https://evil.example) # y',
       '      h5 $110.00',
+    ]);
+  });
+
+  it('turns angle brackets into ‹ and ›, so no text holds a <scheme:...> link', () => {
+    const products = withProduct('A-3', { title: 'Knife <mailto:a@evil.example>' });
+    const blocks: Block[] = [
+      {
+        kind: 'copy',
+        title: '<https://evil.example/login>',
+        body: 'Get it at <itms-services://?action=download-manifest>',
+      },
+      { kind: 'banner', tone: 'info', text: '<shopapp://pay?to=evil>', ctaLabel: null },
+      CAROUSEL,
+    ];
+
+    expect(blockOutline(messagesFor(blocks, products))).toStrictEqual([
+      '  column align start',
+      '    h3 ‹https://evil.example/login›',
+      '    caption Get it at ‹itms-services://?action=download-manifest›',
+      '  card',
+      '    column align start',
+      '      h5 ‹shopapp://pay?to=evil›',
+      '  column',
+      '    row align start',
+      '      card weight 1',
+      '        borderless link to https://shop.example/product/A-3',
+      '          column align start',
+      '            h5 Knife ‹mailto:a@evil.example›',
+      '            h5 $55.00',
+      '      empty column weight 1',
     ]);
   });
 

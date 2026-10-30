@@ -76,32 +76,35 @@ describe('the README install commands', () => {
     },
   );
 
-  it('let a server without React load the server entry', () => {
-    const react = '/^(react|react-dom|@a2ui\\/react|@rudra-js\\/react)(\\/|$)/';
-    const blockReact = [
-      'export async function resolve(specifier, context, next) {',
-      `  if (${react}.test(specifier)) {`,
-      "    throw new Error('the server entry imported ' + specifier);",
-      '  }',
-      '  return next(specifier, context);',
-      '}',
-    ].join('\n');
-    const script = [
-      "import Module, { register } from 'node:module';",
-      // A require() inside a CommonJS module skips the resolve hook, so block it here too.
-      'const resolveFilename = Module._resolveFilename;',
-      'Module._resolveFilename = function (request, ...rest) {',
-      `  if (${react}.test(request)) throw new Error('the server entry imported ' + request);`,
-      '  return resolveFilename.call(this, request, ...rest);',
-      '};',
-      `register('data:text/javascript,' + encodeURIComponent(${JSON.stringify(blockReact)}));`,
-      "const server = await import('@rudra-js/a2ui/server');",
-      'console.log(typeof server.buildRecommendationMessages);',
-    ].join('\n');
-    const run = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
+  it('leave React out of the server-only command, and nothing else is optional', () => {
+    const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
+    const manifest: {
+      peerDependencies: Record<string, string>;
+      peerDependenciesMeta: Record<string, { optional: boolean }>;
+    } = JSON.parse(readFileSync(join(REPO_ROOT, 'packages/a2ui/package.json'), 'utf8'));
+    const serverSection = readme.split('## Flutter, Angular and other renderers')[1] ?? '';
+    const serverCommand = new Set(
+      (serverSection.match(/^npm install (.*)$/m)?.[1] ?? '')
+        .split(' ')
+        .map((arg) => arg.replace(/(?<=.)@.*$/, '')),
+    );
+
+    expect(manifest.peerDependenciesMeta).toStrictEqual({
+      '@a2ui/react': { optional: true },
+      '@rudra-js/react': { optional: true },
+      react: { optional: true },
     });
+    for (const name of Object.keys(manifest.peerDependencies)) {
+      expect(serverCommand.has(name), name).toBe(!(name in manifest.peerDependenciesMeta));
+    }
+  });
+
+  it('let a server without React load the server entry', () => {
+    const run = spawnSync(
+      process.execPath,
+      [join(import.meta.dirname, 'server-without-react.mjs')],
+      { encoding: 'utf8' },
+    );
 
     expect(run.stderr).not.toContain('the server entry imported');
     expect(run.stdout.trim()).toBe('function');

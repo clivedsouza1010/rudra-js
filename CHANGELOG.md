@@ -18,20 +18,23 @@ break them.
   `RudraRecommendations` or React. It formats prices on your server and links
   each product card to its page with `openUrl`. Grids and carousels show two
   cards to a row. It refuses a link that is empty, and a link or an image that
-  isn't `http` or `https`. It keeps every text in heading and caption styles,
-  with square brackets turned into parentheses and line breaks into spaces, so
-  no text can load an image. Flutter's `genui` reads every style as Markdown,
-  so it shows a URL or an email address in text as a link that does nothing.
+  isn't `http` or `https`. All text uses heading and caption styles, with
+  square brackets turned into parentheses, `<` and `>` into `‹` and `›`, and
+  line breaks into spaces. So no text can load an image, and only a bare web
+  or email address can show as a link.
 
 ### Changed
 
-- `@a2ui/react`, `@rudra-js/react` and `react` are optional peers of
-  `@rudra-js/a2ui` now, so a server that only builds messages doesn't install
-  React. npm and pnpm no longer install those three for you. If your app uses
-  `createRudraRecommendationsComponent` and its `package.json` doesn't list
-  them, add them. Otherwise a fresh install, or `npm ci --omit=optional`,
-  leaves them out and `@rudra-js/a2ui` fails to load. The README's install
-  command already lists them.
+- **Breaking.** `@a2ui/react`, `@rudra-js/react` and `react` are optional
+  peers of `@rudra-js/a2ui` now, so a server that only builds messages doesn't
+  install React. npm and pnpm no longer install those three for you. If your
+  app uses `createRudraRecommendationsComponent` and its `package.json`
+  doesn't list them, add them. Otherwise npm or pnpm drops them and
+  `@rudra-js/a2ui` fails to load. npm 11 drops them on the upgrade and on
+  every install after it, even from a lockfile npm 10 wrote. npm 10 and pnpm
+  drop them on an install with no lockfile, and npm 10 also on `npm update`
+  and `npm ci --omit=optional`. The README's install command already lists
+  them.
 
 ## [0.8.3] - 2026-10-24
 

@@ -214,8 +214,10 @@ export function messagesFor(result: RecommendationResult, locale: string) {
 ```
 
 In [your endpoint](#your-endpoint), return `Response.json(messagesFor(result, shopper.locale))`
-instead of `result`. Skip the other two pieces, which are for React only, and leave
-`rudraRecommendationsApi` out of your agent's catalog.
+instead of `result`. Skip the [agent catalog](#the-catalog-your-agent-is-prompted-with) and
+[browser](#the-browser) pieces, and keep `rudraRecommendationsApi` out of your agent's catalog.
+Those are for `RudraRecommendations`, which needs React. Use your own `surfaceId` in place of
+`'rudra_recommendations'`, and never name it in your agent's prompt.
 
 Your app can call the endpoint with the four hints and give the messages it gets back to its A2UI
 renderer. Or your agent's code can call it and pass the messages on to the client unchanged. Then
@@ -233,13 +235,19 @@ from the block's surface, as
   native app has no page to resolve them against. A product whose image URL is empty or only
   spaces shows no image. A link that is empty, or a link or an image that doesn't end up `http` or
   `https`, throws.
-- Prices are formatted on your server, for `locale`. Pass `formatPrice` and `formatBundlePrice` to
-  format them yourself.
-- All text uses a heading or caption style, never body. Renderers read body text as Markdown, and
-  Flutter's `genui` reads every style that way. So square brackets become parentheses and line
-  breaks become spaces, and no text can load an image or open a link. `genui` still shows a bare
-  `https://` or `www.` address, an email address or a `<...>` link as a link that does nothing, and
-  text that starts with a Markdown marker such as `# ` or `- ` as Markdown.
+- A featured card looks like any other, and a banner looks the same whatever its tone, because the
+  basic catalog has no styles for them. Nothing carries the `data-rudra-*` attributes the React
+  block uses for click tracking, so to count clicks, add a query parameter in `hrefForSku`.
+- Prices are formatted on your server, for `locale`. Without it, they use the server's default
+  locale, not the shopper's. Pass `formatPrice` and `formatBundlePrice` to format them yourself.
+- All text uses a heading or caption style, never body, because the web renderers read only body
+  text as Markdown. Flutter's `genui` and the A2UI SwiftUI renderer read every style as Markdown, as
+  the
+  [A2UI guide](https://github.com/a2ui-project/a2ui/blob/main/specification/v0_9_1/docs/basic_catalog_implementation_guide.md)
+  asks. So square brackets become parentheses, `<` and `>` become `‹` and `›`, and line breaks
+  become spaces. No text can load an image, and only a bare web address or email address can show
+  as a link. On SwiftUI a tap opens it. On `genui` it does nothing, and text that starts with `# `
+  or `- ` shows as Markdown.
 - The rationale and how the block was generated are never sent.
 - Flutter's `genui` knows the basic catalog by its id from 0.10.3. For 0.8 to 0.10.2, pass
   `catalogId: 'https://a2ui.org/specification/v0_9/basic_catalog.json'`. On Android 11 and later,
@@ -248,8 +256,7 @@ from the block's surface, as
 - On `@a2ui/angular` 0.13, register the `BasicCatalog` from `@a2ui/angular/v0_9`, because the one
   from `@a2ui/angular` has the v1.0 id. Pass `useUniversalComponents: true` to `provideA2Ui` too,
   next to `catalogs`. Without it, a click on a card does nothing, and each card tries to open its
-  link in a new tab as soon as it renders. Don't send these messages to an Angular 0.13 app without
-  that setting.
+  link in a new tab as soon as it renders.
 
 ## zod
 
