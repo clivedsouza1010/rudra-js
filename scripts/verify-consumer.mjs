@@ -78,11 +78,11 @@ const dependencyNames = (manifest) =>
 
 const DIRECTORY_OF = new Map(PACKAGES.map((name) => [manifestOf(name).name, name]));
 
-const closureOf = (packageName) => {
+const closureOf = (packageName, leftOut) => {
   const closure = new Set();
   const walk = (directory) => {
     for (const name of dependencyNames(manifestOf(directory))) {
-      if (closure.has(name)) continue;
+      if (closure.has(name) || leftOut.has(name)) continue;
       closure.add(name);
       if (DIRECTORY_OF.has(name)) walk(DIRECTORY_OF.get(name));
     }
@@ -206,12 +206,12 @@ function consumerProgram() {
   };
 }
 
-function soloProgram(packageName, tarball, declarations) {
-  const root = join(solo, packageName);
+function soloProgram(packageName, tarball, declarations, label, leftOut) {
+  const root = join(solo, label.replaceAll(/\W+/g, '-'));
   const soloModules = join(root, 'node_modules');
   extract(tarball, join(soloModules, '@rudra-js', packageName));
 
-  for (const dependency of closureOf(packageName)) {
+  for (const dependency of closureOf(packageName, leftOut)) {
     link(
       soloModules,
       dependency,
@@ -231,8 +231,8 @@ function soloProgram(packageName, tarball, declarations) {
   writeFileSync(config, JSON.stringify({ compilerOptions: COMPILER_OPTIONS, files }, null, 2));
 
   return {
-    label: `@rudra-js/${packageName} on its own`,
-    failure: `a declaration published by @rudra-js/${packageName} did not typecheck`,
+    label,
+    failure: `a declaration published by @rudra-js/${packageName} did not typecheck: ${label}`,
     config,
     declarationFiles: files.map((path) => join(root, path)),
   };
@@ -337,7 +337,20 @@ try {
   const programs = [
     consumerProgram(),
     ...PACKAGES.map((packageName) =>
-      soloProgram(packageName, tarballs.get(packageName), shipped.get(packageName)),
+      soloProgram(
+        packageName,
+        tarballs.get(packageName),
+        shipped.get(packageName),
+        `@rudra-js/${packageName} on its own`,
+        new Set(),
+      ),
+    ),
+    soloProgram(
+      'a2ui',
+      tarballs.get('a2ui'),
+      ['dist/server.d.ts'],
+      '@rudra-js/a2ui/server without its optional peers',
+      new Set(Object.keys(manifestOf('a2ui').peerDependenciesMeta)),
     ),
   ];
   for (const { config } of programs) checkOptions(config);

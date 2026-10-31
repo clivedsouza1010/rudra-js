@@ -134,13 +134,13 @@ If an [A2UI](https://a2ui.org) agent builds your pages, add [`@rudra-js/a2ui`](p
 
 ## Packages
 
-| Package                                     | What it does                                                                                                                    |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| [`@rudra-js/core`](packages/core)           | The schemas and logic that turn one tracking input into one spec you can render. The spec is checked with `@rudra-js/attested`. |
-| [`@rudra-js/react`](packages/react)         | Renders the spec with React, on the server or in the browser.                                                                   |
-| [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API. It's the only package that makes a billed call.                                                     |
-| [`@rudra-js/attested`](packages/attested)   | Checks the model's copy against the facts a shop stands behind. Has no dependencies.                                            |
-| [`@rudra-js/a2ui`](packages/a2ui)           | Lets an [A2UI](https://a2ui.org) agent place the block. Your server still picks the products.                                   |
+| Package                                     | What it does                                                                                                                                                                    |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@rudra-js/core`](packages/core)           | The schemas and logic that turn one tracking input into one spec you can render. The spec is checked with `@rudra-js/attested`.                                                 |
+| [`@rudra-js/react`](packages/react)         | Renders the spec with React, on the server or in the browser.                                                                                                                   |
+| [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API. It's the only package that makes a billed call.                                                                                                     |
+| [`@rudra-js/attested`](packages/attested)   | Checks the model's copy against the facts a shop stands behind. Has no dependencies.                                                                                            |
+| [`@rudra-js/a2ui`](packages/a2ui)           | Puts the block in an [A2UI](https://a2ui.org) interface: an agent places it in React, or your server sends it to any other A2UI renderer. Your server still picks the products. |
 
 ## Development
 

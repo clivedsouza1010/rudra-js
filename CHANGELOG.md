@@ -10,6 +10,32 @@ break them.
 
 ## [Unreleased]
 
+### Added
+
+- `buildRecommendationMessages` in `@rudra-js/a2ui/server`. It turns a
+  recommendation result into A2UI messages that use only the basic catalog, so
+  Flutter, Angular and other A2UI renderers can show the block without
+  `RudraRecommendations` or React. It formats prices on your server and links
+  each product card to its page with `openUrl`. Grids and carousels show two
+  cards to a row. It refuses a link that is empty, and a link or an image that
+  isn't `http` or `https`. All text uses heading and caption styles, with
+  square brackets turned into parentheses, `<` and `>` into `‹` and `›`, and
+  line breaks into spaces. So no text can load an image, and only a bare web
+  or email address can show as a link.
+
+### Changed
+
+- **Breaking.** `@a2ui/react`, `@rudra-js/react` and `react` are optional
+  peers of `@rudra-js/a2ui` now, so a server that only builds messages doesn't
+  install React. npm and pnpm no longer install those three for you. If your
+  app uses `createRudraRecommendationsComponent` and its `package.json`
+  doesn't list them, add them. Otherwise npm or pnpm drops them and
+  `@rudra-js/a2ui` fails to load. npm 11 drops them on the upgrade and on
+  every install after it, even from a lockfile npm 10 wrote. npm 10 and pnpm
+  drop them on an install with no lockfile, and npm 10 also on `npm update`
+  and `npm ci --omit=optional`. The README's install command already lists
+  them.
+
 ## [0.8.3] - 2026-10-24
 
 ### Changed

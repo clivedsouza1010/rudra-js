@@ -12,6 +12,7 @@ import { createAnthropicProvider } from '@rudra-js/anthropic';
 import { verify, type Facts } from '@rudra-js/attested';
 import type { RudraRecommendationsOptions } from '@rudra-js/a2ui';
 import {
+  buildRecommendationMessages,
   fitRecommendationRequest,
   parseRecommendationRequest,
   rudraRecommendationsApi,
@@ -136,6 +137,18 @@ const fitted = fitRecommendationRequest(
 );
 if (JSON.stringify(fitted) !== '{"currentSku":"TR-101"}') {
   throw new Error(`@rudra-js/a2ui/server returned ${JSON.stringify(fitted)}`);
+}
+
+const sent = JSON.stringify(
+  buildRecommendationMessages(
+    { spec, products, bundles },
+    { surfaceId: 'picks', shopUrl: 'https://shop.example', locale: 'en-US' },
+  ),
+);
+for (const expected of ['$174.00', 'https://shop.example/product/TR-101']) {
+  if (!sent.includes(expected)) {
+    throw new Error(`@rudra-js/a2ui/server sent no ${expected}: ${sent.slice(0, 300)}`);
+  }
 }
 
 const forbidden: string = '__FORBIDDEN_PACKAGE__';

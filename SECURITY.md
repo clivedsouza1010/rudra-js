@@ -62,7 +62,7 @@ a vulnerability:
   of being read as data.
 - Prototype pollution, or any parsed field silently disappearing instead of being rejected.
 
-**An A2UI agent is untrusted too, and with `@rudra-js/a2ui` all it can do is hint.** The agent
+**An A2UI agent is untrusted too, and with `RudraRecommendations` all it can do is hint.** The agent
 places `RudraRecommendations` and your server builds the block. A hint that reaches the model is
 quoted as data, like a shopper's search, so an agent can sway the wording no more than a shopper
 can. Any of these is a vulnerability:
@@ -75,6 +75,30 @@ can. Any of these is a vulnerability:
   bundle schemas first.
 - A `currentSku` or a `currentCategory` that `fitRecommendationRequest` keeps although none of the
   candidates it was given carries it.
+
+**The basic-catalog messages carry the block itself.** `buildRecommendationMessages` writes the
+block's words, prices and links into A2UI messages, so whatever forwards them can change them, and
+so can any later message for the same surface. The ids are fixed, so a model that writes its own
+A2UI can replace a card's link or price by sending a component with the same id. Keep the model
+away from the messages in one of two ways:
+
+- If you don't run the agent's code yourself, have your app call the endpoint and render the
+  messages with a renderer that never gets the agent's messages. This is the only setup that
+  doesn't depend on filtering what the model sends.
+- If you do run it, pass the messages from your agent's code to the client unchanged, never through
+  the model, and use a `surfaceId` the model is never told. From the model, forward only objects
+  that are exactly one v0.9 message: a `version` and one of `createSurface`, `updateComponents`,
+  `updateDataModel` or `deleteSurface`, whose `surfaceId` is a string other than the block's. Drop
+  everything else, including arrays, `{ messages }` wrappers and objects with a `type` field,
+  because `@a2ui/web_core` unwraps and applies those too.
+
+Any of these is a vulnerability:
+
+- Text from the spec or the catalog reaching the messages as anything other than a heading or
+  caption `Text`, or with a square bracket, an angle bracket or a line break still in it.
+- A link or an image URL in the messages that is empty or isn't `http` or `https`, or a link that
+  comes from anywhere but `hrefForSku`.
+- The rationale, the provider, the model or any other generation detail reaching the messages.
 
 ## How prompt injection is handled
 

@@ -10,6 +10,8 @@ This package puts that block inside the interfaces an [A2UI](https://a2ui.org) a
 adds one component, `RudraRecommendations`, to the catalog your A2UI renderer draws from. The agent
 places it and passes hints about what the shopper is looking at. Your server still picks the
 products and builds the block with `@rudra-js/core`. The browser renders it with `@rudra-js/react`.
+For Flutter, Angular or any other renderer, your server can send the block as A2UI messages
+instead. See [Flutter, Angular and other renderers](#flutter-angular-and-other-renderers).
 
 It works with version 0.9 of the A2UI protocol, using `@a2ui/react` and `@a2ui/web_core` 0.14.
 
@@ -28,7 +30,11 @@ already has. Without `@latest`, an app on an older core can get an `ERESOLVE` er
 and `react-dom` have no version, so npm and pnpm keep a React 18 app on 18.
 
 Everything except zod is a peer dependency, so your app holds one copy of each. npm and pnpm
-install peers for you. List them anyway, because your code imports most of them itself.
+install `@rudra-js/core`, `@rudra-js/attested` and `@a2ui/web_core` for you, but not `@a2ui/react`,
+`@rudra-js/react` or `react`. Those three are optional, so a server that only builds
+[messages for other renderers](#flutter-angular-and-other-renderers) can leave React out. The
+browser component can't load without them, so keep them in the command. List the rest anyway,
+because your code imports most of them itself.
 pnpm only lets your code import what your `package.json` names. Yarn doesn't install peers, so on Yarn you
 need the whole list. Yarn also moves a name with no version to its latest release. So on Yarn, if your app
 already has React, leave out `react` and `react-dom`. On pnpm, read [zod](#zod) first.
@@ -182,6 +188,75 @@ A2UI renders in the browser, so a crawler won't see a block an agent places. For
 render `RudraComponent` on the server, as the
 [`@rudra-js/react` README](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/react)
 describes.
+
+## Flutter, Angular and other renderers
+
+`RudraRecommendations` needs a React renderer. For any other A2UI renderer, build the block on your
+server as A2UI messages that use only the basic catalog, which every renderer ships. A server with
+no React needs only these:
+
+```sh
+npm install @rudra-js/a2ui@latest @rudra-js/core@latest @rudra-js/attested@latest @a2ui/web_core@0.14
+```
+
+If your server has `@rudra-js/anthropic`, add `@rudra-js/anthropic@latest` to that command too.
+
+```ts
+import { buildRecommendationMessages, type RecommendationResult } from '@rudra-js/a2ui/server';
+
+export function messagesFor(result: RecommendationResult, locale: string) {
+  return buildRecommendationMessages(result, {
+    surfaceId: 'rudra_recommendations',
+    shopUrl: 'https://shop.example',
+    locale,
+  });
+}
+```
+
+In [your endpoint](#your-endpoint), return `Response.json(messagesFor(result, shopper.locale))`
+instead of `result`. Skip the [agent catalog](#the-catalog-your-agent-is-prompted-with) and
+[browser](#the-browser) pieces, and keep `rudraRecommendationsApi` out of your agent's catalog.
+Those are for `RudraRecommendations`, which needs React. Use your own `surfaceId` in place of
+`'rudra_recommendations'`, and never name it in your agent's prompt.
+
+Your app can call the endpoint with the four hints and give the messages it gets back to its A2UI
+renderer. Or your agent's code can call it and pass the messages on to the client unchanged. Then
+the call has to carry the shopper's session, because `shopperFor` reads the shopper from the
+request. The first way is the safer one. Either way, keep the model away from the messages and
+from the block's surface, as
+[SECURITY.md](https://github.com/clivedsouza1010/rudra-js/blob/main/SECURITY.md) explains.
+
+- The messages create the surface named `surfaceId` and fill it. To show a new block there, send
+  `deleteSurface` for it first. When nothing in the block can be shown, you get no messages.
+- Grids and carousels show two cards to a row. The basic catalog can't fit cards to the screen, and
+  its `List` doesn't scroll on every renderer.
+- Each product card is a button that opens the product's page. `hrefForSku` builds the link,
+  `/product/<sku>` by default. `shopUrl` resolves that link and any relative image URL, because a
+  native app has no page to resolve them against. A product whose image URL is empty or only
+  spaces shows no image. A link that is empty, or a link or an image that doesn't end up `http` or
+  `https`, throws.
+- A featured card looks like any other, and a banner looks the same whatever its tone, because the
+  basic catalog has no styles for them. Nothing carries the `data-rudra-*` attributes the React
+  block uses for click tracking, so to count clicks, add a query parameter in `hrefForSku`.
+- Prices are formatted on your server, for `locale`. Without it, they use the server's default
+  locale, not the shopper's. Pass `formatPrice` and `formatBundlePrice` to format them yourself.
+- All text uses a heading or caption style, never body, because the web renderers read only body
+  text as Markdown. Flutter's `genui` and the A2UI SwiftUI renderer read every style as Markdown, as
+  the
+  [A2UI guide](https://github.com/a2ui-project/a2ui/blob/main/specification/v0_9_1/docs/basic_catalog_implementation_guide.md)
+  asks. So square brackets become parentheses, `<` and `>` become `‹` and `›`, and line breaks
+  become spaces. No text can load an image, and only a bare web address or email address can show
+  as a link. On SwiftUI a tap opens it. On `genui` it does nothing, and text that starts with `# `
+  or `- ` shows as Markdown.
+- The rationale and how the block was generated are never sent.
+- Flutter's `genui` knows the basic catalog by its id from 0.10.3. For 0.8 to 0.10.2, pass
+  `catalogId: 'https://a2ui.org/specification/v0_9/basic_catalog.json'`. On Android 11 and later,
+  the app has to declare `https` links under `<queries>` in its manifest, or a tap on a card does
+  nothing.
+- On `@a2ui/angular` 0.13, register the `BasicCatalog` from `@a2ui/angular/v0_9`, because the one
+  from `@a2ui/angular` has the v1.0 id. Pass `useUniversalComponents: true` to `provideA2Ui` too,
+  next to `catalogs`. Without it, a click on a card does nothing, and each card tries to open its
+  link in a new tab as soon as it renders.
 
 ## zod
 

@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { A2uiSurface } from '@a2ui/react/v0_9';
-import type { A2uiMessage } from '@a2ui/web_core/v0_9';
+import { MessageProcessor, STRICT_VALIDATION, type A2uiMessage } from '@a2ui/web_core/v0_9';
+import { basicCatalog } from '@a2ui/web_core/v0_9/basic_catalog';
 import { agentCatalog } from './agent-catalog.js';
+import { messagesFor } from './other-renderers.js';
 import { processor } from './browser.js';
 import { POST } from './endpoint.js';
 
@@ -48,27 +51,64 @@ afterEach(() => {
 describe('the examples in the @rudra-js/a2ui README', () => {
   it('are the code this test runs', () => {
     const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
-    const run = ['agent-catalog.ts', 'endpoint.ts', 'browser.tsx'].map((file) =>
-      readFileSync(join(import.meta.dirname, file), 'utf8').trim(),
+    const run = ['agent-catalog.ts', 'endpoint.ts', 'browser.tsx', 'other-renderers.ts'].map(
+      (file) => readFileSync(join(import.meta.dirname, file), 'utf8').trim(),
     );
 
     expect(codeBlocksIn(readme), 'the README shows code the test does not run').toStrictEqual(run);
   });
 });
 
-describe('the README install command', () => {
+describe('the README install commands', () => {
   it.each(['@a2ui/react', '@a2ui/web_core'])(
-    'asks for the %s release the package peers on',
+    'ask for the %s release the package peers on',
     (name) => {
       const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
       const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
         readFileSync(join(REPO_ROOT, 'packages/a2ui/package.json'), 'utf8'),
       );
-      const release = readme.match(new RegExp(`^npm install .*${name}@(\\S+)`, 'm'))?.[1];
+      const releases = [
+        ...readme.matchAll(new RegExp(`^npm install .*${name}(?:@(\\S+))?(?= |$)`, 'gm')),
+      ].map((match) => `^${match[1]}.0`);
 
-      expect(`^${release}.0`).toBe(manifest.peerDependencies[name]);
+      expect(releases.length, name).toBeGreaterThan(0);
+      expect(new Set(releases)).toStrictEqual(new Set([manifest.peerDependencies[name]]));
     },
   );
+
+  it('leave React out of the server-only command, and nothing else is optional', () => {
+    const readme = readFileSync(join(REPO_ROOT, 'packages/a2ui/README.md'), 'utf8');
+    const manifest: {
+      peerDependencies: Record<string, string>;
+      peerDependenciesMeta: Record<string, { optional: boolean }>;
+    } = JSON.parse(readFileSync(join(REPO_ROOT, 'packages/a2ui/package.json'), 'utf8'));
+    const serverSection = readme.split('## Flutter, Angular and other renderers')[1] ?? '';
+    const serverCommand = new Set(
+      (serverSection.match(/^npm install (.*)$/m)?.[1] ?? '')
+        .split(' ')
+        .map((arg) => arg.replace(/(?<=.)@.*$/, '')),
+    );
+
+    expect(manifest.peerDependenciesMeta).toStrictEqual({
+      '@a2ui/react': { optional: true },
+      '@rudra-js/react': { optional: true },
+      react: { optional: true },
+    });
+    for (const name of Object.keys(manifest.peerDependencies)) {
+      expect(serverCommand.has(name), name).toBe(!(name in manifest.peerDependenciesMeta));
+    }
+  });
+
+  it('let a server without React load the server entry', () => {
+    const run = spawnSync(
+      process.execPath,
+      [join(import.meta.dirname, 'server-without-react.mjs')],
+      { encoding: 'utf8' },
+    );
+
+    expect(run.stderr).not.toContain('the server entry imported');
+    expect(run.stdout.trim()).toBe('function');
+  });
 });
 
 describe('the README endpoint', () => {
@@ -140,5 +180,26 @@ describe('the README, end to end', () => {
 
     act(() => root.unmount());
     container.remove();
+  });
+});
+
+describe('the README messages for other renderers', () => {
+  it('carry the block the endpoint built, on the basic catalog, with links into the shop', async () => {
+    const response = await post(JSON.stringify({ currentSku: 'A-1' }));
+    const messages = messagesFor(await response.json(), 'en-US');
+    const basicProcessor = new MessageProcessor([basicCatalog], undefined, {
+      validationConfig: STRICT_VALIDATION,
+    });
+
+    expect(() => basicProcessor.processMessages(messages)).not.toThrow();
+    const sent = JSON.stringify(messages);
+    for (const expected of [
+      'Goes with your cart',
+      'Chef knife',
+      '$55.00',
+      'https://shop.example/product/A-3',
+    ]) {
+      expect(sent).toContain(expected);
+    }
   });
 });
