@@ -398,7 +398,7 @@ prompt. It trims instead of throwing.
 ### Unknown fields are rejected
 
 Every fixed-shape object is a `strictObject`. Misspell `recentSearches` and you
-get an error, instead of a shopper who quietly looks like a first-time visitor.
+get an error, instead of a shopper who looks like a first-time visitor with no sign of why.
 `interaction.meta` is the one open shape. It takes any key, except the keys that
 would change a prototype instead of the object.
 
