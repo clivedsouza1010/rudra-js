@@ -1,9 +1,9 @@
 # Changelog
 
-Notable changes to rudra-js. The format follows [Keep a Changelog][kac], and the
-project follows [Semantic Versioning][semver] — with the caveat that while the
-version is `0.x`, the public contracts are still moving and a minor bump may
-break them.
+Notable changes to rudra-js. This file follows the format of
+[Keep a Changelog][kac] and the project follows [Semantic Versioning][semver].
+But while the version is `0.x` the public contracts are still moving and a minor
+bump may break them.
 
 [kac]: https://keepachangelog.com/en/1.1.0/
 [semver]: https://semver.org/spec/v2.0.0.html
@@ -14,149 +14,154 @@ break them.
 
 ### Added
 
-- `buildRecommendationMessages` in `@rudra-js/a2ui/server`. It turns a
-  recommendation result into A2UI messages that use only the basic catalog, so
-  Flutter, Angular and other A2UI renderers can show the block without
-  `RudraRecommendations` or React. It formats prices on your server and links
-  each product card to its page with `openUrl`. Grids and carousels show two
-  cards to a row. It refuses a link that is empty, and a link or an image that
-  isn't `http` or `https`. All text uses heading and caption styles, with
-  square brackets turned into parentheses, `<` and `>` into `‹` and `›`, and
-  line breaks into spaces. So no text can load an image, and only a bare web
-  or email address can show as a link.
+- `buildRecommendationMessages` in `@rudra-js/a2ui/server`. This turns a
+  recommendation result into A2UI messages that use only the basic catalog. That
+  lets Flutter, Angular and other A2UI renderers show the block without
+  `RudraRecommendations` or React. Prices are formatted on your server and
+  product cards link to their pages with `openUrl`. In grids and carousels there
+  will be two cards to a row. An empty link will be refused, as will a link or
+  an image that isn't `http` or `https`. All of the text uses heading and
+  caption styles. Also square brackets are turned into parentheses, `<` and `>`
+  into `‹` and `›` and line breaks into spaces. This means no text can load an
+  image and only a bare web or email address can show as a link.
 
 ### Changed
 
-- **Breaking.** `@a2ui/react`, `@rudra-js/react` and `react` are optional
-  peers of `@rudra-js/a2ui` now, so a server that only builds messages doesn't
-  install React. npm and pnpm no longer install those three for you. If your
-  app uses `createRudraRecommendationsComponent` and its `package.json`
-  doesn't list them, add them. Otherwise npm or pnpm drops them and
-  `@rudra-js/a2ui` fails to load. npm 11 drops them on the upgrade and on
-  every install after it, even from a lockfile npm 10 wrote. npm 10 and pnpm
-  drop them on an install with no lockfile, and npm 10 also on `npm update`
-  and `npm ci --omit=optional`. The README's install command already lists
-  them.
+- **Breaking.** `@a2ui/react`, `@rudra-js/react` and `react` are optional peers
+  of `@rudra-js/a2ui` now. This means a server that only builds messages doesn't
+  install React. But npm and pnpm will no longer install those three for you. If
+  your app uses `createRudraRecommendationsComponent` and its `package.json`
+  doesn't list those three, you have to add them. If you don't, npm or pnpm will
+  drop them and `@rudra-js/a2ui` will fail to load. With npm 11 they are dropped
+  on the upgrade and on all later installs, even from a lockfile npm 10 wrote.
+  With npm 10 and pnpm they are dropped on an install with no lockfile. For npm
+  10 this is also true of `npm update` and `npm ci --omit=optional`. In the
+  README the install command already lists them.
 
 ## [0.8.3] - 2026-10-24
 
 ### Changed
 
-- The READMEs are rewritten in plain words, the way the docs site was. They
-  say the same things: every fact, default, limit and warning is still there,
-  and every code block is unchanged. Repeated sentences and notes on why the
-  library was built a certain way are gone, and words like "cohort" and "spec"
-  are explained where they first appear.
+- READMEs are rewritten in plain words, the way the docs site was. They say the
+  same things: all of the facts, defaults, limits and warnings are still there
+  and all of the code blocks are unchanged. There are no more repeated sentences
+  or notes on why the library was built a certain way. And words like "cohort"
+  and "spec" are explained where they first appear.
 
 ### Fixed
 
-- The root README's Getting started didn't mention Cache Components, which
-  new Next.js apps turn on. With it on, the build stops with "Next.js
+- In the root README, Getting started didn't mention Cache Components (new
+  Next.js apps turn this on). With it on, the build stops with "Next.js
   encountered the unstable value `Date.now()` while prerendering". It now says
-  to create the app with `--no-cache-components`, or to remove
+  to either create the app with `--no-cache-components` or remove
   `cacheComponents` and `partialPrefetching` from `next.config.ts`.
-- The root README sent questions to GitHub Discussions, which is turned off,
-  so the link was a 404. Questions now go to Issues.
-- The anthropic, attested, core and react READMEs linked to anchors on
-  `rudrajs.com/docs`, which the rebuilt docs site no longer has, so the links
-  landed on the reference index. They now go to each package's own reference
-  pages, and core's no longer says every export is documented there.
+- In the root README, questions were sent to GitHub Discussions. That is turned
+  off and the link was a 404. Now they will be sent to Issues.
+- READMEs for anthropic, attested, core and react linked to anchors on
+  `rudrajs.com/docs` that the rebuilt docs site no longer has. Those links
+  landed on the reference index. They now go to the reference pages for each
+  package. And the core README no longer says that all exports are documented
+  there.
 
 ## [0.8.2] - 2026-10-22
 
 ### Changed
 
-- The cache key leaves out view dwell time (`dwellMs`) and category affinity
-  scores, which never reach the prompt. In per-shopper mode a shopper whose
-  dwell time or scores moved used to cost a second model call for the same
-  prompt; now they share the cached one. Shoppers otherwise share a key exactly
-  when they did before. A key changes when its digest has a dwell time or a
-  category the shopper leans towards (the category being browsed counts too),
-  cohort keys included, so those entries miss once after upgrading.
-- The claim screen catches more of the example shop's own recorded copy. "other
-  shoppers", as in "how well they've held up for other shoppers", was the
-  product rating said another way, and the prompt already says never to state
-  one. "strongest all round pick", as in "the strongest all-round picks", ranks
-  products by that rating, and "strongest all around pick" covers the US
-  spelling. A plain "all-round pick" still passes. The demo's product page now
-  drops that copy paragraph and keeps its grid. The list grows from 122 to 125
-  phrases.
+- Both view dwell time (`dwellMs`) and category affinity scores are now left out
+  of the cache key because they never reach the prompt. In per-shopper mode, a
+  shopper whose dwell time or scores moved used to cost a second model call for
+  the same prompt. Now they share the cached one. Otherwise shoppers share a key
+  exactly when they did before. But a key will change if its digest has a dwell
+  time or a category the shopper leans towards (the category being browsed
+  counts too). This is also true of cohort keys. Any entry whose key changes
+  will miss once after upgrading.
+- More of the example shop's own recorded copy is caught by the claim screen.
+  "other shoppers", as in "how well they've held up for other shoppers", was
+  just the product rating said another way, but the prompt already says never to
+  state one. "strongest all round pick", as in "the strongest all-round picks",
+  ranks products by that rating. Also "strongest all around pick" covers the US
+  spelling. But a plain "all-round pick" still passes. In the demo, the product
+  page now drops that copy paragraph but keeps its grid. There are now 125
+  phrases on the list, up from 122.
 
 ### Fixed
 
-- The a2ui README's install command failed with `ERESOLVE` in an app on an
-  older `@rudra-js/core` or A2UI, because for a bare name npm stays inside the
-  range the app's `package.json` already has. It now asks for `@latest` on the
-  `@rudra-js` packages, `@rudra-js/anthropic` included when the app has it, and
-  `@0.14` on the `@a2ui` ones. A test keeps that `@0.14` on the release the
-  package peers on.
-- The install commands in the react, anthropic and core READMEs and the root
-  README had the same problem: in an app on an older `@rudra-js/core` they
-  failed with `ERESOLVE` or, when run again to upgrade, stayed inside the
-  ranges the app already had. They now ask for `@latest` on the `@rudra-js`
-  packages, say to add the app's other `@rudra-js` packages the same way, and
-  point an app that has `@rudra-js/a2ui` to that package's install line.
-- The react README's command named `react` without `react-dom`, so in a React
-  19 app npm could move `react` to a newer release than `react-dom`, and React
-  then refuses to load `react-dom`. It names both now, and says Yarn moves a
-  bare name to its latest version.
-- Three gaps in the claim screen, in core and attested. Greek accents stayed on,
-  so a shop's banned phrase `ευκαιρία` missed `ΕΥΚΑΙΡΙΑ`; accents on Greek
-  letters are now dropped, and Latin ones are kept as before. Greek words told
-  apart only by their accent now read as one, so `προσφορά` also catches
-  `πρόσφορα`. A Greek phrase that starts or ends on ά, έ, ί, ό or ύ (with or
-  without dialytika) now follows the whole-word rule, as one on α, ε, ι, ο or υ
-  already did, so `φθηνό` no longer catches `φθηνότερο` and `άνετο` no longer
-  catches `πολυάνετο`; list those forms too. `Ѡ`, `Ϙ`, `Ϗ` and `Ͳ` weren't
-  folded, so "LOѠ STOCK", "GOING ϘUICK", "IN STOCϏ" and "IN SͲOCK" got through;
-  the by-look reading now takes them as w, q, k and t. And `Ӏ` written for an l
-  next to another look-alike capital ("seӀӀiΝg fast") passed both readings. Both
-  screens now add a third, by look with `Ӏ` as l, and skip any reading that
-  comes out the same as one already done.
+- In the a2ui README the install command failed with `ERESOLVE` in an app on an
+  older `@rudra-js/core` or A2UI because for a bare name npm stays inside the
+  range that's already in the app's `package.json`. It now asks for `@latest` on
+  the `@rudra-js` packages (this includes `@rudra-js/anthropic` if the app has
+  it) and `@0.14` on the `@a2ui` ones. There is a test to keep that `@0.14` on
+  the release the package peers on.
+- In the react, anthropic and core READMEs and the root README the install
+  commands had this problem too. In an app on an older `@rudra-js/core` they
+  failed with `ERESOLVE` or, when run again to upgrade, stayed inside the ranges
+  the app already had. They now ask for `@latest` on the `@rudra-js` packages
+  and tell you to add the other `@rudra-js` packages of the app in the same way.
+  An app that has `@rudra-js/a2ui` is pointed to the install line of that
+  package.
+- In the react README, the command named `react` without `react-dom`. This meant
+  npm could move `react` to a newer release than `react-dom` in a React 19 app.
+  If that happens, React will refuse to load `react-dom`. It names both now. It
+  also says Yarn moves a bare name to its latest version.
+- Three gaps in the claim screen, in core and attested. In Greek text the
+  accents stayed on and a shop's banned phrase `ευκαιρία` missed `ΕΥΚΑΙΡΙΑ`.
+  These are now dropped on Greek letters but Latin ones are kept as before. Now
+  Greek words told apart only by their accent will read as one: `προσφορά` also
+  catches `πρόσφορα`. Any Greek phrase that starts or ends on ά, έ, ί, ό or ύ
+  (with or without dialytika) now follows the whole-word rule, as one on α, ε,
+  ι, ο or υ already did. This means `φθηνό` won't catch `φθηνότερο` any more and
+  `άνετο` won't catch `πολυάνετο` either. You will have to list those forms too.
+  None of `Ѡ`, `Ϙ`, `Ϗ` and `Ͳ` were folded and "LOѠ STOCK", "GOING ϘUICK", "IN
+  STOCϏ" and "IN SͲOCK" got through. Now the by-look reading takes those as w,
+  q, k and t. And `Ӏ` written for an l next to another look-alike capital
+  ("seӀӀiΝg fast") passed both readings. Now a third reading will be added by
+  both screens (by look, with `Ӏ` as l) and any reading that comes out the same
+  as one already done will be skipped.
 
 ## [0.8.1] - 2026-10-18
 
 ### Changed
 
-- `@rudra-js/a2ui` is published to npm from this release on. The release
-  workflow publishes it right after `@rudra-js/react`, since it needs both core
-  and react.
+- `@rudra-js/a2ui` is published to npm from this release on. This will be done
+  by the release workflow right after `@rudra-js/react`, since it needs both
+  core and react.
 
 ## [0.8.0] - 2026-10-17
 
 ### Added
 
-- `@rudra-js/a2ui`, a new package. An [A2UI](https://a2ui.org) agent can place a
-  `RudraRecommendations` component and hint at a SKU, a category, a search and
-  how many items. Your server still picks the products and builds the block with
-  core. Supports A2UI 0.9 through `@a2ui/react` and `@a2ui/web_core` 0.14. Not
-  on npm yet.
-- `parseComponentSpec` in `@rudra-js/core`, which checks a whole
-  `ComponentSpec`, metadata included.
-- `@rudra-js/core/schemas`, a second entry point with `productSchema`,
+- `@rudra-js/a2ui` is a new package. An [A2UI](https://a2ui.org) agent can place
+  a `RudraRecommendations` component and hint at a SKU, a category, a search and
+  how many items. Your server will still pick the products and build the block
+  with core. The package supports A2UI 0.9 via `@a2ui/react` and
+  `@a2ui/web_core` 0.14. Not on npm yet.
+- `parseComponentSpec` in `@rudra-js/core` checks a whole `ComponentSpec`
+  (metadata included).
+- `@rudra-js/core/schemas` is a second entry point with `productSchema`,
   `bundleSchema`, `renderContextSchema`, `FIELD_LIMITS` and
-  `parseComponentSpec`. It skips core's `node:crypto` import, so browser code
-  can use it.
+  `parseComponentSpec`. You can also use it in browser code because it skips
+  core's `node:crypto` import.
 
 ### Fixed
 
-- `SECURITY.md` listed what a cohort key is built from but left out the
-  candidates' SKUs, which have been part of it since 0.1.0. Each new candidate
-  set is a new model call too.
+- `SECURITY.md` listed the things a cohort key is built from but left out the
+  SKUs of the candidates. Those have been part of it since 0.1.0. Any new
+  candidate set will also be a new model call.
 
 ## [0.7.6] - 2026-10-10
 
 ### Changed
 
-- The READMEs now say plainly what rudra-js is, an open-source TypeScript
-  library, and what it is not. The npm descriptions and keywords name rudra-js.
+- READMEs now say plainly what rudra-js is (an open-source TypeScript library)
+  and what it is not. Also the npm descriptions and keywords name rudra-js.
 
 ### Fixed
 
-- The core README said our tests use `createFixedSpecProvider` to exercise the
-  blocks the deterministic component never emits. They don't. It now says what
-  happens instead: a fixed spec still goes through reconciliation, so it needs a
-  headline that survives screening and at least one product on show.
+- In the core README, the text said our tests use `createFixedSpecProvider` to
+  exercise the blocks the deterministic component never emits. They don't. It
+  now says this instead: a fixed spec still has to pass reconciliation. To do
+  that it has to have a headline that survives screening and at least one
+  product on show.
 
 ## [0.7.5] - 2026-10-10
 
@@ -164,684 +169,717 @@ break them.
 
 - `@rudra-js/attested` exports `foldLookalikes(text, byLook?)`, the part of its
   phrase normalising that strips hidden characters and folds lookalike letters.
-  `@rudra-js/core` now uses it instead of keeping its own copy, so its peer range
-  on attested is `^0.7.5`.
+  `@rudra-js/core` now uses this instead of keeping its own copy. This is why
+  the peer range of core on attested is `^0.7.5`.
 
 ### Changed
 
-- Cohort cache keys are built from the same digest the model is prompted with,
-  instead of a hand-picked list of its fields. The same shoppers share a key as
-  before, but the key strings are new, so existing cohort cache entries miss
-  once after upgrading.
+- Now cohort cache keys will be built from the digest the model is prompted with
+  instead of a hand-picked list of its fields. The same shoppers will share a
+  key as before, but the key strings are new. This means existing cohort cache
+  entries will miss once after upgrading.
 
 ## [0.7.4] - 2026-10-08
 
 ### Changed
 
-- The claim screen catches more. `@rudra-js/attested`'s phrase list now holds
-  generic environmental claims ("eco-friendly", "carbon neutral",
-  "sustainable" and the like). Under EU Directive 2024/825, applied through
-  each country's own law from 27 September 2026, those are unfair unless the
-  trader can show recognised excellent environmental performance, and a
-  "neutral" claim based on offsetting is unfair outright. It also holds social
-  proof nobody can back ("others are looking at this", "trending") and
-  countdowns ("ends tonight"). It leaves out the bare word "green", which is
-  too often a colour, and core now allows "sustainable pace". Core's stock
-  pattern reads "only two left" as well as "only 2 left". The list grows from
-  81 to 122 phrases.
+- More is caught by the claim screen. `@rudra-js/attested`'s phrase list now
+  holds generic environmental claims ("eco-friendly", "carbon neutral",
+  "sustainable" and the like). Under EU Directive 2024/825 (applied via the law
+  of each country from 27 September 2026) those are unfair unless the trader can
+  show recognised excellent environmental performance. And a "neutral" claim
+  based on offsetting is unfair outright. It also holds social proof nobody can
+  back ("others are looking at this", "trending") and countdowns ("ends
+  tonight"). It leaves out the bare word "green" because this is too often a
+  colour. Also core now allows "sustainable pace". In core the stock pattern
+  reads "only two left" as well as "only 2 left". In attested the list of
+  phrases grows from 81 to 122.
 
 ### Fixed
 
-- `@rudra-js/react` no longer renders an empty hero heading when the claim
-  screen removes its text, and a hero left with nothing to show renders
-  nothing. A card's link text, which is what a screen reader announces, ran
-  together ("Shoe$53.67Popular"); its parts are now separated by spaces, and so
-  are the hero link's and the banner's text and call to action. The react
-  README now says the banner and bundle calls to action are plain text, not
-  controls.
-- The core README's list of what the model sees was off in two places. A
-  shopper counts as having no history when they have no likes, dislikes,
-  purchases, basket items or views, so one with only searches or other
+- `@rudra-js/react` no longer renders an empty hero heading if the claim screen
+  removes its text. And a hero left with nothing to show renders nothing. In a
+  card, the link text (this is what a screen reader announces) ran together
+  ("Shoe$53.67Popular"). Its parts are now separated by spaces. This also goes
+  for the text and call to action of the hero link and the banner. In the react
+  README it now says the banner and bundle calls to action are plain text (not
+  controls).
+- In the core README, the list of what the model sees was off in two places. Any
+  shopper with no likes, dislikes, purchases, basket items or views counts as
+  having no history. This means a shopper with only searches or other
   interactions is still sent as "no history at all". And per-shopper mode sends
-  up to six categories the shopper leans towards, not every one.
+  up to six categories the shopper leans towards rather than all of those.
 
 ## [0.7.3] - 2026-10-01
 
 ### Fixed
 
-- Greek and Cyrillic capitals that look like Latin ones got claims past the
-  screen in core and `@rudra-js/attested`: "IΝ STOCK", "ΗURRY", "ΜONEY BACK"
-  and "ΒARGAIN" all rendered. Thirteen capitals lowercase to a letter that
-  looks like something else, or that the look-alike table doesn't have: `Ν`
-  becomes `ν`, which reads as v. Both screens now read the text twice, once as
-  before and once with those capitals taken by how they look, and flag a claim
-  if either reading catches it. So all-caps copy still matches a shop's own
-  lowercase phrases. The table also gains `ϳ` and `ѵ`, which read as j and v.
+- In core and `@rudra-js/attested`, Greek and Cyrillic capitals that look like
+  Latin ones got claims past the screen: "IΝ STOCK", "ΗURRY", "ΜONEY BACK" and
+  "ΒARGAIN" all rendered. There are thirteen capitals which lowercase to a
+  letter that looks like something else or to a letter the look-alike table
+  doesn't have. For example `Ν` becomes `ν` (this reads as v). Now the text will
+  be read twice by both screens (once as before, once with those capitals taken
+  by how they look) and a claim will be flagged if either reading catches it.
+  This means all-caps copy will still match a shop's own lowercase phrases. Also
+  the table gains `ϳ` and `ѵ`, to be read as j and v.
 
 ## [0.7.2] - 2026-09-30
 
 ### Changed
 
 - `@rudra-js/anthropic` asks the model to call its tool instead of forcing the
-  call (`tool_choice` is `auto`, one call at most), and adds a system line
-  telling the model to put its JSON in that tool. Claude Opus 5.5, Sonnet 5.5,
-  Fable 5.1 and Mythos 5.1 answer a forced tool call with a 400, so with those
-  models every request fell back. The cost is that a model can now reply in
-  plain text; that reply fails the same check as any other bad answer, and the
-  page gets the fallback component.
+  call (`tool_choice` is `auto`, one call at most). It also adds a system line
+  that tells the model to put its JSON in that tool. All requests fell back with
+  Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 because they answer a
+  forced tool call with a 400. But there is a cost: a model can now reply in
+  plain text. In that case the reply will fail the check just like any other bad
+  answer and the page gets the fallback component.
 
 ### Fixed
 
-- A lunate sigma in place of a "c" got a claim past the screen in both
-  `@rudra-js/attested` and core: "In stoϲk now" and "ϹHEAP" rendered. The
-  look-alike table had an entry for `ϲ`, but NFKC turns `ϲ` into `ς`, and `Ϲ`
-  into `Σ`, before the table is read, so the entry never matched. Both screens
-  now turn the two lunate sigmas into `c` before NFKC runs. Ordinary Greek sigmas
-  are left alone, so a Greek shop's own banned phrases still match their case
-  endings.
+- With a lunate sigma in place of a "c", a claim got past the screen in
+  `@rudra-js/attested` and core: "In stoϲk now" and "ϹHEAP" rendered. There was
+  an entry for `ϲ` in the look-alike table, but the table is read after NFKC has
+  turned `ϲ` into `ς` and `Ϲ` into `Σ`. This is why that entry could never
+  match. Now the two lunate sigmas will be turned into `c` by both screens
+  before NFKC runs. Ordinary Greek sigmas are left alone, to let the banned
+  phrases of a Greek shop still match their case endings.
 
 ## [0.7.1] - 2026-09-26
 
 ### Changed
 
-- The npm homepage for all four packages is https://rudrajs.com, not the
-  package folder on GitHub. The repository and issues links still go to GitHub.
+- For all four packages the npm homepage is https://rudrajs.com rather than the
+  package folder on GitHub. But the repository and issues links still go to
+  GitHub.
 
 ## [0.7.0] - 2026-09-25
 
 ### Changed
 
-- The zod range in core and anthropic is `^4.0.0`, down from `^4.5.0`.
-  Nothing in either package uses anything newer than 4.0. The floor only fixed
-  how the tool schema is worded, and it shut out every app on zod 4.0 to 4.4.
-  On those, a nullable field in the tool schema is written as `anyOf` instead of
-  a type array, and before 4.1.13 the block list is `anyOf` instead of `oneOf`.
-  Same schema, different wording.
-- zod is a dependency of core and anthropic rather than a peer. An app no
-  longer needs zod of its own, and an app on zod 3 installs instead of failing
-  with `ERESOLVE`. An app on zod 4 still shares one copy. On zod 3 there are
-  two, and the app's own zod can't be mixed with the exported schemas.
-- The docs no longer say `@rudra-js/react` needs Server Components. It never
-  did: the components have no hooks, and they render the same with
-  `renderToString` or in a client-rendered React 18 or 19 app.
+- In core and anthropic the zod range is `^4.0.0`, down from `^4.5.0`. Neither
+  package uses anything newer than 4.0. That floor only fixed how the tool
+  schema is worded, but it shut out all apps on zod 4.0 to 4.4. On those
+  versions a nullable field in the tool schema will be written as `anyOf`
+  instead of a type array. And before 4.1.13 the block list will also be `anyOf`
+  instead of `oneOf`. Same schema, different wording.
+- Now zod is a dependency of core and anthropic rather than a peer. An app
+  doesn't need to have a zod of its own any more. An app on zod 3 will install
+  instead of failing with `ERESOLVE`. An app on zod 4 still shares one copy. On
+  zod 3 there are two copies and the app's zod can't be mixed with the exported
+  schemas.
+- Now the docs don't say `@rudra-js/react` needs Server Components. It never
+  did. Its components don't have hooks and render the same with `renderToString`
+  or in a client-rendered React 18 or 19 app.
 
 ### Deprecated
 
-- `@rudra-js/core`'s `parseGeneratedSpec` is slated for removal. It is a
-  throwing wrapper that forwards straight to `generatedSpecSchema.parse`, and
-  nothing in the repo calls it. Use the exported `generatedSpecSchema` directly
-  if you want throwing behaviour, or `safeParseGeneratedSpec` if you do not.
+- In `@rudra-js/core`, `parseGeneratedSpec` is slated for removal. It is a
+  throwing wrapper that forwards straight to `generatedSpecSchema.parse` and is
+  not called by anything in the repo. To get throwing behaviour use the exported
+  `generatedSpecSchema` directly. If you do not want that, use
+  `safeParseGeneratedSpec`.
 
 ## [0.6.0] - 2026-09-20
 
 ### Added
 
-- `@rudra-js/core` exports `GeneratedSpecResult`, a name for what
+- `@rudra-js/core` exports `GeneratedSpecResult` as a name for what
   `safeParseGeneratedSpec` returns. It is `z.ZodSafeParseResult<GeneratedSpec>`,
-  the type the function already returned at 0.5.0 — nothing changed but the
-  signature, which says it now instead of leaving it to inference. What is new
-  is being able to write the type down: annotating a variable, a helper's
-  parameter or a wrapper's return used to mean
-  `ReturnType<typeof safeParseGeneratedSpec>`, or spelling zod's generic out by
-  hand. The emitted declaration shortens with it — at 0.5.0
-  `safeParseGeneratedSpec` unfolded the whole spec across 49 lines, every block
-  kind and every nullable field inline, and it is one line now. Nothing new is
-  asked of zod: `ZodSafeParseResult` is zod's own name for what `safeParse`
-  returns, it is there at the peer floor, and the range is unchanged at
+  the type the function already returned at 0.5.0. Only the signature changed,
+  to state this type instead of leaving that to inference. You can now write the
+  type down. To annotate a variable, a helper's parameter or a wrapper's return,
+  you used to need `ReturnType<typeof safeParseGeneratedSpec>` or had to spell
+  out zod's generic by hand. This also shortens the emitted declaration. At
+  0.5.0 `safeParseGeneratedSpec` unfolded the whole spec across 49 lines, with
+  all block kinds and nullable fields inline. It is one line now. There is
+  nothing more asked of zod: `ZodSafeParseResult` is the name zod gives to the
+  result of `safeParse`. It is there at the peer floor and the range stays at
   `^4.5.0`.
-- The react README states what a custom renderer is never called for. A grid,
-  carousel or bundle block with nothing left in the catalog is dropped before
-  any renderer runs — a host's own, registered through `extendRegistry`, as
-  much as the package's. Hero, banner and copy always reach their renderer,
-  because none of them reads the catalog. The behaviour is the one 0.5.0
-  shipped; what was missing was saying so, and an empty-state branch inside a
-  custom grid or carousel renderer is dead code. A test pins it now.
-- `SECURITY.md` and the core README say what the currently-viewed rule costs. A
-  set is refused when it holds the product whose page it is on, which they both
-  stated — what neither said is that this rules out the common "frequently
-  bought together, including this item" set on exactly the page it was written
-  for, and that a bundle block with no other block beside it hands the whole
-  component to the deterministic fallback when the set is refused. Sell the
-  companions without the item and the set places if it passes the rest. The behaviour is
-  the one the last release shipped; the consequence is new in writing only.
+- Now the react README states what a custom renderer is never called for. Any
+  grid, carousel or bundle block with nothing left in the catalog will be
+  dropped before any renderer runs. This is true of a host's renderer
+  (registered via `extendRegistry`) as much as the package's. But hero, banner
+  and copy always reach their renderer because none of those reads the catalog.
+  This is the behaviour 0.5.0 shipped but it wasn't written down. Also an
+  empty-state branch inside a custom grid or carousel renderer is dead code.
+  That behaviour is pinned by a test now.
+- `SECURITY.md` and the core README say what the currently-viewed rule costs.
+  Both of those already said a set will be refused if it holds the product whose
+  page it is on. Neither said this rules out the common "frequently bought
+  together, including this item" set on exactly the page it was written for.
+  Neither said that a bundle block with no other block beside it hands the whole
+  component to the deterministic fallback when the set is refused. If you sell
+  the companions without the item, the set will be placed if it passes the rest.
+  This is the behaviour the last release shipped and the consequence is new in
+  writing only.
 
 ### Changed
 
-- The example shop stops drawing two of its three call-to-action labels as
-  buttons. `.rudra-bundle__cta` and `.rudra-banner__cta` came out of the rule
-  they shared with `.rudra-hero__cta` in
-  `examples/shop/public/demo-styles.css`, and render as bold accent text rather
-  than a bordered inline-block box. Neither has anywhere to send anyone:
-  `BundleRenderer` and `BannerRenderer` each draw their label as a bare
-  `<span>` with no href, so the stylesheet had them looking like controls that
-  did nothing. The hero's label keeps the button rule, because it became a real
-  link in the same release. The react README says to copy this stylesheet as a
-  starting point, so a copy taken since 0.5.0 differs here.
+- Two of the three call-to-action labels in the example shop are not drawn as
+  buttons any more. `.rudra-bundle__cta` and `.rudra-banner__cta` came out of
+  the rule they shared with `.rudra-hero__cta` in
+  `examples/shop/public/demo-styles.css`. These two will now be rendered as bold
+  accent text rather than a bordered inline-block box. Neither of those has
+  anywhere to send anyone: `BundleRenderer` and `BannerRenderer` draw their
+  labels as a bare `<span>` without an href. That left the stylesheet making
+  those look like controls that did nothing. But the hero's label keeps the
+  button rule because it became a real link in the same release. In the react
+  README you are told to copy this stylesheet as a starting point. This means a
+  copy taken since 0.5.0 will differ here.
 
 ### Fixed
 
-- `@rudra-js/react` drew the hero's call to action as a label no one could
-  click. It was a bare `<span class="rudra-hero__cta">` next to
+- `@rudra-js/react` drew the hero's call to action as a label that could not be
+  clicked. It was a bare `<span class="rudra-hero__cta">` next to
   `<a class="rudra-hero__link">` inside `<section class="rudra-hero">`, while
-  the demo stylesheet drew it as a button, so a pointer landing on it hit
-  nothing. The span is now the last child of that anchor, after
-  `<span class="rudra-hero__price">`: a click or a tap on the label follows the
-  link, and the link's accessible name runs through the label rather than
-  stopping at the price. Keyboard access is where it was — the anchor has
-  always been focusable and the label still is not. Nothing else about the
-  markup moved, and the condition for drawing the label is the one it was: a
-  hero whose `sku` is `null`, or whose SKU has left the catalog, still renders
-  no anchor and no label. What this does break is hero CSS that reaches the
-  class from above it. `.rudra-hero > .rudra-hero__cta`,
-  `.rudra-hero__link + .rudra-hero__cta` and
-  `.rudra-hero__link ~ .rudra-hero__cta` each matched at 0.5.0 and none matches
-  now, so a label that took its border and padding from one of those renders as
-  bare text. `.rudra-hero .rudra-hero__cta` and a plain `.rudra-hero__cta` both
-  still match, and `examples/shop/public/demo-styles.css` uses the plain form.
-  Two things follow from the new parent: the label inherits the anchor's
-  `color` unless it sets its own, and `.rudra-hero__link:hover` covers it now.
+  the demo stylesheet drew this as a button. This meant there was nothing for a
+  pointer to hit. Now the span is the last child of that anchor, after
+  `<span class="rudra-hero__price">`. You can now click or tap the label to
+  follow the link. Also the accessible name of the link will include the label
+  rather than stop at the price. For keyboards, access is where it was: the
+  anchor has always been focusable and the label still is not. There are no
+  other changes to the markup and the condition for drawing the label has not
+  changed: a hero whose `sku` is `null`, or whose SKU has left the catalog,
+  still renders neither an anchor nor a label. This does break some hero CSS:
+  any that reaches the class from above it. At 0.5.0
+  `.rudra-hero > .rudra-hero__cta`, `.rudra-hero__link + .rudra-hero__cta` and
+  `.rudra-hero__link ~ .rudra-hero__cta` each matched but none matches now. Any
+  label that took its border and padding from any of those will render as bare
+  text. But `.rudra-hero .rudra-hero__cta` and just `.rudra-hero__cta` still
+  match (`examples/shop/public/demo-styles.css` uses the plain form). Two things
+  follow from the new parent: the label inherits the anchor's `color` unless it
+  sets its own. And `.rudra-hero__link:hover` covers the label now.
 
 ### Security
 
 - Three of the checks that stand between model output and a shopper were
-  narrower than they read, and all three are widened.
+  narrower than they read. All three are wider now.
 
-  The set of products that must never be recommended is now read from the
-  payload instead of from the digest. The digest keeps the eight most recent
-  purchases and eight most recent basket entries because that is what a prompt
-  can afford; the blocklist was reading the same shortened lists, so a shopper
-  with a longer order book could be recommended something they already own, or
-  have in the basket, with nothing recorded in `violations`. A bundle keeps its
-  exception and still allows a set holding a bought or in-basket product, which
-  `SECURITY.md` now says out loud.
+  Now the set of products that must never be recommended is read from the
+  payload instead of from the digest. Only the eight most recent purchases and
+  eight most recent basket entries are kept in the digest, because that is what
+  a prompt can afford. But the blocklist was reading those shortened lists too.
+  This meant a shopper with more orders could be recommended something they
+  already own or have in the basket. Also nothing was recorded in `violations`.
+  As `SECURITY.md` now says out loud, a bundle keeps its exception and can still
+  hold a bought or in-basket product.
 
-  A product's badge is now dropped along with its reason when the stated basis
-  does not hold. The reason was already dropped, the basis already downgraded
-  to `popular` and the downgrade already recorded — and then a badge saying the
-  same thing in three words rendered underneath. Twenty-four characters is
-  enough for "You viewed this".
+  If the stated basis does not hold, a product's badge will now be dropped along
+  with its reason. By that point the reason was already dropped, the basis
+  already downgraded to `popular` and the downgrade already recorded. But a
+  badge repeating that reason in three words would then be rendered underneath.
+  There is room in twenty-four characters to say "You viewed this".
 
-  `liked_category` no longer accepts the category a shopper is merely standing
-  in. Category affinity scores the current page on purpose, because it is good
-  evidence for ranking, but it is not evidence that anyone likes anything: a
-  first-time visitor on a tent page had a tent affinity and a clean bill for
-  "because you keep coming back to tents". It is now checked against the
-  categories the shopper bought, liked, carted or viewed in. `similar_to_current`
-  is the basis for standing on a page, and it says so honestly.
+  Now `liked_category` needs more than the category a shopper is merely standing
+  in. For category affinity the current page is scored on purpose, because this
+  is good evidence for ranking. But it's not evidence that anyone likes
+  anything: a first-time visitor on a tent page had a tent affinity and passed
+  the check for "because you keep coming back to tents". Now it will be checked
+  against the categories the shopper bought, liked, carted or viewed in.
+  `similar_to_current` is the basis for standing on a page. It is honest about
+  that.
 
-- A bundle now refuses a member the shopper thumbed down or is looking at. The
-  bundle path skips the never-recommend set on purpose, because a set is placed
-  whole and may hold something already bought or in the basket — but it was
-  reading dislikes from the digest, which keeps only the twelve most recent, and
-  it never looked at `context.currentSku` at all. So a thirteenth thumbs-down
-  could come back inside a set, and so could the product on the page the shopper
-  was standing on. Both are read from the payload now, the same source every
-  other block reads. The purchase-and-basket exception is untouched, and
-  `SECURITY.md` claimed both of these already.
+- Any member the shopper thumbed down or is looking at will now be refused by a
+  bundle. It skips the never-recommend set on purpose, because a set is placed
+  whole and may hold something already bought or in the basket. But it was
+  reading dislikes from the digest (this keeps only the twelve most recent) and
+  it never looked at `context.currentSku` at all. This let a thirteenth
+  thumbs-down come back inside a set. It also let the product on the page the
+  shopper was standing on come back. Both will be read from the payload now, the
+  source all of the other blocks read. There is no change to the
+  purchase-and-basket exception. `SECURITY.md` had already claimed both of
+  these.
 
-- A claim the length cap cut in half is now caught. Every piece of model copy is
-  truncated to what its field can show and then read for price, discount, stock,
-  rating and delivery claims — but the read ran after the cut, so a badge
-  reading "Ridge picks, only 2 left!" lost the word "left" at twenty-four
+- Now a claim that was cut in half by the length cap will be caught. All model
+  copy is truncated to fit its field and then read for price, discount, stock,
+  rating and delivery claims. But that read ran after the cut. For example a
+  badge reading "Ridge picks, only 2 left!" lost the word "left" at twenty-four
   characters, rendered as "Ridge picks, only 2…" and matched no stock pattern.
-  The same sentence two characters shorter was dropped. It leaked on every capped
-  field, it needed no adversary — ordinary copy running a couple
-  of characters long is enough — and it recorded no violation, so an evaluation
-  counted it as clean. The patterns now read what the model wrote as well as
-  what will render, and the field goes if either flags. The numeral and wording
-  passes still read only what renders: a number the cap threw away cannot
-  mislead anybody.
+  That sentence would be dropped if it was two characters shorter. This leaked
+  on all capped fields and needed no adversary: ordinary copy running a couple
+  of characters long is enough. It also recorded no violation, so an evaluation
+  counted it as clean. Now the patterns will read the text the model wrote as
+  well as the text that will render. If either flags, the field goes. But the
+  numeral and wording passes will still read only the rendered text: a number
+  the cap threw away cannot mislead anybody.
 
-- The prompt escapes invisible characters the general Unicode categories miss.
-  `Default_Ignorable_Code_Point` is in the class now, which covers the ones that
-  are marks or letters rather than format characters — the Hangul fillers, the
-  Mongolian selectors and the thirteen variation selectors at U+FE00 that spell
-  no emoji. Twenty-eight such code points used to reach the model as themselves,
-  which is an alphabet: enough to carry a sentence inside a search term that
-  reads as ordinary text in a shop's own logs. Three are still let through, the
-  zero-width joiner and U+FE0E and U+FE0F, because emoji are spelled with them.
-  Ordinary text, accented text, non-Latin text and emoji are untouched.
+- In the prompt, invisible characters the general Unicode categories miss will
+  now be escaped. `Default_Ignorable_Code_Point` is in the class now, to cover
+  the ones that are marks or letters rather than format characters: the Hangul
+  fillers, the Mongolian selectors and the thirteen variation selectors at
+  U+FE00 that spell no emoji. There were twenty-eight such code points that used
+  to reach the model as themselves. That's an alphabet and it is enough to carry
+  a sentence inside a search term that will read as ordinary text in the logs of
+  a shop. Three will still be let through (the zero-width joiner, U+FE0E and
+  U+FE0F) because emoji are spelled with those. This leaves ordinary text,
+  accented text, non-Latin text and emoji untouched.
 
-- What a host value turns into is capped, not just the value itself. An escape
-  writes up to eight characters for one, applied after the contract's length
-  caps, so a field sitting on its cap could buy eight times the prompt — and the
-  bill — that the cap implies. A quoted value is now cut at twice
-  `FIELD_LIMITS.shortText`, on a character boundary. Real text escapes nothing
-  and never reaches it.
+- Now the escaped form of a host value is capped too, and not just the value
+  itself. An escape can write up to eight characters for one and is applied
+  after the length caps of the contract. This means a field sitting on its cap
+  could buy eight times the prompt (and the bill) that the cap implies. Now a
+  quoted value will be cut at twice `FIELD_LIMITS.shortText`, on a character
+  boundary. But real text escapes nothing and will never reach this cut.
 
-- `productSchema` reads an `imageUrl` path the way a browser does. A browser
-  drops tab, carriage return and newline from a URL before parsing it and reads
-  a backslash as a slash, so a handful of root-relative-looking paths actually
-  named another host — and both this package's own comment and the react README
-  said those were what `productSchema` rejected. It does now. Ordinary paths,
-  including one with a stray tab in the middle, are accepted as before.
+- `productSchema` reads an `imageUrl` path the way a browser does. Before
+  parsing a URL a browser will drop tab, carriage return and newline from it. It
+  will also read a backslash as a slash. This means a handful of
+  root-relative-looking paths actually named another host. And this package's
+  own comment and the react README said those were the ones `productSchema`
+  rejected. It does now. As before, ordinary paths will continue to be accepted.
+  This includes a path with a stray tab in the middle.
 
 - `@rudra-js/react` treats a catalog row flagged `isInStock: false` as a row
-  that is not there. Cards for it are dropped, a hero loses its link, and a
-  bundle with a sold-out member disappears — the same as a row you leave out,
-  which was already the documented behaviour. Core only ever names a product
-  that was in stock in the payload, but the `products` prop is read later and
-  can be the fresher of the two. A catalog that omits the field renders as it
-  did.
+  that is not there. This means cards for it will be dropped, a hero will lose
+  its link and a bundle with a sold-out member will disappear. It is just like a
+  row you leave out (that was already the documented behaviour). Core will only
+  ever name a product that was in stock in the payload, but the `products` prop
+  is read later and can be the fresher of the two. Any catalog that omits the
+  field will render as it did.
 
-- The cache key holds the provider name and the model id as two fields rather
-  than as one joined string. Joined with a colon they were ambiguous, and hosted
-  model ids carry colons, so two different provider configurations sharing one
-  store could read each other's entries. **Every cache key changes with this**,
-  so a shared persistent store misses once per key after the upgrade and then
-  settles. An in-process cache notices nothing.
+- There are now two fields in the cache key for the provider name and the model
+  id, instead of just one joined string. With a colon to join those they were
+  ambiguous because hosted model ids carry colons. This means two different
+  provider configurations sharing a store could read each other's entries.
+  **Every cache key changes with this**. After the upgrade a shared persistent
+  store will miss once per key and then settle. An in-process cache will not
+  notice anything.
 
 - `SECURITY.md` and the package READMEs now state four limits that were true
-  before and unwritten: block prose carries no basis and so nothing checks it
-  against a shopper's history; `complements_cart` and `complements_purchase`
-  check only that a basket or an order history exists; a bundle's copy is
-  written before the shop picks which set fills the block; and a cohort key made
-  from anything a visitor can choose — a `locale` taken from `Accept-Language`,
-  a category read off a URL slug — lets one visitor mint cohorts, pay for a
-  model call each and evict the entries real shoppers were being served from.
+  before but not written down: there is no basis in block prose and so nothing
+  will check it against the history of a shopper; `complements_cart` and
+  `complements_purchase` check only that a basket or an order history exists;
+  the copy of a bundle is written before the shop picks which set fills the
+  block; and a cohort key made from anything a visitor can choose (a `locale`
+  taken from `Accept-Language`, a category read off a URL slug) can be used by a
+  single visitor to make new cohorts, pay for a model call each and evict the
+  entries real shoppers were being served from.
 
 ## [0.5.0] - 2026-09-14
 
 ### Changed
 
-- `@rudra-js/core` now screens every model-written string with
-  `@rudra-js/attested` as well as with its own `CLAIM_PATTERNS`, which is a new
-  required peer dependency. Three passes, in this order: core's patterns, which
-  still name one of `rating`, `price`, `discount`, `delivery` and `stock`;
-  attested's quantity layer, recorded as `unverifiable-claim:quantity:<field>`;
-  attested's wording layer, recorded as `unverifiable-claim:wording:<field>`.
-  Core's patterns answer first so every violation string an evaluation already
-  counts reads the same as before. All 41 patterns stay — measured over the 55
-  distinct strings the tests require to drop by kind, they catch all 55, where
-  attested's two layers together reach 38, so replacing them would have been a
-  downgrade. The extra pass costs what an extra pass costs: one `reconcileSpec`
-  against 0.4.0, median of nine batches of twenty, runs 0.021 ms to 0.215 ms on
-  digit-free copy over seven candidates, 0.032 ms to 0.244 ms digit-free at the
-  payload ceiling, and 0.022 ms to 0.967 ms with a digit in every field against
-  a 60-candidate spec sheet. That is 7.6x to 44x on a pass that was cheap to
-  begin with, and it runs next to a model call, not instead of one.
-- A specification with a number in it is no longer kept on the strength of the
+- `@rudra-js/core` now screens all model-written strings with
+  `@rudra-js/attested` as well as with its own `CLAIM_PATTERNS`. This means
+  attested will be a new required peer dependency. There are three passes, in
+  this order: core's patterns (these still name one of `rating`, `price`,
+  `discount`, `delivery` and `stock`); attested's quantity layer (recorded as
+  `unverifiable-claim:quantity:<field>`); attested's wording layer (recorded as
+  `unverifiable-claim:wording:<field>`). To keep all violation strings an
+  evaluation already counts reading as they did before, core's patterns answer
+  first. All 41 patterns stay. Over the 55 distinct strings the tests require to
+  drop by kind, they catch all 55 where attested's two layers together reach 38.
+  That means replacing those would have been a downgrade. There is a cost to the
+  extra pass. Against 0.4.0 (median of nine batches of twenty) a single
+  `reconcileSpec` runs 0.021 ms to 0.215 ms on digit-free copy over seven
+  candidates, 0.032 ms to 0.244 ms digit-free at the payload ceiling and 0.022
+  ms to 0.967 ms with a digit in all fields against a 60-candidate spec sheet.
+  That is 7.6x to 44x on a pass that was cheap to begin with. It also runs next
+  to a model call rather than instead of one.
+- Now a specification with a number in it will not be kept just because of the
   words around the number. `"a comfort rating of -5C"` and
-  `"a waterproof rating of 20,000mm"` are kept when a `5` or a `20000` turns up
-  in a `tag` or a `category` on the candidates the prompt showed the model, and
-  dropped as `quantity` when it does not. The number, not the string: a tag
-  reading `5-pocket` keeps the first of those as surely as `-5C comfort` does.
-  Those are the strings the prompt hands the model and lets it repeat; a `title`
-  and a `rating` it is shown but told never to restate, so neither stands behind
-  a number. This reverses a documented judgement in `reconciliation.ts` (since
-  moved to `claim-screening.ts`) and it reclassifies 15 strings the test suite
-  used to assert were kept. Put your spec sheet in `tags` and the model can
-  quote it. On a catalogue with no digit in any tag or category — the example
-  shop is one — the rule becomes "no digit may appear", and an emptied headline
-  makes the whole generation unusable, so one digit there costs the model call.
-- The numbers that stand behind a sentence are narrower than the request. Only
-  candidates the prompt actually showed the model count: a product that is out
-  of stock or past the 60-candidate cap stands behind nothing. `currentCategory`
-  does not count at all — it is a string from the request rather than a row of
-  the catalogue, and a host that passes a URL segment into it would be handing
-  the fact list to whoever types the URL. A `reason` and a `badge` are read
-  against their own product's tags and category; every other field reads all the
-  candidates' pooled.
-- A `reason` this library wrote is exempt from the screen, not just one the host
-  supplied. In `cohort` mode `fitToShopper` replaces every item reason with the
-  host's own sentence or the selector's, so screening it was core reading back
-  its own copy — and losing, for any shop with a category called Clearance or
-  Last Chance, while the deterministic component printed the same sentence
-  unscreened. The fourth argument to `reconcileSpec` is now a
-  `ReadonlyMap<string, string>` of SKU to that sentence rather than a
-  `ReadonlySet<string>` of SKUs, and `ProductPick.reasonFromHost` is gone with
-  it.
+  `"a waterproof rating of 20,000mm"` will be kept if a `5` or a `20000` turns
+  up in a `tag` or a `category` on the candidates the prompt showed the model.
+  If it doesn't, they are dropped as `quantity`. It is the number that counts
+  and not the string: a tag reading `5-pocket` will keep the first of those as
+  surely as `-5C comfort` does. Those are the strings the prompt hands the model
+  and lets it repeat. It is shown a `title` and a `rating` but told never to
+  restate those. This means neither of those can support a number. This reverses
+  a documented judgement in `reconciliation.ts` (since moved to
+  `claim-screening.ts`) and reclassifies 15 strings the test suite used to
+  assert were kept. If you put your spec sheet in `tags` the model can quote it.
+  On a catalogue with no digit in any tag or category (the example shop is one)
+  the rule becomes "no digit may appear". An emptied headline makes the whole
+  generation unusable. This means one digit there costs the model call.
+- For a sentence, the numbers that can support it are narrower than the request.
+  Only the candidates the prompt actually showed the model will count. Any
+  product that is out of stock or past the 60-candidate cap supports nothing.
+  `currentCategory` does not count at all because it is a string from the
+  request rather than a row of the catalogue. Any host that passes a URL segment
+  into it would be handing the fact list to whoever types the URL. For a
+  `reason` and a `badge` the tags and category of their own product are read;
+  all of the other fields read those of all the candidates pooled.
+- Now a `reason` this library wrote is also exempt from the screen, just like a
+  reason the host supplied. In `cohort` mode `fitToShopper` replaces all item
+  reasons with the sentence of the host or of the selector. By screening that,
+  core was reading back its own copy only to fail it for any shop with a
+  category called Clearance or Last Chance, while the deterministic component
+  printed the same sentence unscreened. Now the fourth argument to
+  `reconcileSpec` is a `ReadonlyMap<string, string>` of SKU to that sentence
+  rather than a `ReadonlySet<string>` of SKUs. `ProductPick.reasonFromHost` is
+  gone with it.
 - Three more patterns, all closing a gap in a rule that was already there rather
-  than opening a new one. `rating` catches "number one seller", the words a model
-  reaches for when "best seller" is banned. `price` catches a currency sign with
-  no digit after it, because "$thirty-nine and it is yours" was walking past a
-  rule that asked for one, and catches "dollars" and "euros" spelled out —
-  "pounds" stays out of that one, since a pack weighs two of those.
+  than opening a new one. For `rating` this catches "number one seller", the
+  words a model reaches for when "best seller" is banned. For `price` this
+  catches a currency sign with no digit after it, because "$thirty-nine and it
+  is yours" got past a rule that asked for one. It will also catch "dollars" and
+  "euros" spelled out, but "pounds" stays out of that rule since a pack weighs
+  two of those.
 
 ### Fixed
 
-- `@rudra-js/attested` laid a string fact out from its exponent without weighing
-  the run first, so a twelve-character catalogue tag took the process down.
-  `'1e2000000000'` threw a `RangeError`, and `'-2.5e400000000'` reached a heap
-  abort no caller can catch. An exponent that would run past a thousand digits
-  now stands behind no numeral at all — nothing a shop sells is that wide, and
-  every finite JavaScript number lays out inside it, the longest being `5e-324`
-  at 326 characters. Core screens every model-written string now, so a tag like
-  that reaches this code on any render. `@rudra-js/core` keeps such a tag off
-  the fact list as well, rather than relying on the fix: attested is a peer
-  dependency, so the copy a host has installed may still be one that tries.
-  Core draws its line on the exponent and attested on the laid-out run, so a
-  few tags at the margin — `1e1000`, `9999e998` — pass core's rule and then
-  stand behind nothing here. Nothing that wide is a product fact either way.
-- `@rudra-js/attested` did two things again on every `verify` call that it only
-  needed to do once: it re-read the whole fact list, and it rebuilt its index
-  over the text for each of the eighty-odd phrases it screens against. A fact
-  list is now read once per list rather than once per call, held against a copy
-  of what the list carried so a host that writes to its own array still gets a
-  fresh reading. Measured on one call, median of nine batches of twenty: handed
-  the same array again, as core does for the fields of one pass, 0.052 ms to
-  0.025 ms on a digit-free field, 0.251 ms to 0.016 ms against 420 facts and
-  2.245 ms to 0.022 ms against 4200; handed a new array every call, as core's
-  per-product `reason` and `badge` are, 0.045 ms to 0.018 ms, 0.251 ms to
-  0.231 ms and 2.224 ms to 2.300 ms. The second set is the index saving on its
-  own, and at 4200 facts the copy costs a shade more than it saves.
+- `@rudra-js/attested` laid a string fact out from its exponent without checking
+  the length of the run first. This let a twelve-character catalogue tag take
+  the process down. `'1e2000000000'` threw a `RangeError` and `'-2.5e400000000'`
+  reached a heap abort no caller can catch. An exponent that would run past a
+  thousand digits now supports no numeral at all. There is nothing a shop sells
+  that is that wide. All finite JavaScript numbers lay out inside that limit,
+  the longest being `5e-324` at 326 characters. Since core screens all
+  model-written strings now, a tag like that will reach this code on any render.
+  `@rudra-js/core` also keeps such a tag off the fact list to avoid relying on
+  the fix: attested is a peer dependency and the copy a host has installed may
+  still be a version that tries. In core the line is drawn on the exponent and
+  in attested on the laid-out run. This means a few tags at the margin
+  (`1e1000`, `9999e998`) will pass core's rule and then support nothing here.
+  Either way nothing that wide is a product fact.
+- `@rudra-js/attested` did two things again on all `verify` calls that it only
+  needed to do once: it re-read the whole fact list and it rebuilt its index
+  over the text for each of the eighty-odd phrases it screens against. Now a
+  fact list will be read once per list rather than once per call. It will also
+  be held against a copy of the list, to let a host that writes to its own array
+  still get a fresh reading. These times are for a single call (median of nine
+  batches of twenty). If you pass the same array again, as core does for the
+  fields of a single pass, it goes 0.052 ms to 0.025 ms on a digit-free field,
+  0.251 ms to 0.016 ms against 420 facts and 2.245 ms to 0.022 ms against 4200.
+  If you pass a new array on each call, as core does for its per-product
+  `reason` and `badge`, it goes 0.045 ms to 0.018 ms, 0.251 ms to 0.231 ms and
+  2.224 ms to 2.300 ms. This second set is just the index saving. But at 4200
+  facts the copy costs a bit more than it saves.
 
 ## [0.4.0] - 2026-09-13
 
 ### Added
 
-- `@rudra-js/attested`, a new package with no dependencies and no node builtins.
-  It checks model-written copy against the facts a shop stands behind, in two
-  layers reported apart. The quantity layer inverts the check core's
-  `CLAIM_PATTERNS` cannot: every run of digits in the text has to be a value the
-  host supplied, whatever language the sentence is in, so "Nur noch 2 übrig" and
-  "4,8 von 5" no longer sail through. The wording layer, for claims with no
-  number in them, stays a denylist, says so in `strength: 'best-effort'` on
-  every result, and takes phrases the host adds for their own language — or,
-  through `allowedPhrases`, wording the shop stands behind, so a shop that
-  genuinely offers free shipping is not barred from saying so. `verifyFields` also
-  reads the fields joined, because a card renders them next to each other and
-  the model picks where one field ends. The README states the guarantee in one
-  sentence and lists every bypass left open under its own heading. Nothing in
-  `@rudra-js/core` is wired to it yet.
+- `@rudra-js/attested` is a new package without any dependencies or node
+  builtins. It checks model-written copy against the facts a shop stands behind,
+  in two layers reported apart. Its quantity layer inverts the check core's
+  `CLAIM_PATTERNS` cannot do: all runs of digits in the text have to be values
+  the host supplied, whatever language the sentence is in. This stops "Nur noch
+  2 übrig" and "4,8 von 5" from being accepted. For claims without a number in
+  them the wording layer stays a denylist and this is stated in
+  `strength: 'best-effort'` on all results. It can take phrases the host adds
+  for their own language. Via `allowedPhrases` it can also take wording the shop
+  stands behind. This way a shop that really offers free shipping is not barred
+  from saying that. `verifyFields` also reads the fields joined, because a card
+  renders those next to each other and the model picks where a field ends. In
+  the README the guarantee is stated in a single sentence and all bypasses left
+  open are listed under their own heading. There is nothing in `@rudra-js/core`
+  wired to this yet.
 
 ### Fixed
 
-- `@rudra-js/attested` dropped only format characters as invisible, so a
-  variation selector survived both layers. `"$1<U+FE0F>3"` renders as `$13` and
-  passed against facts of 1 and 3 — a false acceptance in the layer the package
-  calls a proof — and `"fr<U+FE0F>ee shipping"` walked past the built-in entry.
-  The class is now every format character and every default-ignorable code
-  point, which covers the variation selectors, the combining grapheme joiner and
-  the zero-width set, and a sweep over the whole of Unicode holds it there.
-- `@rudra-js/attested` read a number fact through `String()`, so `1e21` arrived
-  as `1e+21` and minted 1 and 21 as supported values. Both `"1 left"` and
-  `"Only 21 sold"` then passed. A number is now laid out in positional notation
-  first, keeping exactly the digits `String()` chose and adding only the zeros
-  the exponent implies. String facts are untouched, because there the host typed
-  the digits.
-- `@rudra-js/attested` could not actually allow 7 of its 81 built-in phrases.
-  `allowedPhrases` deleted the exact string while matching ignored spaces and
-  phrases nest, so allowing `best seller` left `bestseller` firing and allowing
-  `back in stock` left `in stock` firing. An allowance now works on the text
-  rather than on the list: where one of the host's phrases appears, a banned
-  claim sitting wholly inside it is not reported, and the same words elsewhere
-  still are. `checked` stays at the full list. This also closes the negation
-  hole the README names — allowing `no sale` clears
-  `"there is no sale on this product"` while a `sale` later in the same text
-  still fails.
+- `@rudra-js/attested` dropped only format characters as invisible. This let a
+  variation selector survive both layers. `"$1<U+FE0F>3"` renders as `$13` and
+  passed against facts of 1 and 3, a false acceptance in the layer the package
+  calls a proof. `"fr<U+FE0F>ee shipping"` also got past the built-in entry. Now
+  the class will be all format characters and all default-ignorable code points.
+  This covers the variation selectors, the combining grapheme joiner and the
+  zero-width set. It is held there by a sweep over the whole of Unicode.
+- `@rudra-js/attested` read a number fact via `String()`. That turned `1e21`
+  into `1e+21` and made 1 and 21 supported values. Both `"1 left"` and
+  `"Only 21 sold"` then passed. Now a number will be laid out in positional
+  notation first, to keep exactly the digits `String()` chose and add only the
+  zeros the exponent implies. But this doesn't touch string facts because there
+  the host typed the digits.
+- `@rudra-js/attested` was not actually able to allow 7 of its 81 built-in
+  phrases. `allowedPhrases` deleted the exact string but matching ignored spaces
+  and phrases nest. This means allowing `best seller` left `bestseller` firing
+  and allowing `back in stock` left `in stock` firing. An allowance now works on
+  the text rather than on the list: where any of the host's phrases appears, a
+  banned claim sitting wholly inside that phrase will not be reported but those
+  words elsewhere still are. But `checked` stays at the full list. This also
+  closes the negation hole the README names: allowing `no sale` clears
+  `"there is no sale on this product"` but a `sale` later in that text will
+  still fail.
 - `@rudra-js/attested` still let a control character or a combining mark split a
-  number, because neither is a format character or default-ignorable.
+  number (neither of those is a format character or default-ignorable).
   `"$1<U+0008>3"` and `"$4<U+0305>9"` both render as the joined number and both
-  passed against the two digits apart. The class is now every character that
-  takes no room on the page: format characters, default-ignorable code points,
-  the controls that are not whitespace, and the marks that hang on the character
-  before them. Whitespace controls and spacing marks stay, because a tab, a line
-  break and a Devanagari matra are gaps the shopper can see, so two numbers on
-  two lines are still two numbers. The wording layer takes the same class, and it
-  composes accents before dropping anything, so `café` keeps its `é` while
-  `"fr<U+0305>ee shipping"` no longer hides from its own entry.
-- `@rudra-js/attested` minted garbage from a string fact in exponent notation.
-  The number arm was laid out positionally, but the string arm was not, so
-  `'1e21'` still stood behind `"Only 21 sold"`. A string whose whole content is
-  a number in exponent notation is now laid out the same way; any other string
-  is still read exactly as typed, so `'SKU AX-220e5'` keeps minting 220 and 5.
+  passed against the two digits apart. Now the class will be all of the
+  characters that take no room on the page: format characters, default-ignorable
+  code points, the controls that are not whitespace and the marks that hang on
+  the previous character. But whitespace controls and spacing marks will stay,
+  because a tab, a line break and a Devanagari matra are kinds of gap the
+  shopper can see. Two numbers on two lines are still two numbers. Also the
+  wording layer takes this class. To do that it composes accents before dropping
+  anything, to let `café` keep its `é` while `"fr<U+0305>ee shipping"` won't
+  hide from its own entry any more.
+- `@rudra-js/attested` got garbage from a string fact in exponent notation. For
+  the number arm the layout was positional but not for the string arm. This
+  meant `'1e21'` could still support `"Only 21 sold"`. Now if the whole content
+  of a string is a number in exponent notation it will be laid out that way too;
+  any other string will still be read exactly as typed: `'SKU AX-220e5'` keeps
+  giving 220 and 5.
 - `@rudra-js/attested` threw a `TypeError` on any fact that was not a number or
-  a string. `values: [product.price]` with a null price took the whole call
-  down, and a bigint — the only way to hand over an id past 2^53 without
-  `JSON.parse` rounding it — threw as well. `values` now takes bigints, and
-  anything else stands behind no numeral instead of throwing.
-- `@rudra-js/attested` let an allowance reach across a paragraph break. The
+  a string. With `values: [product.price]` a null price took the whole call
+  down. And a bigint (the only way to hand over an id past 2^53 without
+  `JSON.parse` rounding that id) threw as well. Now `values` can also take
+  bigints and anything else will support no numeral instead of throwing.
+- `@rudra-js/attested` let an allowance reach across a paragraph break. An
   allowance works on normalised copy, where a blank line and a `---` rule both
-  collapsed to a space, so `['we do not offer free shipping']` forgave
-  `"We do not offer"` above a rule with `"Free shipping on every order"` below
-  it. A line break now survives normalisation: matching still reads straight
-  through it, so the denylist catches `"Free\n\nshipping"`, but an allowance
-  will not bridge one. The two rules pull opposite ways on purpose.
+  collapsed to a space. This let `['we do not offer free shipping']` forgive
+  `"We do not offer"` above a rule with `"Free shipping on every order"` below.
+  Now a line break will survive normalisation. For matching it is still read
+  straight past, to let the denylist catch `"Free\n\nshipping"`, but an
+  allowance will not bridge one. These two rules pull opposite ways on purpose.
 
-- `@rudra-js/core`'s claim screen read the model's text with nothing but
-  `toLowerCase()` in front of it, so a banned claim only had to be spelled with
-  characters the pattern did not expect. A zero-width space, a soft hyphen or a
-  control character dropped inside a word, an overline hung on a letter, a
-  Cyrillic o standing in for a Latin one, a blank-rendering Hangul filler, or the
-  whole phrase typed fullwidth — every one of those renders to the shopper as the
-  claim it is, and every one walked straight past the rule written for it. The
-  text is now read through the same normalising pass `@rudra-js/attested` uses:
-  the characters that take no room come off, compatibility spellings fold to
-  plain ASCII, and a short table of Cyrillic and Greek look-alikes maps back to
-  Latin. Only the reading changes — what renders is still exactly what the model
-  wrote, character for character. The screen is the same best-effort backstop it
-  always was: a reworded claim still gets through, and the structural boundaries
-  are still the real defence.
+- `@rudra-js/core`'s claim screen read the model's text with nothing more than
+  `toLowerCase()` in front of it. This meant a banned claim only had to be
+  spelled with characters the pattern did not expect. You could drop a
+  zero-width space, a soft hyphen or a control character inside a word. You
+  could hang an overline on a letter, use a Cyrillic o in place of a Latin one,
+  use a blank-rendering Hangul filler or type the whole phrase fullwidth. All of
+  those will render to the shopper as the real claim, but all of those got past
+  the rule written for that claim. Now the text is read via the normalising pass
+  `@rudra-js/attested` uses. This means characters that take no room will come
+  off, compatibility spellings will fold to plain ASCII and a short table of
+  Cyrillic and Greek look-alikes will map back to Latin. Only the reading
+  changes: the rendered text is still exactly the text the model wrote,
+  character for character. This screen is the best-effort backstop it always
+  was: a reworded claim will still get past the screen and the structural
+  boundaries are still the real defence.
 
 ### Changed
 
 - `@rudra-js/attested` documents three holes it does not close, all in the
-  best-effort wording layer. A character that folds into an allowance counts as
-  that allowance, so `"№ SALE"` passes under `['no sale']`. A footnote marker
-  glued to a phrase drops the finding, so `"FREE SHIPPINGᵃ"` is not reported.
-  And the quantity layer trusts Unicode about what renders as nothing, which a
-  font is free to disagree with. Laying facts out positionally also costs
-  scientific notation in the copy: `"1e-7 g"` no longer matches a fact of
-  `1e-7`, and the value has to be written out in full.
+  best-effort wording layer. Any character that folds into an allowance counts
+  as that allowance: `"№ SALE"` passes under `['no sale']`. Any footnote marker
+  glued to a phrase will drop the finding: `"FREE SHIPPINGᵃ"` is not reported.
+  And the quantity layer trusts Unicode about what renders as nothing, but a
+  font is free to disagree with that. But laying facts out positionally also
+  costs scientific notation in the copy: `"1e-7 g"` won't match a fact of `1e-7`
+  any more. You will have to write out the value in full.
 
 ## [0.3.1] - 2026-09-13
 
-Released as 0.3.1 because the `v0.3.0` tag was pushed at a commit that predated
-the version bump. The release job's own guard stopped it, nothing was published,
-and `v*` tags cannot be reused. There is no 0.3.0 on the registry, and this
-release carries everything that version was meant to.
+This was released as 0.3.1 because the `v0.3.0` tag was pushed at a commit older
+than the version bump. That tag was stopped by the guard of the release job
+itself, nothing was published and `v*` tags can't be reused. There is no 0.3.0
+on the registry. This release carries everything that version was meant to.
 
 ### Added
 
-- `rank` on `createComponentGenerator`. The default, `'signals'`, orders
-  products by the shopper's signals as before. `'given'` keeps the order you
-  sent, for a shop whose own recommender is better than four weights. Either
-  way the exclusions and the stock check still apply, every product still
-  carries a basis reconciliation verifies, and everything the model writes is
-  still screened. Until now the host's ordering never reached the page in
-  either generation mode, so adopting this meant replacing a ranker you trust.
-- A candidate can carry its own `reason`, the phrase shown under the product,
-  for when your ranking knows something the signals do not. A reason you supply
-  is your own words, like the title, so it renders as written and is not
-  screened. The same sentence from the model still is.
+- `rank` on `createComponentGenerator`. By default (`'signals'`) products are
+  ordered by the signals of the shopper as before. With `'given'` the order you
+  sent is kept, for a shop whose own recommender is better than four weights.
+  Either way the exclusions and the stock check still apply, all products still
+  carry a basis reconciliation verifies and everything the model writes is still
+  screened. Until now the host's ordering never reached the page in either
+  generation mode, which meant that to adopt this you had to replace a ranker
+  you trust.
+- Any candidate can carry its own `reason`, the phrase shown under the product,
+  for when your ranking knows something the signals do not. Any reason you
+  supply will be your own words (like the title). It will render as written and
+  will not be screened. But the same sentence from the model will still be
+  screened.
 
 ### Fixed
 
-- A product's `badge` is now read for banned claims like every other field the
-  model writes. It was clamped and escaped but never screened, so in
-  `per-shopper` mode a badge could carry "Only 2 left" or "Save 30%" straight to
-  the page. The schema's own example for the field was "Back in stock", which is
-  a stock claim, so the contract invited exactly what the screen exists to stop.
-  In `cohort` mode nothing changes, because the badge was already dropped there.
+- Now a product's `badge` will be read for banned claims like all of the other
+  fields the model writes. It was clamped and escaped but never screened. In
+  `per-shopper` mode a badge could then carry "Only 2 left" or "Save 30%"
+  straight to the page. The example for this field in the schema was "Back in
+  stock" (a stock claim). That made the contract invite exactly what the screen
+  exists to stop. In `cohort` mode nothing changes because the badge was already
+  dropped there.
 
-- The deterministic selector no longer writes `Highly rated` as a product's
-  reason. Its basis is `popular`, so the prose stated something the basis did
-  not, and the claim screen deleted it: on a well-rated catalog every card in
-  cohort mode lost its reason line, and each deletion was counted as the model
-  making an unverifiable rating claim when the model had written nothing. The
-  rating still decides the ordering, through its own weight in the score. A
-  test now drives every branch of the selector through the screen, so a reason
-  the screen would delete fails the suite.
+- As a product's reason, `Highly rated` will no longer be written by the
+  deterministic selector. Its basis is `popular`. This means the prose stated
+  something the basis did not and this was deleted by the claim screen. On a
+  well-rated catalog all cards in cohort mode lost their reason line. All of
+  those deletions were counted as the model making an unverifiable rating claim,
+  even though the model had written nothing. But the rating still decides the
+  ordering via its own weight in the score. There is now a test to drive all
+  branches of the selector through the screen: a reason the screen would delete
+  will fail the suite.
 - `@rudra-js/anthropic` sends `thinking: { type: 'disabled' }` by default and
-  defaults to `claude-sonnet-5`. Generation runs on the request path inside
-  `modelTimeoutMs`, which core defaults to 1500ms, and a model that reasons
-  before answering does not finish inside that. Following the package's own
-  quickstart therefore billed a call on every request and then timed out on
-  every request, rendering the deterministic component every time. The model
-  default alone did not fix this, because Sonnet 5 also reasons when `thinking`
-  is left out; turning it off explicitly is what makes the budget reachable.
-  Pass `thinking: null` to send no `thinking` field, which is what a model that
-  rejects an explicit `disabled` needs, and raise `modelTimeoutMs` to match.
+  defaults to `claude-sonnet-5`. Since generation runs on the request path
+  inside `modelTimeoutMs` (core defaults this to 1500ms) a model that reasons
+  before answering will not finish inside that. This means following the
+  package's own quickstart billed a call on all requests and then timed out on
+  all requests, and rendered the deterministic component each time. Just
+  changing the model default did not fix this, because Sonnet 5 also reasons
+  when `thinking` is left out. Turning it off explicitly is what makes the
+  budget reachable. Pass `thinking: null` to send no `thinking` field (this is
+  what a model that rejects an explicit `disabled` needs) and raise
+  `modelTimeoutMs` to match.
 
 ### Changed
 
-- `@rudra-js/react` takes React 18 as well as 19. The peer range said `^19.0.0`
-  while the package imports only two types from React and no runtime API, so
-  the build touches nothing but `react/jsx-runtime`, which has existed since
-  React 17. The range was refusing installs the code supports. A test now fails
-  if anything in the package imports a React value rather than a type, so the
-  range stays true.
+- `@rudra-js/react` takes React 18 as well as 19. Its peer range said `^19.0.0`
+  while the package imports only two types from React and no runtime API. This
+  means the build touches nothing but `react/jsx-runtime` (this has existed
+  since React 17). That range was refusing installs the code supports. Now a
+  test will fail if anything in the package imports a React value rather than a
+  type, to keep the range true.
 
 ## [0.2.0] - 2026-09-10
 
 ### Added
 
-- `GenerationEvent` carries `error` and `cache`. `error` is what the provider
-  threw when `degradedReason` is `provider-error`, or the timeout itself when it
-  is `timeout`, so rate limiting and schema drift no longer arrive as the same
-  code. `cache` says how the request's one cache read went — `hit`, `miss`,
-  `error` or `timeout` — so a store that is down stops looking exactly like a
-  cold cache.
-- `SpecCache` takes an optional `delete(key)`. The in-memory cache implements
-  it and the generator never calls it; it is how a host drops one bad entry,
-  using the `key` from that generation's event.
+- `GenerationEvent` carries `error` and `cache`. For `error` this is what the
+  provider threw when `degradedReason` is `provider-error` or the timeout itself
+  when it is `timeout`. This means rate limiting and schema drift won't arrive
+  as the same code any more. Also `cache` says how the request's single cache
+  read went (`hit`, `miss`, `error` or `timeout`). That way a store that is down
+  will stop looking exactly like a cold cache.
+- `SpecCache` takes an optional `delete(key)`. This is implemented by the
+  in-memory cache but never called by the generator. It can be used by a host to
+  drop a single bad entry with the `key` from that generation's event.
 - `FIELD_LIMITS` names two caps that were written into the schema by hand:
-  `localeTag`, 35, and `maxItems`, 12. Both are in the core README's table of
-  limits.
-- The claim screen reads six more ways of writing what it already banned: a
-  currency code before the number, the rupee and the krona, a score as "4.8 out
-  of 5", "limited stock", a count that "remains", and money off with no percent
-  sign on it.
-- The READMEs say what leaves the machine. The core README lists, per mode,
-  every field that reaches the model and every one that stays behind —
-  `user.id`, timestamps, dwell time, prices, currencies and `imageUrl` are in
-  neither prompt — what belongs in `segment` and what does not, the
-  three-method interface any provider sits behind, and what an entry in the
-  cache holds. The anthropic README names the endpoint a generation posts to,
-  and says an EU or UK shop sending personal data to Anthropic is the one that
-  needs a data processing agreement, not this package. SECURITY.md says how to
-  check a published package with `npm audit signatures`.
-- The core README gains an options table for `createComponentGenerator` with
-  every default, a "What the model decides, by mode" table, a "Watching it in
-  production" section on what to compute from `onEvent` and what to alert on,
-  and a "When a generation is wrong" section on getting a bad entry off the
-  page.
-- The example shop has a README and an `.env.example`, and `RUDRA_SHOP_MODE`
-  chooses between replaying the committed transcripts and calling the model.
+  `localeTag` (35) and `maxItems` (12). You can find both in the table of limits
+  in the core README.
+- Now the claim screen reads six more ways of writing claims it already banned:
+  a currency code before the number, the rupee and the krona, a score as "4.8
+  out of 5", "limited stock", a count that "remains" and money off with no
+  percent sign on it.
+- READMEs say what leaves the machine. In the core README you will find, per
+  mode, all fields that reach the model and all that stay behind (`user.id`,
+  timestamps, dwell time, prices, currencies and `imageUrl` are in neither
+  prompt). It also lists the data that belongs in `segment` and the data that
+  does not, the three-method interface any provider sits behind and the contents
+  of an entry in the cache. In the anthropic README you will see the endpoint a
+  generation posts to. It also says that an EU or UK shop sending personal data
+  to Anthropic is the one that needs a data processing agreement (not this
+  package). SECURITY.md says how to check a published package with
+  `npm audit signatures`.
+- In the core README there is now an options table for
+  `createComponentGenerator` with all of the defaults, a "What the model
+  decides, by mode" table, a "Watching it in production" section on what to
+  compute from `onEvent` and what to alert on and a "When a generation is wrong"
+  section on getting a bad entry off the page.
+- There is a README for the example shop and an `.env.example`. You can use
+  `RUDRA_SHOP_MODE` to choose between replaying the committed transcripts and
+  calling the model.
 
 ### Changed
 
-- **Breaking.** `context.locale` takes one language tag — `en-US`,
-  `zh-Hant-TW` — rather than any string of 2 to 35 characters. An
-  `Accept-Language` header passed straight through parsed under 0.1.0 and now
-  throws. The locale is part of the cohort cache key, so a list of tags gave
-  every browser its own cohort and its own billed generation.
-- The rationale the model writes goes through the same claim screen as every
-  other field it writes, so a price or a stock claim cannot survive in the
-  generation log while the same words are stripped from the headline above it.
-- Both cache keys carry a fingerprint of the system prompt, so editing the
-  prompt moves every key. An entry written under 0.1.0's prompt is never read
-  back: it misses once and is generated again.
-- **Breaking.** All three packages need Node 22.12 or later. The floor was
-  `^20.19.0 || >=22.12.0`; Node 20 is end of life, and the check that installs
-  the packages from outside the repo needs `--experimental-strip-types`, which
-  20.19 does not have.
-- The zod peer range in core and anthropic is `^4.5.0`, widened back from
-  `^4.5.4`. The tool schema depends on a change zod made in 4.5.0 and on
-  nothing later; the narrower range came from a weekly dependency bump
-  rewriting the peer by accident.
-- The release workflow checks the tag before it publishes anything: the tagged
-  commit has to be an ancestor of `main`, and the tag has to equal the `version`
-  in `packages/core/package.json`. A `v*` tag pushed on any branch used to
-  publish, with valid provenance on it.
-- Releases publish through npm trusted publishing. The workflow mints a
-  short-lived OIDC token at publish time and no npm token is stored anywhere.
-- The example shop is styled by default. The note at the top still says the
-  package ships no CSS, and `?styles=off` shows the raw markup.
-- The example shop replays by default. Only `RUDRA_SHOP_MODE=record` calls the
-  model, a key on its own no longer spends anything, and a transcript that
-  already exists is never overwritten.
+- **Breaking.** `context.locale` takes a single language tag (`en-US`,
+  `zh-Hant-TW`) rather than just any string of 2 to 35 characters. An
+  `Accept-Language` header passed straight in would be parsed under 0.1.0 but
+  will now throw. Because the locale is part of the cohort cache key, a list of
+  tags gave each browser a cohort of its own and a billed generation of its own.
+- Now the rationale the model writes will be read by the claim screen just like
+  all of the other fields it writes. This means a price or a stock claim can't
+  survive in the generation log while those words are stripped from the headline
+  above.
+- Both cache keys carry a fingerprint of the system prompt. This means editing
+  the prompt will move all keys. An entry written under 0.1.0's prompt will
+  never be read back: it misses once and is generated again.
+- **Breaking.** All three packages need Node 22.12 or later. Until now the floor
+  was `^20.19.0 || >=22.12.0`; Node 20 is end of life. Also the check that
+  installs the packages from outside the repo needs to have
+  `--experimental-strip-types` and 20.19 does not have that.
+- In core and anthropic the zod peer range is `^4.5.0`, widened back from
+  `^4.5.4`. This is because the tool schema depends on a change zod made in
+  4.5.0 and on nothing more recent; the narrower range came from a weekly
+  dependency bump that rewrote the peer by accident.
+- Now the release workflow checks the tag before it publishes anything: the
+  tagged commit has to be an ancestor of `main` and the tag has to equal the
+  `version` in `packages/core/package.json`. It used to publish a `v*` tag
+  pushed on any branch (with valid provenance on it).
+- Now releases publish via npm trusted publishing. At publish time the workflow
+  mints a short-lived OIDC token and no npm token is stored anywhere.
+- By default the example shop is styled. But the note at the top still says the
+  package ships no CSS. You can use `?styles=off` if you want to see the raw
+  markup.
+- By default the example shop replays. Only `RUDRA_SHOP_MODE=record` calls the
+  model. Just having a key will not spend anything any more and a transcript
+  that already exists will never be overwritten.
 
 ### Removed
 
-- Six pipeline internals are no longer exported from `@rudra-js/core`:
+- From `@rudra-js/core` six pipeline internals are no longer exported:
   `fitToShopper`, `neverRecommend`, `buildFallbackSpec`, `specCacheKey`,
-  `cohortCacheKey` and `SYSTEM_PROMPT`. Nothing outside the package imported
-  them, and after 1.0 taking them away would be a breaking change.
+  `cohortCacheKey` and `SYSTEM_PROMPT`. There was nothing outside the package
+  importing those. After 1.0 taking those away would be a breaking change.
 
 ### Fixed
 
-- A hallucinated SKU is cut to 32 characters before it goes into a violation
-  string. The spec schema cannot bound a string, so the whole of whatever the
-  model wrote used to land in the list an evaluation reads.
-- The documents that said the model picks the products. It does under
-  `generation: 'per-shopper'`; under `cohort`, the default, every product but
-  the one a hero names is filled in per request. The root README, the react
-  README and four source comments are corrected.
+- Now a hallucinated SKU will be cut to 32 characters before it goes into a
+  violation string. Since the spec schema cannot bound a string, all of whatever
+  the model wrote used to land in the list an evaluation reads.
+- Some documents said the model picks the products. It does under
+  `generation: 'per-shopper'`; under `cohort` (the default) all products but the
+  one a hero names are filled in per request. This is now corrected in the root
+  README, the react README and four source comments.
 - SECURITY.md said the generator that would emit monitoring events does not
-  exist. It does: one `GenerationEvent` per call through `onEvent`, and wiring
-  that to a log or a rate limiter is the host's job.
-- The anthropic README names its default model, `claude-opus-5`, rather than
-  calling it the current one.
-- The anthropic install line asks for `zod@^4`, the range its peer takes and the
-  range the other three READMEs print. It said `zod`, which reads as though any
-  major would do.
-- `defaultFormatBundlePrice` guards what `defaultFormatPrice` guards — building
-  the formatter, not running it — which is the parity the react README claims.
-- The example's placeholder image carries a width and a height, so an unstyled
-  card no longer fills the viewport, and its route sends `no-cache` rather than
-  pinning a stale image in the browser for a year.
+  exist. It does: there is a single `GenerationEvent` per call via `onEvent`. It
+  is up to the host to wire that to a log or a rate limiter.
+- Now the anthropic README names its default model (`claude-opus-5`) rather than
+  calling this the current model.
+- In the anthropic README the install line asks for `zod@^4`, the range its peer
+  takes and the range the other three READMEs print. It said `zod` and this
+  reads as though any major would do.
+- `defaultFormatBundlePrice` guards what `defaultFormatPrice` guards (this
+  covers building the formatter but not running it). This is the parity the
+  react README claims.
+- Now the placeholder image of the example carries a width and a height. This
+  stops an unstyled card from filling the viewport. Its route also sends
+  `no-cache` rather than pinning a stale image in the browser for a year.
 
 ## [0.1.0] - 2026-09-07
 
-The first release. Three packages: `@rudra-js/core`, `@rudra-js/react` and
-`@rudra-js/anthropic`.
+This is the first release. Three packages: `@rudra-js/core`, `@rudra-js/react`
+and `@rudra-js/anthropic`.
 
 ### Added
 
-- The tracking-input contract: one validated JSON payload per render, with every
-  free-text field and array length-capped.
-- The signal digest: reduces a payload to the bounded, ordered view everything
-  downstream reads.
-- The component spec: the closed vocabulary a language model is allowed to
-  return, doubling as a provider structured-output schema.
-- Reconciliation: reads every model-written field for the claims the prompt bans
-  — a rating, a price, a discount, a delivery date, a stock level — and drops any
-  field that makes one. Host text is left alone.
-- Reconciliation: enforces product truth and verifies the stated reason for each
-  pick against the shopper's actual signals.
-- The deterministic selector and fallback component, which render when no model
-  does and act as the control arm for evaluation.
-- The language-model port, keeping the package free of any vendor SDK.
-- The spec cache: a store port plus an in-memory implementation. Per-shopper
-  generation keys on the whole signal digest. Cohort generation, the default,
-  keys on a listed set of fields, and a test over every digest field fails if
-  one the key leaves out reaches the prompt.
-- The model prompt: a cacheable instruction half and a per-shopper half, with
-  every host-supplied value quoted and escaped so it cannot introduce prompt
-  structure.
-- The component generator: the order every other module goes in, which always
-  returns something renderable and never waits unbounded on a model or a store.
-- `@rudra-js/react`: renders a specification as React Server Components. Product
-  facts come from the shop's catalog at render time, never from the model, and
-  the recommendation area needs no client JavaScript.
-- The bundle block: a set the shop sells together, shown as one offer at the
-  shop's own price. The shop supplies the sets in `bundles`, the model may only
-  ask for the block and write the words around it, and the framework picks which
-  set when the page is served, from the shopper's own basket, views and
-  category. The set's members are drawn from the same catalog every other block
-  uses, and the price shown is always the shop's, in the currency the shop put
-  on the set, never a sum of the parts. The model's own words for the block are
-  steered by the prompt — write about the offer, never state a saving — and text
-  that makes such a claim is dropped, though spotting one is not a guarantee;
-  pass a `label` on the bundle to put the shop's own words on the set, which is
-  text the shop wrote rather than text the model wrote.
+- There is a tracking-input contract: a single validated JSON payload per
+  render, with all free-text fields and arrays length-capped.
+- There is a signal digest to reduce a payload to the bounded, ordered view that
+  all later steps read.
+- There is a component spec: the closed vocabulary a language model is allowed
+  to return, also used as a provider structured-output schema.
+- In reconciliation, all model-written fields are read for the claims the prompt
+  bans (a rating, a price, a discount, a delivery date, a stock level) and any
+  field that makes one will be dropped. But host text is left alone.
+- In reconciliation, product truth is also enforced and the stated reason for
+  each pick is verified against the shopper's actual signals.
+- There is also a deterministic selector and fallback component. These will
+  render when no model does and act as the control arm for evaluation.
+- There is a language-model port to keep the package free of any vendor SDK.
+- There is a spec cache: a store port plus an in-memory implementation. In
+  per-shopper generation this keys on the whole signal digest. In cohort
+  generation (the default) this keys on a listed set of fields. If one the key
+  leaves out reaches the prompt, a test over all digest fields will fail.
+- There is a model prompt: a cacheable instruction half and a per-shopper half,
+  with all host-supplied values quoted and escaped to stop those from
+  introducing prompt structure.
+- There is a component generator: the order all of the other modules go in. It
+  will always return something renderable and will never wait unbounded on a
+  model or a store.
+- `@rudra-js/react` renders a specification as React Server Components. At
+  render time, product facts come from the shop's catalog and never from the
+  model. Also the recommendation area needs no client JavaScript.
+- There is a bundle block: a set the shop sells together, shown as one offer at
+  the shop's own price. It is up to the shop to supply the sets in `bundles`.
+  All the model may do is ask for the block and write the words around it. When
+  the page is served the framework picks which set, from the shopper's basket,
+  views and category. All members of a set are drawn from the catalog all of the
+  other blocks use. Any price shown will always be the shop's, in the currency
+  the shop put on the set, never a sum of the parts. Any words the model writes
+  for the block are steered by the prompt (write about the offer, never state a
+  saving) and text that makes such a claim is dropped, though spotting one is
+  not a guarantee. You can pass a `label` on the bundle to put the words of the
+  shop on the set. This is text the shop wrote rather than text the model wrote.
 
 ### Changed
 
-- The block vocabulary now has six kinds rather than five, and the render
-  context has two more fields. Nothing had been published, so this is a
-  breaking change taken on purpose rather than worked around: the
-  block union is closed so that a spec cannot say anything the renderer has not
-  agreed to, and a new kind is therefore always a breaking change. Three things
-  stop compiling for a host, and each has a one-line fix.
-  - A `switch` over `block.kind` that ends in a `never` default. Add a
-    `case 'bundle'`.
-  - A `BlockRegistry` written out by hand. Add a `bundle` entry, or build it
-    with `extendRegistry`, which keeps the defaults for whatever you leave out.
-  - A `BlockRenderContext` built by hand. Add `bundles`, the shop's sets keyed
-    by id, and `formatBundlePrice`.
+- Now the block vocabulary has six kinds rather than five and the render context
+  has two more fields. Since nothing had been published, this is a breaking
+  change taken on purpose rather than worked around. This block union is closed
+  to stop a spec from saying anything the renderer has not agreed to. This means
+  a new kind will always be a breaking change. Three things stop compiling for a
+  host and each has a one-line fix.
+  - If you have a `switch` over `block.kind` that ends in a `never` default, add
+    a `case 'bundle'`.
+  - If you have a `BlockRegistry` written out by hand, add a `bundle` entry or
+    build it with `extendRegistry` (this keeps the defaults for whatever you
+    leave out).
+  - If you have a `BlockRenderContext` built by hand, add `bundles` (the shop's
+    sets keyed by id) and `formatBundlePrice`.
 
 [unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.9.0...HEAD
 [0.9.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.3...v0.9.0
