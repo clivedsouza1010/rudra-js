@@ -1,20 +1,21 @@
 # The example shop
 
-A small Next.js storefront that puts the architecture through a real page. The product page asks a
-language model for a recommendation component and server-renders the answer into the same HTML
-response, rather than fetching it after the page loads. The model chooses the layout, the ordering,
-the emphasis and the wording. Every product fact on the page comes from the shop's own catalog:
-title, price, image.
+This is a small Next.js storefront to try out the architecture on a real page. Its product page will
+ask a language model for a recommendation component. That answer is then server-rendered into the
+same HTML response rather than being fetched after the page loads. It's up to the model to choose
+the layout, the order of the blocks, the emphasis and the wording. Core picks the products in a grid
+or carousel, their order and the line under each. All of the product facts on the page come from
+the shop's own catalog: title, price, image.
 
-The catalog, the bundles and the shoppers all come from fixed seeds, so every clone sees the same
-shop. We save the model's answers as transcripts under `recordings/` and commit them, so a clone
-with no API key still exercises generation, deterministically and for free. If a page has no
-transcript it degrades the way any model failure does, to a deterministic fallback component. You
-still get a page.
+We use fixed seeds for the catalog, the bundles and the shoppers. That way all clones will see the
+same shop. We save the model's answers as transcripts under `recordings/` and commit them. This
+means that a clone with no API key still exercises generation. It will be deterministic and free.
+If there is no transcript for a prompt, it will degrade the way any model failure does and fall
+back to a deterministic component. You still get a page.
 
-The stylesheet is the example's own, written against the class table in the `@rudra-js/react`
-README. The package ships no CSS. Add `?styles=off` to any product URL and you'll see the markup it
-emits, unstyled.
+This example's stylesheet was written to match the class table in the `@rudra-js/react` README.
+There is no CSS in the package. You can add `?styles=off` to any product URL to see the markup the
+package emits, unstyled.
 
 ## Running it
 
@@ -31,18 +32,20 @@ To call the model:
 RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop
 ```
 
-This bills one call per uncached page and writes a transcript for it. A page that already has a
-transcript is replayed instead of called again, so browsing costs nothing after the first time. If
-you want to replace a transcript, delete the file first; the runbook below walks you through it.
+This will bill one call per prompt with no transcript and write a transcript. If a prompt has a
+transcript, it will be replayed for free, even on another page. But a page might need more calls for
+different shoppers, because transcripts have to match the model id and prompt. To replace a
+transcript, you have to delete the file first (the runbook below walks you through it).
 
-Expect the first render of a page in record mode to be slow. We give the model 60 seconds instead of
-core's 1.5-second default, because this model reasons before it answers and a spec doesn't come back
-inside a second and a half. A transcript is only written once the call returns, so with that default
-no recording could ever be made. Nothing after that first render waits.
+In record mode, expect the first render with a new prompt to be slow. We give the model 60 seconds
+instead of core's 1.5-second default, because this model reasons first and then answers. Its specs
+don't come back inside a second and a half. You couldn't make any recording with that default,
+because a transcript is only written once the call returns. Once a prompt has a transcript there's
+no more waiting.
 
-Next loads `examples/shop/.env.local` by itself, so a key sitting in that file gets picked up
-without you exporting it. Copy `.env.example` to `.env.local` to start one. `.env.local` is
-gitignored; `.env.example` isn't.
+Next will load `examples/shop/.env.local` by itself. That way a key in that file will be picked up
+without you exporting it. To create this file, just copy `.env.example` to `.env.local`.
+`.env.local` is gitignored; `.env.example` isn't.
 
 ## Environment
 
@@ -56,21 +59,23 @@ gitignored; `.env.example` isn't.
 
 ## Re-recording a transcript
 
-A transcript's filename is a hash of the model id and both halves of the prompt. So editing the
-prompt orphans every transcript at once. That means `SYSTEM_PROMPT` in
-`packages/core/src/model-prompt.ts`, or anything that changes the user half. `replay-miss.test.ts`
-fails when the page it guards has no transcript, and it names the path it looked for.
+All transcript filenames are hashes of the model id and both halves of the prompt. This means that
+editing the prompt will orphan all transcripts at once. This applies to `SYSTEM_PROMPT` in
+`packages/core/src/model-prompt.ts` and to anything that changes the user half.
+`replay-miss.test.ts` will fail if the page it guards has no transcript. It will also name the path
+it looked for.
 
-1. Find the hash: run `npm test`. `replay-miss.test.ts` fails and names the path it wanted, and
-   that's your new hash. Whatever file is sitting in `recordings/` under another name is the orphan.
-   Delete that one: `rm examples/shop/recordings/<old hash>.json`.
-2. Run that one page in record mode: `RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop`, then visit it.
-3. Confirm `git status --short examples/shop/recordings/` shows one deletion and one new file, and
-   that the new name is the hash step 1 named.
-4. Run `npm test`. `replay-miss.test.ts` checks the RJ-00001 / S-0001 page, and no others.
+1. Find the hash: run `npm test`. `replay-miss.test.ts` will fail and name the path it wanted.
+   That's your new hash. Whatever file is in `recordings/` under another name is the orphan. Delete
+   this file: `rm examples/shop/recordings/<old hash>.json`.
+2. Run just that page in record mode: `RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop`, then visit it.
+3. Check that `git status --short examples/shop/recordings/` shows one deletion and one new file.
+   Also check that the new name is the hash from step 1.
+4. Run `npm test`. `replay-miss.test.ts` will check just the RJ-00001 / S-0001 page.
 5. Commit the file.
 
-A transcript is the whole prompt: the system half, the user half and the model's answer, in plain
-JSON, committed to the repository. So record against demo shoppers and demo catalogs only. Don't
-record real traffic, and don't record in `per-shopper` mode — that mode puts a real person's likes,
-basket, views and searches into the prompt, and all of it lands in a file you then commit.
+You will find the whole prompt in a transcript: the system half, the user half and the model's
+answer. This is plain JSON that will be committed to the repository. That's why you need to record
+against demo shoppers and demo catalogs only. Don't record real traffic. Don't record in
+`per-shopper` mode either, because this mode puts a real person's likes, basket, views and searches
+into the prompt. All of this will end up in a file you then commit.
