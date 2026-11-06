@@ -59,10 +59,10 @@ setting. Don't use it in production.
 
 This adapter asks the model to answer by calling its tool. But the call isn't
 forced, because Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 reject a
-forced tool call. This means a model can answer in plain text instead. If a
-model does this, the adapter will reject the reply like any other reply that
-doesn't fit. You will then get the fallback (the block that core builds without
-a model). For this reply the event's `error` in `onEvent` says
+forced tool call. This means a model can answer in plain text instead. If it
+does, the adapter will reject the reply like any other reply that doesn't fit.
+You will then get the fallback (the block that core builds without a model). For
+this reply the event's `error` in `onEvent` says
 `anthropic returned no emit_component_spec tool use`.
 
 Those four models also reject `thinking: { type: 'disabled' }`. With them you
@@ -108,9 +108,9 @@ under **What the model sees**. You will need to read this before you send real
 shopper traffic.
 
 By default, shoppers who look alike share a single generated block, but each
-shopper's products are filled in per request. This is cohort mode. In
-per-shopper mode a block is generated for each shopper. Neither mode sends
-`user.id`.
+shopper's products are filled in per request, except a hero's. This is cohort
+mode. In per-shopper mode a block is generated for each shopper. Neither mode
+sends `user.id`.
 
 Even a cohort-mode request can be personal data. It carries:
 

@@ -68,10 +68,10 @@ All packages are under the `@rudra-js` scope. The unscoped `rudra-js` package on
 someone else. This is why you have to include the `@`.
 
 There's no need to install zod, because `@rudra-js/core` brings zod 4 as a dependency. If your app
-is already on zod 4, it will share that copy. On zod 3, npm will put a zod 4 under core. If you use
-`@rudra-js/anthropic`, npm will put another zod 4 under that package too. Your zod 3 can't be mixed
-with the schemas core exports. `productSchema.array()` will work, but your `z.array(productSchema)`
-won't.
+is on a zod 4 inside core's range, it will share that copy. On zod 3, npm will put a zod 4 under
+core. If you use `@rudra-js/anthropic`, npm will put another zod 4 under that package too. Your zod
+3 can't be mixed with the schemas core exports. `productSchema.array()` will work, but your
+`z.array(productSchema)` won't.
 
 You will need React 18 or 19, but not Server Components. `@rudra-js/react` is just plain React with
 no hooks. It will work with `renderToString` and in a client-rendered app. If your framework
@@ -212,9 +212,10 @@ in your environment. To spend money, you have to set `RUDRA_SHOP_MODE` to `recor
 RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop
 ```
 
-That will call Claude once for a page that doesn't have a transcript yet, then save the answer as a
-new transcript. Pages that already have one will replay. This means you can browse a page for free
-after the first visit.
+That will call Claude once per prompt that doesn't have a transcript yet, then save the answer as a
+new transcript. If a prompt has one, it will replay for free, even on another page. But a different
+shopper on the same page might need a new call, because transcripts have to match the model id and
+prompt.
 
 [`examples/shop/README.md`](examples/shop/README.md) covers the rest:
 

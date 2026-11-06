@@ -147,7 +147,8 @@ npm test
 npm run verify:consumer  # packs every package and uses them from outside the repo
 ```
 
-In CI all six are separate steps. This means a failed run will name the check that failed.
+In CI all six run as a single `npm run check` step. If one of them fails, the step's log will show
+which.
 
 ## Releasing
 
@@ -171,9 +172,9 @@ places:
   npm install --package-lock-only --ignore-scripts
   ```
 
-  Node 22.21.1 comes with npm 10.9.4. That npm will drop the 12 `libc` fields in the lockfile
-  without telling you. These fields pick the glibc or musl build of Next's SWC and of oxlint's
-  native binaries on the runner.
+  Node 22.21.1 comes with npm 10.9.4. That npm will drop the `libc` fields in the lockfile without
+  telling you. On the runner, these fields pick the glibc or musl build of native packages like
+  Next's SWC, sharp and oxlint.
 
 You'll need to go through this list on the pull request, because nothing will check it for you. If
 you miss one, the release will either fail on the tag or publish packages that can't be installed
@@ -223,7 +224,7 @@ you'll have to tag a new patch version, not retry the old one.
 ### The npm pin
 
 Both `release.yml` and `rehearsal.yml` install `npm@11.19.1` before they publish. Node 22 ships npm
-10, but that can't do trusted publishing at all. For this you need npm 11.5 or newer, which reads
+10, but that can't do trusted publishing at all. For this you need npm 11.5.1 or newer, which reads
 the OIDC token itself.
 
 For trusted publishing you'll also need Node 22.14 or newer. That's higher than the `>=22.12` floor

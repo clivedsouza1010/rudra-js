@@ -45,9 +45,9 @@ app on 18. But do name both, because npm will then move each to the newest relea
 React 19, a `react-dom` at a different version from `react` won't load.
 
 `@rudra-js/core` and `react` are peer dependencies. Your spec comes from your copy of core. This
-package's elements have to come from your app's copy of React. If you have two copies of core, the
-spec will fail its own type check. If you have two copies of React, React will refuse to render the
-component tree.
+package's elements have to come from your app's copy of React. If two copies of core have
+different types, `spec` or another prop can fail its type check. With two copies of React, React
+can refuse to render the component tree.
 
 `@rudra-js/attested` is core's peer dependency. npm and pnpm will add it for you, but Yarn won't.
 Yarn will move a bare name to its latest version though, so with Yarn, leave `react` and
@@ -98,7 +98,7 @@ If a price isn't a finite number, rendering will throw an error.
 Any row with `isInStock: false` counts as a row that isn't there. Its cards are dropped. If a hero
 names it, the hero will lose its link. If a bundle has it as a member, the bundle will disappear.
 Core will only name products that were in stock in the data you sent it. But this catalog is read
-later, so it may be the more up to date of the two.
+later, so it may be the fresher of the two.
 
 ## Styling
 
@@ -184,8 +184,9 @@ const registry = extendRegistry({
 ```
 
 If a grid, carousel or bundle block has nothing left in your catalog, it will be dropped before any
-renderer runs, yours or ours. But the rest of the blocks will still render. Hero, banner and copy
-blocks will always reach the renderer because they don't depend on the catalog.
+renderer runs, yours or ours. But the rest of the blocks will still render. Banner and copy blocks
+will always reach the renderer because they don't depend on the catalog. Heroes without a headline
+or body will need an in-stock SKU in your catalog to get there.
 
 ## Props
 

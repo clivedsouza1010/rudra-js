@@ -256,7 +256,7 @@ explains.
   asks. So square brackets become parentheses, while `<` and `>` become `‹` and `›`. Line breaks
   also become spaces. No text can load an image. Only a bare web address or email address can show
   as a link. On SwiftUI a tap will open the link, but on `genui` it does nothing and text that
-  starts with `# ` or `- ` shows as Markdown.
+  starts with `#` or `-` followed by a space shows as Markdown.
 - Neither the rationale nor how the block was generated is ever sent.
 - Flutter's `genui` knows the basic catalog by its id from 0.10.3. For 0.8 to 0.10.2, pass
   `catalogId: 'https://a2ui.org/specification/v0_9/basic_catalog.json'`. On Android 11 and later, a

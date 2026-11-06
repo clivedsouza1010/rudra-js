@@ -102,7 +102,8 @@ will cost you a duller sentence, but a wrong pass will cost you a made-up claim.
 - A magnitude mark glued to a run of digits, like `4.8万`, `12M` or `4.8k`. You
   may have supplied the digits, but not the multiplier.
 - A run no locale reads as a number, like `24.12.2026` or `3.14.15`. These can
-  only be backed by a fact written exactly like that.
+  only be backed by a fact written the same way, but the digits may be in any
+  script.
 
 To start with, this layer will drop characters that take no room on the page.
 Because of this, a zero-width space, a soft hyphen, a variation selector, a
@@ -239,7 +240,9 @@ interface Facts {
 
 `values` is a single flat list with no types. Write all values the way your
 system does, like `39`, `'$1,299.00'`, `'4,8'` or `'ships 13 March'`. All the
-numerals in a value will become supported values.
+numerals in a value will become supported values, but not a glued magnitude or
+any numeric character that isn't a digit. `12M`, `4.8万` and `½` will supply
+nothing, not even the 12 or the 4.8.
 
 Numbers will be written out in plain digits first, whatever `String` would have
 made of them. For example, a fact of `1e21` backs
@@ -258,16 +261,17 @@ cases: `'1e2000000000'` is twelve characters, but writing it out would take more
 memory than the process has. All finite JavaScript numbers fit well inside the
 limit. Of these, the longest is `5e-324`, at 326 characters.
 
-Past 2^53, a number will have lost its exact digits by the time it gets to this
+Past 2^53, a number may have lost its exact digits by the time it gets to this
 package. `JSON.parse` turns `9007199254740993` into `...92`. Pass a long id as a
 bigint or a string.
 
-If a field is null or undefined, it backs no numeral and doesn't throw. This way
-an empty field won't break the whole call. Anything else is read via `String()`
-and supplies whatever digits that gives. For a `Date`, that's the day, the year
-and all the digits of the clock. If you pass a raw `listedAt`, it won't be
-ignored. You can find this hazard under
-[What it cannot catch](#what-it-cannot-catch).
+The type of `values` only takes `string | number | bigint`, but plain JavaScript
+or data typed `any` can pass other things. If a field is null or undefined, it
+backs no numeral and doesn't throw. This way an empty field won't break the
+whole call. Anything else is read via `String()` and supplies whatever digits
+that gives. For a `Date`, that's the day, the year, the time zone offset and all
+the digits of the clock. If you pass a raw `listedAt`, it won't be ignored. You
+can find this hazard under [What it cannot catch](#what-it-cannot-catch).
 
 That section also lists the costs of a flat list. There are two habits to keep
 the cost down:
@@ -381,10 +385,10 @@ There's a cost to leaning toward rejection:
   a support phone number, a founding year, the denominator of a rating scale.
   None of these are claims, but they're all digits. If copy mentions a number
   you didn't supply, it will be rejected.
-- **Three digits after a dot or comma are always grouping.** Neither mark can be
-  used to write a real three-decimal number (like a weight or a price in a
-  currency with three decimal places). `1.299 kg` reads as 1299. Supply it and
-  write it the same way.
+- **With up to three digits in front, three digits after a single dot or comma
+  are always grouping.** Neither mark can be used to write a real three-decimal
+  number that way (like a weight or a price in a currency with three decimal
+  places). `1.299 kg` reads as 1299. Supply it and write it the same way.
 - **Numeric characters that aren't digits are refused outright.** `2 m²` and
   `½ inch` will fail.
 - **Magnitude letters glued to a digit are refused.** `4K display` will fail.

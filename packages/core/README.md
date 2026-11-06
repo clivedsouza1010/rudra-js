@@ -45,8 +45,9 @@ inside the range your `package.json` already has. An app on an older core will
 then never leave the minor release it's on.
 
 You don't need to install `zod` yourself, because it's a dependency of this
-package. The public API of this package _is_ zod schemas. Apps on any zod 4 will
-share a single copy of zod with this package.
+package. The public API of this package _is_ zod schemas. If your zod 4 fits
+this package's `zod` range, your app will share a single copy of zod with this
+package. If your app's zod is below that range, it will get a second copy.
 
 Apps on zod 3 will get their own copy next to ours, but the two copies don't
 mix. Build on the exported schemas with their own methods
@@ -262,9 +263,9 @@ The model has no way to tell `3-season` (a tag you sent and fine to use) from
 catalog, nothing in the prompt can bring that down.
 
 Some fields can't be null, like a headline or the text of a banner. If the check
-drops text from one of these, it will empty the field instead. The block will
-then be dropped, as any block with no text is. An empty page headline makes the
-whole generation unusable.
+drops text from one of these, it will empty the field instead. Banner and copy
+blocks will then be dropped. For a hero, this will only happen if it has no
+product either. An empty page headline makes the whole generation unusable.
 
 That's the costly case. For example, the model might write
 "Our 3 favourites for wet weather" when no candidate carries a 3. This headline
@@ -325,9 +326,10 @@ your ranking is personal and you order your candidates per shopper, the products
 the copy talks about won't be the ones you put at the top.
 
 Prices, titles and stock will always be read from your catalog at render time.
-This is to make sure a stale value never shows. If a product sold out, it's
-dropped as the page is served, but any sentence the model wrote about it will
-stay.
+This is to make sure a stale value never shows in those fields. If a product
+sold out, it's dropped as the page is served, but any sentence the model wrote
+about it will stay. You can also end up with copy written from an old title,
+rating or tag, because the cache key holds SKUs and none of those fields.
 
 #### Who can create a cohort
 
@@ -349,9 +351,10 @@ You need to draw those fields from sets you control:
 - your own category ids
 - your own segment labels
 
-Nothing will leak either way, because there's no shopper text at all in a cohort
-prompt. The cost will be the bill, plus a model round trip on a page that was
-being served from cache.
+A cohort prompt leaves out the shopper's searches and signal lists, but those
+three fields go in as written. If a visitor can set one, what they send reaches
+your provider. The other cost will be the bill, plus a model round trip on a
+page that was being served from cache.
 
 To generate for each shopper instead, you can pass `generation: 'per-shopper'`.
 The model will then pick the products too and each shopper will cost a call of
@@ -406,9 +409,10 @@ finding them out from a rejection.
 | `reason`             | 120   | `candidates[].reason`, your own phrase for a product                |
 
 Each cap bounds a single field on its own. Together they aren't a budget for the
-whole prompt. Fitting a payload into a context window is the job of the digest.
-This is the short summary of the shopper and the page that core puts into the
-prompt. It trims instead of throwing.
+whole prompt. Core doesn't count tokens either. The digest, the short summary of
+the shopper and the page, trims signals instead of throwing. The prompt will
+also be limited to 60 in-stock candidates. With long titles and tag lists, those
+60 products can still be too much for a small model.
 
 ### Unknown fields are rejected
 
@@ -419,14 +423,17 @@ key, except the keys that would change a prototype instead of the object.
 
 ## Bringing your own ranking
 
-By default core orders the products for you, by scoring each candidate against
-the shopper's signals. You might already have a recommender you trust:
+By default core orders the products for you in cohort mode and in the fallback,
+by scoring each candidate against the shopper's signals. You might already have
+a recommender you trust:
 
 - bought-together data
 - an engine trained on your orders
 - a merchandiser's hand-picked row
 
-If you pass `rank: 'given'`, the order you sent is the order that renders.
+If you pass `rank: 'given'`, the order you sent will be kept for grids and
+carousels in cohort mode and in the fallback. The hero's product will still be
+picked by the model. In per-shopper mode the model will pick the order too.
 
 ```ts
 const generator = createComponentGenerator({ provider, rank: 'given' });
@@ -441,9 +448,9 @@ shouldn't be shown:
 - disliked
 - being looked at right now
 
-These checks use the payload you sent and not the shorter history the model was
-shown. This means a shopper with a long order history is covered too. Each
-product will still have a basis: this is a code like `most_viewed` to say why
+These checks use the payload you sent and not a trimmed copy of it. This means
+a shopper with a long order history is covered too. Each product will still have
+a basis: this is a code like `most_viewed` to say why
 it's shown. Core checks this basis against the shopper's real signals. All of
 the model's text will still be read by the claim check.
 
@@ -632,8 +639,9 @@ package. To store nothing at all, you can pass `createNullSpecCache()`.
 - If your store has `delete`, you can drop an entry by the `key` on its
   `GenerationEvent`. The next request will then generate again.
 
-Per-shopper entries will only end when they expire, because nothing maps a
-shopper to their keys.
+Core can't drop all the entries of a shopper for you, because nothing maps a
+shopper to their keys. Per-shopper entries will end when they expire or when
+newer entries push them out. You can also delete an entry by a `key` you kept.
 
 ## Watching it in production
 

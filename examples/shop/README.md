@@ -3,14 +3,15 @@
 This is a small Next.js storefront to try out the architecture on a real page. Its product page will
 ask a language model for a recommendation component. That answer is then server-rendered into the
 same HTML response rather than being fetched after the page loads. It's up to the model to choose
-the layout, the ordering, the emphasis and the wording. All of the product facts on the page come
-from the shop's own catalog: title, price, image.
+the layout, the order of the blocks, the emphasis and the wording. Core picks the products in a grid
+or carousel, their order and the line under each. All of the product facts on the page come from
+the shop's own catalog: title, price, image.
 
 We use fixed seeds for the catalog, the bundles and the shoppers. That way all clones will see the
 same shop. We save the model's answers as transcripts under `recordings/` and commit them. This
 means that a clone with no API key still exercises generation. It will be deterministic and free.
-If there is no transcript for a page, it will degrade the way any model failure does and fall back
-to a deterministic component. You still get a page.
+If there is no transcript for a prompt, it will degrade the way any model failure does and fall
+back to a deterministic component. You still get a page.
 
 This example's stylesheet was written to match the class table in the `@rudra-js/react` README.
 There is no CSS in the package. You can add `?styles=off` to any product URL to see the markup the
@@ -31,15 +32,16 @@ To call the model:
 RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop
 ```
 
-This will bill one call per uncached page and write a transcript for it. Pages that already have a
-transcript will be replayed instead of called again. You can browse for free after the first time.
-To replace a transcript, you have to delete the file first (the runbook below walks you through
-it).
+This will bill one call per prompt with no transcript and write a transcript. If a prompt has a
+transcript, it will be replayed for free, even on another page. But a page might need more calls for
+different shoppers, because transcripts have to match the model id and prompt. To replace a
+transcript, you have to delete the file first (the runbook below walks you through it).
 
-Expect the first render of a page in record mode to be slow. We give the model 60 seconds instead of
-core's 1.5-second default, because this model reasons first and then answers. Its specs don't come
-back inside a second and a half. You couldn't make any recording with that default, because a
-transcript is only written once the call returns. After that first render there's no more waiting.
+In record mode, expect the first render with a new prompt to be slow. We give the model 60 seconds
+instead of core's 1.5-second default, because this model reasons first and then answers. Its specs
+don't come back inside a second and a half. You couldn't make any recording with that default,
+because a transcript is only written once the call returns. Once a prompt has a transcript there's
+no more waiting.
 
 Next will load `examples/shop/.env.local` by itself. That way a key in that file will be picked up
 without you exporting it. To create this file, just copy `.env.example` to `.env.local`.

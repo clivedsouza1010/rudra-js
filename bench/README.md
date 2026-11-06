@@ -8,8 +8,9 @@ billed call.
 
 - `b deterministic`: no provider at all. All views will be the deterministic fallback component. If
   a model gets called even once, this arm will fail.
-- `c cohort`: a stub provider in `cohort` mode with a memory cache. Because shoppers who share a
-  page and a segment also share a single generation, this is the arm the cache hit rate comes from.
+- `c cohort`: a stub provider in `cohort` mode with a memory cache. Because shoppers who match on
+  page, segment and whether they have any history share a single generation, this is the arm the
+  cache hit rate comes from.
 - `d per-shopper`: the same stub, but in `per-shopper` mode. With a single generation per shopper,
   there's almost nothing left to share.
 

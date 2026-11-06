@@ -50,8 +50,10 @@ component with nothing to show. The deterministic component will then be rendere
 
 In any other placement (grid, carousel, hero) all bought, in-basket, disliked and currently-viewed
 products are dropped. There is no cap on any of these refusals. We match against all of the signals
-in your payload (a set's members included) and not against the trimmed history the model was shown.
-But it's this trimmed history that decides which set wins if more than one is clean.
+in your payload (a set's members included) and not against the trimmed history we build from it. But
+the trimmed basket and views, then the current category, will decide which set wins if more than one
+is clean. In per-shopper mode the model sees that basket and views. In the default cohort mode it
+sees neither.
 
 **Host payloads are untrusted too. We validate them at the boundary.** Any of these is a
 vulnerability:
@@ -71,8 +73,8 @@ more than a shopper can. Any of these is a vulnerability:
 
 - Any property set on the component by the agent (other than the four hints) reaching the request
   the browser sends or the rendered block.
-- Any request body that sets one or more of the shopper, the signals, the candidates, the surface,
-  the slot and the locale but passes `parseRecommendationRequest`.
+- Any request body that sets any of the shopper, the signals, the candidates, the surface, the slot
+  and the locale but passes `parseRecommendationRequest`.
 - Anything returned by `loadRecommendations` reaching the page without first passing core's spec,
   product and bundle schemas.
 - Any `currentSku` or `currentCategory` kept by `fitRecommendationRequest` although none of the
@@ -82,8 +84,8 @@ more than a shopper can. Any of these is a vulnerability:
 the block's words, prices and links into A2UI messages. These messages can be changed by anything
 that forwards them. They can also be changed by any later message for the same surface. Since the
 ids are fixed, a model that writes A2UI itself will be able to replace a card's link or price just
-by sending a component with a matching id. Keep the model away from the messages. There are two ways
-to do this:
+by sending a component with a matching id. You have to keep the model away from the messages. There
+are two ways to do this:
 
 - If you don't run the agent's code yourself, have your app call the endpoint and then render the
   messages with a renderer that never gets the agent's messages. This is the only setup where you
@@ -124,10 +126,10 @@ shop's list. But it can write a product name into prose. There's nothing to prev
 Say an injection succeeds completely and the model does exactly what the attacker's text tells it to
 do. That buys nothing more than the wording and the ordering of a recommendation block. That's as
 far as it can go: the response is parsed against a schema, every SKU is checked against the shop's
-list, every stated reason is checked against the shopper's signals and whatever survives is rendered
-as escaped text by React. There's no other tool on the model's side of the boundary, just the schema
-it fills in to answer. This means there's no tool that does anything and also no network or data
-access to aim at.
+list, every stated basis is checked against the shopper's signals, the model's text is screened for
+claims and whatever survives is rendered as escaped text by React or as a `Text` by A2UI. There's no
+other tool on the model's side of the boundary, just the schema it fills in to answer. This means
+there's no tool that does anything and also no network or data access to aim at.
 
 None of this is an accident. This is a defence based on what the model is _able_ to emit. It doesn't
 depend on what we can persuade it to avoid.
@@ -141,7 +143,7 @@ depend on what we can persuade it to avoid.
 | Marking untrusted data            | Shopper and product data sit between `BEGIN_UNTRUSTED_DATA` and `END_UNTRUSTED_DATA`, and the instruction half says nothing inside them is an instruction                                                              |
 | Input length limits               | Every free-text field and every array is capped in the payload contract, before a prompt is built                                                                                                                      |
 | Input sanitisation                | Every host value is JSON-quoted, and invisible, direction-changing and line-ending characters are escaped. That includes the Unicode tag block, which can hide a whole instruction in a value that displays as nothing |
-| Output validation                 | The response must satisfy a schema, then reconciliation checks every product against the shop's own list and every stated reason against the shopper's actual signals                                                  |
+| Output validation                 | The response must satisfy a schema, then reconciliation checks every product against the shop's own list and every stated basis against the shopper's actual signals                                                   |
 | Output rendering safety           | Output is data, not markup. Prices, titles, images and links come from the shop's catalog at render time, never from the model                                                                                         |
 | Indirect injection                | The tracking payload _is_ the indirect channel, and we treat it as untrusted throughout                                                                                                                                |
 
@@ -193,7 +195,7 @@ the primary model can act. Ours can't.
   any tag or category name (like the example shop in this repo), the rule stops being
   "every digit must be one you supplied" and becomes "no digit may appear". This means
   "Built for 3 season use" will be dropped along with the invented prices. Any required field (such
-  as a headline) is emptied and not nulled. An empty headline will be enough to make the whole
+  as a headline) is emptied and not nulled. An empty page headline will be enough to make the whole
   generation unusable. In this case just one digit there will cost you the model call and leave you
   with the deterministic component instead.
 
@@ -230,9 +232,10 @@ the primary model can act. Ours can't.
   a URL slug), one visitor can create as many cohorts as they have the patience for. Each new value
   will be a fresh model call. There's also the shipped in-memory cache to think about: it holds
   10,000 entries and evicts the oldest. Enough new values will push out the cohorts real shoppers
-  were being served from. There's no leak, because a cohort prompt carries no shopper text at all.
-  All of the damage is to the bill and the latency. Take those fields from sets you control and put
-  a rate limit in front of the page. With `@rudra-js/a2ui`, the agent (or anyone who calls your
+  were being served from. A cohort prompt has no searches or signal lists, but any text in those
+  fields goes in as written. A visitor who can set one can send text to your provider. The rest of
+  the damage is to the bill and the latency. Take those fields from sets you control and put a rate
+  limit in front of the page. With `@rudra-js/a2ui`, the agent (or anyone who calls your
   endpoint) picks the category and `maxItems`. An agent can also place as many components as it
   likes. `fitRecommendationRequest` drops a category your candidates don't have. Pick candidates on
   your side and not from a hint. Also rate-limit the endpoint.
@@ -242,9 +245,10 @@ the primary model can act. Ours can't.
   and can be read in this repository. It isn't zero.
 - **Monitoring.** There's no per-request logging or rate limiting here. You will just get a
   `GenerationEvent` per call via `onEvent`. It tells you where the component came from, how long it
-  took, whether a model was called, the cost and what reconciliation removed. If the model answered
-  a call but the adapter turned it down, the call will be billed anyway. Its event has no usage,
-  which means that cost will be missing. It's your job to wire this to a log or a rate limiter.
+  took, whether a model was called, the token usage and what reconciliation removed. You work out
+  the cost from your provider's prices. If the model answered a call but the adapter turned it down,
+  the call will be billed anyway. Its event has no usage, which means those tokens will be missing.
+  It's your job to wire this to a log or a rate limiter.
 
 - **Invisible characters.** All of the character categories that can carry hidden text are escaped.
   This also goes for `Default_Ignorable_Code_Point`. This is needed to catch the characters that are
@@ -292,7 +296,7 @@ scripts from executing during a build.
 ### Checking what you installed
 
 All packages are published with `npm publish --provenance`. This means npm holds a signed statement
-of where the tarball was built. You can check this yourself:
+of where the tarball was built. You can check the signature yourself:
 
 ```sh
 npm audit signatures
@@ -300,4 +304,5 @@ npm audit signatures
 
 In the attestation you can see this repository, the workflow that ran
 (`.github/workflows/release.yml`) and the commit the release tag pointed to. If any of this doesn't
-match what you expect, the package didn't come from this pipeline. We'd like to hear about it.
+match what you expect, the package didn't come from this pipeline. We'd like to hear about it if that
+happens.
