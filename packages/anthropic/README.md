@@ -1,16 +1,15 @@
 # @rudra-js/anthropic
 
-This package is part of [rudra-js](https://rudrajs.com).
-
-rudra-js is an open-source TypeScript library (MIT) you install from npm. A language model designs one product-recommendation block for a page in your shop, rudra-js checks it against your catalog, and React renders it.
-
-It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
+This package is part of [rudra-js](https://rudrajs.com), an open-source TypeScript library (MIT)
+you install from npm. In rudra-js, a language model designs one product-recommendation block for a
+page in your shop. Then rudra-js checks it against your catalog and React renders it. rudra-js isn't
+a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
 
 This package plugs Anthropic's models into
-[`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core)
-as a `ComponentProvider`.
+[`@rudra-js/core`](https://github.com/clivedsouza1010/rudra-js/tree/main/packages/core) as a
+`ComponentProvider`.
 
-Its docs are at [rudrajs.com](https://rudrajs.com/reference/anthropic/createAnthropicProvider).
+See the docs on [rudrajs.com](https://rudrajs.com/reference/anthropic/createAnthropicProvider).
 
 > Anthropic and Claude are trademarks of Anthropic, PBC. This package is an
 > independent adapter and is not affiliated with or endorsed by Anthropic.

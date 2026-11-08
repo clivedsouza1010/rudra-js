@@ -1,7 +1,7 @@
 {
   "name": "@rudra-js/core",
   "version": "0.9.1",
-  "description": "Core of rudra-js, a TypeScript library for LLM-designed product recommendations: turns one page view into a recommendation spec checked against your catalog",
+  "description": "The core of rudra-js. Lets a language model design product recommendations for a page and checks them against your own products.",
   "keywords": [
     "rudra-js",
     "product-recommendations",

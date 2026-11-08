@@ -1,7 +1,7 @@
 {
   "name": "@rudra-js/react",
   "version": "0.9.1",
-  "description": "React renderer for rudra-js: renders an LLM-designed product-recommendation block from your own catalog, on the server or in the browser",
+  "description": "Renders rudra-js product recommendations with React, on the server or in the browser.",
   "keywords": [
     "rudra-js",
     "product-recommendations",

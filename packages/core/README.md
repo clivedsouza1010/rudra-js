@@ -1,26 +1,26 @@
 # @rudra-js/core
 
-This package is part of [rudra-js](https://rudrajs.com).
-
-rudra-js is an open-source TypeScript library (MIT) you install from npm. A
-language model designs one product-recommendation block for a page in your shop,
-rudra-js checks it against your catalog, and React renders it.
-
-It is not a hosted platform, a visual or low-code app builder, or a workspace
-you sign up for.
+This package is part of [rudra-js](https://rudrajs.com), an open-source
+TypeScript library (MIT) you install from npm. With rudra-js, a language model
+designs one product-recommendation block for a page in your shop: the model
+picks the layout and writes the words. After rudra-js checks the model's reply
+against your products, React renders the block with your own titles and prices.
+To be clear, rudra-js is not a hosted platform, a visual or low-code app
+builder, or a workspace you sign up for.
 
 You give this package one page view:
 
-- the shopper and what they've been doing
+- who the shopper is and what they've been doing
 - the page they're on
-- the products you're willing to show
+- the products you're happy to show
 
-You will get back a spec, which is just data to describe the recommendations on
-that page. This can be written by your model or can be built by core without a
-model. Either way, it's checked against those products. There's no React in this
-package: the job of `@rudra-js/react` is to turn the spec into markup.
+You get back a spec. It's just data describing the block. Your model can write
+the spec, or core can build one without a model. This also happens if the model
+fails. Either way, core checks the spec against those products.
 
-You can find the guides and the API reference at
+There's no React here: `@rudra-js/react` turns the spec into markup.
+
+For more, see the guides and API reference on
 [rudrajs.com](https://rudrajs.com).
 
 ## Install

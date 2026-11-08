@@ -1,20 +1,22 @@
 # @rudra-js/a2ui
 
-This package is part of [rudra-js](https://rudrajs.com).
+This package is part of [rudra-js](https://rudrajs.com), an open-source TypeScript library (MIT)
+that you can install from npm. rudra-js uses a language model to design one product-recommendation
+block for a page of your shop. The model picks the layout and writes the words. After rudra-js
+checks the model's answer against your products, React renders the block with your own titles and
+prices. rudra-js is not a hosted platform, a visual or low-code app builder, or a workspace you sign
+up for.
 
-rudra-js is an open-source TypeScript library (MIT) you install from npm. A language model designs one product-recommendation block for a page in your shop, rudra-js checks it against your catalog, and React renders it.
-
-It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
-
-You can use this package to put the block inside the interfaces an [A2UI](https://a2ui.org) agent
-builds. It adds a single component, `RudraRecommendations`, to the catalog your A2UI renderer draws
-from. This component will be placed by the agent, which will also pass hints about what the shopper
-is looking at. It's still up to your server to pick the products and build the block with
+You can use this package to let an [A2UI](https://a2ui.org) agent put the block into the interfaces
+that it builds. This package adds a single component, `RudraRecommendations`, to the catalog your
+A2UI renderer draws from. Your agent places the component and passes hints about what the shopper is
+looking at. It's still up to your server to pick the products and build the block with
 `@rudra-js/core`. To render the block in the browser, this package uses `@rudra-js/react`. For
 Flutter, Angular or any other renderer, your server can send the block as A2UI messages instead (see
 [Flutter, Angular and other renderers](#flutter-angular-and-other-renderers)).
 
-It works with version 0.9 of the A2UI protocol and uses `@a2ui/react` and `@a2ui/web_core` 0.14.
+This package works with version 0.9 of the A2UI protocol and uses `@a2ui/react` and `@a2ui/web_core`
+0.14.
 
 ## Install
 

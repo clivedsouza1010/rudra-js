@@ -1,26 +1,26 @@
 # @rudra-js/attested
 
-This package is part of [rudra-js](https://rudrajs.com).
-
-rudra-js is an open-source TypeScript library (MIT) you install from npm. A
-language model designs one product-recommendation block for a page in your shop,
-rudra-js checks it against your catalog, and React renders it.
-
-It is not a hosted platform, a visual or low-code app builder, or a workspace
-you sign up for.
+This package is part of [rudra-js](https://rudrajs.com), an open-source
+TypeScript library (MIT) you install from npm. rudra-js uses a language model to
+design one product-recommendation block for a page in your shop: the model picks
+the layout and writes the words. After rudra-js checks this output against your
+catalog, React renders the block with your own titles and prices. rudra-js is
+not a hosted platform, a visual or low-code app builder, or a workspace you sign
+up for.
 
 You can use this package to check model-written product copy against the facts
-your shop stands behind.
+you give it.
+
+`verify` is a pure function over text and facts. Since the package has no
+dependencies, does no I/O and uses no Node built-ins, it runs in browsers and
+edge runtimes as well as Node. You can also run it after anything that writes
+copy (json-render, the Vercel AI SDK, a raw `fetch` to a model, your template,
+etc.).
 
 For more, see the reference for
 [`verify`](https://rudrajs.com/reference/attested/verify) and
 [`verifyFields`](https://rudrajs.com/reference/attested/verifyFields) on
 rudrajs.com.
-
-It's a pure function over text and facts. There are no dependencies and no I/O.
-With no Node built-ins either, it will run in browsers and edge runtimes as well
-as in Node. You can run this after anything that writes copy (json-render, the
-Vercel AI SDK, a raw `fetch` to a model, your template, etc.).
 
 ## The guarantee
 
