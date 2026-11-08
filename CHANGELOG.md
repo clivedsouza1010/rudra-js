@@ -10,6 +10,14 @@ bump may break them.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-08
+
+### Changed
+
+- The READMEs, this changelog, CONTRIBUTING.md and SECURITY.md are reworded. No
+  code changed and every code block in them is the same as in 0.9.0, so this
+  release only brings the new READMEs to npm.
+
 ## [0.9.0] - 2026-10-31
 
 ### Added
@@ -881,7 +889,8 @@ and `@rudra-js/anthropic`.
   - If you have a `BlockRenderContext` built by hand, add `bundles` (the shop's
     sets keyed by id) and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.9.0...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.1...v0.8.2

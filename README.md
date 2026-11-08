@@ -40,7 +40,7 @@ crawler that never runs JavaScript will read it.
 On our 500-shopper benchmark, the default mode makes 460 model calls per 1,000 page views. That
 would be 1,000 if you generated for each shopper.
 
-> **Status: `0.9.0`, early.** It installs and it works: the Getting started below runs as a test on
+> **Status: `0.9.1`, early.** It installs and it works: the Getting started below runs as a test on
 > every commit. But the public API might still change between minor versions before `1.0`. Any
 > change like this will be in the changelog.
 
