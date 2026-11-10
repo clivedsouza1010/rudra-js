@@ -1,7 +1,7 @@
 {
   "name": "@rudra-js/anthropic",
   "version": "0.9.1",
-  "description": "Anthropic adapter for rudra-js (@rudra-js/core), with no vendor SDK",
+  "description": "Use Anthropic's models with rudra-js. It calls the API with fetch, so there's no Anthropic SDK to install.",
   "keywords": [
     "rudra-js",
     "product-recommendations",

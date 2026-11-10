@@ -1,7 +1,7 @@
 {
   "name": "@rudra-js/a2ui",
   "version": "0.9.1",
-  "description": "A2UI component for rudra-js: lets an A2UI agent place a product-recommendation block whose products, prices and wording come from your shop, not from the agent",
+  "description": "Lets an A2UI agent place rudra-js product recommendations. Your server still picks the products and builds the block.",
   "keywords": [
     "rudra-js",
     "a2ui",
