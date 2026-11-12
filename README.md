@@ -1,6 +1,4 @@
-# [rudra-js](https://rudrajs.com) &middot; [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/clivedsouza1010/rudra-js/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@rudra-js/core.svg?style=flat)](https://www.npmjs.com/package/@rudra-js/core)
-
-[![demo page](https://img.shields.io/badge/demo_page-link-blue)](https://demo.rudrajs.com/product/RJ-00001?shopper=S-0001)
+# [rudra-js](https://rudrajs.com) &middot; [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/clivedsouza1010/rudra-js/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@rudra-js/core.svg?style=flat)](https://www.npmjs.com/package/@rudra-js/core) [![demo page](https://img.shields.io/badge/demo_page-link-blue)](https://demo.rudrajs.com/product/RJ-00001?shopper=S-0001)
 
 rudra-js is an open-source TypeScript library for generating dynamic product recommendations.
 
