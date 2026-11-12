@@ -1,13 +1,14 @@
 # [rudra-js](https://rudrajs.com) &middot; [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/clivedsouza1010/rudra-js/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@rudra-js/core.svg?style=flat)](https://www.npmjs.com/package/@rudra-js/core)
+
 [![demo page](https://img.shields.io/badge/demo_page-link-blue)](https://demo.rudrajs.com/product/RJ-00001?shopper=S-0001)
 
-rudra-js is an open-source TypeScript library for generating dynamic product recommendations. 
+rudra-js is an open-source TypeScript library for generating dynamic product recommendations.
 
-You specify the tracking input to the generator, rudra-js does all the work. 
+You specify the tracking input to the generator, rudra-js does all the work.
+
 - Send the sanitized data to an LLM (Large Language Model).
 - The LLM will design one product-recommendation block and send it back in the response for a product page.
 - rudra-js checks it against your catalog, and React renders it.
-
 
 If a language model is allowed to write raw HTML, it can make up a price. It can also show a product
 you don't sell. That is why rudra-js will not let the model write HTML at all. The model has to
@@ -50,7 +51,7 @@ would be 1,000 if you generated for each shopper.
 ## Getting started
 
 You don't need an API key to start. If you leave the provider out, `@rudra-js/core` will build the
-block itself (with no model). 
+block itself (with no model).
 
 ```sh
 npm install @rudra-js/core@latest @rudra-js/react@latest @rudra-js/attested@latest
@@ -128,10 +129,10 @@ If an [A2UI](https://a2ui.org) agent builds your pages, add [`@rudra-js/a2ui`](p
 
 | Package                                     | What it does                                                                                                                                                                    |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`@rudra-js/core`](packages/core)           | The schemas and logic that turn a tracking input into a spec you can render in your code. The spec is checked with `@rudra-js/attested`.                                                 |
+| [`@rudra-js/core`](packages/core)           | The schemas and logic that turn a tracking input into a spec you can render in your code. The spec is checked with `@rudra-js/attested`.                                        |
 | [`@rudra-js/react`](packages/react)         | Renders the spec with React, on the server or in the browser.                                                                                                                   |
-| [`@rudra-js/anthropic`](packages/anthropic) | Connector to the Anthropic API.                          |
-| [`@rudra-js/attested`](packages/attested)   | validates the model output against the app facts. Has no dependencies.                                                                                            |
+| [`@rudra-js/anthropic`](packages/anthropic) | Connector to the Anthropic API.                                                                                                                                                 |
+| [`@rudra-js/attested`](packages/attested)   | validates the model output against the app facts. Has no dependencies.                                                                                                          |
 | [`@rudra-js/a2ui`](packages/a2ui)           | Puts the block in an [A2UI](https://a2ui.org) interface: an agent places it in React, or your server sends it to any other A2UI renderer. Your server still picks the products. |
 
 ## Development
