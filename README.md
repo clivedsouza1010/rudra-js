@@ -6,7 +6,7 @@ rudra-js is an open-source TypeScript library for generating dynamic product rec
 
 You specify the tracking input to the generator, rudra-js does all the work.
 
-- Send the sanitized data to an LLM (Large Language Model).
+- Sends the sanitized data to an LLM (Large Language Model), which is applicable only when a provider is configured.
 - The LLM will design one product-recommendation block and send it back in the response for a product page.
 - rudra-js checks it against your catalog, and React renders it.
 
