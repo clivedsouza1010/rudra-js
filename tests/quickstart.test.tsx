@@ -12,7 +12,7 @@ const catalog = [
 ];
 
 async function recommendations() {
-  // Passing no provider means no API key and no spend.
+  // Passing no provider means no API key.
   // Core builds the block itself, and the same input always gives the same block.
   const generator = createComponentGenerator({ provider: null });
 
