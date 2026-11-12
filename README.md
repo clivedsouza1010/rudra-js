@@ -1,10 +1,13 @@
-# rudra-js
+# [rudra-js](https://rudrajs.com) &middot; [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/clivedsouza1010/rudra-js/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@rudra-js/core.svg?style=flat)](https://www.npmjs.com/package/@rudra-js/core)
+[![demo page](https://img.shields.io/badge/demo_page-link-blue)](https://demo.rudrajs.com/product/RJ-00001?shopper=S-0001)
 
-rudra-js is an open-source TypeScript library (MIT) you install from npm. A language model designs one product-recommendation block for a page in your shop, rudra-js checks it against your catalog, and React renders it.
+rudra-js is an open-source TypeScript library for generating dynamic product recommendations. 
 
-It is not a hosted platform, a visual or low-code app builder, or a workspace you sign up for.
+You specify the tracking input to the generator, rudra-js does all the work. 
+- Send the sanitized data to an LLM (Large Language Model).
+- The LLM will design one product-recommendation block and send it back in the response for a product page.
+- rudra-js checks it against your catalog, and React renders it.
 
-[Docs](https://rudrajs.com) · [npm](https://www.npmjs.com/package/@rudra-js/core) · [Demo shop](https://demo.rudrajs.com/product/RJ-00001?shopper=S-0001)
 
 If a language model is allowed to write raw HTML, it can make up a price. It can also show a product
 you don't sell. That is why rudra-js will not let the model write HTML at all. The model has to
@@ -47,8 +50,7 @@ would be 1,000 if you generated for each shopper.
 ## Getting started
 
 You don't need an API key to start. If you leave the provider out, `@rudra-js/core` will build the
-block itself (with no model). This is a fully supported setting. It's also the right one until you
-have settled on a model.
+block itself (with no model). 
 
 ```sh
 npm install @rudra-js/core@latest @rudra-js/react@latest @rudra-js/attested@latest
@@ -59,26 +61,12 @@ upgrade. If your app has `@rudra-js/anthropic`, you will need to add it to the c
 `@latest` too. For `@rudra-js/a2ui`, use the install line in the README of that package instead.
 This line also names the two A2UI packages.
 
-All of the `@rudra-js` packages are published together. Each package's peer ranges on the others
-start at that package's own version. With a bare package name, npm will stay inside the range your
-`package.json` already has. This means that without `@latest`, an app on an older core can get an
-`ERESOLVE` error.
-
-All packages are under the `@rudra-js` scope. The unscoped `rudra-js` package on npm belongs to
-someone else. This is why you have to include the `@`.
-
-There's no need to install zod, because `@rudra-js/core` brings zod 4 as a dependency. If your app
-is on a zod 4 inside core's range, it will share that copy. On zod 3, npm will put a zod 4 under
-core. If you use `@rudra-js/anthropic`, npm will put another zod 4 under that package too. Your zod
-3 can't be mixed with the schemas core exports. `productSchema.array()` will work, but your
-`z.array(productSchema)` won't.
-
 You will need React 18 or 19, but not Server Components. `@rudra-js/react` is just plain React with
 no hooks. It will work with `renderToString` and in a client-rendered app. If your framework
 supports Server Components, it can be used as one too. To put the block in the first HTML response,
 you have to render it on the server.
 
-You also need Node 22.12 or later. We don't build or test on Node 20 because it is end of life.
+You also need Node 22.12 or later.
 
 ```tsx
 import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
@@ -91,7 +79,7 @@ const catalog = [
 ];
 
 async function recommendations() {
-  // Passing no provider means no API key and no spend.
+  // Passing no provider means no API key.
   // Core builds the block itself, and the same input always gives the same block.
   const generator = createComponentGenerator({ provider: null });
 
@@ -119,7 +107,7 @@ In Next.js, add `export default recommendations` at the bottom of the sample to 
 New Next.js apps from `create-next-app` have Cache Components turned on. This will stop the build
 with "Next.js encountered the unstable value `Date.now()` while prerendering", because the sample
 and `generate` read the clock while the page renders. To fix this, you can create the app with
-`npx create-next-app@latest my-shop --yes --no-cache-components`. You can also delete
+`npx create-next-app@latest my-app --yes --no-cache-components`. You can also delete
 `cacheComponents: true` and `partialPrefetching: true` from `next.config.ts`. There's more in the
 [quick start](https://rudrajs.com/learn/quick-start#cache-components).
 
@@ -140,18 +128,15 @@ If an [A2UI](https://a2ui.org) agent builds your pages, add [`@rudra-js/a2ui`](p
 
 | Package                                     | What it does                                                                                                                                                                    |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`@rudra-js/core`](packages/core)           | The schemas and logic that turn one tracking input into one spec you can render. The spec is checked with `@rudra-js/attested`.                                                 |
+| [`@rudra-js/core`](packages/core)           | The schemas and logic that turn a tracking input into a spec you can render in your code. The spec is checked with `@rudra-js/attested`.                                                 |
 | [`@rudra-js/react`](packages/react)         | Renders the spec with React, on the server or in the browser.                                                                                                                   |
-| [`@rudra-js/anthropic`](packages/anthropic) | Talks to the Anthropic API. It's the only package that makes a billed call.                                                                                                     |
-| [`@rudra-js/attested`](packages/attested)   | Checks the model's copy against the facts a shop stands behind. Has no dependencies.                                                                                            |
+| [`@rudra-js/anthropic`](packages/anthropic) | Connector to the Anthropic API.                          |
+| [`@rudra-js/attested`](packages/attested)   | validates the model output against the app facts. Has no dependencies.                                                                                            |
 | [`@rudra-js/a2ui`](packages/a2ui)           | Puts the block in an [A2UI](https://a2ui.org) interface: an agent places it in React, or your server sends it to any other A2UI renderer. Your server still picks the products. |
 
 ## Development
 
-You need Node `>=22.12` to work on the repo too. Node 20 also doesn't have the
-`--experimental-strip-types` flag that `npm run verify:consumer` relies on. There's an exact Node 22
-in `.nvmrc`. With `engine-strict=true`, you will get a readable install error on a wrong Node
-version. CI runs the checks on Node 22.12.0 and also on the latest Node 22.
+You need Node `>=22.12` to work on this repo.
 
 ```sh
 nvm use
@@ -171,12 +156,7 @@ To see the cost of each generation mode under a stub model, run
 `ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run bench`. [bench/README.md](bench/README.md) explains
 the columns.
 
-If you keep a key exported in your shell, you will need to run the tests as
-`ANTHROPIC_API_KEY= npm test`. This is because `vitest.config.ts` sets `RUDRA_REPLAY_ONLY=1` for all
-test runs and the shop will throw at start-up if that flag and a key are both set. With a key in
-your shell, the test run will fail to load instead of spending money.
-
-CI runs all six checks on every pull request. There's also a second job to build the example shop
+There's also a second job to build the example shop
 and check that a crawler still sees the block as part of the page. Because CI doesn't set
 `RUDRA_SHOP_MODE`, the shop will replay. That job runs the plain build:
 
@@ -196,7 +176,7 @@ ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/examp
 ## Example
 
 [`examples/shop`](examples/shop) is a small Next.js storefront that runs rudra-js on a real page.
-Its product page asks a language model for a recommendation block. This block will be rendered by
+Its product page asks the LLM for a recommendation block. This block will be rendered by
 the server as part of the HTML response for the page. It won't be fetched after the page loads.
 
 ```sh
@@ -225,18 +205,14 @@ prompt.
 
 ## Getting help
 
-- **The docs**: guides and the API reference at [rudrajs.com](https://rudrajs.com).
-- **Questions and ideas**: open an [issue](https://github.com/clivedsouza1010/rudra-js/issues).
-- **Bugs**: open an [issue](https://github.com/clivedsouza1010/rudra-js/issues/new/choose).
+- **Bugs, Questions and ideas**: open an [issue](https://github.com/clivedsouza1010/rudra-js/issues).
 - **Vulnerabilities**: report these privately (see [SECURITY.md](./SECURITY.md)).
 
 ## Contributing
 
-You are welcome to contribute. [CONTRIBUTING.md](./CONTRIBUTING.md) covers setup and the scope the
+The main purpose of this repository is to continue evolving rudra-js, making it better and easier to use. [CONTRIBUTING.md](./CONTRIBUTING.md) covers setup and the scope the
 project holds to. It also covers the naming and testing conventions. We expect everyone taking part
 to follow the [code of conduct](./CODE_OF_CONDUCT.md).
-
-You can find the changes in the [changelog](./CHANGELOG.md).
 
 ## Patent
 
