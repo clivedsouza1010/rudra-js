@@ -10,6 +10,30 @@ bump may break them.
 
 ## [Unreleased]
 
+### Fixed
+
+- In cohort mode the grid only left out the heroes' products and slots when it
+  was also keeping room for a set. When the spec had no bundle block, the shop
+  had no set to offer, or the set and the heroes filled the item budget, the grid
+  could take a hero's product or the slot it needed. With the hero above the
+  grid, the grid could lose a card, and the event logged `duplicate-sku` or
+  `budget:dropped` as if the model had got it wrong. With the grid above the
+  hero, the hero lost its product. The grid now always leaves out the heroes'
+  products and slots, so a grid above a hero may show one card fewer.
+- In cohort mode, the first bundle block, when no grid or carousel with cards
+  sits above it, now always has its room kept, because its set shows whatever
+  the grid does. Before, the grid could take the set's products or the slots the
+  heroes needed, and log them as `duplicate-sku` or `budget:dropped`. Now the
+  grid gets what's left. If that's nothing, the block is dropped and the event
+  logs `empty-block:grid` or `empty-block:carousel`.
+- In cohort mode, when a grid or carousel with cards sits anywhere above the
+  bundle block and the set and the heroes fill the budget, the grid still comes
+  first, as before. Which set shows here, if any, can change both ways, and the
+  page can show fewer products. Some sets only showed because the grid lost a
+  card to a duplicate, and those don't show now. A set that fits in the slots
+  the grid leaves for heroes below the bundle block can now take them, and those
+  heroes log `budget:dropped` or `duplicate-sku`.
+
 ## [0.9.1] - 2026-11-08
 
 ### Changed

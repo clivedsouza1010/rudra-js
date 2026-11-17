@@ -141,24 +141,23 @@ function fitCohortSpec(
   digest: SignalDigest,
   rank: RankOrder,
 ): FittedSpec {
-  const picks = selectProducts(input, digest, { rank });
   const blocks = capBlocks(spec.blocks);
+  let spokenFor = new Set(placeableHeroSkus(blocks, input));
 
   const bundleAt = blocks.findIndex((block) => block.kind === 'bundle');
-  if (bundleAt === -1) return fitToShopper(spec, picks, digest.maxItems);
+  if (bundleAt !== -1) {
+    const above = blocks.slice(0, bundleAt);
+    const bundle = bundleForShopper(input, digest, placeableHeroSkus(above, input));
+    const withBundle = new Set([...spokenFor, ...(bundle?.skus ?? [])]);
+    const listAbove = above.some(
+      (block) => (block.kind === 'grid' || block.kind === 'carousel') && block.items.length > 0,
+    );
+    if (!listAbove || withBundle.size < digest.maxItems) spokenFor = withBundle;
+  }
 
-  const heroesAbove = placeableHeroSkus(blocks.slice(0, bundleAt), input);
-  const bundle = bundleForShopper(input, digest, heroesAbove);
-  if (!bundle) return fitToShopper(spec, picks, digest.maxItems);
-
-  const spokenFor = new Set<string>(bundle.skus);
-  for (const sku of placeableHeroSkus(blocks, input)) spokenFor.add(sku);
-
-  const roomLeft = digest.maxItems - spokenFor.size;
-  if (roomLeft <= 0) return fitToShopper(spec, picks, digest.maxItems);
-
+  const picks = selectProducts(input, digest, { rank });
   const forGrid = picks.filter((pick) => !spokenFor.has(pick.product.sku));
-  return fitToShopper(spec, forGrid, roomLeft);
+  return fitToShopper(spec, forGrid, digest.maxItems - spokenFor.size);
 }
 
 export function createComponentGenerator(
