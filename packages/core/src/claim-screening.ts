@@ -1,4 +1,4 @@
-import { foldLookalikes, verify } from '@rudra-js/attested';
+import { listLookalikeReadings, verify } from '@rudra-js/attested';
 import { offeredCandidates } from './model-prompt.js';
 import type { TrackingInput } from './tracking-input.js';
 
@@ -114,11 +114,7 @@ function kindIn(reading: string): string | null {
 }
 
 function claimIn(text: string): string | null {
-  const readings = new Set([foldLookalikes(text), foldLookalikes(text, true)]);
-  if (text.includes('\u04C0')) {
-    readings.add(foldLookalikes(text.replaceAll('\u04C0', '\u04CF'), true));
-  }
-  for (const reading of readings) {
+  for (const reading of listLookalikeReadings(text)) {
     const kind = kindIn(reading);
     if (kind !== null) return kind;
   }

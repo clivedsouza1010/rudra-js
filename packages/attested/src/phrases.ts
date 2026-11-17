@@ -205,12 +205,24 @@ export function foldLookalikes(text: string, byLook = false): string {
   return foldChars(lowered, CONFUSABLES);
 }
 
-export function normalisePhrasing(text: string, byLook = false): string {
-  return foldLookalikes(text, byLook)
+export function listLookalikeReadings(text: string): string[] {
+  const readings = new Set([foldLookalikes(text), foldLookalikes(text, true)]);
+  if (text.includes('\u04C0')) {
+    readings.add(foldLookalikes(text.replaceAll('\u04C0', '\u04CF'), true));
+  }
+  return [...readings];
+}
+
+export function tidyPhrasing(folded: string): string {
+  return folded
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[-_\u2010-\u2015]+/g, ' ')
     .replace(/\s+/g, (run) => (LINE_BREAK.test(run) ? '\n' : ' '))
     .trim();
+}
+
+export function normalisePhrasing(text: string): string {
+  return tidyPhrasing(foldLookalikes(text));
 }
 
 const ASCII_WORD = /[a-z0-9]/;

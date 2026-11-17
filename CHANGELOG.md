@@ -10,6 +10,16 @@ bump may break them.
 
 ## [Unreleased]
 
+### Added
+
+- `@rudra-js/attested` exports `listLookalikeReadings(text)`. It returns the ways
+  both screens read a text for look-alike letters: by case, by look, and, when
+  the text has a `Ӏ`, by look with that `Ӏ` read as an l. A reading that comes
+  out the same as an earlier one is left out. Neither screen catches or lets
+  through anything it didn't before. `@rudra-js/core` now uses it instead of
+  keeping its own copy of the same readings. This is why the peer range of core
+  on attested is `^0.9.2`.
+
 ### Fixed
 
 - In cohort mode the grid only left out the heroes' products and slots when it
