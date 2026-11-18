@@ -2,8 +2,10 @@ import { numeralsIn, supportedValues, type Numeral } from './numerals.js';
 import {
   BANNED_PHRASES,
   indexPhrasing,
+  listLookalikeReadings,
   normalisePhrasing,
   spansIn,
+  tidyPhrasing,
   type Indexed,
   type Span,
 } from './phrases.js';
@@ -158,11 +160,7 @@ function isCaught(scans: Indexed[], phrase: string, forgiven: Span[]): boolean {
 
 function checkWording(text: string, prepared: PreparedFacts): LayerReport {
   const { banned, allowed } = prepared;
-  const readings = new Set([normalisePhrasing(text), normalisePhrasing(text, true)]);
-  if (text.includes('\u04C0')) {
-    readings.add(normalisePhrasing(text.replaceAll('\u04C0', '\u04CF'), true));
-  }
-  const scans = [...readings].map((reading) => indexPhrasing(reading));
+  const scans = listLookalikeReadings(text).map((reading) => indexPhrasing(tidyPhrasing(reading)));
 
   const forgiven = forgivenInAnyReading(scans, allowed);
 

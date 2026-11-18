@@ -279,6 +279,21 @@ describe('verify — the wording layer', () => {
     expect(verify('selling\nfast', NOTHING).wording.supported).toBe(false);
   });
 
+  it('catches a claim across a fullwidth hyphen, which is only a hyphen once folded', () => {
+    expect(verify('a best\uFF0Dselling shoe', NOTHING).wording.supported).toBe(false);
+  });
+
+  it('tidies tabs, curly apostrophes, underscores and Unicode dashes in the text it screens', () => {
+    for (const text of ['in\tstock', 'don\u2019t miss out', 'next_day', 'best\u2010seller']) {
+      expect(verify(text, NOTHING).wording.supported, text).toBe(false);
+    }
+  });
+
+  it('catches a custom phrase with a mark between two letters that join', () => {
+    const phrase = '\u1100\u0301\u1161';
+    expect(verify(phrase, { values: [], bannedPhrases: [phrase] }).wording.supported).toBe(false);
+  });
+
   it('catches a phrase off the built-in list written into ordinary copy', () => {
     expect(tokensOf(verify('Sorry, this one is out of stock.', NOTHING).wording.findings)).toEqual([
       'out of stock',
@@ -372,6 +387,11 @@ describe('verify — the wording layer', () => {
 
   it('leaves honest copy with a palochka and a Greek capital alone', () => {
     expect(verify('\u04C0\u039D YOUR SIZE', NOTHING).wording.supported).toBe(true);
+  });
+
+  it('still checks the by-case and by-look readings when there is a palochka one', () => {
+    expect(verify('\u04C0\u039D STOCK', NOTHING).wording.supported).toBe(false);
+    expect(verify('SO\u04C0D O\u03A5T', NOTHING).wording.supported).toBe(false);
   });
 
   it('lets an allowed phrase in capitals stand behind the banned one inside it', () => {
@@ -579,6 +599,11 @@ describe('verify — allowedPhrases', () => {
       const result = verify('Back in stock today', { values: [], allowedPhrases: [phrase] });
       expect(tokensOf(result.wording.findings), phrase).toEqual([]);
     }
+  });
+
+  it('strips a byte-order mark before tidying, so it cannot end an allowance the way a space would', () => {
+    const facts = { values: [], allowedPhrases: ['sustainable pace'] };
+    expect(verify('A sustainable pace\uFEFFr', facts).wording.supported).toBe(false);
   });
 
   it('ignores an allowance that normalises to nothing', () => {

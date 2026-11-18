@@ -1476,6 +1476,7 @@ describe('a claim spelled in characters the patterns do not expect', () => {
 
   const DISGUISED_STOCK: { hidden: string; reason: string }[] = [
     { hidden: 'a zero-width space', reason: 'in st\u200Bock in your size' },
+    { hidden: 'a byte-order mark', reason: 'in st\uFEFFock in your size' },
     { hidden: 'a variation selector', reason: 'in st\uFE0Fock in your size' },
     { hidden: 'a soft hyphen', reason: 'in st\u00ADock in your size' },
     { hidden: 'a Cyrillic look-alike', reason: 'in st\u043Eck in your size' },
@@ -1545,6 +1546,23 @@ describe('a claim spelled in characters the patterns do not expect', () => {
     const reason = '\u04C0\u039D YOUR SIZE';
 
     expect(reasonFor(reason)).toBe(reason);
+  });
+
+  it('reads each look-alike reading on its own, so the end of one cannot run into the next', () => {
+    const reason = 'Monday hikes on \u039Dew trails, in a pack that ships';
+
+    expect(reasonFor(reason)).toBe(reason);
+
+    const counted = 'Now 12 \u039Dew colours, where last season there was 8.';
+    const result = reconcile(grid([ref('TR-101', { reason: counted })]), {
+      candidates: [product('TR-101', { tags: ['12 colours', '8 colours'] }), product('TR-102')],
+    });
+    expect(basisOf(result)?.reason).toBe(counted);
+  });
+
+  it('still checks the by-case and by-look readings when there is a palochka one', () => {
+    expect(disguisedKindFor('Packed \u04C0\u039D TIME FOR your trip')).toBe('delivery');
+    expect(disguisedKindFor('\u04C0O\u039DED BY THOUSANDS')).toBe('rating');
   });
 });
 

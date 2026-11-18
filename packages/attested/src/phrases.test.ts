@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BANNED_PHRASES, indexPhrasing, normalisePhrasing, spansIn } from './phrases.js';
+import {
+  BANNED_PHRASES,
+  foldLookalikes,
+  indexPhrasing,
+  listLookalikeReadings,
+  normalisePhrasing,
+  spansIn,
+} from './phrases.js';
 
 function phraseSpans(text: string, phrase: string) {
   return spansIn(indexPhrasing(text), phrase);
@@ -100,6 +107,59 @@ describe('normalisePhrasing', () => {
     }
   });
 
+  it('folds fullwidth and ligature forms', () => {
+    expect(normalisePhrasing('ＦＲＥＥ ＳＨＩＰＰＩＮＧ')).toBe('free shipping');
+  });
+
+  it('turns a hyphen or an underscore into a space, so best-selling is best selling', () => {
+    expect(normalisePhrasing('best-selling')).toBe('best selling');
+    expect(normalisePhrasing('next\u2013day')).toBe('next day');
+    expect(normalisePhrasing('free_shipping')).toBe('free shipping');
+    for (const dash of '-_\u2010\u2011\u2012\u2013\u2014\u2015') {
+      expect(normalisePhrasing(`best${dash}selling`), dash).toBe('best selling');
+    }
+  });
+
+  it('keeps a line break as a line break, because an allowance may not cross one', () => {
+    expect(normalisePhrasing('selling\n  fast')).toBe('selling\nfast');
+    expect(normalisePhrasing('not\n\n---\n\nin stock')).toBe('not\nin stock');
+    expect(normalisePhrasing('selling\u2028fast')).toBe('selling\nfast');
+    expect(normalisePhrasing('selling\u2029fast')).toBe('selling\nfast');
+    expect(normalisePhrasing('selling\rfast')).toBe('selling\nfast');
+    expect(normalisePhrasing('selling\vfast')).toBe('selling\nfast');
+    expect(normalisePhrasing('selling\ffast')).toBe('selling\nfast');
+  });
+
+  it('drops a combining mark that composes with nothing', () => {
+    expect(normalisePhrasing('fr̅ee shipping')).toBe('free shipping');
+    expect(normalisePhrasing('s̃old out')).toBe('sold out');
+  });
+
+  it('drops a control character, which renders as nothing at all', () => {
+    expect(normalisePhrasing('fr\u0008ee shipping')).toBe('free shipping');
+    expect(normalisePhrasing('fr\u001dee shipping')).toBe('free shipping');
+  });
+
+  it('collapses runs of whitespace', () => {
+    expect(normalisePhrasing('selling   fast')).toBe('selling fast');
+    expect(normalisePhrasing('last\u1680few miles')).toBe('last few miles');
+    expect(normalisePhrasing('new colour, in\tstock')).toBe('new colour, in stock');
+    expect(normalisePhrasing('送料\u3000無料')).toBe('送料 無料');
+  });
+
+  it('turns a typographic apostrophe into a plain one', () => {
+    expect(normalisePhrasing('don\u2019t miss')).toBe("don't miss");
+    expect(normalisePhrasing('don\u2018t miss')).toBe("don't miss");
+    expect(normalisePhrasing('shoppers\u2019 pick')).toBe("shoppers' pick");
+    expect(normalisePhrasing('it\u2019s here, don\u2019t miss')).toBe("it's here, don't miss");
+  });
+
+  it('trims', () => {
+    expect(normalisePhrasing('  cheap  ')).toBe('cheap');
+  });
+});
+
+describe('foldLookalikes', () => {
   it('reads each look-alike capital as the letter it looks like', () => {
     const capitals: [string, string][] = [
       ['\u0392', 'b'],
@@ -124,51 +184,86 @@ describe('normalisePhrasing', () => {
     ];
     for (const [written, latin] of capitals) {
       const label = `U+${written.codePointAt(0)?.toString(16)}`;
-      expect(normalisePhrasing(written, true), label).toBe(latin);
+      expect(foldLookalikes(written, true), label).toBe(latin);
+    }
+  });
+});
+
+describe('listLookalikeReadings', () => {
+  it('reads the text once when case and look agree', () => {
+    expect(listLookalikeReadings('In stоck')).toEqual(['in stock']);
+    expect(listLookalikeReadings('\u03BDew')).toEqual(['vew']);
+  });
+
+  it('reads a look-alike capital by case and by look', () => {
+    expect(listLookalikeReadings('\u039DEW')).toEqual(['vew', 'new']);
+  });
+
+  it('adds a reading by look with the palochka as an l', () => {
+    expect(listLookalikeReadings('se\u04C0\u04C0i\u039Dg')).toEqual([
+      'sellivg',
+      'seiiing',
+      'selling',
+    ]);
+  });
+
+  it('swaps in the small palochka, not an l, so a mark on it is dropped instead of composed', () => {
+    expect(listLookalikeReadings('\u04C0\u0301\u039D')).toEqual(['lv', '\u00EDn', 'ln']);
+  });
+
+  it('reads a capital with no lowercase form by look, even in lowercase text', () => {
+    expect(listLookalikeReadings('next da\u03D2')).toEqual(['next dau', 'next day']);
+  });
+
+  it('reads a palochka word the same way every time, even right after one that differs only in case', () => {
+    expect(listLookalikeReadings('\u04C0O\u0461 STOCK')).toEqual([
+      'lo\u0461 stock',
+      'io\u0461 stock',
+    ]);
+    for (const call of [1, 2]) {
+      expect(listLookalikeReadings('\u04C0O\u0460 STOCK'), `call ${call}`).toEqual([
+        'lo\u0461 stock',
+        'iow stock',
+        'low stock',
+      ]);
     }
   });
 
-  it('folds fullwidth and ligature forms', () => {
-    expect(normalisePhrasing('ＦＲＥＥ ＳＨＩＰＰＩＮＧ')).toBe('free shipping');
+  it('folds a lunate sigma in the palochka reading too', () => {
+    expect(listLookalikeReadings('\u03F2\u04C0eara\u039D\u03F2e')).toEqual([
+      'clearavce',
+      'ciearance',
+      'clearance',
+    ]);
   });
 
-  it('turns a hyphen or an underscore into a space, so best-selling is best selling', () => {
-    expect(normalisePhrasing('best-selling')).toBe('best selling');
-    expect(normalisePhrasing('next\u2013day')).toBe('next day');
-    expect(normalisePhrasing('free_shipping')).toBe('free shipping');
-    for (const dash of '-_\u2010\u2011\u2012\u2013\u2014\u2015') {
-      expect(normalisePhrasing(`best${dash}selling`), dash).toBe('best selling');
-    }
+  it('leaves a Latin or Cyrillic I beside a palochka as an i in the palochka reading', () => {
+    expect(listLookalikeReadings('SE\u04C0\u04C0I\u039DG')).toEqual([
+      'sellivg',
+      'seiiing',
+      'selling',
+    ]);
+    expect(listLookalikeReadings('SE\u04C0\u04C0\u0406\u039DG')).toEqual([
+      'sellivg',
+      'seiiing',
+      'selling',
+    ]);
   });
 
-  it('keeps a line break as a line break, because an allowance may not cross one', () => {
-    expect(normalisePhrasing('selling\n  fast')).toBe('selling\nfast');
-    expect(normalisePhrasing('not\n\n---\n\nin stock')).toBe('not\nin stock');
-    expect(normalisePhrasing('selling\u2028fast')).toBe('selling\nfast');
-    expect(normalisePhrasing('selling\u2029fast')).toBe('selling\nfast');
+  it('adds the palochka reading in a word with a capital that only shows up after NFKC', () => {
+    expect(listLookalikeReadings('se\u04C0\u04C0i\u{1D6B4}g')).toEqual([
+      'sellivg',
+      'seiiing',
+      'selling',
+    ]);
   });
 
-  it('drops a combining mark that composes with nothing', () => {
-    expect(normalisePhrasing('fr̅ee shipping')).toBe('free shipping');
-    expect(normalisePhrasing('s̃old out')).toBe('sold out');
+  it('reads a small palochka as an l in the by-look reading too', () => {
+    expect(listLookalikeReadings('se\u04CF\u04CFi\u039Dg')).toEqual(['sellivg', 'selling']);
   });
 
-  it('drops a control character, which renders as nothing at all', () => {
-    expect(normalisePhrasing('fr\u0008ee shipping')).toBe('free shipping');
-    expect(normalisePhrasing('fr\u001dee shipping')).toBe('free shipping');
-  });
-
-  it('collapses runs of whitespace', () => {
-    expect(normalisePhrasing('selling   fast')).toBe('selling fast');
-    expect(normalisePhrasing('送料\u3000無料')).toBe('送料 無料');
-  });
-
-  it('turns a typographic apostrophe into a plain one', () => {
-    expect(normalisePhrasing('don\u2019t miss')).toBe("don't miss");
-  });
-
-  it('trims', () => {
-    expect(normalisePhrasing('  cheap  ')).toBe('cheap');
+  it('keeps a spacing mark after the palochka, and drops the palochka reading when it matches the by-case one', () => {
+    expect(listLookalikeReadings('\u04C0\u0903')).toEqual(['l\u0903', 'i\u0903']);
   });
 });
 
