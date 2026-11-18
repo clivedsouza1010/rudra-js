@@ -26,9 +26,9 @@ bump may break them.
   its API stays the same, and `@rudra-js/a2ui` uses them instead of its own copy.
   Neither package renders anything differently. This is why the peer range of
   react and a2ui on core is `^0.9.2`. Core also ships a `schemas/package.json`
-  that points at the built files. Bundlers and TypeScript settings that ignore
-  package `exports` (webpack 4, `moduleResolution: node`) can still find
-  `@rudra-js/core/schemas`, which react now loads.
+  that points at the built files, so tools that resolve modules without reading
+  package `exports`, such as TypeScript's `moduleResolution: node`, can still
+  find `@rudra-js/core/schemas`, which react now loads.
 
 ### Fixed
 

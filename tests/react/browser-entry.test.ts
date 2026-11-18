@@ -10,6 +10,7 @@ describe('the react entry', () => {
       { encoding: 'utf8' },
     );
 
+    expect(run.status, run.stderr || String(run.error)).toBe(0);
     expect(run.stderr).not.toContain('the react entry imported');
     expect(run.stdout.trim()).toBe('function');
   });
