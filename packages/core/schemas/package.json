@@ -1,0 +1,4 @@
+{
+  "main": "../dist/schemas.js",
+  "types": "../dist/schemas.d.ts"
+}

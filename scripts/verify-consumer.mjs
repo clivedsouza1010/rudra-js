@@ -137,6 +137,9 @@ function packAndInstall() {
     if (untyped.length > 0) {
       throw new Error(`@rudra-js/${packageName} ships no declaration for ${untyped.join(', ')}`);
     }
+    if (packageName === 'core' && !paths.includes('schemas/package.json')) {
+      throw new Error('@rudra-js/core ships no schemas/package.json for tools that ignore exports');
+    }
     shipped.set(packageName, declarations);
 
     extract(filename, join(modules, '@rudra-js', packageName));

@@ -3,7 +3,7 @@ import {
   defaultFormatBundlePrice,
   defaultFormatPrice,
   defaultHrefForSku,
-  sellableProduct,
+  findSellableProduct,
   type BlockRenderContext,
 } from './render-context.js';
 import { defaultRegistry, type BlockRegistry } from './registry.js';
@@ -40,7 +40,7 @@ function toProductMap(catalog: ProductCatalog): ReadonlyMap<string, Product> {
 }
 
 function hasContent(block: Block, context: BlockRenderContext): boolean {
-  const isSellable = (sku: string) => sellableProduct(context.products, sku) !== undefined;
+  const isSellable = (sku: string) => findSellableProduct(context.products, sku) !== undefined;
 
   switch (block.kind) {
     case 'grid':

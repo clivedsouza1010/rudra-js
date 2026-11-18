@@ -9,6 +9,12 @@ import type {
   Product,
   ProductReference,
 } from '@rudra-js/core';
+import {
+  defaultFormatBundlePrice,
+  defaultFormatPrice,
+  defaultHrefForSku,
+  findSellableProduct,
+} from '@rudra-js/core/schemas';
 import type { RecommendationResult } from './recommendation-result.js';
 
 export interface RecommendationMessagesOptions {
@@ -54,40 +60,6 @@ interface BuildContext {
   readonly add: (component: BasicComponent) => string;
 }
 
-function defaultHrefForSku(sku: string): string {
-  return `/product/${encodeURIComponent(sku)}`;
-}
-
-function formatMoney(price: number, currency: string, locale: string | undefined): string {
-  let formatter: Intl.NumberFormat;
-  try {
-    formatter = new Intl.NumberFormat(locale, { style: 'currency', currency });
-  } catch {
-    return `${currency} ${price}`;
-  }
-  return formatter.format(price);
-}
-
-function defaultFormatPrice(product: Product, locale: string | undefined): string {
-  if (!Number.isFinite(product.price)) {
-    throw new TypeError(
-      `price for SKU ${product.sku} is ${String(product.price)}, not a finite number. ` +
-        'Catalog objects must satisfy productSchema from @rudra-js/core',
-    );
-  }
-  return formatMoney(product.price, product.currency, locale);
-}
-
-function defaultFormatBundlePrice(bundle: Bundle, locale: string | undefined): string {
-  if (!Number.isFinite(bundle.price)) {
-    throw new TypeError(
-      `price for bundle ${bundle.id} is ${String(bundle.price)}, not a finite number. ` +
-        'Bundle objects must satisfy bundleSchema from @rudra-js/core',
-    );
-  }
-  return formatMoney(bundle.price, bundle.currency, locale);
-}
-
 function toWebUrl(value: unknown, base: string | undefined, name: string): string {
   if (typeof value !== 'string') throw new TypeError(`${name} is not a string`);
   if (value.trim() === '') throw new TypeError(`${name} is empty`);
@@ -115,11 +87,6 @@ function plainText(value: string): string {
 
 function defined(ids: readonly (string | undefined)[]): string[] {
   return ids.filter((id): id is string => id !== undefined);
-}
-
-function sellableProduct(context: BuildContext, sku: string): Product | undefined {
-  const product = context.products.get(sku);
-  return product?.isInStock === false ? undefined : product;
 }
 
 function addText(
@@ -209,7 +176,7 @@ function addCardRows(
 ): string | undefined {
   const cards: string[] = [];
   for (const reference of items) {
-    const product = sellableProduct(context, reference.sku);
+    const product = findSellableProduct(context.products, reference.sku);
     if (product) {
       cards.push(addProductCard(context, `${id}_item${cards.length}`, reference, product));
     }
@@ -236,7 +203,7 @@ function addCardRows(
 }
 
 function addHero(context: BuildContext, id: string, block: HeroBlock): string | undefined {
-  const product = block.sku === null ? undefined : sellableProduct(context, block.sku);
+  const product = block.sku === null ? undefined : findSellableProduct(context.products, block.sku);
   const headline = addText(context, `${id}_headline`, block.headline, 'h3');
   const body = addText(context, `${id}_body`, block.body, 'caption');
   if (!headline && !body && !product) return undefined;
@@ -278,7 +245,7 @@ function addBundle(context: BuildContext, id: string, block: BundleBlock): strin
 
   const products: Product[] = [];
   for (const sku of bundle.skus) {
-    const product = sellableProduct(context, sku);
+    const product = findSellableProduct(context.products, sku);
     if (!product) return undefined;
     products.push(product);
   }
