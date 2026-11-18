@@ -540,6 +540,18 @@ describe('a few behaviours the code asserts', () => {
     expect(textOf(link)).toBe('Product TR-101 $174.00 Shop');
   });
 
+  it('keeps the headline of a hero whose product sold out, but drops the product link', () => {
+    const markup = render(
+      spec([
+        { kind: 'hero', headline: 'Trail season', body: null, sku: 'TR-101', ctaLabel: 'Shop' },
+      ]),
+      { products: [product('TR-101', { isInStock: false })], locale: 'en-US' },
+    );
+
+    expect(markup).toContain('Trail season');
+    expect(markup).not.toContain('rudra-hero__link');
+  });
+
   it('leaves out a hero with nothing left to show', () => {
     const markup = render(
       spec([{ kind: 'hero', headline: '', body: null, sku: 'TR-101', ctaLabel: null }]),
@@ -896,6 +908,35 @@ describe('a bundle', () => {
     const Bundle = defaultRegistry.bundle;
     const context: BlockRenderContext = {
       products: new Map([['TR-101', product('TR-101')]]),
+      bundles: new Map(BUNDLES.map((entry) => [entry.id, entry])),
+      hrefForSku: defaultHrefForSku,
+      formatPrice: (entry) => String(entry.price),
+      formatBundlePrice: (entry) => String(entry.price),
+    };
+
+    expect(
+      html(
+        <Bundle
+          block={{
+            kind: 'bundle',
+            title: 'Get set up in one go',
+            body: null,
+            ctaLabel: null,
+            bundleId: 'BUN-1',
+          }}
+          context={context}
+        />,
+      ),
+    ).toBe('');
+  });
+
+  it('renders nothing on its own when a member sold out, for a host composing the renderer directly', () => {
+    const Bundle = defaultRegistry.bundle;
+    const context: BlockRenderContext = {
+      products: new Map([
+        ['TR-101', product('TR-101')],
+        ['TR-102', product('TR-102', { isInStock: false })],
+      ]),
       bundles: new Map(BUNDLES.map((entry) => [entry.id, entry])),
       hrefForSku: defaultHrefForSku,
       formatPrice: (entry) => String(entry.price),

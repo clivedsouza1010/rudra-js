@@ -7,7 +7,7 @@ import type {
   HeroBlock,
   Product,
 } from '@rudra-js/core';
-import { sellableProduct, type BlockRenderContext } from '../render-context.js';
+import { findSellableProduct, type BlockRenderContext } from '../render-context.js';
 import { ProductCard } from './product-card.js';
 
 export function HeroRenderer({
@@ -17,7 +17,7 @@ export function HeroRenderer({
   block: HeroBlock;
   context: BlockRenderContext;
 }) {
-  const product = block.sku ? sellableProduct(context.products, block.sku) : undefined;
+  const product = block.sku ? findSellableProduct(context.products, block.sku) : undefined;
 
   return (
     <section className="rudra-hero">
@@ -105,7 +105,7 @@ export function BundleRenderer({
 
   const products: Product[] = [];
   for (const sku of bundle.skus) {
-    const product = sellableProduct(context.products, sku);
+    const product = findSellableProduct(context.products, sku);
     if (!product) return null;
     products.push(product);
   }

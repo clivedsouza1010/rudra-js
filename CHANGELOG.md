@@ -19,6 +19,16 @@ bump may break them.
   through anything it didn't before. `@rudra-js/core` now uses it instead of
   keeping its own copy of the same readings. This is why the peer range of core
   on attested is `^0.9.2`.
+- `@rudra-js/core/schemas` exports `defaultHrefForSku`, `defaultFormatPrice`,
+  `defaultFormatBundlePrice` and `findSellableProduct`. These are the defaults a
+  block uses to link to a product, show a price, and leave out a product that is
+  out of stock. `@rudra-js/react` now re-exports the first three from there, so
+  its API stays the same, and `@rudra-js/a2ui` uses them instead of its own copy.
+  Neither package renders anything differently. This is why the peer range of
+  react and a2ui on core is `^0.9.2`. Core also ships a `schemas/package.json`
+  that points at the built files. Bundlers and TypeScript settings that ignore
+  package `exports` (webpack 4, `moduleResolution: node`) can still find
+  `@rudra-js/core/schemas`, which react now loads.
 
 ### Fixed
 

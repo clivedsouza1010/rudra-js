@@ -43,6 +43,7 @@
   },
   "files": [
     "dist",
+    "schemas",
     "src/**/*.ts",
     "src/**/*.tsx",
     "!src/**/*.test.ts",

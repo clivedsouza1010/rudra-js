@@ -1,5 +1,5 @@
 import type { ProductReference } from '@rudra-js/core';
-import { sellableProduct, type BlockRenderContext } from '../render-context.js';
+import { findSellableProduct, type BlockRenderContext } from '../render-context.js';
 
 export function ProductCard({
   reference,
@@ -8,7 +8,7 @@ export function ProductCard({
   reference: ProductReference;
   context: BlockRenderContext;
 }) {
-  const product = sellableProduct(context.products, reference.sku);
+  const product = findSellableProduct(context.products, reference.sku);
   if (!product) return null;
 
   const isFeatured = reference.emphasis === 'featured';
