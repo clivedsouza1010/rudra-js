@@ -408,6 +408,10 @@ finding them out from a rejection.
 | `maxItems`           | 12    | `context.maxItems`, which also needs at least 1                     |
 | `reason`             | 120   | `candidates[].reason`, your own phrase for a product                |
 
+A product's `sku` and each of `bundles[].skus` must also be well-formed Unicode.
+Half of a UTF-16 surrogate pair on its own is refused, because the default
+product link runs the SKU through `encodeURIComponent`, and that throws on one.
+
 Each cap bounds a single field on its own. Together they aren't a budget for the
 whole prompt. Core doesn't count tokens either. The digest, the short summary of
 the shopper and the page, trims signals instead of throwing. The prompt will

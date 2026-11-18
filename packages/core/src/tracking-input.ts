@@ -23,6 +23,15 @@ const MAX_EPOCH_MS = Date.UTC(2100, 0, 1);
 const identifier = () => z.string().min(1).max(FIELD_LIMITS.identifier);
 const optionalIdentifier = () => identifier().optional();
 
+// In u mode a surrogate pair reads as one code point, so this matches only an unpaired half.
+const hasLoneSurrogate = (value: string) => /\p{Surrogate}/u.test(value);
+
+// Product links run the SKU through encodeURIComponent, which throws on a lone surrogate.
+const skuIdentifier = () =>
+  identifier().refine((value) => !hasLoneSurrogate(value), {
+    message: 'expected well-formed Unicode, with no unpaired surrogate',
+  });
+
 const currencyCode = () =>
   z
     .string()
@@ -48,7 +57,7 @@ const imageReference = () =>
     );
 
 export const productSchema = z.strictObject({
-  sku: identifier(),
+  sku: skuIdentifier(),
   title: z.string().min(1).max(FIELD_LIMITS.shortText),
   category: identifier(),
   price: z.number().nonnegative(),
@@ -143,7 +152,7 @@ export type TrackingSignals = z.infer<typeof trackingSignalsSchema>;
 export const bundleSchema = z.strictObject({
   id: identifier(),
   skus: z
-    .array(identifier())
+    .array(skuIdentifier())
     .min(2)
     .max(FIELD_LIMITS.productsPerBundle)
     .refine(isUnique, { message: 'a bundle must not list the same product twice' }),
