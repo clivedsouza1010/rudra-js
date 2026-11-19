@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bundleSchema,
   FIELD_LIMITS,
   parseTrackingInput,
   safeParseTrackingInput,
@@ -89,6 +90,10 @@ describe('parseTrackingInput', () => {
     expect(result.error?.issues[0]?.path).toEqual(['user', 'id']);
   });
 });
+
+const loneHighSurrogate = String.fromCharCode(0xd800);
+const loneLowSurrogate = String.fromCharCode(0xdc00);
+const runningShoeEmoji = String.fromCodePoint(0x1f45f);
 
 const repeat = (size: number) => 'x'.repeat(size);
 const sized = <T>(size: number, build: (index: number) => T) =>
@@ -342,6 +347,22 @@ describe('host-supplied values that are not merely bounded', () => {
     expect(result.success).toBe(accepted);
   });
 
+  it.each([
+    ['a lone high surrogate', `TR-${loneHighSurrogate}`, false],
+    ['a lone high surrogate mid-SKU', `TR-${loneHighSurrogate}-42`, false],
+    ['a lone low surrogate', `TR-${loneLowSurrogate}`, false],
+    ['a pair in the wrong order', `TR-${loneLowSurrogate}${loneHighSurrogate}`, false],
+    ['an emoji outside the basic plane', `TR-${runningShoeEmoji}`, true],
+  ])('sku: %s', (_label, sku, accepted) => {
+    expect(withProduct({ sku }).success).toBe(accepted);
+  });
+
+  it('names the product SKU when it is not well-formed', () => {
+    const result = withProduct({ sku: `TR-${loneHighSurrogate}` });
+
+    expect(result.error?.issues[0]?.path).toEqual(['candidates', 0, 'sku']);
+  });
+
   it('rejects a duplicate SKU in the candidate set', () => {
     const result = safeParseTrackingInput(
       minimalPayload({ candidates: [aProduct, { ...aProduct, title: 'Same shoe, listed twice' }] }),
@@ -408,6 +429,16 @@ describe('bundles', () => {
     expect(() =>
       parseTrackingInput(withBundles([{ id: 'BUN-1', skus: ['A', 'GHOST'], price: 25 }])),
     ).toThrow();
+  });
+
+  it('refuses a SKU that is not well-formed, even when the bundle is parsed on its own', () => {
+    const result = bundleSchema.safeParse({
+      id: 'BUN-1',
+      skus: ['A', loneHighSurrogate],
+      price: 25,
+    });
+
+    expect(result.error?.issues[0]?.path).toEqual(['skus', 1]);
   });
 
   it('refuses a bundle of one', () => {

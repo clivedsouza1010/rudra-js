@@ -30,6 +30,19 @@ bump may break them.
   package `exports`, such as TypeScript's `moduleResolution: node`, can still
   find `@rudra-js/core/schemas`, which react now loads.
 
+### Changed
+
+- `productSchema` and `bundleSchema` now refuse a SKU that isn't well-formed
+  Unicode, meaning it has half of a UTF-16 surrogate pair on its own, such as a
+  lone U+D800. The default product link runs the SKU through
+  `encodeURIComponent`, which throws on one, so the whole React block or A2UI
+  message build used to fail. Now a host with such a SKU gets a parse error that
+  names the field. The SKU isn't cleaned up for you, because that would change
+  which product it names. Emoji and other characters outside the basic plane are
+  still fine. SKUs in signals and `currentSku` aren't checked, because they
+  never become links, and a stale one in a shopper's history shouldn't fail the
+  whole request.
+
 ### Fixed
 
 - In cohort mode the grid only left out the heroes' products and slots when it
