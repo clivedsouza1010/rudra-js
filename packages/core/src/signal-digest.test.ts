@@ -232,6 +232,19 @@ describe('most viewed', () => {
     expect(strongest).toBeGreaterThan(bothWeak ?? 0);
   });
 
+  it('keeps the category a later view record names', () => {
+    const digest = digestOf({
+      signals: {
+        mostViewed: [
+          { sku: 'XX-999', views: 1 },
+          { sku: 'XX-999', views: 1, category: 'Climbing' },
+        ],
+      },
+    });
+
+    expect(digest.categoryAffinity).toEqual([{ category: 'Climbing', score: 1.58 }]);
+  });
+
   it('orders by view count, most viewed first', () => {
     const digest = digestOf({
       signals: {
