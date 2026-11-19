@@ -68,6 +68,16 @@ install a single copy at the top of the tree. All `@rudra-js` packages are
 published to npm by a single tag at the same version. That's why these ranges
 will always move together.
 
+In browser code, import values from `@rudra-js/core/schemas` instead of
+`@rudra-js/core`. It has `productSchema`, `bundleSchema`, `renderContextSchema`,
+`FIELD_LIMITS`, `parseComponentSpec`, and the defaults a block uses for product
+links, prices and stock. The main entry loads `node:crypto` to hash cache keys,
+so keep it on the server. Types are the exception:
+`import type { Product } from '@rudra-js/core'` is removed at build time, so
+it's fine in browser code. Keep the `type` before the braces. With
+`verbatimModuleSyntax`, `import { type Product }` stays in the build as an
+import of the main entry.
+
 ## Running without a model
 
 `createComponentGenerator` takes a `provider`. If you leave this out or pass
