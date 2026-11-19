@@ -122,6 +122,18 @@ schema share a stem: `ProductReference` and `productReferenceSchema`.
 You can rename freely up to the first published release. It costs nothing. After that, you'll need
 real breakage or a real collision to justify a rename, because it will be a major-version change.
 
+## Core's browser entry
+
+`@rudra-js/core/schemas` is the entry for browser code, and react and a2ui load it at runtime. So
+`packages/core/src/schemas.ts` may only re-export from files that import nothing from Node, not even
+through their own imports. Today that's `tracking-input.ts`, `component-spec.ts` and
+`product-display.ts`. `spec-cache.ts` imports `node:crypto`, so it stays out, and so does
+`component-generator.ts`, which imports it. `tests/react/browser-entry.test.ts` loads
+`@rudra-js/react`, which loads this entry, and fails if `node:crypto` comes in.
+
+`packages/core/schemas/package.json` points tools that ignore `exports` at the same built files, and
+`packages/core/src/schemas.test.ts` checks that the two agree.
+
 ## Tests
 
 Any behaviour that a comment claims is true needs a test that will fail when it stops being true.
