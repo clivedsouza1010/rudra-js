@@ -349,6 +349,7 @@ describe('host-supplied values that are not merely bounded', () => {
 
   it.each([
     ['a lone high surrogate', `TR-${loneHighSurrogate}`, false],
+    ['a lone high surrogate mid-SKU', `TR-${loneHighSurrogate}-42`, false],
     ['a lone low surrogate', `TR-${loneLowSurrogate}`, false],
     ['a pair in the wrong order', `TR-${loneLowSurrogate}${loneHighSurrogate}`, false],
     ['an emoji outside the basic plane', `TR-${runningShoeEmoji}`, true],
