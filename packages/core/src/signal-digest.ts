@@ -150,14 +150,8 @@ function mergeViewsBySku(views: ViewSignal[]): MergedView[] {
   const totals = new Map<string, MergedView>();
 
   for (const view of views) {
-    const total = totals.get(view.sku);
-    if (!total) {
-      const first: MergedView = { sku: view.sku, views: view.views, weight: weightOf(view) };
-      if (view.dwellMs !== undefined) first.dwellMs = view.dwellMs;
-      if (view.category !== undefined) first.category = view.category;
-      totals.set(view.sku, first);
-      continue;
-    }
+    const total = totals.get(view.sku) ?? { sku: view.sku, views: 0, weight: -Infinity };
+    totals.set(view.sku, total);
 
     total.views += view.views;
     if (view.dwellMs !== undefined) total.dwellMs = (total.dwellMs ?? 0) + view.dwellMs;
