@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GeneratedSpec } from './component-spec.js';
 import { buildDigest } from './signal-digest.js';
 import { buildFallbackSpec } from './fallback-component.js';
+import type { SelectOptions } from './product-selection.js';
 import { reconcileSpec } from './reconciliation.js';
 import { parseTrackingInput, type TrackingInputDraft } from './tracking-input.js';
 
@@ -15,7 +16,7 @@ const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
 
 const FOUR = [product('TR-101'), product('TR-102'), product('TR-103'), product('NU-201')];
 
-function build(overrides: Partial<TrackingInputDraft> = {}) {
+function build(overrides: Partial<TrackingInputDraft> = {}, options: SelectOptions = {}) {
   const input = parseTrackingInput({
     user: { id: 'shopper-1' },
     context: { surface: 'pdp' },
@@ -23,7 +24,7 @@ function build(overrides: Partial<TrackingInputDraft> = {}) {
     ...overrides,
   });
   const digest = buildDigest(input);
-  return { spec: buildFallbackSpec(input, digest), input, digest };
+  return { spec: buildFallbackSpec(input, digest, options), input, digest };
 }
 
 const gridOf = (spec: GeneratedSpec) => {
@@ -77,6 +78,27 @@ describe('the deterministic component', () => {
 
   it('says in the rationale which path produced it', () => {
     expect(build().spec.rationale).toContain('Deterministic');
+  });
+
+  it.each([
+    ['a first-time visitor', {}],
+    [
+      'a first-time visitor on a category page',
+      { context: { surface: 'pdp', currentCategory: 'Trail Running' } },
+    ],
+    ['a shopper with history', { signals: { likes: [{ sku: 'TR-101' }] } }],
+  ])('names the signals ranking for %s', (_label, overrides) => {
+    const signals =
+      'Deterministic: ranked by category interest (the browsed category counts too), views, rating and shared tags.';
+
+    expect(build(overrides).spec.rationale).toBe(signals);
+    expect(build(overrides, { rank: 'signals' }).spec.rationale).toBe(signals);
+  });
+
+  it('names the order the host sent under rank given', () => {
+    expect(build({}, { rank: 'given' }).spec.rationale).toBe(
+      'Deterministic: kept in the order the candidates were sent.',
+    );
   });
 });
 

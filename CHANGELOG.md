@@ -82,6 +82,15 @@ bump may break them.
   card to a duplicate, and those don't show now. A set that fits in the slots
   the grid leaves for heroes below the bundle block can now take them, and those
   heroes log `budget:dropped` or `duplicate-sku`.
+- The fallback spec's `rationale` could name a ranking that didn't run. It
+  picked its text by whether the shopper had any history and never looked at
+  `rank`. Under `rank: 'given'` it named a score, when the products were in the
+  order you sent. Under the default `rank: 'signals'`, a shopper with no history
+  was told the products were ranked by rating and stock, but the category being
+  browsed, if there is one, counts most, and stock only filters. Now it says the
+  order is the one you sent under `rank: 'given'`, and otherwise names what core
+  ranks by. Only the text changes. It shows in `spec.rationale` and under
+  `hasDiagnostics`, and the products and their order are the same.
 
 ## [0.9.1] - 2026-11-08
 
