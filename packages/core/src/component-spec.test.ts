@@ -272,6 +272,10 @@ describe('parseComponentSpec', () => {
     expect(parseComponentSpec(componentSpec)).toStrictEqual(componentSpec);
   });
 
+  it('drops a field it does not know', () => {
+    expect(parseComponentSpec({ ...componentSpec, cacheKey: 'k' })).toStrictEqual(componentSpec);
+  });
+
   it('keeps the reason a degraded spec gives', () => {
     expect(parseComponentSpec({ ...componentSpec, degradedReason: 'timeout' })).toMatchObject({
       degradedReason: 'timeout',
@@ -283,6 +287,7 @@ describe('parseComponentSpec', () => {
     ['has no slot', { slot: undefined }],
     ['names a source core never sets', { source: 'agent' }],
     ['gives a degraded reason core never gives', { degradedReason: 'because' }],
+    ['sets its degraded reason to undefined', { degradedReason: undefined }],
     ['has a latency that JSON turned from NaN into null', { latencyMs: null }],
     ['has a timestamp that is not a number', { generatedAt: 'now' }],
     ['names its model with a number', { model: 5 }],

@@ -50,6 +50,14 @@ bump may break them.
   still fine. SKUs in signals and `currentSku` aren't checked, because they
   never become links, and a stale one in a shopper's history shouldn't fail the
   whole request.
+- `parseComponentSpec` now refuses a spec whose `degradedReason` is written out
+  as `undefined`. It used to drop the key. A spec that arrives as JSON parses
+  the same as before, because JSON can't carry `undefined`, and core never
+  writes one. The `RudraRecommendations` component in `@rudra-js/a2ui` runs your
+  loader's result through this check, so a loader that returns such a spec
+  without going through JSON now shows nothing and calls `onError`.
+  `ComponentSpec` is now inferred from the schema `parseComponentSpec` checks,
+  so the two can't drift apart. Its fields haven't changed.
 
 ### Fixed
 
