@@ -1057,6 +1057,19 @@ describe('keeping room for the set', () => {
     expect(events[0]?.violations).toEqual(['no-bundle']);
   });
 
+  it('keeps the hero below the set its product when the one card above names a product this shopper cannot see', async () => {
+    const events: GenerationEvent[] = [];
+    const rendered = await generatorFor(
+      specOf([gridBlock(['GONE-1']), bundleBlock, heroBlock('E')]),
+      { onEvent: (event) => events.push(event) },
+    ).generate(shopper({ context: { surface: 'pdp', maxItems: 2 } }));
+
+    expect(placedSkus(rendered)).toEqual(['A']);
+    expect(heroSkuOf(rendered)).toBe('E');
+    expect(bundleIdOf(rendered)).toBeNull();
+    expect(events[0]?.violations).toEqual(['no-bundle']);
+  });
+
   it('counts a hero product named twice once', async () => {
     const events: GenerationEvent[] = [];
     const rendered = await generatorFor(
@@ -1117,6 +1130,16 @@ describe('keeping room for the set', () => {
     const rendered = await generatorFor(
       specOf([heroBlock('C'), gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
     ).generate(shopper());
+
+    expect(heroSkuOf(rendered)).toBeNull();
+    expect(placedSkus(rendered)).toEqual(['A', 'B']);
+    expect(bundleIdOf(rendered)).toBe('BUN-CD');
+  });
+
+  it('gives the grid back the slot of a hero below the set naming the product being looked at', async () => {
+    const rendered = await generatorFor(
+      specOf([gridBlock(['A', 'B', 'C', 'D']), bundleBlock, heroBlock('E')]),
+    ).generate(shopper({ context: { surface: 'pdp', currentSku: 'E' } }));
 
     expect(heroSkuOf(rendered)).toBeNull();
     expect(placedSkus(rendered)).toEqual(['A', 'B']);
@@ -1271,6 +1294,16 @@ describe('keeping room for the set', () => {
     expect(heroSkuOf(rendered)).toBe('E');
     expect(placedSkus(rendered)).toEqual([]);
     expect(events[0]?.violations).toEqual(['empty-block:grid', 'no-bundle']);
+  });
+
+  it('keeps room for the set of the first bundle block when a later one would choose another', async () => {
+    const rendered = await generatorFor(
+      specOf([bundleBlock, heroBlock('D'), gridBlock(['A', 'B', 'C', 'D']), bundleBlock]),
+    ).generate(shopper());
+
+    expect(bundleIdOf(rendered)).toBe('BUN-CD');
+    expect(heroSkuOf(rendered)).toBeNull();
+    expect(placedSkus(rendered)).toEqual(['A', 'B']);
   });
 
   it('keeps room for a set that is the first block', async () => {

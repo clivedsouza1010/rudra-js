@@ -13,8 +13,7 @@ import { buildDigest, DIGEST_LIMITS } from './signal-digest.js';
 import { ALLOWED_PHRASES } from './claim-screening.js';
 import {
   MAX_BLOCKS,
-  bundleForShopper,
-  placeableHeroSkus,
+  heroAndSetSkus,
   reconcileSpec,
   type ReconcileResult,
 } from './reconciliation.js';
@@ -400,7 +399,7 @@ describe('the hero products a spec reserves room for', () => {
       { kind: 'hero', headline: 'Out again', body: null, sku: 'TR-101', ctaLabel: null },
     ];
 
-    expect(placeableHeroSkus(heroes, input)).toEqual(['TR-101']);
+    expect([...heroAndSetSkus(heroes, input, buildDigest(input))]).toEqual(['TR-101']);
   });
 });
 
@@ -921,7 +920,7 @@ describe('the set the generator reserves room for', () => {
     const digest = buildDigest(input);
 
     return {
-      reserved: bundleForShopper(input, digest, [])?.id ?? null,
+      reserved: [...heroAndSetSkus([BUNDLE_BLOCK], input, digest)],
       placed: reconcileSpec(specWith([BUNDLE_BLOCK]), input, digest).spec.blocks[0] ?? null,
     };
   }
@@ -945,7 +944,7 @@ describe('the set the generator reserves room for', () => {
       },
     });
 
-    expect(reserved).toBeNull();
+    expect(reserved).toEqual([]);
     expect(placed).toBeNull();
   });
 
@@ -955,14 +954,14 @@ describe('the set the generator reserves room for', () => {
       context: { surface: 'pdp', currentSku: 'B' },
     });
 
-    expect(reserved).toBeNull();
+    expect(reserved).toEqual([]);
     expect(placed).toBeNull();
   });
 
   it('reserves the set both paths can still place', () => {
     const { reserved, placed } = bothPaths(PAIR);
 
-    expect(reserved).toBe('BUN-1');
+    expect(reserved).toEqual(['A', 'B']);
     expect(placed).toMatchObject({ kind: 'bundle', bundleId: 'BUN-1' });
   });
 });

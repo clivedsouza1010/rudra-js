@@ -9,7 +9,7 @@ import {
 import { buildFallbackSpec } from './fallback-component.js';
 import { buildPrompt } from './model-prompt.js';
 import type { ComponentProvider, TokenUsage } from './provider.js';
-import { bundleForShopper, capBlocks, placeableHeroSkus, reconcileSpec } from './reconciliation.js';
+import { heroAndSetSkus, reconcileSpec } from './reconciliation.js';
 import { selectProducts, type RankOrder } from './product-selection.js';
 import { fitToShopper, type FittedSpec } from './fit-to-shopper.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
@@ -129,20 +129,7 @@ function fitCohortSpec(
   digest: SignalDigest,
   rank: RankOrder,
 ): FittedSpec {
-  const blocks = capBlocks(spec.blocks);
-  let spokenFor = new Set(placeableHeroSkus(blocks, input));
-
-  const bundleAt = blocks.findIndex((block) => block.kind === 'bundle');
-  if (bundleAt !== -1) {
-    const above = blocks.slice(0, bundleAt);
-    const bundle = bundleForShopper(input, digest, placeableHeroSkus(above, input));
-    const withBundle = new Set([...spokenFor, ...(bundle?.skus ?? [])]);
-    const listAbove = above.some(
-      (block) => (block.kind === 'grid' || block.kind === 'carousel') && block.items.length > 0,
-    );
-    if (!listAbove || withBundle.size < digest.maxItems) spokenFor = withBundle;
-  }
-
+  const spokenFor = heroAndSetSkus(spec.blocks, input, digest);
   const picks = selectProducts(input, digest, { rank });
   const forGrid = picks.filter((pick) => !spokenFor.has(pick.product.sku));
   return fitToShopper(spec, forGrid, digest.maxItems - spokenFor.size);
