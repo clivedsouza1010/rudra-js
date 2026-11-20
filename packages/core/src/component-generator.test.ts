@@ -547,6 +547,20 @@ describe('what it reports', () => {
     expect(event).toMatchObject({ source: 'llm', calledModel: true, usage: { inputTokens: 10 } });
   });
 
+  it('reports the fields of a served generation in a fixed order', async () => {
+    const [event] = await collect({ provider: countingProvider().provider });
+
+    expect(Object.keys(event ?? {})).toEqual([
+      'key',
+      'source',
+      'elapsedMs',
+      'calledModel',
+      'cache',
+      'violations',
+      'usage',
+    ]);
+  });
+
   it('does not count a cache hit as a model call', async () => {
     const events = await collect({ provider: countingProvider().provider }, 2);
 
@@ -583,7 +597,12 @@ describe('what it reports', () => {
   ])('counts the model call when %s', async (_label, options, degradedReason) => {
     const [event] = await collect(options);
 
-    expect(event).toMatchObject({ source: 'fallback', calledModel: true, degradedReason });
+    expect(event).toMatchObject({
+      source: 'fallback',
+      calledModel: true,
+      cache: 'miss',
+      degradedReason,
+    });
   });
 
   it('reports what an unparseable answer cost', async () => {
@@ -710,6 +729,15 @@ describe('what it reports', () => {
     });
 
     expect(event).toMatchObject({ source: 'llm', cache: 'miss' });
+  });
+
+  it('reports an entry with extra fields from the store as a cache hit', async () => {
+    const entry = { spec: modelSpec(['TR-101']), generatedAt: 1, storedAt: 2 };
+    const taggedCache: SpecCache = { get: async () => entry, set: async () => {} };
+
+    const [event] = await collect({ provider: countingProvider().provider, cache: taggedCache });
+
+    expect(event).toMatchObject({ source: 'cache', cache: 'hit' });
   });
 
   it('reports a cache hit when a valid entry was served', async () => {

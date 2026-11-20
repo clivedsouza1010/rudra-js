@@ -29,9 +29,17 @@ bump may break them.
   that points at the built files, so tools that resolve modules without reading
   package `exports`, such as TypeScript's `moduleResolution: node`, can still
   find `@rudra-js/core/schemas`, which react now loads.
+- `@rudra-js/core` exports `RankOrder`, the type of the generator's `rank`
+  option, `'signals' | 'given'`. `ComponentGeneratorOptions` already used it,
+  but you couldn't import it, so you had to write
+  `ComponentGeneratorOptions['rank']`.
 
 ### Changed
 
+- `createComponentGenerator` now reads `onEvent` once, when you create the
+  generator, like its other options. Setting or replacing `options.onEvent`
+  afterwards has no effect, and an `onEvent` written as a method no longer gets
+  your options object as `this`.
 - `productSchema` and `bundleSchema` now refuse a SKU that isn't well-formed
   Unicode, meaning it has half of a UTF-16 surrogate pair on its own, such as a
   lone U+D800. The default product link runs the SKU through
@@ -42,6 +50,14 @@ bump may break them.
   still fine. SKUs in signals and `currentSku` aren't checked, because they
   never become links, and a stale one in a shopper's history shouldn't fail the
   whole request.
+- `parseComponentSpec` now refuses a spec whose `degradedReason` is written out
+  as `undefined`. It used to drop the key. A spec that arrives as JSON parses
+  the same as before, because JSON can't carry `undefined`, and core never
+  writes one. The `RudraRecommendations` component in `@rudra-js/a2ui` runs your
+  loader's result through this check, so a loader that returns such a spec
+  without going through JSON now shows nothing and calls `onError`.
+  `ComponentSpec` is now inferred from the schema `parseComponentSpec` checks,
+  so the two can't drift apart. Its fields haven't changed.
 
 ### Fixed
 
@@ -66,6 +82,15 @@ bump may break them.
   card to a duplicate, and those don't show now. A set that fits in the slots
   the grid leaves for heroes below the bundle block can now take them, and those
   heroes log `budget:dropped` or `duplicate-sku`.
+- The fallback spec's `rationale` could name a ranking that didn't run. It
+  picked its text by whether the shopper had any history and never looked at
+  `rank`. Under `rank: 'given'` it named a score, when the products were in the
+  order you sent. Under the default `rank: 'signals'`, a shopper with no history
+  was told the products were ranked by rating and stock, but the category being
+  browsed, if there is one, counts most, and stock only filters. Now it says the
+  order is the one you sent under `rank: 'given'`, and otherwise names what core
+  ranks by. Only the text changes. It shows in `spec.rationale` and under
+  `hasDiagnostics`, and the products and their order are the same.
 
 ## [0.9.1] - 2026-11-08
 

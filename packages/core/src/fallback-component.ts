@@ -43,8 +43,9 @@ export function buildFallbackSpec(
       items.length === 0
         ? []
         : [{ kind: 'grid', title: null, columns: columnsFor(items.length, 4), items }],
-    rationale: digest.isColdStart
-      ? 'Deterministic: no behavioural signals, ranked by rating and stock.'
-      : 'Deterministic: ranked by category affinity, revisit, rating and tag overlap.',
+    rationale:
+      options.rank === 'given'
+        ? 'Deterministic: kept in the order the candidates were sent.'
+        : 'Deterministic: ranked by category interest (the browsed category counts too), views, rating and shared tags.',
   };
 }

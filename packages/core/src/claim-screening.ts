@@ -84,7 +84,6 @@ export const ALLOWED_PHRASES = [
 ];
 
 const FACT_DIGIT = /\p{Nd}/u;
-const NUMERAL = /[\p{Nd}\p{No}\p{Nl}]/u;
 
 export const NO_FACTS: readonly string[] = [];
 
@@ -129,8 +128,7 @@ export function unbackedClaim(
   const kind = claimIn(raw) ?? claimIn(clamped);
   if (kind !== null) return kind;
 
-  const values = NUMERAL.test(clamped) ? facts : NO_FACTS;
-  const result = verify(clamped, { values, allowedPhrases: ALLOWED_PHRASES });
+  const result = verify(clamped, { values: facts, allowedPhrases: ALLOWED_PHRASES });
   if (!result.quantity.supported) return 'quantity';
   if (!result.wording.supported) return 'wording';
   return null;

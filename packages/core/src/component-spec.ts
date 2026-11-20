@@ -114,17 +114,6 @@ export type DegradedReason = (typeof DEGRADED_REASONS)[number];
 
 export const SPEC_VERSION = '1' as const;
 
-export interface ComponentSpec extends GeneratedSpec {
-  specVersion: typeof SPEC_VERSION;
-  slot: string;
-  source: SpecSource;
-  generatedAt: number;
-  latencyMs: number;
-  provider: string | null;
-  model: string | null;
-  degradedReason?: DegradedReason;
-}
-
 const componentSpecSchema = generatedSpecSchema.extend({
   specVersion: z.literal(SPEC_VERSION),
   slot: z.string(),
@@ -133,12 +122,12 @@ const componentSpecSchema = generatedSpecSchema.extend({
   latencyMs: z.number(),
   provider: z.string().nullable(),
   model: z.string().nullable(),
-  degradedReason: z.enum(DEGRADED_REASONS).optional(),
+  degradedReason: z.enum(DEGRADED_REASONS).exactOptional(),
 });
+export type ComponentSpec = z.infer<typeof componentSpecSchema>;
 
 export function parseComponentSpec(value: unknown): ComponentSpec {
-  const { degradedReason, ...spec } = componentSpecSchema.parse(value);
-  return degradedReason === undefined ? spec : { ...spec, degradedReason };
+  return componentSpecSchema.parse(value);
 }
 
 export function parseGeneratedSpec(value: unknown): GeneratedSpec {

@@ -158,6 +158,15 @@ describe('a badge is screened like any other sentence', () => {
     expect(result.violations).toEqual([]);
   });
 
+  it('checks the number a cut badge shows, not the one the model wrote', () => {
+    const result = reconcile(grid([ref('TR-101', { badge: 'Waterproof-shell-to:20000mm' })]), {
+      candidates: [product('TR-101', { tags: ['20000mm'] }), product('TR-102')],
+    });
+
+    expect(basisOf(result)?.badge).toBeNull();
+    expect(result.violations).toContain('unverifiable-claim:quantity:badge:TR-101');
+  });
+
   it('drops a badge along with the basis it was stating', () => {
     const result = reconcile(
       grid([ref('TR-101', { basis: 'most_viewed', badge: 'You viewed this' })]),
