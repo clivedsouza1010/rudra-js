@@ -1,12 +1,15 @@
 import { createHash } from 'node:crypto';
-import { SPEC_VERSION, type GeneratedSpec } from './component-spec.js';
+import { z } from 'zod';
+import { SPEC_VERSION, generatedSpecSchema } from './component-spec.js';
 import { SYSTEM_PROMPT } from './model-prompt.js';
 import type { SignalDigest } from './signal-digest.js';
 
-export interface CachedSpec {
-  spec: GeneratedSpec;
-  generatedAt: number;
-}
+export const cachedSpecSchema = z.object({
+  spec: generatedSpecSchema,
+  generatedAt: z.number(),
+});
+
+export type CachedSpec = z.infer<typeof cachedSpecSchema>;
 
 export interface SpecCache {
   get(key: string): Promise<CachedSpec | undefined>;

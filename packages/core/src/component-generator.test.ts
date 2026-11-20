@@ -731,6 +731,15 @@ describe('what it reports', () => {
     expect(event).toMatchObject({ source: 'llm', cache: 'miss' });
   });
 
+  it('reports an entry with extra fields from the store as a cache hit', async () => {
+    const entry = { spec: modelSpec(['TR-101']), generatedAt: 1, storedAt: 2 };
+    const taggedCache: SpecCache = { get: async () => entry, set: async () => {} };
+
+    const [event] = await collect({ provider: countingProvider().provider, cache: taggedCache });
+
+    expect(event).toMatchObject({ source: 'cache', cache: 'hit' });
+  });
+
   it('reports a cache hit when a valid entry was served', async () => {
     const events = await collect({ provider: countingProvider().provider }, 2);
 

@@ -1,7 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type { GeneratedSpec } from './component-spec.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
-import { createMemorySpecCache, createNullSpecCache, specCacheKey } from './spec-cache.js';
+import {
+  createMemorySpecCache,
+  createNullSpecCache,
+  specCacheKey,
+  type CachedSpec,
+} from './spec-cache.js';
 import { buildPrompt } from './model-prompt.js';
 import {
   parseTrackingInput,
@@ -175,6 +180,12 @@ describe('what else the key depends on', () => {
     const digest = richDigest();
 
     expect(keyFor(digest, ['TR-102', 'TR-104'])).toBe(keyFor(digest, ['TR-104', 'TR-102']));
+  });
+});
+
+describe('the cache entry type', () => {
+  it('holds the spec and when it was generated, and nothing else', () => {
+    expectTypeOf<CachedSpec>().toEqualTypeOf<{ spec: GeneratedSpec; generatedAt: number }>();
   });
 });
 

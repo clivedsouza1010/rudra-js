@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import {
   SPEC_VERSION,
   generatedSpecSchema,
@@ -15,6 +14,7 @@ import { selectProducts, type RankOrder } from './product-selection.js';
 import { fitToShopper, type FittedSpec } from './fit-to-shopper.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import {
+  cachedSpecSchema,
   createMemorySpecCache,
   specCacheKey,
   type CachedSpec,
@@ -85,11 +85,6 @@ async function withinBudget<T>(
     clearTimeout(timer);
   }
 }
-
-const cachedSpecSchema = z.object({
-  spec: generatedSpecSchema,
-  generatedAt: z.number(),
-});
 
 interface CacheRead {
   outcome: NonNullable<GenerationEvent['cache']>;
