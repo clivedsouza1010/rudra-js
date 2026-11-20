@@ -547,6 +547,20 @@ describe('what it reports', () => {
     expect(event).toMatchObject({ source: 'llm', calledModel: true, usage: { inputTokens: 10 } });
   });
 
+  it('reports the fields of a served generation in a fixed order', async () => {
+    const [event] = await collect({ provider: countingProvider().provider });
+
+    expect(Object.keys(event ?? {})).toEqual([
+      'key',
+      'source',
+      'elapsedMs',
+      'calledModel',
+      'cache',
+      'violations',
+      'usage',
+    ]);
+  });
+
   it('does not count a cache hit as a model call', async () => {
     const events = await collect({ provider: countingProvider().provider }, 2);
 
@@ -583,7 +597,12 @@ describe('what it reports', () => {
   ])('counts the model call when %s', async (_label, options, degradedReason) => {
     const [event] = await collect(options);
 
-    expect(event).toMatchObject({ source: 'fallback', calledModel: true, degradedReason });
+    expect(event).toMatchObject({
+      source: 'fallback',
+      calledModel: true,
+      cache: 'miss',
+      degradedReason,
+    });
   });
 
   it('reports what an unparseable answer cost', async () => {

@@ -119,16 +119,9 @@ interface Run {
   startedAt: number;
 }
 
-interface Trace {
-  calledModel: boolean;
-  cache: CacheRead['outcome'];
-  usage: TokenUsage | undefined;
-  error?: unknown;
-}
-
 type Found =
-  | { spec: GeneratedSpec; generatedAt: number; source: 'cache' | 'llm'; trace: Trace }
-  | { failed: DegradedReason; trace: Trace };
+  | { spec: GeneratedSpec; generatedAt: number; source: 'cache' | 'llm'; details: EventDetails }
+  | { failed: DegradedReason; details: EventDetails };
 
 type EventDetails = Pick<
   GenerationEvent,
@@ -187,11 +180,11 @@ async function generate(settings: Settings, draft: TrackingInputDraft): Promise<
 
   const key = cacheKeyFor(provider, run);
   const found = await findSpec(settings, provider, run, key);
-  if ('failed' in found)
-    return fallback(settings, run, key, found.failed, eventDetails(found.trace));
+  if ('failed' in found) return fallback(settings, run, key, found.failed, found.details);
 
   const reconciled = shapeForShopper(settings, run, found.spec);
-  const details = eventDetails(found.trace, reconciled.violations);
+  const { usage, ...seen } = found.details;
+  const details = { ...seen, violations: reconciled.violations, ...(usage ? { usage } : {}) };
   if (!reconciled.isUsable) return fallback(settings, run, key, 'unusable-on-serve', details);
 
   const finishedAt = Date.now();
@@ -240,8 +233,8 @@ async function findSpec(
 ): Promise<Found> {
   const read = await readCache(settings, key);
   if (read.entry) {
-    const trace = { calledModel: false, cache: read.outcome, usage: undefined };
-    return { spec: read.entry.spec, generatedAt: read.entry.generatedAt, source: 'cache', trace };
+    const details = { calledModel: false, cache: read.outcome };
+    return { spec: read.entry.spec, generatedAt: read.entry.generatedAt, source: 'cache', details };
   }
 
   const calledModel = !settings.inFlight.has(key);
@@ -250,15 +243,16 @@ async function findSpec(
     call = await sharedCall(settings, key, () => askModel(settings, provider, run));
   } catch (error) {
     const failed = error instanceof TimeoutError ? 'timeout' : 'provider-error';
-    return { failed, trace: { calledModel, cache: read.outcome, usage: undefined, error } };
+    return { failed, details: { calledModel, cache: read.outcome, error } };
   }
 
-  const trace = { calledModel, cache: read.outcome, usage: call.usage };
-  if (!call.spec) return { failed: 'invalid-generation', trace };
+  const details: EventDetails = { calledModel, cache: read.outcome };
+  if (call.usage) details.usage = call.usage;
+  if (!call.spec) return { failed: 'invalid-generation', details };
 
   const generatedAt = Date.now();
   if (calledModel) storeInBackground(settings, key, { spec: call.spec, generatedAt });
-  return { spec: call.spec, generatedAt, source: 'llm', trace };
+  return { spec: call.spec, generatedAt, source: 'llm', details };
 }
 
 async function readCache(settings: Settings, key: string): Promise<CacheRead> {
@@ -341,16 +335,6 @@ function fallback(
     provider: null,
     model: null,
     degradedReason,
-  };
-}
-
-function eventDetails(trace: Trace, violations?: string[]): EventDetails {
-  return {
-    calledModel: trace.calledModel,
-    cache: trace.cache,
-    ...(violations ? { violations } : {}),
-    ...(trace.usage ? { usage: trace.usage } : {}),
-    ...('error' in trace ? { error: trace.error } : {}),
   };
 }
 
