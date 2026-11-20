@@ -102,13 +102,13 @@ interface ModelCall {
 }
 
 interface Settings {
-  options: ComponentGeneratorOptions;
   provider: ComponentProvider | null;
   cache: SpecCache;
-  generation: 'cohort' | 'per-shopper';
+  generation: NonNullable<ComponentGeneratorOptions['generation']>;
   rank: RankOrder;
   modelTimeoutMs: number;
   cacheTimeoutMs: number;
+  onEvent: ComponentGeneratorOptions['onEvent'];
   inFlight: Map<string, Promise<ModelCall>>;
 }
 
@@ -164,13 +164,13 @@ export function createComponentGenerator(
   options: ComponentGeneratorOptions = {},
 ): ComponentGenerator {
   const settings: Settings = {
-    options,
     provider: options.provider ?? null,
     cache: options.cache ?? createMemorySpecCache(),
     generation: options.generation ?? 'cohort',
     rank: options.rank ?? 'signals',
     modelTimeoutMs: options.modelTimeoutMs ?? 1_500,
     cacheTimeoutMs: options.cacheTimeoutMs ?? 50,
+    onEvent: options.onEvent,
     inFlight: new Map(),
   };
 
@@ -355,8 +355,7 @@ function eventDetails(trace: Trace, violations?: string[]): EventDetails {
 }
 
 function report(settings: Settings, event: GenerationEvent): void {
-  if (!settings.options.onEvent) return;
   try {
-    settings.options.onEvent(event);
+    settings.onEvent?.(event);
   } catch {}
 }

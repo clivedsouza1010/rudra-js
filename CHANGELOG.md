@@ -29,9 +29,17 @@ bump may break them.
   that points at the built files, so tools that resolve modules without reading
   package `exports`, such as TypeScript's `moduleResolution: node`, can still
   find `@rudra-js/core/schemas`, which react now loads.
+- `@rudra-js/core` exports `RankOrder`, the type of the generator's `rank`
+  option, `'signals' | 'given'`. `ComponentGeneratorOptions` already used it,
+  but you couldn't import it, so you had to write
+  `ComponentGeneratorOptions['rank']`.
 
 ### Changed
 
+- `createComponentGenerator` now reads `onEvent` once, when you create the
+  generator, like its other options. Setting or replacing `options.onEvent`
+  afterwards has no effect, and an `onEvent` written as a method no longer gets
+  your options object as `this`.
 - `productSchema` and `bundleSchema` now refuse a SKU that isn't well-formed
   Unicode, meaning it has half of a UTF-16 surrogate pair on its own, such as a
   lone U+D800. The default product link runs the SKU through

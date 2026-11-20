@@ -64,7 +64,7 @@ export {
 } from './component-spec.js';
 
 export { reconcileSpec, type ReconcileResult } from './reconciliation.js';
-export { selectProducts, type ProductPick } from './product-selection.js';
+export { selectProducts, type ProductPick, type RankOrder } from './product-selection.js';
 
 export {
   createFixedSpecProvider,
