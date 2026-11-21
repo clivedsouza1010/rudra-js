@@ -7,7 +7,7 @@ import {
   specCacheKey,
   type CachedSpec,
 } from './spec-cache.js';
-import { buildPrompt } from './model-prompt.js';
+import { buildPrompt, type PromptPair } from './model-prompt.js';
 import {
   parseTrackingInput,
   type TrackingInput,
@@ -563,11 +563,15 @@ describe('a cohort key', () => {
   });
 });
 
-async function keysUnderChangedPrompt() {
+async function keysUnderChangedPrompt(change: (prompt: PromptPair) => PromptPair) {
   vi.resetModules();
   vi.doMock('./model-prompt.js', async (importOriginal) => {
     const original = await importOriginal<typeof import('./model-prompt.js')>();
-    return { ...original, SYSTEM_PROMPT: `${original.SYSTEM_PROMPT}\nOne more rule.` };
+    return {
+      ...original,
+      buildPrompt: (...args: Parameters<typeof original.buildPrompt>) =>
+        change(original.buildPrompt(...args)),
+    };
   });
   try {
     return await import('./spec-cache.js');
@@ -577,17 +581,31 @@ async function keysUnderChangedPrompt() {
   }
 }
 
+const PROMPT_CHANGES = [
+  {
+    half: 'system prompt',
+    change: (prompt: PromptPair) => ({ ...prompt, system: `${prompt.system}\nOne more rule.` }),
+  },
+  {
+    half: 'shopper half of the prompt',
+    change: (prompt: PromptPair) => ({ ...prompt, user: `${prompt.user}\nOne more line.` }),
+  },
+];
+
 describe('the prompt is in both keys', () => {
-  it('changes the per-shopper key when the system prompt changes', async () => {
-    const changed = await keysUnderChangedPrompt();
+  it.each(PROMPT_CHANGES)(
+    'changes the per-shopper key when the $half changes',
+    async ({ change }) => {
+      const changed = await keysUnderChangedPrompt(change);
 
-    expect(changed.specCacheKey(richDigest(), SKUS, A_PROVIDER)).not.toBe(
-      keyFor(richDigest(), SKUS, A_PROVIDER),
-    );
-  });
+      expect(changed.specCacheKey(richDigest(), SKUS, A_PROVIDER)).not.toBe(
+        keyFor(richDigest(), SKUS, A_PROVIDER),
+      );
+    },
+  );
 
-  it('changes the cohort key when the system prompt changes', async () => {
-    const changed = await keysUnderChangedPrompt();
+  it.each(PROMPT_CHANGES)('changes the cohort key when the $half changes', async ({ change }) => {
+    const changed = await keysUnderChangedPrompt(change);
 
     expect(
       changed.specCacheKey(toCohortDigest(cohortDigest()), ['TR-101', 'TR-999'], A_PROVIDER),

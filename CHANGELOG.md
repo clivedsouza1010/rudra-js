@@ -58,6 +58,14 @@ bump may break them.
   without going through JSON now shows nothing and calls `onError`.
   `ComponentSpec` is now inferred from the schema `parseComponentSpec` checks,
   so the two can't drift apart. Its fields haven't changed.
+- Both cache keys now move when core changes the wording or layout of either
+  half of the prompt, not only the system prompt. A change to how core describes
+  the shopper or the candidates, such as a heading, the task line or how unusual
+  characters are escaped, used to keep every key. A shared cache then kept
+  serving specs written under the old prompt until they expired. A change that
+  only shows up for some inputs, like escaping one more kind of character, can
+  still keep the keys. Every key moves once with this release, so each entry
+  misses once and is generated again.
 
 ### Fixed
 
