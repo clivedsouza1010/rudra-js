@@ -175,6 +175,11 @@ select {
   background: #fff;
 }
 
+.search__input::placeholder {
+  color: var(--slate);
+  opacity: 1;
+}
+
 .search__button {
   height: 2.75rem;
   padding: 0 1.125rem;
@@ -311,8 +316,8 @@ select {
 }
 
 .gallery__thumb[aria-pressed='true'] {
-  border-color: var(--spruce);
-  box-shadow: 0 0 0 1px var(--spruce);
+  border-color: var(--granite);
+  box-shadow: 0 0 0 1px var(--granite);
 }
 
 .gallery__main {
@@ -551,6 +556,7 @@ select {
 .row-scroller__button {
   position: absolute;
   top: 38%;
+  z-index: 3;
   display: grid;
   place-items: center;
   width: 2.5rem;

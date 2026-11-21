@@ -191,7 +191,7 @@ const CATEGORY_INFO: Record<string, CategoryInfo> = {
       'Color-coded clips for quick pitching',
       'Mesh inner for warm nights',
     ],
-    spec: ['Sleeps', ['1', '2', '3']],
+    spec: ['Sleeps', ['2', '3', '4']],
     tags: ['waterproof', 'lightweight', 'recycled'],
     summary: 'There’s room to sit up and sort your gear when the weather turns.',
     praise: 'It pitches in a few minutes, even on my own.',
@@ -354,7 +354,9 @@ export function detailsFor(product: Product): ProductDetails {
     info.tags.includes(tag) && TAG_TEXT[tag] ? [TAG_TEXT[tag]] : [],
   );
   const specValues = info.spec[1].filter(
-    (value) => material !== 'Primaloft' || !value.includes('down'),
+    (value) =>
+      (material !== 'Primaloft' || !value.includes('down')) &&
+      (!product.tags.includes('lightweight') || value !== 'Heavyweight'),
   );
 
   return {

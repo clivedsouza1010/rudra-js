@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-const TRACK = '.rudra-carousel__track, .rudra-grid__items';
+const TRACK = '.rudra-carousel__track, .rudra-grid__items, .compare';
 
 export function RowScroller({ label, children }: { label: string; children: ReactNode }) {
   const holder = useRef<HTMLDivElement>(null);

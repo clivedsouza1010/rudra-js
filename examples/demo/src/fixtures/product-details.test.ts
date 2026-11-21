@@ -68,6 +68,20 @@ describe('the made-up product details', () => {
     }
   });
 
+  it('never contradicts the highlights in the specs', () => {
+    for (const product of generateCatalog(1)) {
+      const details = detailsFor(product);
+      const spec = (label: string) => details.specs.find(([name]) => name === label)?.[1];
+
+      if (details.highlights.includes('Built light for long days')) {
+        expect(spec('Weight class')).not.toBe('Heavyweight');
+      }
+      if (details.highlights.some((line) => line.includes('two doors'))) {
+        expect(spec('Sleeps')).not.toBe('1');
+      }
+    }
+  });
+
   it('writes weights the way a store would, never as 16 oz or 0 oz', () => {
     for (const product of generateCatalog(1)) {
       const weight = detailsFor(product).specs.find(([label]) => label === 'Weight')?.[1] ?? '';
