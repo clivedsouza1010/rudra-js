@@ -76,11 +76,13 @@ export function buildTrackingInput(
 ): TrackingInputDraft {
   const current = catalog.find((product) => product.sku === currentSku);
   const offerable = offerableBesides(catalog, currentSku);
-  const inCategory = offerable.filter(
-    (product) =>
-      !current || (product.category === current.category && product.title !== current.title),
+  const otherTitles = offerable.filter((product) => !current || product.title !== current.title);
+  const inCategory = otherTitles.filter(
+    (product) => !current || product.category === current.category,
   );
-  const finalCandidates = (inCategory.length > 0 ? inCategory : offerable).slice(0, 24);
+  const finalCandidates = (
+    [inCategory, otherTitles].find((products) => products.length > 0) ?? offerable
+  ).slice(0, 24);
 
   return buildSlotInput(
     shopper,

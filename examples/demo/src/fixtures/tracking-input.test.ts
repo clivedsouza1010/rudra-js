@@ -70,6 +70,25 @@ describe('the tracking payload the demo builds', () => {
     expect(input.candidates.some((candidate) => candidate.sku === viewed.sku)).toBe(false);
   });
 
+  describe('when the only category peer has the same name', () => {
+    const viewed = productSchema.parse({ sku: 'V', title: 'Same', category: 'Cat', price: 10 });
+    const namesake = productSchema.parse({ sku: 'N', title: 'Same', category: 'Cat', price: 12 });
+    const other = productSchema.parse({ sku: 'O', title: 'Other', category: 'Dog', price: 14 });
+
+    it('offers a differently named product from another category instead', () => {
+      const input = buildTrackingInput(shoppers[0]!, 'V', [viewed, namesake, other], bundles);
+
+      expect(input.candidates.map((candidate) => candidate.sku)).toEqual(['O']);
+    });
+
+    it('still offers the namesake when nothing else is in stock, so the payload stays valid', () => {
+      const input = buildTrackingInput(shoppers[0]!, 'V', [viewed, namesake], bundles);
+
+      expect(input.candidates.map((candidate) => candidate.sku)).toEqual(['N']);
+      expect(() => parseTrackingInput(input)).not.toThrow();
+    });
+  });
+
   describe('the bundles it offers', () => {
     const smallCatalog = [
       productSchema.parse({ sku: 'current', title: 'Current', category: 'Cat', price: 15 }),
