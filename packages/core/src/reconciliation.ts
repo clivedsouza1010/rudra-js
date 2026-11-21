@@ -24,10 +24,6 @@ const CLAMP = {
 
 export const MAX_BLOCKS = 4;
 
-export function capBlocks(blocks: Block[]): Block[] {
-  return blocks.slice(0, MAX_BLOCKS);
-}
-
 export interface ReconcileResult {
   spec: GeneratedSpec;
   isUsable: boolean;
@@ -253,27 +249,24 @@ function chooseBundle(run: Run): Bundle | undefined {
   return best;
 }
 
-export function bundleForShopper(
+export function heroAndSetSkus(
+  blocks: Block[],
   input: TrackingInput,
   digest: SignalDigest,
-  spokenFor: readonly string[],
-): Bundle | undefined {
-  const run = startRun(input, digest, new Map());
-  for (const sku of spokenFor) place(run, sku);
+): ReadonlySet<string> {
+  const heroes = startRun(input, digest, new Map());
+  let setSkus: readonly string[] | undefined;
+  let listAbove = false;
 
-  return chooseBundle(run);
-}
-
-export function placeableHeroSkus(blocks: readonly Block[], input: TrackingInput): string[] {
-  const allowed = inStockSkus(input);
-  const blocked = blockedForPicks(input);
-  const skus: string[] = [];
-  for (const block of blocks) {
-    if (block.kind !== 'hero' || block.sku === null) continue;
-    if (!allowed.has(block.sku) || blocked.has(block.sku)) continue;
-    if (!skus.includes(block.sku)) skus.push(block.sku);
+  for (const block of blocks.slice(0, MAX_BLOCKS)) {
+    if (block.kind === 'hero' && block.sku !== null) takeSlot(block.sku, heroes);
+    if (setSkus !== undefined) continue;
+    if (block.kind === 'bundle') setSkus = chooseBundle(heroes)?.skus ?? [];
+    if (block.kind === 'grid' || block.kind === 'carousel') listAbove ||= block.items.length > 0;
   }
-  return skus;
+
+  const withSet = new Set([...heroes.placed, ...(setSkus ?? [])]);
+  return listAbove && withSet.size >= digest.maxItems ? heroes.placed : withSet;
 }
 
 function reconcileBlock(block: Block, run: Run): Block | null {
@@ -390,7 +383,7 @@ export function reconcileSpec(
   }
 
   const blocks: Block[] = [];
-  for (const block of capBlocks(generated.blocks)) {
+  for (const block of generated.blocks.slice(0, MAX_BLOCKS)) {
     const reconciled = reconcileBlock(block, run);
     if (reconciled !== null) blocks.push(reconciled);
   }
