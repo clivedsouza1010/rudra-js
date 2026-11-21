@@ -99,6 +99,9 @@ export default async function ProductPage({
 
   return (
     <>
+      <a className="skip-link" href="#main">
+        Skip to main content
+      </a>
       <link rel="stylesheet" href="/store.css" />
       {styled ? <link rel="stylesheet" href="/demo-styles.css" /> : null}
       <DemoBar sku={sku} shopper={shopper} styled={styled} toggleHref={`?${toggle.toString()}`} />

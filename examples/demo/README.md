@@ -97,16 +97,19 @@ without you exporting it. To create this file, just copy `.env.example` to `.env
 
 ## Re-recording a transcript
 
-All transcript filenames are hashes of the model id and both halves of the prompt. This means that
-editing the prompt will orphan all transcripts at once. This applies to `SYSTEM_PROMPT` in
-`packages/core/src/model-prompt.ts` and to anything that changes the user half.
-`replay-miss.test.ts` will fail if the "Discover more options" section of the page it guards has no
-transcript. It will also name every path the page's requests looked for.
+All transcript filenames are hashes of the model id and both halves of the prompt. Editing
+`SYSTEM_PROMPT` in `packages/core/src/model-prompt.ts`, or anything every section shares (the
+catalog, the shoppers, `buildSlotInput`), orphans every transcript at once. A change to one
+section's builder, such as its candidates, orphans only that section's transcript.
+`replay-miss.test.ts` will fail if a section it checks has no transcript. It names the path of each
+section that missed. A section that still replays prints nothing.
 
 1. Find the hashes: run `npx vitest run 'examples/demo/src/app/product/[sku]/replay-miss.test.ts'`.
    It will fail with a `no recording for this request at <path>` line for each section that has no
-   transcript. Those file names are your new hashes. Whatever files are in `recordings/` under other
-   names are the orphans. Delete them: `rm examples/demo/recordings/<old hash>.json`.
+   transcript. Those file names are your new hashes. If every section printed a path, every other
+   file in `recordings/` is an orphan. If only some did, the rest still replay, so delete only the
+   old file of each section that printed one. `grep -lF 'slot \"more-to-consider\"' examples/demo/recordings/*.json` finds a
+   section's file. Delete it with `rm examples/demo/recordings/<old hash>.json`.
 2. Run just that page in record mode: `RUDRA_DEMO_MODE=record npm run dev --workspace @rudra-js/example-demo`, then visit it.
 3. Check that `git status --short examples/demo/recordings/` shows each orphan from step 1
    deleted, and one new file for each `no recording` path step 1 printed, with the same names.

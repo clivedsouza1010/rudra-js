@@ -15,7 +15,7 @@ export function SearchBox() {
       }}
     >
       <label className="visually-hidden" htmlFor="store-search">
-        Search products
+        Search the store
       </label>
       <input
         id="store-search"

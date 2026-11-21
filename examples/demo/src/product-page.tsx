@@ -185,7 +185,7 @@ export async function ProductPageContent({
   const hrefForSku = (target: string) => `/product/${encodeURIComponent(target)}${linkQuery}`;
 
   return (
-    <main className="page">
+    <main className="page" id="main">
       <nav className="breadcrumb" aria-label="Breadcrumb">
         <ol>
           <li>

@@ -233,3 +233,7 @@
 .rudra[data-rudra-source='fallback'] .rudra__header {
   display: none;
 }
+
+.rudra[data-rudra-source='fallback'] :is(.rudra-carousel__track, .rudra-grid__items) {
+  margin-top: 0.5rem;
+}
