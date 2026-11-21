@@ -77,7 +77,8 @@ export function buildTrackingInput(
   const current = catalog.find((product) => product.sku === currentSku);
   const offerable = offerableBesides(catalog, currentSku);
   const inCategory = offerable.filter(
-    (product) => !current || product.category === current.category,
+    (product) =>
+      !current || (product.category === current.category && product.title !== current.title),
   );
   const finalCandidates = (inCategory.length > 0 ? inCategory : offerable).slice(0, 24);
 

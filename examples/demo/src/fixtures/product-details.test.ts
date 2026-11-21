@@ -79,6 +79,9 @@ describe('the made-up product details', () => {
       if (details.highlights.some((line) => line.includes('two doors'))) {
         expect(spec('Sleeps')).not.toBe('1');
       }
+      if (details.highlights.some((line) => line.startsWith('Wide fit'))) {
+        expect(['Snug', 'Regular']).not.toContain(spec('Fit'));
+      }
     }
   });
 

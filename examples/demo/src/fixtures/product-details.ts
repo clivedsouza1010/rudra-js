@@ -353,11 +353,14 @@ export function detailsFor(product: Product): ProductDetails {
   const tagLines = product.tags.flatMap((tag) =>
     info.tags.includes(tag) && TAG_TEXT[tag] ? [TAG_TEXT[tag]] : [],
   );
-  const specValues = info.spec[1].filter(
-    (value) =>
-      (material !== 'Primaloft' || !value.includes('down')) &&
-      (!product.tags.includes('lightweight') || value !== 'Heavyweight'),
-  );
+  const specValues =
+    product.tags.includes('wide-fit') && info.spec[0] === 'Fit'
+      ? ['Wide']
+      : info.spec[1].filter(
+          (value) =>
+            (material !== 'Primaloft' || !value.includes('down')) &&
+            (!product.tags.includes('lightweight') || value !== 'Heavyweight'),
+        );
 
   return {
     brand: pick(random, BRANDS),

@@ -23,6 +23,15 @@ describe('the tracking payload the demo builds', () => {
     }
   });
 
+  it('never offers another product with the same name as the one being viewed', () => {
+    const fullCatalog = generateCatalog(1);
+    for (const viewed of fullCatalog) {
+      const input = buildTrackingInput(shoppers[0]!, viewed.sku, fullCatalog, []);
+
+      expect(input.candidates.map((candidate) => candidate.title)).not.toContain(viewed.title);
+    }
+  });
+
   it('offers only in-stock candidates', () => {
     const input = buildTrackingInput(shoppers[0]!, 'RJ-00001', catalog, bundles);
 

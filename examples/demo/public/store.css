@@ -587,6 +587,10 @@ select {
   right: -1.25rem;
 }
 
+.row-scroller:has(.compare) .row-scroller__button {
+  top: 3.5rem;
+}
+
 .about__columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
