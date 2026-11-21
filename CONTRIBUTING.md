@@ -279,12 +279,13 @@ It won't start again until someone edits the publisher on npmjs.com to match. Yo
 from npm saying the token doesn't match a configured publisher, but it won't tell you which of the
 three is wrong.
 
-To add a package you need to make two edits: a trusted publisher for its name on npmjs.com and a
-`npm publish --provenance --access public` step in `release.yml` with its `working-directory`. There
-can't be a publisher until the package exists. You'll have to publish a placeholder version by hand
-first, then configure it. You'll need to put the new step as early as its peers allow (ahead of
-everything, if nothing it declares as a peer has to land first) to make an auth failure cost as
-little as possible.
+To add a package you need to make three edits: a trusted publisher for its name on npmjs.com, a
+`npm publish --provenance --access public` step in `release.yml` with its `working-directory`, and
+the matching `npm publish --dry-run --access public` step in `rehearsal.yml`, at the same place in
+its list. There can't be a publisher until the package exists. You'll have to publish a placeholder
+version by hand first, then configure it. You'll need to put the new `release.yml` step as early as
+its peers allow (ahead of everything, if nothing it declares as a peer has to land first) to make an
+auth failure cost as little as possible.
 
 If a publish does half-finish (attested published, core failed), there's nothing to publish by hand
 with. You'll have to bump the patch version on all of them, merge and tag again. Don't go looking
