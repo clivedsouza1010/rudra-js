@@ -21,7 +21,7 @@ import {
 
 function sourceNote(spec: ComponentSpec): string {
   return spec.source === 'fallback'
-    ? 'Core’s own picks, with no model call'
+    ? 'Core’s own picks, not the model’s'
     : 'Laid out and written by the model';
 }
 
@@ -29,11 +29,13 @@ function RecommendationRow({
   id,
   heading,
   spec,
+  hrefForSku,
   registry,
 }: {
   id: string;
   heading: string;
   spec: ComponentSpec;
+  hrefForSku: (sku: string) => string;
   registry?: BlockRegistry;
 }) {
   if (spec.blocks.length === 0) return null;
@@ -52,6 +54,7 @@ function RecommendationRow({
           products={catalog}
           bundles={bundles}
           locale="en-US"
+          hrefForSku={hrefForSku}
           {...(registry ? { registry } : {})}
         />
       </RowScroller>
@@ -107,9 +110,7 @@ function Reviews({ product, details }: { product: Product; details: ProductDetai
         Ratings and reviews
       </h2>
       {details.reviewCount === 0 ? (
-        <p className="reviews__empty">
-          No reviews yet. Be the first to tell others what you think.
-        </p>
+        <p className="reviews__empty">No ratings or reviews yet.</p>
       ) : (
         <div className="reviews__layout">
           <div className="reviews__summary">
@@ -119,7 +120,9 @@ function Reviews({ product, details }: { product: Product; details: ProductDetai
             <ol className="reviews__bars" aria-label="How the ratings split">
               {details.ratingCounts.map((count, index) => (
                 <li key={5 - index}>
-                  <span>{5 - index} stars</span>
+                  <span>
+                    {5 - index} {index === 4 ? 'star' : 'stars'}
+                  </span>
                   <span className="reviews__bar">
                     <span
                       className="reviews__bar-fill"
@@ -152,9 +155,11 @@ function Reviews({ product, details }: { product: Product; details: ProductDetai
 export async function ProductPageContent({
   sku,
   shopperId,
+  linkQuery = shopperId ? `?shopper=${encodeURIComponent(shopperId)}` : '',
 }: {
   sku: string;
   shopperId: string | undefined;
+  linkQuery?: string;
 }) {
   const product = catalog.find((candidate) => candidate.sku === sku);
   if (!product) return null;
@@ -176,14 +181,15 @@ export async function ProductPageContent({
       <CompareTable items={block.items} context={context} current={product} />
     ),
   });
-  const categoryHref = `/product/${firstSkuIn(product.category) ?? product.sku}`;
+  const categoryHref = `/product/${firstSkuIn(product.category) ?? product.sku}${linkQuery}`;
+  const hrefForSku = (target: string) => `/product/${encodeURIComponent(target)}${linkQuery}`;
 
   return (
     <main className="page">
       <nav className="breadcrumb" aria-label="Breadcrumb">
         <ol>
           <li>
-            <a href={HOME_HREF}>Home</a>
+            <a href={`${HOME_HREF}${linkQuery}`}>Home</a>
           </li>
           <li>{details.department}</li>
           <li>
@@ -206,20 +212,32 @@ export async function ProductPageContent({
         isInStock={product.isInStock}
       />
 
-      <RecommendationRow id="discover-more" heading="Discover more options" spec={discover} />
+      <RecommendationRow
+        id="discover-more"
+        heading="Discover more options"
+        spec={discover}
+        hrefForSku={hrefForSku}
+      />
       <AboutThisItem product={product} details={details} />
       <RecommendationRow
         id="compare-similar"
         heading="Compare similar items"
         spec={compare}
+        hrefForSku={hrefForSku}
         registry={compareRegistry}
       />
-      <RecommendationRow id="more-to-consider" heading="More to consider" spec={consider} />
+      <RecommendationRow
+        id="more-to-consider"
+        heading="More to consider"
+        spec={consider}
+        hrefForSku={hrefForSku}
+      />
       <Reviews product={product} details={details} />
       <RecommendationRow
         id="customers-also-viewed"
         heading="Customers also viewed"
         spec={alsoViewed}
+        hrefForSku={hrefForSku}
       />
     </main>
   );

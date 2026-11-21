@@ -17,6 +17,7 @@ describe('the made-up product details', () => {
       const total = details.ratingCounts.reduce((left, right) => left + right, 0);
 
       expect(total).toBe(details.reviewCount);
+      expect(details.ratingCounts.every((count) => count >= 0)).toBe(true);
     }
   });
 
@@ -45,5 +46,13 @@ describe('the made-up product details', () => {
     const product = catalog[7]!;
 
     expect(detailsFor(product).specs).toContainEqual(['Item number', product.sku]);
+  });
+
+  it('never lists an outsole as a material', () => {
+    for (const product of catalog.filter((candidate) => candidate.title.includes('Vibram'))) {
+      const material = detailsFor(product).specs.find(([label]) => label === 'Material')?.[1];
+
+      expect(material).not.toContain('outsole');
+    }
   });
 });

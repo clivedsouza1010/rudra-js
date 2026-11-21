@@ -136,4 +136,16 @@ describe('the three other sections', () => {
 
     expect(candidates.length).toBeGreaterThan(0);
   });
+
+  it('never repeats a product title within one of these sections', () => {
+    for (const input of [
+      buildCompareInput(shopper, current, catalog, bundles),
+      buildMoreToConsiderInput(shopper, current, catalog, bundles),
+      buildAlsoViewedInput(shopper, current, catalog, bundles, shoppers),
+    ]) {
+      const titles = (input.candidates ?? []).map((product) => product.title);
+
+      expect(new Set(titles).size).toBe(titles.length);
+    }
+  });
 });

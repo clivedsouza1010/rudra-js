@@ -38,10 +38,10 @@ caveats. That directory is gitignored.
 - **Cache hits**: the share of views served from the cache. Remember that it's a single cold pass at
   ten views per page. This number would go up with more views per page and down with more pages.
 - **Cost / 1k views (ceiling)**: a cold-call ceiling. At bench start the token counts are read from
-  the single committed transcript in `examples/demo/recordings/`. In this bench the cached prefix
-  read back by the recorded call is billed as written. But a real run writes this prefix once and
-  reads it back for less. This is why the number is close to twice a steady-state cost. Read it as a
-  ceiling, _not_ as what a run would cost you.
+  the committed `recommendations` transcript in `examples/demo/recordings/`. In this bench the
+  cached prefix read back by the recorded call is billed as written. But a real run writes this
+  prefix once and reads it back for less. This is why the number is close to twice a steady-state
+  cost. Read it as a ceiling, _not_ as what a run would cost you.
 - **CPU ms**: user plus system time for the arm's process (parse, digest, select, reconcile and
   render). There's no model call in it.
 

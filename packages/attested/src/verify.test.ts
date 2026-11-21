@@ -300,7 +300,7 @@ describe('verify — the wording layer', () => {
     ]);
   });
 
-  it('catches both claims in the example shop recording', () => {
+  it('catches both claims in the demo recording', () => {
     const held = "Four packs, ordered by how well they've held up for other shoppers.";
     const picks = 'The first two are the strongest all-round picks.';
 

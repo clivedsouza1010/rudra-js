@@ -56,7 +56,9 @@
   overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory;
   scrollbar-width: thin;
-  padding-bottom: 0.5rem;
+  margin: -0.25rem;
+  padding: 0.25rem 0.25rem 0.75rem;
+  scroll-padding-inline: 0.25rem;
 }
 
 .rudra-card {
@@ -116,8 +118,21 @@
   font-weight: 600;
 }
 
-.rudra-card--featured .rudra-card__image {
-  box-shadow: 0 0 0 2px var(--rudra-accent);
+.rudra-card--featured {
+  position: relative;
+}
+
+.rudra-card--featured::before {
+  content: 'Featured';
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--rudra-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .rudra-hero {
@@ -213,4 +228,8 @@
 .rudra-bundle__cta {
   font-weight: 600;
   color: var(--rudra-accent);
+}
+
+.rudra[data-rudra-source='fallback'] .rudra__header {
+  display: none;
 }

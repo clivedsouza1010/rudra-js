@@ -59,6 +59,15 @@ function offerableBesides(catalog: readonly Product[], currentSku: string): Prod
   return catalog.filter((product) => product.isInStock && product.sku !== currentSku);
 }
 
+function distinctTitles(products: Product[], current: Product): Product[] {
+  const titles = new Set([current.title]);
+  return products.filter((product) => {
+    if (titles.has(product.title)) return false;
+    titles.add(product.title);
+    return true;
+  });
+}
+
 export function buildTrackingInput(
   shopper: Shopper,
   currentSku: string,
@@ -89,12 +98,12 @@ export function buildCompareInput(
   catalog: readonly Product[],
   bundles: readonly Bundle[],
 ): TrackingInputDraft {
-  const candidates = offerableBesides(catalog, current.sku)
+  const nearestInPrice = offerableBesides(catalog, current.sku)
     .filter((product) => product.category === current.category)
     .toSorted(
       (left, right) => Math.abs(left.price - current.price) - Math.abs(right.price - current.price),
-    )
-    .slice(0, 12);
+    );
+  const candidates = distinctTitles(nearestInPrice, current).slice(0, 12);
 
   return buildSlotInput(
     shopper,
@@ -115,7 +124,10 @@ export function buildMoreToConsiderInput(
 ): TrackingInputDraft {
   const related = RELATED[current.category] ?? [];
   const byCategory = related.map((category) =>
-    offerableBesides(catalog, current.sku).filter((product) => product.category === category),
+    distinctTitles(
+      offerableBesides(catalog, current.sku).filter((product) => product.category === category),
+      current,
+    ),
   );
   const candidates: Product[] = [];
   for (let index = 0; candidates.length < 24 && index < 24; index += 1) {
@@ -153,7 +165,7 @@ export function buildAlsoViewedInput(
   const sameCategory = offerable.filter(
     (product) => product.category === current.category && !views.has(product.sku),
   );
-  const candidates = [...viewed, ...sameCategory].slice(0, 24);
+  const candidates = distinctTitles([...viewed, ...sameCategory], current).slice(0, 24);
 
   return buildSlotInput(
     shopper,

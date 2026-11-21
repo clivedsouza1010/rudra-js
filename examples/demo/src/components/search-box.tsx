@@ -21,7 +21,7 @@ export function SearchBox() {
         id="store-search"
         className="search__input"
         type="search"
-        placeholder="Search tents, boots, jackets and more"
+        placeholder="Search the store"
         onChange={() => setNote('')}
       />
       <button className="search__button" type="submit">

@@ -51,7 +51,9 @@ RUDRA_DEMO_MODE=record npm run dev --workspace @rudra-js/example-demo
 ```
 
 That bills three model calls and writes three new files under `recordings/`. The existing
-`recommendations` transcript is replayed, not billed again. Commit the three files.
+`recommendations` transcript is replayed, not billed again. Commit the three files. Then add the
+three slots to the check in `replay-miss.test.ts`, so a prompt change that orphans one of them
+fails the test too.
 
 ## Running it
 
@@ -106,10 +108,10 @@ transcript. It will also name every path the page's requests looked for.
    transcript. Those file names are your new hashes. Whatever files are in `recordings/` under other
    names are the orphans. Delete them: `rm examples/demo/recordings/<old hash>.json`.
 2. Run just that page in record mode: `RUDRA_DEMO_MODE=record npm run dev --workspace @rudra-js/example-demo`, then visit it.
-3. Check that `git status --short examples/demo/recordings/` shows one deletion and one new file
-   for each section. Also check that the new names are the hashes from step 1.
+3. Check that `git status --short examples/demo/recordings/` shows each orphan from step 1
+   deleted, and one new file for each `no recording` path step 1 printed, with the same names.
 4. Run `npm test`. `replay-miss.test.ts` will check just the RJ-00001 / S-0001 page.
-5. Commit the file.
+5. Commit the new files and the deletions.
 
 You will find the whole prompt in a transcript: the system half, the user half and the model's
 answer. This is plain JSON that will be committed to the repository. That's why you need to record

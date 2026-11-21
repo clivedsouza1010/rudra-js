@@ -175,8 +175,10 @@ ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/examp
 ## Example
 
 [`examples/demo`](examples/demo) is a small Next.js site that runs rudra-js on a real page.
-Its product page asks the LLM for a recommendation block. This block will be rendered by
-the server as part of the HTML response for the page. It won't be fetched after the page loads.
+Its product page asks the LLM for four recommendation sections, each its own slot. The server
+renders them as part of the HTML response for the page. Nothing is fetched after the page loads.
+Only the first section has a committed transcript so far, so on replay the other three show core's
+own picks.
 
 ```sh
 npm run dev --workspace @rudra-js/example-demo

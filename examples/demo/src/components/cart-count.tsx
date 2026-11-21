@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { CART_EVENT } from './product-top';
 
-export function CartCount() {
-  const [count, setCount] = useState(0);
+export function CartCount({ initial }: { initial: number }) {
+  const [count, setCount] = useState(initial);
 
   useEffect(() => {
     const add = (event: Event) => {
@@ -16,11 +16,12 @@ export function CartCount() {
   }, []);
 
   return (
-    <a className="header__cart" href="#cart">
-      Cart{' '}
-      <span className="header__cart-count" aria-label={`${count} items`}>
-        {count}
-      </span>
+    <a
+      className="header__cart"
+      href="#cart"
+      aria-label={`Cart, ${count} ${count === 1 ? 'item' : 'items'}`}
+    >
+      Cart <span className="header__cart-count">{count}</span>
     </a>
   );
 }

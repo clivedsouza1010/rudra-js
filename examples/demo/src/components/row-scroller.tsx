@@ -36,6 +36,8 @@ export function RowScroller({ label, children }: { label: string; children: Reac
     });
   };
 
+  const scrolls = edges.back || edges.forward;
+
   return (
     <div className="row-scroller" ref={holder}>
       {children}
@@ -43,7 +45,8 @@ export function RowScroller({ label, children }: { label: string; children: Reac
         type="button"
         className="row-scroller__button row-scroller__button--back"
         aria-label={`Scroll ${label} back`}
-        hidden={!edges.back}
+        hidden={!scrolls}
+        aria-disabled={!edges.back}
         onClick={() => scroll(-1)}
       >
         ‹
@@ -52,7 +55,8 @@ export function RowScroller({ label, children }: { label: string; children: Reac
         type="button"
         className="row-scroller__button row-scroller__button--forward"
         aria-label={`Scroll ${label} forward`}
-        hidden={!edges.forward}
+        hidden={!scrolls}
+        aria-disabled={!edges.forward}
         onClick={() => scroll(1)}
       >
         ›

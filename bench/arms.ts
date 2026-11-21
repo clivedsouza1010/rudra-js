@@ -21,23 +21,33 @@ const RECORDINGS_DIRECTORY =
   process.env['RUDRA_DEMO_RECORDINGS'] ||
   fileURLToPath(new URL('../examples/demo/recordings', import.meta.url));
 
+const RECOMMENDATIONS_SLOT = 'slot "recommendations"';
+
+interface Transcript {
+  user?: string;
+  result?: { usage?: TokenUsage };
+}
+
+export function recommendationsTranscripts(directory: string): [string, Transcript][] {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory)
+    .filter((file) => file.endsWith('.json'))
+    .map((file): [string, Transcript] => {
+      const path = join(directory, file);
+      return [path, JSON.parse(readFileSync(path, 'utf8')) as Transcript];
+    })
+    .filter(([, transcript]) => transcript.user?.includes(RECOMMENDATIONS_SLOT));
+}
+
 export function loadColdUsage(directory: string = RECORDINGS_DIRECTORY): TokenUsage {
-  const transcripts: string[] = [];
-  if (existsSync(directory)) {
-    for (const file of readdirSync(directory)) {
-      if (file.endsWith('.json')) transcripts.push(file);
-    }
-  }
+  const transcripts = recommendationsTranscripts(directory);
   if (transcripts.length !== 1) {
     throw new Error(
-      `expected one transcript in ${directory} and found ${transcripts.length}, so there is nothing to bill from`,
+      `expected one recommendations transcript in ${directory} and found ${transcripts.length}, so there is nothing to bill from`,
     );
   }
 
-  const path = join(directory, transcripts[0]!);
-  const transcript = JSON.parse(readFileSync(path, 'utf8')) as {
-    result?: { usage?: TokenUsage };
-  };
+  const [path, transcript] = transcripts[0]!;
   const usage = transcript.result?.usage;
   if (usage === undefined) {
     throw new Error(`the transcript at ${path} reports no usage, so there is nothing to bill from`);

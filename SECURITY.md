@@ -192,7 +192,7 @@ the primary model can act. Ours can't.
 
   It also drops honest copy. This can happen in two ways. Even a banner reading "free returns" will
   be dropped from a shop that offers free returns. And on a catalogue that doesn't have a digit in
-  any tag or category name (like the example shop in this repo), the rule stops being
+  any tag or category name (like the demo in this repo), the rule stops being
   "every digit must be one you supplied" and becomes "no digit may appear". This means
   "Built for 3 season use" will be dropped along with the invented prices. Any required field (such
   as a headline) is emptied and not nulled. An empty page headline will be enough to make the whole

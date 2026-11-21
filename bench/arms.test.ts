@@ -1,23 +1,24 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generatedSpecSchema, type TokenUsage } from '@rudra-js/core';
-import { buildArm, loadColdUsage, PRICES, type ArmName } from './arms.js';
+import {
+  buildArm,
+  loadColdUsage,
+  PRICES,
+  recommendationsTranscripts,
+  type ArmName,
+} from './arms.js';
 
 const RECORDINGS = fileURLToPath(new URL('../examples/demo/recordings/', import.meta.url));
+const RECOMMENDATIONS = 'Page: "pdp", slot "recommendations", locale "en-US"';
 
 function committedUsage(): Required<TokenUsage> {
-  const transcripts: string[] = [];
-  for (const file of readdirSync(RECORDINGS)) {
-    if (file.endsWith('.json')) transcripts.push(file);
-  }
+  const transcripts = recommendationsTranscripts(RECORDINGS);
   expect(transcripts).toHaveLength(1);
-  const transcript = JSON.parse(readFileSync(join(RECORDINGS, transcripts[0]!), 'utf8')) as {
-    result: { usage: Required<TokenUsage> };
-  };
-  return transcript.result.usage;
+  return transcripts[0]![1].result!.usage as Required<TokenUsage>;
 }
 
 async function billedBy(name: ArmName): Promise<TokenUsage | undefined> {
@@ -99,20 +100,38 @@ describe('reading the committed transcript', () => {
   });
 
   it('refuses a recordings directory with no transcript', () => {
-    expect(() => loadColdUsage(scratch())).toThrow(/one transcript.*found 0/);
+    expect(() => loadColdUsage(scratch())).toThrow(/one recommendations transcript.*found 0/);
   });
 
-  it('refuses a recordings directory with more than one transcript', () => {
+  it('refuses a recordings directory with more than one recommendations transcript', () => {
     const directory = scratch();
-    writeFileSync(join(directory, 'a.json'), '{}');
-    writeFileSync(join(directory, 'b.json'), '{}');
+    writeFileSync(join(directory, 'a.json'), JSON.stringify({ user: RECOMMENDATIONS }));
+    writeFileSync(join(directory, 'b.json'), JSON.stringify({ user: RECOMMENDATIONS }));
 
-    expect(() => loadColdUsage(directory)).toThrow(/one transcript.*found 2/);
+    expect(() => loadColdUsage(directory)).toThrow(/one recommendations transcript.*found 2/);
+  });
+
+  it('bills from the recommendations transcript and ignores the other sections', () => {
+    const directory = scratch();
+    const usage = { inputTokens: 10, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0 };
+    writeFileSync(
+      join(directory, 'a.json'),
+      JSON.stringify({ user: RECOMMENDATIONS, result: { usage } }),
+    );
+    writeFileSync(
+      join(directory, 'b.json'),
+      JSON.stringify({ user: 'Page: "pdp", slot "more-to-consider"', result: { usage: {} } }),
+    );
+
+    expect(loadColdUsage(directory)).toMatchObject({ inputTokens: 10, outputTokens: 20 });
   });
 
   it('refuses a transcript that reports no usage', () => {
     const directory = scratch();
-    writeFileSync(join(directory, 'a.json'), JSON.stringify({ result: { spec: {} } }));
+    writeFileSync(
+      join(directory, 'a.json'),
+      JSON.stringify({ user: RECOMMENDATIONS, result: { spec: {} } }),
+    );
 
     expect(() => loadColdUsage(directory)).toThrow(/reports no usage/);
   });

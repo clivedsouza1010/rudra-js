@@ -174,9 +174,19 @@ select {
   position: absolute;
   top: 100%;
   left: 0;
+  right: 0;
   margin: 0.375rem 0 0;
   font-size: 0.8125rem;
   color: var(--slate);
+}
+
+.search__note:not(:empty) {
+  z-index: 3;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: #fff;
+  box-shadow: 0 4px 12px rgb(20 40 30 / 0.12);
 }
 
 .header__account {
@@ -210,10 +220,11 @@ select {
 
 .header__nav ul {
   display: flex;
-  gap: 1.5rem;
+  justify-content: space-between;
+  gap: 0.875rem;
   max-width: var(--page-width);
   margin: 0 auto;
-  padding: 0 var(--gutter) 0.75rem;
+  padding: 0.25rem var(--gutter) 0.5rem;
   list-style: none;
   overflow-x: auto;
   white-space: nowrap;
@@ -539,6 +550,11 @@ select {
   display: none;
 }
 
+.row-scroller__button[aria-disabled='true'] {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .row-scroller__button--back {
   left: -1.25rem;
 }
@@ -627,8 +643,18 @@ select {
 }
 
 .compare__product {
+  position: relative;
   font-weight: 400;
   min-width: 9.5rem;
+}
+
+.compare__table tbody th,
+.compare__table thead td {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: inset -1px 0 0 var(--line);
 }
 
 .compare__product a {
@@ -655,11 +681,13 @@ select {
 }
 
 .compare__this {
-  display: inline-block;
-  margin-bottom: 0.375rem;
+  position: absolute;
+  top: 1.25rem;
+  left: 1.25rem;
+  z-index: 1;
   padding: 0.125rem 0.5rem;
   border-radius: 999px;
-  background: var(--spruce-wash);
+  background: #fff;
   color: var(--spruce-deep);
   font-size: 0.75rem;
   font-weight: 600;
@@ -688,6 +716,7 @@ select {
 .reviews__bars {
   display: grid;
   gap: 0.375rem;
+  max-width: 24rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -866,8 +895,4 @@ select {
   html {
     scroll-behavior: smooth;
   }
-}
-
-.rudra[data-rudra-source='fallback'] .rudra__header {
-  display: none;
 }

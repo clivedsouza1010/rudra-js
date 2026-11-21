@@ -155,4 +155,26 @@ describe('the shopper switch', () => {
 
     expect(new Set(values).size).toBe(values.length);
   });
+
+  it('treats a visit with no shopper as the recorded shopper', async () => {
+    const markup = await renderRoute({});
+
+    expect(markup).toContain('<option value="S-0001" selected="">S-0001, recorded</option>');
+  });
+
+  it('keeps the shopper on every link to another product', async () => {
+    const markup = await renderRoute({ shopper: richShopper.id });
+    const links = [...markup.matchAll(/href="(\/product\/[^"]+)"/g)].map((match) => match[1]!);
+
+    expect(links.length).toBeGreaterThan(10);
+    for (const link of links) expect(link).toContain(`shopper=${richShopper.id}`);
+  });
+
+  it('starts the cart badge at the shopper’s cart', async () => {
+    const markup = await renderRoute({ shopper: richShopper.id });
+
+    expect(markup).toContain(
+      `<span class="header__cart-count">${richShopper.cartSkus.length}</span>`,
+    );
+  });
 });

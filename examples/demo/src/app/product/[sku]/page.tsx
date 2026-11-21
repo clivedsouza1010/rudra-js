@@ -1,30 +1,43 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { StoreFooter } from '../../../components/store-footer';
 import { StoreHeader } from '../../../components/store-header';
-import { shoppers } from '../../../demo-context';
+import { catalog, findShopper, shoppers } from '../../../demo-context';
 import { ProductPageContent } from '../../../product-page';
 
 const RECORDED_SHOPPER = 'S-0001';
-const others = shoppers.filter((shopper) => shopper.id !== RECORDED_SHOPPER);
+const RECORDED_SKU = 'RJ-00001';
+const SIGNED_OUT = 'anonymous';
 
-const EXAMPLE_SHOPPERS = [
-  { id: RECORDED_SHOPPER, label: `${RECORDED_SHOPPER}, recorded` },
-  ...others
-    .filter((shopper) => shopper.viewedSkus.length === 0)
-    .slice(0, 1)
-    .map((shopper) => ({ id: shopper.id, label: `${shopper.id}, first visit` })),
-  ...others
-    .filter((shopper) => shopper.viewedSkus.length >= 6 && shopper.cartSkus.length > 0)
-    .slice(0, 2)
-    .map((shopper) => ({ id: shopper.id, label: `${shopper.id}, browses a lot` })),
-];
+const others = shoppers.filter((shopper) => shopper.id !== RECORDED_SHOPPER);
+const firstVisit = others.find((shopper) => shopper.viewedSkus.length === 0);
+const regular = others.find(
+  (shopper) => shopper.viewedSkus.length >= 6 && shopper.cartSkus.length > 0,
+);
+
+function shopperOptions(sku: string, shopper: string) {
+  const options = [
+    {
+      id: RECORDED_SHOPPER,
+      label: sku === RECORDED_SKU ? `${RECORDED_SHOPPER}, recorded` : RECORDED_SHOPPER,
+    },
+    ...(firstVisit ? [{ id: firstVisit.id, label: `${firstVisit.id}, first visit` }] : []),
+    ...(regular ? [{ id: regular.id, label: `${regular.id}, browses a lot` }] : []),
+    { id: SIGNED_OUT, label: 'No history, signed out' },
+  ];
+  return options.some((option) => option.id === shopper)
+    ? options
+    : [...options, { id: shopper, label: shopper }];
+}
 
 function DemoBar({
+  sku,
   shopper,
   styled,
   toggleHref,
 }: {
-  shopper: string | undefined;
+  sku: string;
+  shopper: string;
   styled: boolean;
   toggleHref: string;
 }) {
@@ -35,8 +48,8 @@ function DemoBar({
       </p>
       <form className="demo-bar__shopper" method="get">
         <label htmlFor="demo-shopper">Viewing as</label>
-        <select id="demo-shopper" name="shopper" defaultValue={shopper ?? RECORDED_SHOPPER}>
-          {EXAMPLE_SHOPPERS.map((option) => (
+        <select id="demo-shopper" name="shopper" defaultValue={shopper}>
+          {shopperOptions(sku, shopper).map((option) => (
             <option key={option.id} value={option.id}>
               {option.label}
             </option>
@@ -52,6 +65,16 @@ function DemoBar({
   );
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ sku: string }>;
+}): Promise<Metadata> {
+  const { sku } = await params;
+  const product = catalog.find((candidate) => candidate.sku === sku);
+  return product ? { title: `${product.title} | Larchmere Outfitters` } : {};
+}
+
 export default async function ProductPage({
   params,
   searchParams,
@@ -60,23 +83,26 @@ export default async function ProductPage({
   searchParams: Promise<{ shopper?: string; styles?: string }>;
 }) {
   const { sku } = await params;
-  const { shopper, styles } = await searchParams;
+  const { shopper: requested, styles } = await searchParams;
+  const shopper = requested ?? RECORDED_SHOPPER;
+  const styled = styles !== 'off';
 
-  const content = await ProductPageContent({ sku, shopperId: shopper });
+  const keep = new URLSearchParams({ shopper });
+  if (!styled) keep.set('styles', 'off');
+  const linkQuery = `?${keep.toString()}`;
+
+  const content = await ProductPageContent({ sku, shopperId: shopper, linkQuery });
   if (content === null) notFound();
 
-  const styled = styles !== 'off';
-  const query = new URLSearchParams();
-  if (shopper !== undefined) query.set('shopper', shopper);
-  if (styled) query.set('styles', 'off');
-  const toggleHref = query.size === 0 ? '?' : `?${query.toString()}`;
+  const toggle = new URLSearchParams({ shopper });
+  if (styled) toggle.set('styles', 'off');
 
   return (
     <>
       <link rel="stylesheet" href="/store.css" />
       {styled ? <link rel="stylesheet" href="/demo-styles.css" /> : null}
-      <DemoBar shopper={shopper} styled={styled} toggleHref={toggleHref} />
-      <StoreHeader />
+      <DemoBar sku={sku} shopper={shopper} styled={styled} toggleHref={`?${toggle.toString()}`} />
+      <StoreHeader linkQuery={linkQuery} cartCount={findShopper(shopper).cartSkus.length} />
       {content}
       <StoreFooter />
     </>

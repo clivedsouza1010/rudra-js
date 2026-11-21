@@ -2071,7 +2071,7 @@ describe('a claim in a field that cannot be empty', () => {
     expect(result.violations).toContain('empty-block:copy');
   });
 
-  it('drops the copy block the example shop recorded', () => {
+  it('drops the copy block the demo recorded', () => {
     const body =
       "Four packs, ordered by how well they've held up for other shoppers. The first two are the strongest all-round picks; the last two lean toward insulated and waterproof builds if you have a specific trip in mind.";
 
