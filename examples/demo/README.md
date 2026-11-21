@@ -32,7 +32,7 @@ transcript.
 "Compare similar items" swaps the grid and carousel renderers for a comparison table with
 `extendRegistry` (see `src/components/compare-table.tsx`). The other three use the package's own
 renderers, styled by `public/demo-styles.css`. A note under each heading says whether the model laid
-it out or core picked the products without one.
+it out and wrote the copy. Core picks the products and the line under each either way.
 
 The demo bar at the top lets you switch shoppers to see the sections change, and its link turns off
 `public/demo-styles.css`. That stylesheet was written against the class table in the

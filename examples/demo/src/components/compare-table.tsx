@@ -6,7 +6,6 @@ import { Stars } from './stars';
 
 interface Column {
   product: Product;
-  reason: string | null;
   isCurrent: boolean;
 }
 
@@ -27,10 +26,6 @@ const ROWS: { label: string; value: (column: Column, context: BlockRenderContext
     { label: 'Brand', value: ({ product }) => detailsFor(product).brand },
     { label: 'Material', value: ({ product }) => detailsFor(product).specs[0]?.[1] },
     { label: 'Weight', value: ({ product }) => detailsFor(product).specs[1]?.[1] },
-    {
-      label: 'Why it’s here',
-      value: ({ reason, isCurrent }) => (isCurrent ? 'You’re looking at it' : (reason ?? '')),
-    },
   ];
 
 export function CompareTable({
@@ -44,13 +39,11 @@ export function CompareTable({
 }) {
   const picked = items.flatMap((item) => {
     const product = context.products.get(item.sku);
-    return product && product.isInStock !== false
-      ? [{ product, reason: item.reason, isCurrent: false }]
-      : [];
+    return product && product.isInStock !== false ? [{ product, isCurrent: false }] : [];
   });
   if (picked.length === 0) return null;
 
-  const columns: Column[] = [{ product: current, reason: null, isCurrent: true }, ...picked];
+  const columns: Column[] = [{ product: current, isCurrent: true }, ...picked];
 
   return (
     <div className="compare">

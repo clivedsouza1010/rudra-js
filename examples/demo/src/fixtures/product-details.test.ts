@@ -55,4 +55,12 @@ describe('the made-up product details', () => {
       expect(material).not.toContain('outsole');
     }
   });
+
+  it('writes weights the way a store would, never as 16 oz or 0 oz', () => {
+    for (const product of generateCatalog(1)) {
+      const weight = detailsFor(product).specs.find(([label]) => label === 'Weight')?.[1] ?? '';
+
+      expect(weight).not.toMatch(/ (16|0) oz$|^16\.0 oz$/);
+    }
+  });
 });

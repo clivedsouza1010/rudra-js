@@ -131,7 +131,7 @@ const CATEGORY_INFO: Record<string, CategoryInfo> = {
     tags: ['lightweight', 'insulated', 'recycled'],
     summary: 'It layers under a shell without bunching at the shoulders.',
     praise: 'I didn’t need a second layer under it.',
-    fault: 'It runs a little small, so check the size chart before you order.',
+    fault: 'It runs a little small, so size up if you’re between sizes.',
   },
   'Rain Shells': {
     department: 'Clothing',
@@ -147,7 +147,7 @@ const CATEGORY_INFO: Record<string, CategoryInfo> = {
     tags: ['waterproof', 'lightweight', 'breathable', 'recycled'],
     summary: 'It packs small enough to carry on a sunny day just in case.',
     praise: 'It kept me dry through a full afternoon of rain.',
-    fault: 'It runs a little small, so check the size chart before you order.',
+    fault: 'It runs a little small, so size up if you’re between sizes.',
   },
   'Base Layers': {
     department: 'Clothing',
@@ -163,7 +163,7 @@ const CATEGORY_INFO: Record<string, CategoryInfo> = {
     tags: ['lightweight', 'breathable', 'recycled'],
     summary: 'It moves sweat away fast, so you stay comfortable when you stop.',
     praise: 'I wore it for three days and it never felt clammy.',
-    fault: 'It runs a little small, so check the size chart before you order.',
+    fault: 'It runs a little small, so size up if you’re between sizes.',
   },
   Backpacks: {
     department: 'Packs',
@@ -225,7 +225,7 @@ const CATEGORY_INFO: Record<string, CategoryInfo> = {
     ],
     spec: ['Max output', ['350 lumens', '500 lumens', '750 lumens']],
     tags: ['waterproof', 'lightweight'],
-    summary: 'One button cycles the modes, and a long press stops it switching on in your pack.',
+    summary: 'One button cycles the modes, and a long press keeps it from turning on in your pack.',
     praise: 'One charge lasted a whole weekend.',
     fault: 'The strap loosens on bumpy trails.',
   },
@@ -271,7 +271,7 @@ const TAG_TEXT: Record<string, string> = {
   insulated: 'Insulated for cold starts',
   breathable: 'Breathable enough for steady climbs',
   recycled: 'Made with recycled fabric',
-  'wide-fit': 'Also comes in a wide fit',
+  'wide-fit': 'Wide fit, for feet that need more room',
 };
 
 const REVIEWERS = ['Maya R.', 'Tom K.', 'Priya S.', 'Owen D.', 'Lena H.', 'Sam W.', 'Jo B.'];
@@ -319,9 +319,11 @@ function ratingCountsFor(rating: number, total: number): ProductDetails['ratingC
 }
 
 function weightText(ounces: number): string {
-  if (ounces < 16) return `${ounces.toFixed(1)} oz`;
-  const pounds = Math.floor(ounces / 16);
-  return `${pounds} lb ${Math.round(ounces - pounds * 16)} oz`;
+  const tenths = Math.round(ounces * 10) / 10;
+  if (tenths < 16) return `${tenths.toFixed(1)} oz`;
+  const whole = Math.round(ounces);
+  const pounds = Math.floor(whole / 16);
+  return whole % 16 === 0 ? `${pounds} lb` : `${pounds} lb ${whole % 16} oz`;
 }
 
 export function colorIndexFor(sku: string): number {

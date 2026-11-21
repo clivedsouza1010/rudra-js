@@ -635,6 +635,7 @@ select {
 .compare {
   margin-top: 1rem;
   overflow-x: auto;
+  scroll-padding-inline-start: 9rem;
 }
 
 .compare__table {
@@ -842,7 +843,12 @@ select {
 @media (max-width: 74rem) {
   .header__nav ul {
     padding-right: 3rem;
+    scroll-padding-inline-end: 3rem;
     mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+  }
+
+  .header__nav ul:has(:focus-visible) {
+    mask-image: none;
   }
 }
 

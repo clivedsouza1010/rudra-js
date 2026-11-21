@@ -21,8 +21,8 @@ import {
 
 function sourceNote(spec: ComponentSpec): string {
   return spec.source === 'fallback'
-    ? 'Core’s own picks, not the model’s'
-    : 'Laid out and written by the model';
+    ? 'No model answer here, so rudra-js built all of it'
+    : 'Layout and copy by the model. Products and the line under each by rudra-js';
 }
 
 function RecommendationRow({
