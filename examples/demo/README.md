@@ -1,21 +1,57 @@
 # The demo
 
-This is a small Next.js site that tries out the architecture on a real page. Its product page will
-ask a language model for a recommendation component. That answer is then server-rendered into the
-same HTML response rather than being fetched after the page loads. It's up to the model to choose
-the layout, the order of the blocks, the emphasis and the wording. Core picks the products in a grid
-or carousel, their order and the line under each. All of the product facts on the page come from
-the demo's own catalog: title, price, image.
+This is a small Next.js site that tries out rudra-js on a realistic product page. Larchmere
+Outfitters is a made-up outdoor store. Its product page has a gallery, a buy box, details, specs and
+reviews, and four recommendation sections that rudra-js fills on the server, in the same HTML
+response. Nothing is fetched after the page loads.
+
+In each section the model chooses the layout, the order of the blocks, the emphasis and the
+wording. Core picks the products in a grid or carousel, their order and the line under each. Every
+product fact comes from the demo's own catalog: title, price, image. The brand, specs, colors and
+reviews on the page are made up per product in `src/fixtures/product-details.ts`. They never reach
+the model.
 
 We use fixed seeds for the catalog, the bundles and the shoppers. That way all clones will see the
 same demo. We save the model's answers as transcripts under `recordings/` and commit them. This
 means that a clone with no API key still exercises generation. It will be deterministic and free.
 If there is no transcript for a prompt, it will degrade the way any model failure does and fall
-back to a deterministic component. You still get a page.
+back to core's own picks. You still get a page.
 
-This example's stylesheet was written to match the class table in the `@rudra-js/react` README.
-There is no CSS in the package. You can add `?styles=off` to any product URL to see the markup the
-package emits, unstyled.
+## The four sections
+
+Each section is its own slot, with its own candidates, so each one gets its own prompt and its own
+transcript.
+
+| Section               | Slot                    | Candidates                                                        | Items |
+| --------------------- | ----------------------- | ----------------------------------------------------------------- | ----- |
+| Discover more options | `recommendations`       | In stock, in the same category                                    | 4     |
+| Compare similar items | `compare-similar-items` | The same category, nearest in price                               | 4     |
+| More to consider      | `more-to-consider`      | Related categories, such as tents and headlamps next to backpacks | 8     |
+| Customers also viewed | `customers-also-viewed` | What other shoppers who browsed this category viewed              | 8     |
+
+"Compare similar items" swaps the grid and carousel renderers for a comparison table with
+`extendRegistry` (see `src/components/compare-table.tsx`). The other three use the package's own
+renderers, styled by `public/demo-styles.css`. A note under each heading says whether the model laid
+it out or core picked the products without one.
+
+The demo bar at the top lets you switch shoppers to see the sections change, and its link turns off
+`public/demo-styles.css`. That stylesheet was written against the class table in the
+`@rudra-js/react` README, and there is no CSS in the package. With it off you see the markup the
+package emits inside an otherwise styled page. `?styles=off` on any product URL does the same.
+
+## Recording the three new sections
+
+Only `recommendations` has a transcript today, for RJ-00001 and shopper S-0001. The other three
+sections show core's own picks until you record them. To record them for that page, run record mode
+once and visit it:
+
+```sh
+RUDRA_DEMO_MODE=record npm run dev --workspace @rudra-js/example-demo
+# then visit http://localhost:3000/product/RJ-00001?shopper=S-0001
+```
+
+That bills three model calls and writes three new files under `recordings/`. The existing
+`recommendations` transcript is replayed, not billed again. Commit the three files.
 
 ## Running it
 
@@ -62,16 +98,16 @@ without you exporting it. To create this file, just copy `.env.example` to `.env
 All transcript filenames are hashes of the model id and both halves of the prompt. This means that
 editing the prompt will orphan all transcripts at once. This applies to `SYSTEM_PROMPT` in
 `packages/core/src/model-prompt.ts` and to anything that changes the user half.
-`replay-miss.test.ts` will fail if the page it guards has no transcript. It will also name the path
-the page's request looked for.
+`replay-miss.test.ts` will fail if the "Discover more options" section of the page it guards has no
+transcript. It will also name every path the page's requests looked for.
 
-1. Find the hash: run `npx vitest run 'examples/demo/src/app/product/[sku]/replay-miss.test.ts'`.
-   It will fail with `no recording for this request at <path>`. That path's file name is your new
-   hash. Whatever file is in `recordings/` under another name is the orphan. Delete this file:
-   `rm examples/demo/recordings/<old hash>.json`.
+1. Find the hashes: run `npx vitest run 'examples/demo/src/app/product/[sku]/replay-miss.test.ts'`.
+   It will fail with a `no recording for this request at <path>` line for each section that has no
+   transcript. Those file names are your new hashes. Whatever files are in `recordings/` under other
+   names are the orphans. Delete them: `rm examples/demo/recordings/<old hash>.json`.
 2. Run just that page in record mode: `RUDRA_DEMO_MODE=record npm run dev --workspace @rudra-js/example-demo`, then visit it.
-3. Check that `git status --short examples/demo/recordings/` shows one deletion and one new file.
-   Also check that the new name is the hash from step 1.
+3. Check that `git status --short examples/demo/recordings/` shows one deletion and one new file
+   for each section. Also check that the new names are the hashes from step 1.
 4. Run `npm test`. `replay-miss.test.ts` will check just the RJ-00001 / S-0001 page.
 5. Commit the file.
 

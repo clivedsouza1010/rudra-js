@@ -14,7 +14,7 @@ return a spec instead: a short description of the block, made up only of fields 
 picks the layout and writes the headline and copy, but there isn't a field for a price, a product
 name, an image or a link. To name a product, it will have to use a SKU from the list you give it.
 
-![The demo's product page. The heading and the highlighting are the model's. The products, their order and the line under each are core's picks, and every title, price and image is the shop's.](docs/demo.png)
+![The demo's product page for a made-up outdoor store, with a gallery, a buy box and the first recommendation section. In that section the line under the heading and the highlighted cards are the model's. The products, their order and the line under each are core's picks, and every title, price and image comes from the demo's catalog.](docs/demo.png)
 
 `@rudra-js/react` will turn the spec into HTML. To do this, it will read the title, price, image and
 link of the products from your catalog as the page is served. Anything the model wrote will be

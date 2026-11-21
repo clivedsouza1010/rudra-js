@@ -27,10 +27,27 @@ const richShopper = shopperWho(
 );
 
 describe('a product page', () => {
-  it('renders the recommendation area into the HTML itself', async () => {
+  it('renders all four recommendation sections into the HTML itself', async () => {
     const markup = await render(SKU, richShopper.id);
 
-    expect(markup).toContain('data-rudra-slot="recommendations"');
+    for (const slot of [
+      'recommendations',
+      'compare-similar-items',
+      'more-to-consider',
+      'customers-also-viewed',
+    ]) {
+      expect(markup).toContain(`data-rudra-slot="${slot}"`);
+    }
+  });
+
+  it('compares similar items in a table that starts with the product being viewed', async () => {
+    const markup = await render(SKU, richShopper.id);
+    const product = generateCatalog(CATALOG_SEED).find((candidate) => candidate.sku === SKU)!;
+
+    const table = markup.slice(markup.indexOf('data-rudra-slot="compare-similar-items"'));
+    expect(table).toContain('<table class="compare__table">');
+    expect(table.indexOf('This item')).toBeLessThan(table.indexOf('data-rudra-sku='));
+    expect(table).toContain(product.title);
   });
 
   it('takes every product fact in the recommendation area from the catalog', async () => {
@@ -86,6 +103,7 @@ describe('the route itself', () => {
 });
 
 const STYLESHEET = '<link rel="stylesheet" href="/demo-styles.css"';
+const STORE_STYLESHEET = '<link rel="stylesheet" href="/store.css"';
 
 const renderRoute = async (searchParams: { shopper?: string; styles?: string }) =>
   renderToStaticMarkup(
@@ -96,9 +114,10 @@ const renderRoute = async (searchParams: { shopper?: string; styles?: string }) 
   );
 
 const toggleHref = (markup: string): string => {
-  const match = /<a href="([^"]*)">(?:Show it unstyled|Apply the example’s styles)<\/a>/.exec(
-    markup,
-  );
+  const match =
+    /<a class="demo-bar__toggle" href="([^"]*)">(?:Show the rudra-js markup unstyled|Put the block styles back)<\/a>/.exec(
+      markup,
+    );
   expect(match, 'the page has no styles toggle').not.toBeNull();
   return match![1]!.replaceAll('&amp;', '&');
 };
@@ -108,7 +127,8 @@ describe('the styles toggle', () => {
     const markup = await renderRoute({ shopper: richShopper.id });
 
     expect(markup).toContain(STYLESHEET);
-    expect(markup).toContain('Show it unstyled');
+    expect(markup).toContain(STORE_STYLESHEET);
+    expect(markup).toContain('Show the rudra-js markup unstyled');
     expect(toggleHref(markup)).toBe(`?shopper=${richShopper.id}&styles=off`);
   });
 
@@ -116,7 +136,23 @@ describe('the styles toggle', () => {
     const markup = await renderRoute({ shopper: richShopper.id, styles: 'off' });
 
     expect(markup).not.toContain(STYLESHEET);
-    expect(markup).toContain('Apply the example’s styles');
+    expect(markup).toContain(STORE_STYLESHEET);
+    expect(markup).toContain('Put the block styles back');
     expect(toggleHref(markup)).toBe(`?shopper=${richShopper.id}`);
+  });
+});
+
+describe('the shopper switch', () => {
+  it('keeps the styles off when you switch shoppers with them off', async () => {
+    const markup = await renderRoute({ shopper: richShopper.id, styles: 'off' });
+
+    expect(markup).toContain('<input type="hidden" name="styles" value="off"/>');
+  });
+
+  it('lists each example shopper once', async () => {
+    const markup = await renderRoute({});
+    const values = [...markup.matchAll(/<option value="([^"]+)"/g)].map((match) => match[1]);
+
+    expect(new Set(values).size).toBe(values.length);
   });
 });

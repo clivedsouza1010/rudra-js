@@ -3,7 +3,12 @@ import { parseTrackingInput, productSchema } from '@rudra-js/core';
 import { generateCatalog } from './catalog';
 import { generateShoppers } from './shoppers';
 import { generateBundles } from './bundles';
-import { buildTrackingInput } from './tracking-input';
+import {
+  buildAlsoViewedInput,
+  buildCompareInput,
+  buildMoreToConsiderInput,
+  buildTrackingInput,
+} from './tracking-input';
 
 const catalog = generateCatalog(1, 200);
 const shoppers = generateShoppers(9, catalog, 50);
@@ -78,5 +83,57 @@ describe('the tracking payload the demo builds', () => {
 
       expect(input.bundles).toEqual([]);
     });
+  });
+});
+
+describe('the three other sections', () => {
+  const current = catalog.find((product) => product.category === 'Backpacks')!;
+  const shopper = shoppers[0]!;
+
+  it('build payloads the contract accepts, each in its own slot', () => {
+    const inputs = [
+      buildCompareInput(shopper, current, catalog, bundles),
+      buildMoreToConsiderInput(shopper, current, catalog, bundles),
+      buildAlsoViewedInput(shopper, current, catalog, bundles, shoppers),
+    ];
+
+    expect(inputs.map((input) => parseTrackingInput(input).context.slot)).toEqual([
+      'compare-similar-items',
+      'more-to-consider',
+      'customers-also-viewed',
+    ]);
+  });
+
+  it('compare products in the same category, nearest in price first', () => {
+    const candidates = buildCompareInput(shopper, current, catalog, bundles).candidates ?? [];
+    const gaps = candidates.map((product) => Math.abs(product.price - current.price));
+
+    expect(candidates.every((product) => product.category === current.category)).toBe(true);
+    expect(gaps).toEqual(gaps.toSorted((left, right) => left - right));
+  });
+
+  it('offer related categories under more to consider, not the one being viewed', () => {
+    const candidates =
+      buildMoreToConsiderInput(shopper, current, catalog, bundles).candidates ?? [];
+
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(candidates.some((product) => product.category === current.category)).toBe(false);
+  });
+
+  it('never offer the product being viewed', () => {
+    for (const input of [
+      buildCompareInput(shopper, current, catalog, bundles),
+      buildMoreToConsiderInput(shopper, current, catalog, bundles),
+      buildAlsoViewedInput(shopper, current, catalog, bundles, shoppers),
+    ]) {
+      expect(input.candidates?.some((product) => product.sku === current.sku)).toBe(false);
+    }
+  });
+
+  it('still offer something under customers also viewed when nobody else browsed the category', () => {
+    const candidates =
+      buildAlsoViewedInput(shopper, current, catalog, bundles, []).candidates ?? [];
+
+    expect(candidates.length).toBeGreaterThan(0);
   });
 });

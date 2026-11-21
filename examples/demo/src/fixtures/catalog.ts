@@ -1,7 +1,7 @@
 import { productSchema, type Product } from '@rudra-js/core';
 import { mulberry32, pick } from './seeded-random';
 
-const CATEGORIES = [
+export const CATEGORIES = [
   'Trail Running',
   'Road Running',
   'Hiking Boots',

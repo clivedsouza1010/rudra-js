@@ -24,4 +24,24 @@ describe('the placeholder image', () => {
     expect(await image('rj-00001.webp')).toBe(await image('rj-00001.webp'));
     expect(await image('rj-00001.webp')).not.toBe(await image('rj-00002.webp'));
   });
+
+  it('draws the product in the color a swatch asks for', async () => {
+    const response = await GET(new Request('http://demo/images/rj-00001.webp?tone=2'), {
+      params: Promise.resolve({ file: 'rj-00001.webp' }),
+    });
+
+    expect(await response.text()).toContain('#33658a');
+  });
+
+  it('draws a different picture for each gallery view', async () => {
+    const views = await Promise.all(
+      ['rj-00001.webp', 'rj-00001-2.webp', 'rj-00001-3.webp', 'rj-00001-4.webp'].map(image),
+    );
+
+    expect(new Set(views).size).toBe(4);
+  });
+
+  it('still answers with a picture for a file it does not know', async () => {
+    expect(await image('not-a-product.webp')).toMatch(/^<svg /);
+  });
 });
