@@ -9,9 +9,9 @@ import {
 import { buildFallbackSpec } from './fallback-component.js';
 import { buildPrompt } from './model-prompt.js';
 import type { ComponentProvider, TokenUsage } from './provider.js';
-import { heroAndSetSkus, reconcileSpec } from './reconciliation.js';
-import { selectProducts, type RankOrder } from './product-selection.js';
-import { fitToShopper, type FittedSpec } from './fit-to-shopper.js';
+import { reconcileSpec } from './reconciliation.js';
+import type { RankOrder } from './product-selection.js';
+import { fitCohortSpec } from './fit-to-shopper.js';
 import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.js';
 import {
   cachedSpecSchema,
@@ -122,18 +122,6 @@ type EventDetails = Pick<
   GenerationEvent,
   'calledModel' | 'usage' | 'violations' | 'cache' | 'error'
 >;
-
-function fitCohortSpec(
-  spec: GeneratedSpec,
-  input: TrackingInput,
-  digest: SignalDigest,
-  rank: RankOrder,
-): FittedSpec {
-  const spokenFor = heroAndSetSkus(spec.blocks, input, digest);
-  const picks = selectProducts(input, digest, { rank });
-  const forGrid = picks.filter((pick) => !spokenFor.has(pick.product.sku));
-  return fitToShopper(spec, forGrid, digest.maxItems - spokenFor.size);
-}
 
 export function createComponentGenerator(
   options: ComponentGeneratorOptions = {},

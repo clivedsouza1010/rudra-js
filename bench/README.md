@@ -14,6 +14,9 @@ billed call.
 - `d per-shopper`: the same stub, but in `per-shopper` mode. With a single generation per shopper,
   there's almost nothing left to share.
 
+The letters come from a four-arm plan. Arm a is a client-rendered page with a deterministic
+recommender, the usual baseline, and this bench doesn't run it.
+
 An arm may only be answered by the stub or by nothing at all. If a real provider answers, the run
 will refuse to publish that arm.
 

@@ -1,5 +1,8 @@
 import type { Block, GeneratedSpec, ProductReference } from './component-spec.js';
-import type { ProductPick } from './product-selection.js';
+import { selectProducts, type ProductPick, type RankOrder } from './product-selection.js';
+import { heroAndSetSkus } from './reconciliation.js';
+import type { SignalDigest } from './signal-digest.js';
+import type { TrackingInput } from './tracking-input.js';
 
 export interface FittedSpec {
   spec: GeneratedSpec;
@@ -40,4 +43,16 @@ export function fitToShopper(
   }
 
   return { spec: { ...spec, blocks }, ourReasons };
+}
+
+export function fitCohortSpec(
+  spec: GeneratedSpec,
+  input: TrackingInput,
+  digest: SignalDigest,
+  rank: RankOrder,
+): FittedSpec {
+  const spokenFor = heroAndSetSkus(spec.blocks, input, digest);
+  const picks = selectProducts(input, digest, { rank });
+  const forGrid = picks.filter((pick) => !spokenFor.has(pick.product.sku));
+  return fitToShopper(spec, forGrid, digest.maxItems - spokenFor.size);
 }

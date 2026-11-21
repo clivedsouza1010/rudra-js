@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { generateCatalog } from '../../../fixtures/catalog';
 import type { Shopper } from '../../../fixtures/shoppers';
-import { shoppers } from '../../../shop-context';
+import { CATALOG_SEED, shoppers } from '../../../shop-context';
 import ProductPage from './page';
 import { ProductPageContent } from '../../../product-page';
 
@@ -43,7 +43,9 @@ describe('a product page', () => {
     const recommendedSku = /data-rudra-sku="([^"]+)"/.exec(recommendations)?.[1];
     expect(recommendedSku).toBeDefined();
 
-    const product = generateCatalog(1).find((candidate) => candidate.sku === recommendedSku);
+    const product = generateCatalog(CATALOG_SEED).find(
+      (candidate) => candidate.sku === recommendedSku,
+    );
     expect(product, `${String(recommendedSku)} is not a SKU this catalog has`).toBeDefined();
 
     expect(recommendations).toContain(

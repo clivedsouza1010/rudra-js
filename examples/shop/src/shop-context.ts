@@ -10,7 +10,7 @@ import { generateCatalog } from './fixtures/catalog';
 import { generateShoppers, type Shopper } from './fixtures/shoppers';
 import { createRecordingProvider, createReplayProvider } from './provider/recording-provider';
 
-const CATALOG_SEED = 1;
+export const CATALOG_SEED = 1;
 const SHOPPER_SEED = 9;
 
 export const MODEL_ID = 'claude-opus-5';
