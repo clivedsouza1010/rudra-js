@@ -106,9 +106,9 @@ This package doesn't ship any CSS. Without styles, the block will render as a si
 All of the card elements are inline. This means a card's parts sit on a single line with spaces in
 between. There is nothing to separate a card from the next. You style it from there.
 
-For a working stylesheet, see `examples/shop/public/demo-styles.css`. It uses just the classes in
-the table below. You can copy it as a starting point. It isn't a supported API though. The example
-shop applies it by default. You can use `?styles=off` to see the raw markup.
+For a working stylesheet, see `examples/demo/public/demo-styles.css`. It uses just the classes and
+attributes in the tables below. You can copy it as a starting point. It isn't a supported API
+though. The demo applies it by default. You can use `?styles=off` to see the raw markup.
 
 All of the elements the component renders have a class. Here is the full list:
 

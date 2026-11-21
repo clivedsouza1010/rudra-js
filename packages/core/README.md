@@ -607,7 +607,7 @@ tenancy or a recorded fixture. `@rudra-js/core` depends on no vendor SDK.
 `@rudra-js/anthropic` is just one adapter and you don't have to use it.
 
 An adapter takes its API key as an option. You can then choose where the key
-comes from. `ANTHROPIC_API_KEY` is just the name the example shop uses. No
+comes from. `ANTHROPIC_API_KEY` is just the name the demo uses. No
 package here reads the environment.
 
 ## The cache

@@ -14,7 +14,7 @@ export default defineConfig({
       'examples/*/src/**/*.test.tsx',
     ],
     env: {
-      RUDRA_SHOP_RECORDINGS: fileURLToPath(new URL('examples/shop/recordings/', import.meta.url)),
+      RUDRA_DEMO_RECORDINGS: fileURLToPath(new URL('examples/demo/recordings/', import.meta.url)),
       RUDRA_REPLAY_ONLY: '1',
     },
   },

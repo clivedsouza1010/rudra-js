@@ -18,9 +18,9 @@ import {
   type SourceRule,
   type TokenPrices,
 } from './measure-arm.js';
-import { buildTrackingInput } from '../examples/shop/src/fixtures/tracking-input.js';
-import { generateCatalog } from '../examples/shop/src/fixtures/catalog.js';
-import { generateShoppers } from '../examples/shop/src/fixtures/shoppers.js';
+import { buildTrackingInput } from '../examples/demo/src/fixtures/tracking-input.js';
+import { generateCatalog } from '../examples/demo/src/fixtures/catalog.js';
+import { generateShoppers } from '../examples/demo/src/fixtures/shoppers.js';
 
 const PRICES: TokenPrices = {
   inputPerMillion: 5,

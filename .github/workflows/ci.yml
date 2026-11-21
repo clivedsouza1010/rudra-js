@@ -47,6 +47,6 @@ jobs:
 
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - run: npm run build --workspace @rudra-js/example-shop
-      - run: npm run typecheck --workspace @rudra-js/example-shop
+      - run: npm run build --workspace @rudra-js/example-demo
+      - run: npm run typecheck --workspace @rudra-js/example-demo
       - run: npm run verify:crawlable

@@ -52,8 +52,8 @@ out. So the `thinking` default is what keeps Sonnet 5 inside the time limit.
 If you want to use another model, pass `model` and raise `modelTimeoutMs` to
 match. Some models reject an explicit `{ type: 'disabled' }` and reason whatever
 you send. For those models you will need to pass `thinking: null` to have the
-adapter send no `thinking` field at all. There is an example shop in this repo
-that pins `claude-opus-5` and gives `modelTimeoutMs` 60 seconds. That's a demo
+adapter send no `thinking` field at all. There is a demo in this repo that
+pins `claude-opus-5` and gives `modelTimeoutMs` 60 seconds. That's a demo
 setting. Don't use it in production.
 
 This adapter asks the model to answer by calling its tool. But the call isn't

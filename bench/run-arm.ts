@@ -1,6 +1,6 @@
 import { isEntryPoint } from '../crawl/entry-point.js';
-import { generateCatalog } from '../examples/shop/src/fixtures/catalog.js';
-import { generateShoppers } from '../examples/shop/src/fixtures/shoppers.js';
+import { generateCatalog } from '../examples/demo/src/fixtures/catalog.js';
+import { generateShoppers } from '../examples/demo/src/fixtures/shoppers.js';
 import { PRICES, buildArm, isArmName } from './arms.js';
 import { measureArm } from './measure-arm.js';
 
