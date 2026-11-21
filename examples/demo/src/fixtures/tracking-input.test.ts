@@ -9,7 +9,7 @@ const catalog = generateCatalog(1, 200);
 const shoppers = generateShoppers(9, catalog, 50);
 const bundles = generateBundles(catalog);
 
-describe('the tracking payload the shop builds', () => {
+describe('the tracking payload the demo builds', () => {
   it('is accepted by the payload contract for every shopper', () => {
     for (const shopper of shoppers) {
       expect(() =>

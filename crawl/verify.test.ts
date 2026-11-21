@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./entry-point.js', () => ({ isEntryPoint: () => true }));
-vi.mock('./shop-server.js', () => ({
+vi.mock('./demo-server.js', () => ({
   freePort: () => Promise.resolve(3999),
-  startShop: () => ({ shop: {}, ready: Promise.resolve(), seen: () => '' }),
-  stopShop: () => Promise.resolve(),
+  startDemo: () => ({ demo: {}, ready: Promise.resolve(), seen: () => '' }),
+  stopDemo: () => Promise.resolve(),
 }));
 
 const IN_PLACE = `<!DOCTYPE html><html><body><main><h1>Trail Shoe</h1>

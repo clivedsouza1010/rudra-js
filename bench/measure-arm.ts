@@ -4,8 +4,8 @@ import {
   type GenerationEvent,
   type Product,
 } from '@rudra-js/core';
-import { buildTrackingInput } from '../examples/shop/src/fixtures/tracking-input.js';
-import type { Shopper } from '../examples/shop/src/fixtures/shoppers.js';
+import { buildTrackingInput } from '../examples/demo/src/fixtures/tracking-input.js';
+import type { Shopper } from '../examples/demo/src/fixtures/shoppers.js';
 
 export interface TokenPrices {
   inputPerMillion: number;

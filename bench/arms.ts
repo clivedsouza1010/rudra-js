@@ -18,8 +18,8 @@ export const PRICES: TokenPrices = {
 };
 
 const RECORDINGS_DIRECTORY =
-  process.env['RUDRA_SHOP_RECORDINGS'] ||
-  fileURLToPath(new URL('../examples/shop/recordings', import.meta.url));
+  process.env['RUDRA_DEMO_RECORDINGS'] ||
+  fileURLToPath(new URL('../examples/demo/recordings', import.meta.url));
 
 export function loadColdUsage(directory: string = RECORDINGS_DIRECTORY): TokenUsage {
   const transcripts: string[] = [];

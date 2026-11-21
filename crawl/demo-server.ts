@@ -18,32 +18,32 @@ export function freePort(): Promise<number> {
   });
 }
 
-export type RunningShop = {
-  shop: ChildProcess;
+export type RunningDemo = {
+  demo: ChildProcess;
   ready: Promise<void>;
   seen: () => string;
 };
 
-export type ShopCommand = { file: string; args: string[] };
+export type DemoCommand = { file: string; args: string[] };
 
-function shopCommand(port: number): ShopCommand {
+function demoCommand(port: number): DemoCommand {
   return {
     file: 'npm',
-    args: ['run', 'start', '--workspace', '@rudra-js/example-shop', '--', '-p', String(port)],
+    args: ['run', 'start', '--workspace', '@rudra-js/example-demo', '--', '-p', String(port)],
   };
 }
 
 export function exitedBeforeServing(code: number | null, signal: NodeJS.Signals | null): string {
-  if (code === null) return `the shop was killed by ${signal} before serving anything`;
-  return `the shop exited with ${code} before serving anything`;
+  if (code === null) return `the demo was killed by ${signal} before serving anything`;
+  return `the demo exited with ${code} before serving anything`;
 }
 
-export function startShop(port: number, command: ShopCommand = shopCommand(port)): RunningShop {
-  const shop = spawn(command.file, command.args, {
+export function startDemo(port: number, command: DemoCommand = demoCommand(port)): RunningDemo {
+  const demo = spawn(command.file, command.args, {
     env: {
       ...process.env,
       RUDRA_REPLAY_ONLY: '1',
-      RUDRA_SHOP_MODE: 'replay',
+      RUDRA_DEMO_MODE: 'replay',
       ANTHROPIC_API_KEY: '',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -55,7 +55,7 @@ export function startShop(port: number, command: ShopCommand = shopCommand(port)
 
   const ready = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(
-      () => reject(new Error('the shop did not start within 60 seconds')),
+      () => reject(new Error('the demo did not start within 60 seconds')),
       60_000,
     );
 
@@ -66,16 +66,16 @@ export function startShop(port: number, command: ShopCommand = shopCommand(port)
         resolve();
       }
     };
-    shop.stdout?.on('data', remember);
-    shop.stderr?.on('data', remember);
+    demo.stdout?.on('data', remember);
+    demo.stderr?.on('data', remember);
 
-    shop.on('exit', (code, signal) => {
+    demo.on('exit', (code, signal) => {
       clearTimeout(timer);
       reject(new Error(exitedBeforeServing(code, signal)));
     });
   });
 
-  return { shop, ready, seen: () => seen };
+  return { demo, ready, seen: () => seen };
 }
 
 function signalGroup(pid: number, signal: NodeJS.Signals): void {
@@ -84,28 +84,28 @@ function signalGroup(pid: number, signal: NodeJS.Signals): void {
   } catch {}
 }
 
-export async function stopShop(shop: ChildProcess): Promise<void> {
+export async function stopDemo(demo: ChildProcess): Promise<void> {
   await new Promise<void>((resolve) => {
-    if (shop.exitCode !== null || shop.signalCode !== null) {
+    if (demo.exitCode !== null || demo.signalCode !== null) {
       resolve();
       return;
     }
-    if (shop.pid === undefined) {
+    if (demo.pid === undefined) {
       resolve();
       return;
     }
-    const pid = shop.pid;
+    const pid = demo.pid;
     const escalate = setTimeout(() => {
       signalGroup(pid, 'SIGKILL');
     }, 5_000);
-    shop.once('exit', () => {
+    demo.once('exit', () => {
       clearTimeout(escalate);
       resolve();
     });
     signalGroup(pid, 'SIGTERM');
   });
 
-  shop.stdout?.destroy();
-  shop.stderr?.destroy();
-  shop.unref();
+  demo.stdout?.destroy();
+  demo.stderr?.destroy();
+  demo.unref();
 }

@@ -11,9 +11,9 @@ vi.mock('@rudra-js/anthropic', async (importOriginal) => {
 
 const KEY = 'ANTHROPIC_API_KEY';
 const REPLAY_ONLY = 'RUDRA_REPLAY_ONLY';
-const MODE = 'RUDRA_SHOP_MODE';
+const MODE = 'RUDRA_DEMO_MODE';
 const WORKSPACE = 'ANTHROPIC_WORKSPACE_ID';
-const RECORDINGS = 'RUDRA_SHOP_RECORDINGS';
+const RECORDINGS = 'RUDRA_DEMO_RECORDINGS';
 
 const AMBIENT_REPLAY_ONLY = process.env[REPLAY_ONLY];
 const AMBIENT_RECORDINGS = process.env[RECORDINGS];
@@ -67,27 +67,27 @@ describe('the replay-only switch', () => {
   it('is already on by default, so a key alone in the shell cannot bill during npm test', async () => {
     process.env[KEY] = 'sk-ant-not-a-real-key';
 
-    await expect(import('./shop-context')).rejects.toThrow(/replay only/i);
+    await expect(import('./demo-context')).rejects.toThrow(/replay only/i);
   });
 
   it('refuses to load when a key is present as well', async () => {
     process.env[REPLAY_ONLY] = '1';
     process.env[KEY] = 'sk-ant-not-a-real-key';
 
-    await expect(import('./shop-context')).rejects.toThrow(/replay only/i);
+    await expect(import('./demo-context')).rejects.toThrow(/replay only/i);
   });
 
   it('loads when the switch is on and no key is set', async () => {
     process.env[REPLAY_ONLY] = '1';
 
-    await expect(import('./shop-context')).resolves.toBeDefined();
+    await expect(import('./demo-context')).resolves.toBeDefined();
   });
 
   it('refuses record mode even when no key is set', async () => {
     process.env[REPLAY_ONLY] = '1';
     process.env[MODE] = 'record';
 
-    await expect(import('./shop-context')).rejects.toThrow(/replay only/i);
+    await expect(import('./demo-context')).rejects.toThrow(/replay only/i);
   });
 
   it('refuses record mode with a key as well', async () => {
@@ -95,13 +95,13 @@ describe('the replay-only switch', () => {
     process.env[MODE] = 'record';
     process.env[KEY] = 'sk-ant-not-a-real-key';
 
-    await expect(import('./shop-context')).rejects.toThrow(/RUDRA_SHOP_MODE is record/);
+    await expect(import('./demo-context')).rejects.toThrow(/RUDRA_DEMO_MODE is record/);
   });
 
   it('treats a missing recording as an error, not something to paper over', async () => {
     process.env[REPLAY_ONLY] = '1';
 
-    const { chooseProvider } = await import('./shop-context');
+    const { chooseProvider } = await import('./demo-context');
     const provider = chooseProvider();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -120,7 +120,7 @@ describe('the replay-only switch', () => {
   it('holds a page for an hour and lets it go after that', async () => {
     vi.useFakeTimers();
     try {
-      const { specCache } = await import('./shop-context');
+      const { specCache } = await import('./demo-context');
       const cached = { spec: { blocks: [] } as never, generatedAt: Date.now() };
 
       await specCache.set('k', cached);
@@ -135,7 +135,7 @@ describe('the replay-only switch', () => {
   });
 
   it('gives the generator that cache, not a copy of it', async () => {
-    const { bundles, catalog, findShopper, generator, specCache } = await import('./shop-context');
+    const { bundles, catalog, findShopper, generator, specCache } = await import('./demo-context');
     const { buildTrackingInput } = await import('./fixtures/tracking-input');
     const get = vi.spyOn(specCache, 'get');
 
@@ -152,7 +152,7 @@ describe('the mode switch', () => {
     delete process.env[REPLAY_ONLY];
     process.env[KEY] = 'sk-ant-not-a-real-key';
 
-    const { chooseProvider } = await import('./shop-context');
+    const { chooseProvider } = await import('./demo-context');
     const factory = await anthropicFactory();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -167,7 +167,7 @@ describe('the mode switch', () => {
     process.env[MODE] = '';
     process.env[KEY] = 'sk-ant-not-a-real-key';
 
-    const { chooseProvider } = await import('./shop-context');
+    const { chooseProvider } = await import('./demo-context');
     const factory = await anthropicFactory();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -181,14 +181,14 @@ describe('the mode switch', () => {
     delete process.env[REPLAY_ONLY];
     process.env[MODE] = 'record';
 
-    await expect(import('./shop-context')).rejects.toThrow(/ANTHROPIC_API_KEY/);
+    await expect(import('./demo-context')).rejects.toThrow(/ANTHROPIC_API_KEY/);
   });
 
   it('refuses a mode it does not know, naming the two it does', async () => {
     delete process.env[REPLAY_ONLY];
     process.env[MODE] = 'live';
 
-    await expect(import('./shop-context')).rejects.toThrow(/"replay" or "record"/);
+    await expect(import('./demo-context')).rejects.toThrow(/"replay" or "record"/);
   });
 
   it('records with a key, and hands the workspace to the Anthropic provider', async () => {
@@ -197,7 +197,7 @@ describe('the mode switch', () => {
     process.env[KEY] = 'sk-ant-not-a-real-key';
     process.env[WORKSPACE] = 'wrkspc_not_a_real_workspace';
 
-    await expect(import('./shop-context')).resolves.toBeDefined();
+    await expect(import('./demo-context')).resolves.toBeDefined();
 
     const factory = await anthropicFactory();
     expect(factory).toHaveBeenCalledTimes(1);
@@ -212,7 +212,7 @@ describe('the mode switch', () => {
   it('replays under the same provider name it records under', async () => {
     delete process.env[REPLAY_ONLY];
 
-    const { chooseProvider } = await import('./shop-context');
+    const { chooseProvider } = await import('./demo-context');
     const replayed = chooseProvider();
     process.env[MODE] = 'record';
     process.env[KEY] = 'sk-ant-not-a-real-key';
@@ -229,7 +229,7 @@ describe('the mode switch', () => {
     process.env[MODE] = 'record';
     process.env[KEY] = 'sk-ant-not-a-real-key';
 
-    const { chooseProvider, MODEL_ID } = await import('./shop-context');
+    const { chooseProvider, MODEL_ID } = await import('./demo-context');
     const factory = await anthropicFactory();
     factory.mockReturnValue({
       name: 'anthropic',
@@ -247,7 +247,7 @@ describe('the mode switch', () => {
     process.env[RECORDINGS] = scratch();
     delete process.env[REPLAY_ONLY];
 
-    const { bundles, catalog, findShopper, generator } = await import('./shop-context');
+    const { bundles, catalog, findShopper, generator } = await import('./demo-context');
     const { buildTrackingInput } = await import('./fixtures/tracking-input');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -267,7 +267,7 @@ describe('a replay miss outside replay-only', () => {
   it('warns, then rejects', async () => {
     delete process.env[REPLAY_ONLY];
 
-    const { chooseProvider } = await import('./shop-context');
+    const { chooseProvider } = await import('./demo-context');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await expect(chooseProvider().generate(missingRequest())).rejects.toThrow(/no recording/i);
@@ -281,7 +281,7 @@ describe('the recordings directory', () => {
   it('falls back to the default when the variable is set but empty, as an empty .env.local row leaves it', async () => {
     process.env[RECORDINGS] = '';
 
-    const { RECORDINGS_DIRECTORY } = await import('./shop-context');
+    const { RECORDINGS_DIRECTORY } = await import('./demo-context');
 
     expect(RECORDINGS_DIRECTORY).toBe(join(process.cwd(), 'recordings'));
   });
@@ -289,7 +289,7 @@ describe('the recordings directory', () => {
   it('uses the variable when it names a directory', async () => {
     process.env[RECORDINGS] = '/somewhere/else';
 
-    const { RECORDINGS_DIRECTORY } = await import('./shop-context');
+    const { RECORDINGS_DIRECTORY } = await import('./demo-context');
 
     expect(RECORDINGS_DIRECTORY).toBe('/somewhere/else');
   });

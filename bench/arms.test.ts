@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generatedSpecSchema, type TokenUsage } from '@rudra-js/core';
 import { buildArm, loadColdUsage, PRICES, type ArmName } from './arms.js';
 
-const RECORDINGS = fileURLToPath(new URL('../examples/shop/recordings/', import.meta.url));
+const RECORDINGS = fileURLToPath(new URL('../examples/demo/recordings/', import.meta.url));
 
 function committedUsage(): Required<TokenUsage> {
   const transcripts: string[] = [];
@@ -119,19 +119,19 @@ describe('reading the committed transcript', () => {
 });
 
 describe('the recordings directory', () => {
-  const ambient = process.env['RUDRA_SHOP_RECORDINGS'];
+  const ambient = process.env['RUDRA_DEMO_RECORDINGS'];
 
   afterEach(() => {
     if (ambient === undefined) {
-      delete process.env['RUDRA_SHOP_RECORDINGS'];
+      delete process.env['RUDRA_DEMO_RECORDINGS'];
     } else {
-      process.env['RUDRA_SHOP_RECORDINGS'] = ambient;
+      process.env['RUDRA_DEMO_RECORDINGS'] = ambient;
     }
     vi.resetModules();
   });
 
   it('falls back to the committed recordings when the variable is set but empty', async () => {
-    process.env['RUDRA_SHOP_RECORDINGS'] = '';
+    process.env['RUDRA_DEMO_RECORDINGS'] = '';
     vi.resetModules();
 
     const fresh = await import('./arms.js');

@@ -16,7 +16,7 @@ const SHOPPER_SEED = 9;
 export const MODEL_ID = 'claude-opus-5';
 
 export const RECORDINGS_DIRECTORY =
-  process.env['RUDRA_SHOP_RECORDINGS'] || join(process.cwd(), 'recordings');
+  process.env['RUDRA_DEMO_RECORDINGS'] || join(process.cwd(), 'recordings');
 
 const MODEL_TIMEOUT_MS = 60_000;
 
@@ -42,21 +42,21 @@ export function findShopper(id: string | undefined): Shopper {
 
 export function chooseProvider(): ComponentProvider {
   const apiKey = process.env['ANTHROPIC_API_KEY'];
-  const mode = process.env['RUDRA_SHOP_MODE'] || 'replay';
+  const mode = process.env['RUDRA_DEMO_MODE'] || 'replay';
   const replayOnly = process.env['RUDRA_REPLAY_ONLY'];
 
   if (mode !== 'replay' && mode !== 'record') {
-    throw new Error(`RUDRA_SHOP_MODE is "${mode}": it must be "replay" or "record"`);
+    throw new Error(`RUDRA_DEMO_MODE is "${mode}": it must be "replay" or "record"`);
   }
   if (replayOnly && mode === 'record') {
     throw new Error(
-      'RUDRA_REPLAY_ONLY is set and RUDRA_SHOP_MODE is record: refusing to start, because replay only means no model calls',
+      'RUDRA_REPLAY_ONLY is set and RUDRA_DEMO_MODE is record: refusing to start, because replay only means no model calls',
     );
   }
   if (replayOnly && apiKey) {
     throw new Error(
       'RUDRA_REPLAY_ONLY is set and so is ANTHROPIC_API_KEY: refusing to start, because replay only means no model calls ' +
-        '(the key may be coming from examples/shop/.env.local)',
+        '(the key may be coming from examples/demo/.env.local)',
     );
   }
   if (mode === 'replay') {
@@ -68,8 +68,8 @@ export function chooseProvider(): ComponentProvider {
   }
   if (!apiKey) {
     throw new Error(
-      'RUDRA_SHOP_MODE is record but ANTHROPIC_API_KEY is not set: recording calls the model, so it needs a key ' +
-        '(export one, or put it in examples/shop/.env.local)',
+      'RUDRA_DEMO_MODE is record but ANTHROPIC_API_KEY is not set: recording calls the model, so it needs a key ' +
+        '(export one, or put it in examples/demo/.env.local)',
     );
   }
 

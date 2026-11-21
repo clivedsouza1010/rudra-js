@@ -14,7 +14,7 @@ return a spec instead: a short description of the block, made up only of fields 
 picks the layout and writes the headline and copy, but there isn't a field for a price, a product
 name, an image or a link. To name a product, it will have to use a SKU from the list you give it.
 
-![The example shop's product page. The heading and the highlighting are the model's. The products, their order and the line under each are core's picks, and every title, price and image is the shop's.](docs/demo.png)
+![The demo's product page. The heading and the highlighting are the model's. The products, their order and the line under each are core's picks, and every title, price and image is the shop's.](docs/demo.png)
 
 `@rudra-js/react` will turn the spec into HTML. To do this, it will read the title, price, image and
 link of the products from your catalog as the page is served. Anything the model wrote will be
@@ -155,40 +155,40 @@ To see the cost of each generation mode under a stub model, run
 `ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run bench`. [bench/README.md](bench/README.md) explains
 the columns.
 
-There's also a second job to build the example shop
+There's also a second job to build the demo
 and check that a crawler still sees the block as part of the page. Because CI doesn't set
-`RUDRA_SHOP_MODE`, the shop will replay. That job runs the plain build:
+`RUDRA_DEMO_MODE`, the demo will replay. That job runs the plain build:
 
 ```sh
-npm run build --workspace @rudra-js/example-shop
+npm run build --workspace @rudra-js/example-demo
 npm run verify:crawlable
 ```
 
-That build is safe to run locally on its own: building doesn't call a model. Serving the shop will
-only spend money with `RUDRA_SHOP_MODE=record`. Use the prefix below to make that a rule and not
+That build is safe to run locally on its own: building doesn't call a model. Serving the demo will
+only spend money with `RUDRA_DEMO_MODE=record`. Use the prefix below to make that a rule and not
 just a default:
 
 ```sh
-ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/example-shop
+ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/example-demo
 ```
 
 ## Example
 
-[`examples/shop`](examples/shop) is a small Next.js storefront that runs rudra-js on a real page.
+[`examples/demo`](examples/demo) is a small Next.js site that runs rudra-js on a real page.
 Its product page asks the LLM for a recommendation block. This block will be rendered by
 the server as part of the HTML response for the page. It won't be fetched after the page loads.
 
 ```sh
-npm run dev --workspace @rudra-js/example-shop
+npm run dev --workspace @rudra-js/example-demo
 # then visit http://localhost:3000/product/RJ-00001?shopper=S-0001
 ```
 
-That will replay the transcripts committed under `examples/shop/recordings/`. These are saved model
+That will replay the transcripts committed under `examples/demo/recordings/`. These are saved model
 calls: the prompt and the model's answer. You won't be billed for replaying, whatever keys you have
-in your environment. To spend money, you have to set `RUDRA_SHOP_MODE` to `record`:
+in your environment. To spend money, you have to set `RUDRA_DEMO_MODE` to `record`:
 
 ```sh
-RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop
+RUDRA_DEMO_MODE=record npm run dev --workspace @rudra-js/example-demo
 ```
 
 That will call Claude once per prompt that doesn't have a transcript yet, then save the answer as a
@@ -196,7 +196,7 @@ new transcript. If a prompt has one, it will replay for free, even on another pa
 shopper on the same page might need a new call, because transcripts have to match the model id and
 prompt.
 
-[`examples/shop/README.md`](examples/shop/README.md) covers the rest:
+[`examples/demo/README.md`](examples/demo/README.md) covers the rest:
 
 - the environment variables
 - how to re-record a transcript after a prompt change

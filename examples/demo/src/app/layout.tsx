@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'rudra-js demo shop',
+  title: 'rudra-js demo',
   description:
-    'A demo shop for rudra-js, an open-source TypeScript library. The products and prices are made up.',
+    'A demo of rudra-js, an open-source TypeScript library. The products and prices are made up.',
   robots: { index: false, follow: true },
 };
 

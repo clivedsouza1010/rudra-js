@@ -15,7 +15,7 @@ describe('the replay-miss rule', () => {
       }),
     );
 
-    expect(markup, `${String(warn.mock.calls[0]?.[0] ?? '')}, see examples/shop/README.md`).toMatch(
+    expect(markup, `${String(warn.mock.calls[0]?.[0] ?? '')}, see examples/demo/README.md`).toMatch(
       /data-rudra-source="(llm|cache)"/,
     );
   });

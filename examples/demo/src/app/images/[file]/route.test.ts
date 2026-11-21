@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GET } from './route.js';
 
 const image = async (file: string): Promise<string> => {
-  const response = await GET(new Request('http://shop/images/x'), {
+  const response = await GET(new Request('http://demo/images/x'), {
     params: Promise.resolve({ file }),
   });
   return response.text();
@@ -14,7 +14,7 @@ describe('the placeholder image', () => {
   });
 
   it('is revalidated on every load, so a changed placeholder cannot sit in a browser cache for a year', async () => {
-    const response = await GET(new Request('http://shop/images/x'), {
+    const response = await GET(new Request('http://demo/images/x'), {
       params: Promise.resolve({ file: 'rj-00001.webp' }),
     });
     expect(response.headers.get('cache-control')).toBe('no-cache');

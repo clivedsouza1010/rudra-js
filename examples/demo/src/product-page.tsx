@@ -1,5 +1,5 @@
 import { RudraComponent, defaultFormatPrice } from '@rudra-js/react';
-import { bundles, catalog, findShopper, generator } from './shop-context';
+import { bundles, catalog, findShopper, generator } from './demo-context';
 import { buildTrackingInput } from './fixtures/tracking-input';
 
 export async function ProductPageContent({

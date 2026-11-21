@@ -1,20 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { startShop } from './shop-server.js';
+import { startDemo } from './demo-server.js';
 
-vi.mock('./shop-server.js', () => ({ freePort: vi.fn(), startShop: vi.fn(), stopShop: vi.fn() }));
+vi.mock('./demo-server.js', () => ({ freePort: vi.fn(), startDemo: vi.fn(), stopDemo: vi.fn() }));
 
 describe('importing a crawl entry point', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('verify.ts starts no shop', async () => {
+  it('verify.ts starts no demo', async () => {
     let failure: unknown;
     await import('./verify.js').catch((error: unknown) => {
       failure = error;
     });
 
-    expect(startShop).not.toHaveBeenCalled();
+    expect(startDemo).not.toHaveBeenCalled();
     expect(failure).toBeUndefined();
   });
 });

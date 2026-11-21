@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { generateCatalog } from '../../../fixtures/catalog';
 import type { Shopper } from '../../../fixtures/shoppers';
-import { CATALOG_SEED, shoppers } from '../../../shop-context';
+import { CATALOG_SEED, shoppers } from '../../../demo-context';
 import ProductPage from './page';
 import { ProductPageContent } from '../../../product-page';
 

@@ -170,13 +170,13 @@ Bump the version in a pull request of its own and merge it. There's more to a bu
 places:
 
 - `version` in the root manifest, in all of the `packages/*/package.json` files and in
-  `examples/shop/package.json`.
+  `examples/demo/package.json`.
 - All the peer ranges that packages declare on their siblings. `^0.5.0` becomes `^0.6.0` in
   `packages/core`, `packages/react`, `packages/anthropic` and `packages/a2ui` (two there, core and
   react). A caret on a `0.x` version will only allow patches. If you leave one behind, you'll
   publish packages that can't be installed together.
 - All the exact sibling pins those four have in `devDependencies` (two in `packages/a2ui`) and the
-  three in `examples/shop`.
+  three in `examples/demo`.
 - `package-lock.json`, regenerated with the npm the release installs:
 
   ```sh
