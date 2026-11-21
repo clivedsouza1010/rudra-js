@@ -63,11 +63,12 @@ All transcript filenames are hashes of the model id and both halves of the promp
 editing the prompt will orphan all transcripts at once. This applies to `SYSTEM_PROMPT` in
 `packages/core/src/model-prompt.ts` and to anything that changes the user half.
 `replay-miss.test.ts` will fail if the page it guards has no transcript. It will also name the path
-it looked for.
+the page's request looked for.
 
-1. Find the hash: run `npm test`. `replay-miss.test.ts` will fail and name the path it wanted.
-   That's your new hash. Whatever file is in `recordings/` under another name is the orphan. Delete
-   this file: `rm examples/shop/recordings/<old hash>.json`.
+1. Find the hash: run `npx vitest run 'examples/shop/src/app/product/[sku]/replay-miss.test.ts'`.
+   It will fail with `no recording for this request at <path>`. That path's file name is your new
+   hash. Whatever file is in `recordings/` under another name is the orphan. Delete this file:
+   `rm examples/shop/recordings/<old hash>.json`.
 2. Run just that page in record mode: `RUDRA_SHOP_MODE=record npm run dev --workspace @rudra-js/example-shop`, then visit it.
 3. Check that `git status --short examples/shop/recordings/` shows one deletion and one new file.
    Also check that the new name is the hash from step 1.
