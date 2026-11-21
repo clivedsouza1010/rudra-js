@@ -45,8 +45,8 @@ export function StoreFooter() {
         </section>
       </div>
       <p className="footer__note">
-        Larchmere Outfitters is made up for a rudra-js demo. The products, prices and reviews are
-        generated, and nothing here is for sale.
+        Larchmere Outfitters is made up for a rudra-js demo. The products, prices and reviews come
+        from a script, not the model, and nothing here is for sale.
       </p>
     </footer>
   );

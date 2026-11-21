@@ -312,7 +312,13 @@ function reviewsFor(info: CategoryInfo, rating: number, random: () => number) {
 function ratingCountsFor(rating: number, total: number): ProductDetails['ratingCounts'] {
   const weights = [5, 4, 3, 2, 1].map((stars) => Math.exp(-Math.abs(stars - rating) * 1.4));
   const sum = weights.reduce((left, right) => left + right, 0);
-  const counts = weights.map((weight) => Math.round((weight / sum) * total));
+  const shares = weights.map((weight) => weight / sum);
+  const mean = shares.reduce((left, share, index) => left + share * (5 - index), 0);
+  const end = mean > rating ? 1 : 5;
+  const keep = (rating - end) / (mean - end);
+  const counts = shares.map((share, index) =>
+    Math.round((share * keep + (5 - index === end ? 1 - keep : 0)) * total),
+  );
   const largest = counts.indexOf(Math.max(...counts));
   counts[largest]! += total - counts.reduce((left, right) => left + right, 0);
   return counts as ProductDetails['ratingCounts'];

@@ -1,9 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export function SearchBox() {
   const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (!note) return;
+    const timer = setTimeout(() => setNote(''), 5000);
+    return () => clearTimeout(timer);
+  }, [note]);
 
   return (
     <form
@@ -12,6 +18,9 @@ export function SearchBox() {
       onSubmit={(event) => {
         event.preventDefault();
         setNote('Search isn’t part of this demo. Use the categories below to look around.');
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setNote('');
       }}
     >
       <label className="visually-hidden" htmlFor="store-search">

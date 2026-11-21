@@ -198,6 +198,7 @@ select {
 
 .search__note:not(:empty) {
   z-index: 3;
+  pointer-events: none;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 0.5rem;

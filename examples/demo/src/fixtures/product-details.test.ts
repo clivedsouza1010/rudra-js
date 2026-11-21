@@ -21,6 +21,18 @@ describe('the made-up product details', () => {
     }
   });
 
+  it('split the ratings so the bars average out to the product rating', () => {
+    for (const product of catalog) {
+      const details = detailsFor(product);
+      if (details.reviewCount < 50) continue;
+      const average =
+        details.ratingCounts.reduce((sum, count, index) => sum + count * (5 - index), 0) /
+        details.reviewCount;
+
+      expect(Math.abs(average - (product.rating ?? 0))).toBeLessThan(0.06);
+    }
+  });
+
   it('show no reviews for a product rated below one star', () => {
     const product = catalog.find((candidate) => (candidate.rating ?? 0) < 1)!;
 

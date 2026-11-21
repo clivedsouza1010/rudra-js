@@ -19,10 +19,8 @@ import {
   buildTrackingInput,
 } from './fixtures/tracking-input';
 
-function sourceNote(spec: ComponentSpec): string {
-  return spec.source === 'fallback'
-    ? 'No model answer here, so rudra-js built all of it'
-    : 'Layout and copy by the model. Products and the line under each by rudra-js';
+function sourceNote(spec: ComponentSpec, credit: string): string {
+  return spec.source === 'fallback' ? 'No model answer here, so rudra-js built all of it' : credit;
 }
 
 function RecommendationRow({
@@ -31,12 +29,14 @@ function RecommendationRow({
   spec,
   hrefForSku,
   registry,
+  credit = 'Layout and copy by the model. Products and the line under each by rudra-js',
 }: {
   id: string;
   heading: string;
   spec: ComponentSpec;
   hrefForSku: (sku: string) => string;
   registry?: BlockRegistry;
+  credit?: string;
 }) {
   if (spec.blocks.length === 0) return null;
 
@@ -46,7 +46,7 @@ function RecommendationRow({
         <h2 className="store-row__title" id={id}>
           {heading}
         </h2>
-        <p className="store-row__source">{sourceNote(spec)}</p>
+        <p className="store-row__source">{sourceNote(spec, credit)}</p>
       </div>
       <RowScroller label={heading}>
         <RudraComponent
@@ -225,6 +225,7 @@ export async function ProductPageContent({
         spec={compare}
         hrefForSku={hrefForSku}
         registry={compareRegistry}
+        credit="Copy by the model. Products by rudra-js"
       />
       <RecommendationRow
         id="more-to-consider"
