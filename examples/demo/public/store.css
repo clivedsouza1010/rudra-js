@@ -316,8 +316,7 @@ select {
 }
 
 .gallery__thumb[aria-pressed='true'] {
-  border-color: var(--granite);
-  box-shadow: 0 0 0 1px var(--granite);
+  border: 2px solid var(--granite);
 }
 
 .gallery__main {
@@ -391,11 +390,27 @@ select {
   border: 3px solid #fff;
   border-radius: 999px;
   box-shadow: 0 0 0 1px var(--line);
+  forced-color-adjust: none;
   cursor: pointer;
 }
 
 .swatch[aria-pressed='true'] {
   box-shadow: 0 0 0 2px var(--granite);
+}
+
+@media (forced-colors: active) {
+  .swatch {
+    border-color: Canvas;
+    box-shadow: 0 0 0 1px CanvasText;
+  }
+
+  .swatch[aria-pressed='true'] {
+    box-shadow: 0 0 0 3px CanvasText;
+  }
+
+  .swatch:focus-visible {
+    outline-color: Highlight;
+  }
 }
 
 .fulfillment {
@@ -675,6 +690,7 @@ select {
   position: relative;
   font-weight: 400;
   min-width: 9.5rem;
+  width: 13.75rem;
 }
 
 .compare__table tbody th,

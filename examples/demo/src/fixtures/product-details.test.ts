@@ -33,6 +33,16 @@ describe('the made-up product details', () => {
     }
   });
 
+  it('never show a review at a star level the bars say nobody gave', () => {
+    for (const product of generateCatalog(1)) {
+      const details = detailsFor(product);
+
+      for (const review of details.reviews) {
+        expect(details.ratingCounts[5 - review.rating]).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it('show no reviews for a product rated below one star', () => {
     const product = catalog.find((candidate) => (candidate.rating ?? 0) < 1)!;
 

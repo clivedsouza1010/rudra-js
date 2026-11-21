@@ -277,8 +277,13 @@ const TAG_TEXT: Record<string, string> = {
 const REVIEWERS = ['Maya R.', 'Tom K.', 'Priya S.', 'Owen D.', 'Lena H.', 'Sam W.', 'Jo B.'];
 const WHEN = ['2 weeks ago', '1 month ago', '3 months ago', '5 months ago'];
 
-function reviewsFor(info: CategoryInfo, rating: number, random: () => number) {
+function reviewStars(rating: number): [number, number] {
   const stars = Math.min(5, Math.max(1, Math.round(rating)));
+  return [stars, stars >= 4 ? stars - 1 : stars + 1];
+}
+
+function reviewsFor(info: CategoryInfo, rating: number, random: () => number) {
+  const [stars, secondRating] = reviewStars(rating);
   const first: Review =
     stars >= 4
       ? {
@@ -295,7 +300,6 @@ function reviewsFor(info: CategoryInfo, rating: number, random: () => number) {
           body: `I bought this ${info.noun} for ${info.use}. ${stars === 3 ? 'It does the job, but it feels heavier than the listing suggests.' : 'It started to wear after a few weeks, and I sent it back.'}`,
           when: pick(random, WHEN),
         };
-  const secondRating = Math.min(5, Math.max(1, stars + (stars >= 4 ? -1 : 1)));
   const second: Review = {
     author: pick(
       random,
@@ -321,6 +325,12 @@ function ratingCountsFor(rating: number, total: number): ProductDetails['ratingC
   );
   const largest = counts.indexOf(Math.max(...counts));
   counts[largest]! += total - counts.reduce((left, right) => left + right, 0);
+  for (const stars of total > 0 ? reviewStars(rating) : []) {
+    if (counts[5 - stars] === 0) {
+      counts[5 - stars] = 1;
+      counts[largest]! -= 1;
+    }
+  }
   return counts as ProductDetails['ratingCounts'];
 }
 
