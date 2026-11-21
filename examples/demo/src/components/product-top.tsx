@@ -13,7 +13,7 @@ export const CART_EVENT = 'demo-cart';
 
 const VIEWS = [
   { view: 1, label: 'Front' },
-  { view: 2, label: 'Side' },
+  { view: 2, label: 'Angled' },
   { view: 3, label: 'Close-up' },
   { view: 4, label: 'Outdoors' },
 ];

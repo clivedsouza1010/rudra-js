@@ -182,8 +182,8 @@ select {
 
 .search__button {
   height: 2.75rem;
-  padding: 0 1.125rem;
-  border: 0;
+  padding: 0 calc(1.125rem - 1px);
+  border: 1px solid transparent;
   border-radius: 0 0.5rem 0.5rem 0;
   background: var(--spruce);
   color: #fff;
@@ -476,7 +476,7 @@ select {
 .purchase__add {
   flex: 1;
   height: 3rem;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: var(--spruce);
   color: #fff;
@@ -786,6 +786,17 @@ select {
   display: block;
   height: 100%;
   background: var(--amber);
+}
+
+@media (forced-colors: active) {
+  .reviews__bar {
+    border: 1px solid CanvasText;
+  }
+
+  .reviews__bar-fill {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
 }
 
 .reviews__list {

@@ -144,8 +144,9 @@ function svgFor(category: string | undefined, color: string, view: number): stri
     return `${OUTDOORS}<g transform="translate(60 54) scale(0.7)">${shadow}${shape}</g>`;
   }
   const backdrop = '<rect width="400" height="300" fill="#f2f4f1"/>';
-  if (view === 2)
-    return `${backdrop}<g transform="translate(400 0) scale(-1 1)">${shadow}${shape}</g>`;
+  if (view === 2) {
+    return `${backdrop}<g transform="matrix(0.62 0 0 1 76 0)">${shadow}</g><g transform="matrix(0.62 0.1 0 1 76 -20)">${shape}</g>`;
+  }
   if (view === 3) return `${backdrop}<g transform="translate(-200 -140) scale(2)">${shape}</g>`;
   return `${backdrop}${shadow}${shape}`;
 }
