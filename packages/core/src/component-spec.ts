@@ -40,6 +40,8 @@ const gridBlockSchema = z.object({
   items: z.array(productReferenceSchema),
 });
 
+export const GRID_COLUMNS = gridBlockSchema.shape.columns.options.map((option) => option.value);
+
 export function columnsFor(count: number, widest: 2 | 3 | 4): 2 | 3 | 4 {
   return Math.min(widest, Math.max(2, count)) as 2 | 3 | 4;
 }
@@ -128,10 +130,6 @@ export type ComponentSpec = z.infer<typeof componentSpecSchema>;
 
 export function parseComponentSpec(value: unknown): ComponentSpec {
   return componentSpecSchema.parse(value);
-}
-
-export function parseGeneratedSpec(value: unknown): GeneratedSpec {
-  return generatedSpecSchema.parse(value);
 }
 
 export function safeParseGeneratedSpec(value: unknown): GeneratedSpecResult {

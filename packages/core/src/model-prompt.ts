@@ -1,4 +1,10 @@
-import { BANNER_TONES, EMPHASIS, RECOMMENDATION_BASES, TONES } from './component-spec.js';
+import {
+  BANNER_TONES,
+  EMPHASIS,
+  GRID_COLUMNS,
+  RECOMMENDATION_BASES,
+  TONES,
+} from './component-spec.js';
 import type { SignalDigest } from './signal-digest.js';
 import { FIELD_LIMITS, type Product, type TrackingInput } from './tracking-input.js';
 
@@ -11,6 +17,21 @@ export interface PromptPair {
 }
 
 const quotedList = (values: readonly string[]) => values.map((value) => `"${value}"`).join(', ');
+
+const NUMBER_WORDS = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+];
+
+const inWords = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
 export const SYSTEM_PROMPT = `You design one recommendation component for one shopper on an
 e-commerce page. You return JSON matching the schema you were given, and nothing else.
@@ -46,7 +67,7 @@ Blocks never nest.
 
 - "hero" — one large statement, optionally anchored to a single product. Use
   when one product clearly dominates what the shopper seems to want.
-- "grid" — a titled grid of 2, 3 or 4 columns. The general choice when several
+- "grid" — a titled grid of ${GRID_COLUMNS.slice(0, -1).join(', ')} or ${GRID_COLUMNS.at(-1)} columns. The general choice when several
   products are comparably relevant.
 - "carousel" — a row read left to right. Use when the order means something.
 - "banner" — a single line of merchandising copy, with a tone of ${quotedList(BANNER_TONES)}.
@@ -59,7 +80,7 @@ Blocks never nest.
   products: you are never shown which set the shop will pick, so words about
   the things in it end up beside a different set. Never say a set saves money,
   and never say by how much — you are not told any of the prices. Every product
-  in a set spends one of your product slots, and a set holds two to five of
+  in a set spends one of your product slots, and a set holds two to ${inWords(FIELD_LIMITS.productsPerBundle)} of
   them.
 
 Each product you place carries an "emphasis" of ${quotedList(EMPHASIS)}.

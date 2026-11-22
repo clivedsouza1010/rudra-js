@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BANNER_TONES,
   EMPHASIS,
@@ -107,7 +107,40 @@ describe('the vocabulary the model is shown', () => {
   it('tells the model a set spends a product slot for each thing in it', () => {
     expect(asOneLine(SYSTEM_PROMPT)).toContain('spends one of your product slots');
   });
+
+  it('gives the bundle size and the grid columns the schemas allow', () => {
+    expect(asOneLine(SYSTEM_PROMPT)).toContain('a set holds two to five of them');
+    expect(SYSTEM_PROMPT).toContain('a titled grid of 2, 3 or 4 columns');
+  });
+
+  it('follows the bundle size limit when it changes', async () => {
+    const prompt = await systemPromptWith('./tracking-input.js', {
+      FIELD_LIMITS: { ...FIELD_LIMITS, productsPerBundle: 6 },
+    });
+
+    expect(asOneLine(prompt)).toContain('a set holds two to six of them');
+  });
+
+  it('follows the grid columns when they change', async () => {
+    const prompt = await systemPromptWith('./component-spec.js', { GRID_COLUMNS: [2, 3, 4, 5] });
+
+    expect(prompt).toContain('a titled grid of 2, 3, 4 or 5 columns');
+  });
 });
+
+async function systemPromptWith(path: string, overrides: Record<string, unknown>) {
+  vi.resetModules();
+  vi.doMock(path, async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    ...overrides,
+  }));
+  try {
+    return (await import('./model-prompt.js')).SYSTEM_PROMPT;
+  } finally {
+    vi.doUnmock(path);
+    vi.resetModules();
+  }
+}
 
 describe('the shopper half', () => {
   it('names the categories in order and shows no scores', () => {

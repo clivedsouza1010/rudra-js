@@ -17,15 +17,15 @@ bump may break them.
   the text has a `Ӏ`, by look with that `Ӏ` read as an l. A reading that comes
   out the same as an earlier one is left out. Neither screen catches or lets
   through anything it didn't before. `@rudra-js/core` now uses it instead of
-  keeping its own copy of the same readings. This is why the peer range of core
-  on attested is `^0.9.2`.
+  keeping its own copy of the same readings. This is why core now needs the
+  attested from this release.
 - `@rudra-js/core/schemas` exports `defaultHrefForSku`, `defaultFormatPrice`,
   `defaultFormatBundlePrice` and `findSellableProduct`. These are the defaults a
   block uses to link to a product, show a price, and leave out a product that is
   out of stock. `@rudra-js/react` now re-exports the first three from there, so
   its API stays the same, and `@rudra-js/a2ui` uses them instead of its own copy.
-  Neither package renders anything differently. This is why the peer range of
-  react and a2ui on core is `^0.9.2`. Core also ships a `schemas/package.json`
+  Neither package renders anything differently. This is why react and a2ui now
+  need the core from this release. Core also ships a `schemas/package.json`
   that points at the built files, so tools that resolve modules without reading
   package `exports`, such as TypeScript's `moduleResolution: node`, can still
   find `@rudra-js/core/schemas`, which react now loads.
@@ -58,14 +58,27 @@ bump may break them.
   without going through JSON now shows nothing and calls `onError`.
   `ComponentSpec` is now inferred from the schema `parseComponentSpec` checks,
   so the two can't drift apart. Its fields haven't changed.
-- Both cache keys now move when core changes the wording or layout of either
-  half of the prompt, not only the system prompt. A change to how core describes
-  the shopper or the candidates, such as a heading, the task line or how unusual
-  characters are escaped, used to keep every key. A shared cache then kept
-  serving specs written under the old prompt until they expired. A change that
-  only shows up for some inputs, like escaping one more kind of character, can
-  still keep the keys. Every key moves once with this release, so each entry
+- The cache key is now a hash of the exact prompt core sends, with the provider
+  and the spec version. It used to be built from the digest, the candidate SKUs
+  and a hash of the system prompt alone. A change to how core describes the
+  shopper or the candidates kept every key, so a shared cache kept serving specs
+  written under the old prompt until they expired. Now a change to anything the
+  model is shown moves the key, and this changes which requests share a spec.
+  The same candidates in another order now get a spec each, so a shop that
+  orders them per shopper, for example under `rank: 'given'`, gets a cohort per
+  order. So does a page where a product has sold out or come back, or where a
+  title, category, rating or tag has changed. In per-shopper mode two shoppers
+  whose prompts match now share an entry, because the prompt never carries
+  `user.id`. A change to a price or an image, or to a product the model isn't
+  shown, keeps the key. Every key moves once with this release, so each entry
   misses once and is generated again.
+
+### Removed
+
+- `@rudra-js/core` no longer exports `parseGeneratedSpec`, which 0.7.0
+  deprecated. It only passed its argument to `generatedSpecSchema.parse`, so
+  call that to get the same throwing check, or use `safeParseGeneratedSpec` to
+  get a result back instead of an error.
 
 ### Fixed
 

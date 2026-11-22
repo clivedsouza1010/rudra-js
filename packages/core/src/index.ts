@@ -43,7 +43,6 @@ export {
   blockSchema,
   generatedSpecSchema,
   parseComponentSpec,
-  parseGeneratedSpec,
   productReferenceSchema,
   safeParseGeneratedSpec,
   type BannerBlock,
