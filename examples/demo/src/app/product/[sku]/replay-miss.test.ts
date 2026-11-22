@@ -4,9 +4,15 @@ import ProductPage from './page';
 
 const SKU = 'RJ-00001';
 const SHOPPER = 'S-0001';
+const SLOTS = [
+  'recommendations',
+  'compare-similar-items',
+  'more-to-consider',
+  'customers-also-viewed',
+];
 
 describe('the replay-miss rule', () => {
-  it('serves the recorded transcript rather than the fallback component', async () => {
+  it.each(SLOTS)('serves %s from its recorded transcript, not the fallback', async (slot) => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const markup = renderToStaticMarkup(
       await ProductPage({
@@ -15,7 +21,7 @@ describe('the replay-miss rule', () => {
       }),
     );
 
-    const source = /data-rudra-slot="recommendations" data-rudra-source="([a-z]+)"/.exec(
+    const source = new RegExp(`data-rudra-slot="${slot}" data-rudra-source="([a-z]+)"`).exec(
       markup,
     )?.[1];
     const misses = warn.mock.calls.map((call) => String(call[0])).join('\n');
