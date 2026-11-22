@@ -1,6 +1,6 @@
 {
   "name": "@rudra-js/anthropic",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Use Anthropic's models with rudra-js. It calls the API with fetch, so there's no Anthropic SDK to install.",
   "keywords": [
     "rudra-js",
@@ -52,10 +52,10 @@
     "zod": "^4.6.7"
   },
   "peerDependencies": {
-    "@rudra-js/core": "^0.9.1"
+    "@rudra-js/core": "^0.10.0"
   },
   "devDependencies": {
-    "@rudra-js/core": "0.9.1",
+    "@rudra-js/core": "0.10.0",
     "@types/node": "^26.4.1"
   }
 }

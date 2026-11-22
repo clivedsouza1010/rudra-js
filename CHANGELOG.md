@@ -10,6 +10,8 @@ bump may break them.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-22
+
 ### Added
 
 - `@rudra-js/attested` exports `listLookalikeReadings(text)`. It returns the ways
@@ -992,7 +994,8 @@ and `@rudra-js/anthropic`.
   - If you have a `BlockRenderContext` built by hand, add `bundles` (the shop's
     sets keyed by id) and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.9.1...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.2...v0.8.3
