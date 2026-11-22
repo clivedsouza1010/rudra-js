@@ -178,7 +178,7 @@ ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/examp
 Its product page asks the LLM for four recommendation sections, each its own slot. The server
 renders them as part of the HTML response for the page. Nothing is fetched after the page loads.
 All four sections have a committed transcript for the page below, so on replay each one shows the
-model's layout and copy.
+model's answer instead of core's own picks.
 
 ```sh
 npm run dev --workspace @rudra-js/example-demo

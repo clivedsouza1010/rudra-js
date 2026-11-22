@@ -128,7 +128,10 @@ describe('reading the committed transcript', () => {
     );
     writeFileSync(
       join(directory, 'b.json'),
-      JSON.stringify({ user: 'Page: "pdp", slot "more-to-consider"', result: { usage: {} } }),
+      JSON.stringify({
+        user: 'Page: "pdp", slot "more-to-consider"',
+        result: { usage: { ...usage, outputTokens: 1000 } },
+      }),
     );
 
     expect(loadColdUsage(directory)).toMatchObject({ inputTokens: 10, outputTokens: 20 });

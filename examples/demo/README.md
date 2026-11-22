@@ -42,9 +42,9 @@ package emits inside an otherwise styled page. `?styles=off` on any product URL 
 ## What's recorded
 
 All four sections have a transcript for two pages, both for shopper S-0001: RJ-00001, a backpack,
-and RJ-00107, a headlamp. A shopper whose prompt is the same, such as another shopper in the same
-cohort, replays them too. Any other page or shopper gets core's own picks in a section with no
-transcript. `replay-miss.test.ts` checks all four sections of the RJ-00001 page.
+and RJ-00107, a headlamp. A shopper whose prompt is the same replays them too. Any other page or
+shopper gets core's own picks in a section with no transcript. `replay-miss.test.ts` checks all four
+sections of the RJ-00001 page.
 
 ## Running it
 
@@ -91,7 +91,7 @@ without you exporting it. To create this file, just copy `.env.example` to `.env
 All transcript filenames are hashes of the model id and both halves of the prompt. Editing
 `SYSTEM_PROMPT` in `packages/core/src/model-prompt.ts`, or anything every section shares (the
 catalog, the shoppers, `buildSlotInput`), orphans every transcript at once. A change to one
-section's builder, such as its candidates, orphans only that section's transcript.
+section's builder, such as its candidates, orphans only that section's transcripts.
 `replay-miss.test.ts` will fail if a section it checks has no transcript. It names the path of each
 section that missed. A section that still replays prints nothing.
 
@@ -100,7 +100,9 @@ section that missed. A section that still replays prints nothing.
    transcript. Those file names are your new hashes. If every section printed a path, every other
    file in `recordings/` is an orphan. If only some did, the rest still replay, so delete only the
    old file of each section that printed one. `grep -lF 'slot \"more-to-consider\"' examples/demo/recordings/*.json` finds a
-   section's file. Delete it with `rm examples/demo/recordings/<old hash>.json`.
+   section's files, one per recorded page. The `Category being browsed` line in each says which:
+   `"Backpacks"` is RJ-00001 and `"Headlamps"` is RJ-00107. Delete the headlamp one only if your
+   change touched headlamp pages too. Delete a file with `rm examples/demo/recordings/<old hash>.json`.
 2. Run just that page in record mode: `RUDRA_DEMO_MODE=record npm run dev --workspace @rudra-js/example-demo`, then visit it.
 3. Check that `git status --short examples/demo/recordings/` shows each orphan from step 1
    deleted, and one new file for each `no recording` path step 1 printed, with the same names.
