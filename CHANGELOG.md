@@ -58,13 +58,19 @@ bump may break them.
   without going through JSON now shows nothing and calls `onError`.
   `ComponentSpec` is now inferred from the schema `parseComponentSpec` checks,
   so the two can't drift apart. Its fields haven't changed.
-- Both cache keys now move when core changes the wording or layout of either
-  half of the prompt, not only the system prompt. A change to how core describes
-  the shopper or the candidates, such as a heading, the task line or how unusual
-  characters are escaped, used to keep every key. A shared cache then kept
-  serving specs written under the old prompt until they expired. A change that
-  only shows up for some inputs, like escaping one more kind of character, can
-  still keep the keys. Every key moves once with this release, so each entry
+- The cache key is now a hash of the exact prompt core sends, with the provider
+  and the spec version. It used to be built from the digest, the candidate SKUs
+  and a hash of the system prompt alone. A change to how core describes the
+  shopper or the candidates kept every key, so a shared cache kept serving specs
+  written under the old prompt until they expired. Now a change to anything the
+  model is shown moves the key, and this changes which requests share a spec.
+  The same candidates in another order now get a spec each, so a shop that
+  orders them per shopper, for example under `rank: 'given'`, gets a cohort per
+  order. So does a page where a product has sold out or come back, or where a
+  title, category, rating or tag has changed. In per-shopper mode two shoppers
+  whose prompts match now share an entry, because the prompt never carries
+  `user.id`. A change to a price or an image, or to a product the model isn't
+  shown, keeps the key. Every key moves once with this release, so each entry
   misses once and is generated again.
 
 ### Removed

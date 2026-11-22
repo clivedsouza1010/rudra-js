@@ -7,7 +7,12 @@ import {
 } from './component-generator.js';
 import type { Block, GeneratedSpec } from './component-spec.js';
 import type { ComponentProvider } from './provider.js';
-import { createMemorySpecCache, createNullSpecCache, type SpecCache } from './spec-cache.js';
+import {
+  createMemorySpecCache,
+  createNullSpecCache,
+  specCacheKey,
+  type SpecCache,
+} from './spec-cache.js';
 import type { TrackingInputDraft } from './tracking-input.js';
 
 const product = (sku: string, overrides: Record<string, unknown> = {}) => ({
@@ -282,7 +287,45 @@ describe('the cache', () => {
     expect(counted.calls).toBe(2);
   });
 
-  it('never serves a cached product that has since sold out', async () => {
+  it('keys the cache on the exact prompt it sends the model', async () => {
+    const sent: Array<{ system: string; user: string }> = [];
+    const provider: ComponentProvider = {
+      name: 'recording',
+      model: 'recording-model',
+      generate: async ({ system, user }) => {
+        sent.push({ system, user });
+        return { spec: modelSpec(['TR-101']) };
+      },
+    };
+    const keys: Array<string | null> = [];
+    const generator = createComponentGenerator({
+      provider,
+      cache: createMemorySpecCache(),
+      onEvent: (event) => keys.push(event.key),
+    });
+
+    await generator.generate(payload({ signals: { recentSearches: ['maternity leggings'] } }));
+
+    expect(sent).toHaveLength(1);
+    expect(keys).toEqual([specCacheKey(sent[0]!, provider)]);
+  });
+
+  it('serves a second shopper whose prompt matches from the cache, even per shopper', async () => {
+    const counted = countingProvider();
+    const generator = createComponentGenerator({
+      provider: counted.provider,
+      cache: createMemorySpecCache(),
+      generation: 'per-shopper',
+    });
+
+    await generator.generate(payload({ user: { id: 'a' } }));
+    const second = await generator.generate(payload({ user: { id: 'b' } }));
+
+    expect(second.source).toBe('cache');
+    expect(counted.calls).toBe(1);
+  });
+
+  it('asks the model again once a product sells out, and never shows it', async () => {
     const counted = countingProvider(modelSpec(['TR-101', 'TR-102']));
     const generator = createComponentGenerator({
       provider: counted.provider,
@@ -295,12 +338,12 @@ describe('the cache', () => {
     );
 
     expect(placedSkus(before)).toContain('TR-101');
-    expect(placedSkus(after)).not.toContain('TR-101');
-    expect(after.source).toBe('cache');
-    expect(counted.calls).toBe(1);
+    expect(placedSkus(after)).toEqual(['TR-102']);
+    expect(after.source).toBe('llm');
+    expect(counted.calls).toBe(2);
   });
 
-  it('picks a restocked product back up, without asking the model again', async () => {
+  it('asks the model again once a product is back in stock, and shows it', async () => {
     const counted = countingProvider(modelSpec(['TR-101', 'TR-102']));
     const generator = createComponentGenerator({
       provider: counted.provider,
@@ -314,8 +357,8 @@ describe('the cache', () => {
 
     expect(placedSkus(soldOut)).not.toContain('TR-101');
     expect(placedSkus(restocked)).toContain('TR-101');
-    expect(restocked.source).toBe('cache');
-    expect(counted.calls).toBe(1);
+    expect(restocked.source).toBe('llm');
+    expect(counted.calls).toBe(2);
   });
 
   it('falls back when a cached spec has nothing left this shopper can see', async () => {
@@ -323,14 +366,18 @@ describe('the cache', () => {
     const generator = createComponentGenerator({
       provider: counted.provider,
       cache: createMemorySpecCache(),
-      generation: 'per-shopper',
     });
 
-    await generator.generate(payload());
+    const liked = { likes: [{ sku: 'TR-101' }] };
+    await generator.generate(payload({ signals: liked }));
     const after = await generator.generate(
-      payload({ candidates: [product('TR-101', { isInStock: false }), product('TR-102')] }),
+      payload({
+        user: { id: 'shopper-2' },
+        signals: { ...liked, cart: [{ sku: 'TR-101' }, { sku: 'TR-102' }] },
+      }),
     );
 
+    expect(counted.calls).toBe(1);
     expect(after.source).toBe('fallback');
     expect(after.degradedReason).toBe('unusable-on-serve');
   });
@@ -822,14 +869,17 @@ const cohortMate = (id: string, likedSku: string): TrackingInputDraft =>
   });
 
 const SHARED_CANDIDATES = ['TR-101', 'TR-102', 'TR-201', 'TR-202'];
-const IN_STOCK_FOR_FIRST = ['TR-101', 'TR-102'];
-const IN_STOCK_FOR_SECOND = ['TR-201', 'TR-202'];
+const SEEN_BY_FIRST = ['TR-101', 'TR-102'];
+const SEEN_BY_SECOND = ['TR-201', 'TR-202'];
 
-const cohortShopper = (id: string, sellable: string[]): TrackingInputDraft =>
+const cohortShopper = (id: string, seen: string[]): TrackingInputDraft =>
   payload({
     user: { id, segment: 'loyalty' },
-    signals: { likes: [{ sku: sellable[0]!, at: 1_700_000_000_000 }] },
-    candidates: SHARED_CANDIDATES.map((sku) => product(sku, { isInStock: sellable.includes(sku) })),
+    signals: {
+      likes: [{ sku: seen[0]!, at: 1_700_000_000_000 }],
+      cart: SHARED_CANDIDATES.filter((sku) => !seen.includes(sku)).map((sku) => ({ sku })),
+    },
+    candidates: SHARED_CANDIDATES.map((sku) => product(sku)),
   });
 
 describe('generation modes', () => {
@@ -881,16 +931,15 @@ describe('generation modes', () => {
       cache: createMemorySpecCache(),
     });
 
-    const first = await generator.generate(cohortShopper('S-0001', IN_STOCK_FOR_FIRST));
-    const second = await generator.generate(cohortShopper('S-0002', IN_STOCK_FOR_SECOND));
+    const first = await generator.generate(cohortShopper('S-0001', SEEN_BY_FIRST));
+    const second = await generator.generate(cohortShopper('S-0002', SEEN_BY_SECOND));
 
     expect(first.source).toBe('llm');
     expect(second.source).toBe('cache');
     expect(placedSkus(first).length).toBeGreaterThan(0);
     expect(placedSkus(second).length).toBeGreaterThan(0);
-    expect(placedSkus(first).every((sku) => IN_STOCK_FOR_FIRST.includes(sku))).toBe(true);
-    expect(placedSkus(second).every((sku) => IN_STOCK_FOR_SECOND.includes(sku))).toBe(true);
-    expect(placedSkus(second).some((sku) => IN_STOCK_FOR_FIRST.includes(sku))).toBe(false);
+    expect(placedSkus(first).every((sku) => SEEN_BY_FIRST.includes(sku))).toBe(true);
+    expect(placedSkus(second).every((sku) => SEEN_BY_SECOND.includes(sku))).toBe(true);
   });
 
   it('renders even when the model names products that do not exist', async () => {
@@ -936,21 +985,6 @@ describe('generation modes', () => {
     expect(second.source).toBe('cache');
     expect(bundleIdOf(first)).toBe('BUN-AB');
     expect(bundleIdOf(second)).toBe('BUN-CD');
-  });
-
-  it('picks from what is in stock now, not what the cohort was generated with', async () => {
-    const generator = createComponentGenerator({
-      provider: countingProvider(modelSpec(['TR-101'])).provider,
-      cache: createMemorySpecCache(),
-    });
-
-    await generator.generate(payload());
-    const after = await generator.generate(
-      payload({ candidates: [product('TR-101', { isInStock: false }), product('TR-102')] }),
-    );
-
-    expect(after.source).toBe('cache');
-    expect(placedSkus(after)).toEqual(['TR-102']);
   });
 });
 

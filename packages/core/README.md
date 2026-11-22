@@ -328,18 +328,18 @@ products and writes about them. In most shops the candidates come from the page
 and will be shared by all the people looking at it. If you pick candidates per
 shopper, you'll get smaller cohorts, because each prompt really is personal.
 
-For a cohort, the cache key holds the _set_ of candidate SKUs. This key will
-ignore the order they were sent in, which of them were in stock and where the
-60-product cut fell. Two requests with the same SKUs in a different order are
-going to share a spec. Both of them will get the first spec to be generated. If
-your ranking is personal and you order your candidates per shopper, the products
-the copy talks about won't be the ones you put at the top.
+The cache key is a hash of the exact prompt the model is sent. So it sees the
+candidates the way the model does: the first 60 in stock, in the order you sent
+them, each with its title, category, rating and tags. Two requests with the same
+products in a different order get a spec each. A product that sells out or comes
+back moves the key too, so the next request asks the model again. If your
+ranking is personal and you order your candidates per shopper, each order makes
+a cohort of its own. Send them in the same order to everyone who should share a
+spec.
 
 Prices, titles and stock will always be read from your catalog at render time.
-This is to make sure a stale value never shows in those fields. If a product
-sold out, it's dropped as the page is served, but any sentence the model wrote
-about it will stay. You can also end up with copy written from an old title,
-rating or tag, because the cache key holds SKUs and none of those fields.
+This is to make sure a stale value never shows in those fields. A price or an
+image never reaches the model, so changing one keeps the spec you have.
 
 #### Who can create a cohort
 
@@ -367,8 +367,9 @@ your provider. The other cost will be the bill, plus a model round trip on a
 page that was being served from cache.
 
 To generate for each shopper instead, you can pass `generation: 'per-shopper'`.
-The model will then pick the products too and each shopper will cost a call of
-their own.
+The model will then pick the products too. Most shoppers will cost a call of
+their own. Two share an entry only when their prompts match exactly, as two
+first-time visitors on the same page can.
 
 ```ts
 createComponentGenerator({ provider, generation: 'per-shopper' });
@@ -554,11 +555,12 @@ All of the above and also:
 The candidate list will be trimmed before it's sent. Out-of-stock products will
 be dropped and no more than 60 products will go, in the order you supplied.
 
-`spec-cache.test.ts` walks all the fields of the digest, to check that each
-field is either in the cache key or removed from the cohort prompt. If a field
-is left out of the key but still changes the prompt, that test will fail. It
-will also fail for a new field added to the digest, until someone says which
-side the field is on.
+The cache key hashes the prompt itself, so nothing the model is shown can be
+left out of it. `spec-cache.test.ts` walks all the fields of the digest, to
+check that each one either reaches the cohort prompt or is removed from it. A
+new field added to the digest fails the typecheck there until someone gives it
+a test value, and the walk then fails if the field reaches the cohort prompt
+without being listed as part of the cohort.
 
 ## What the model decides, by mode
 
@@ -623,9 +625,9 @@ the spec). It doesn't hold a payload or a prompt.
 
 In cohort mode an entry holds no shopper id and it's shared by all the shoppers
 in the cohort. But there's an exception if the segment or candidates were picked
-for one shopper. In per-shopper mode the model wrote the entry from the signals
-of that shopper. Its text can then repeat them (a search term, for instance)
-and the entry will be personal data until it's gone.
+or ordered for one shopper. In per-shopper mode the model wrote the entry from
+the signals of that shopper. Its text can then repeat them (a search term, for
+instance) and the entry will be personal data until it's gone.
 
 Expiry is checked when an entry is read. An expired entry will stay in memory
 until it's read again or pushed out by a newer entry.
@@ -715,12 +717,12 @@ it will personalise.
 the cache. In cohort mode an entry holds no shopper id and it's shared by all
 the shoppers in the cohort. There's usually no single shopper's entry to delete.
 But there's an exception if a cohort entry has a segment or candidate list
-picked for one shopper. Like all per-shopper entries, it's about that shopper.
-Nothing maps a shopper to their entries. That's why you need to keep `ttlMs`
-short or pass `createNullSpecCache()`. `onEvent` sends no shopper id. But in
-per-shopper mode its `key` is derived from a shopper id. `violations` can also
-name SKUs from a shopper's basket or purchases. Treat logs of `onEvent` as
-personal data.
+picked or ordered for one shopper. Like all per-shopper entries, it's about that
+shopper. Nothing maps a shopper to their entries. That's why you need to keep
+`ttlMs` short or pass `createNullSpecCache()`. `onEvent` sends no shopper id.
+But in per-shopper mode its `key` is derived from the shopper's history.
+`violations` can also name SKUs from a shopper's basket or purchases. Treat logs
+of `onEvent` as personal data.
 
 **Caching pages.** In its HTML, a personalised page will say things like
 "Goes with your cart" and "You looked at this recently". Serve those pages with

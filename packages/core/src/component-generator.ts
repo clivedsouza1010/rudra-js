@@ -7,7 +7,7 @@ import {
   type SpecSource,
 } from './component-spec.js';
 import { buildFallbackSpec } from './fallback-component.js';
-import { buildPrompt } from './model-prompt.js';
+import { buildPrompt, type PromptPair } from './model-prompt.js';
 import type { ComponentProvider, TokenUsage } from './provider.js';
 import { reconcileSpec } from './reconciliation.js';
 import type { RankOrder } from './product-selection.js';
@@ -148,8 +148,9 @@ async function generate(settings: Settings, draft: TrackingInputDraft): Promise<
   const provider = settings.provider;
   if (!provider) return fallback(settings, run, null, 'no-provider');
 
-  const key = cacheKeyFor(provider, run);
-  const found = await findSpec(settings, provider, run, key);
+  const prompt = buildPrompt(run.input, run.promptDigest);
+  const key = specCacheKey(prompt, provider);
+  const found = await findSpec(settings, provider, prompt, key);
   if ('failed' in found) return fallback(settings, run, key, found.failed, found.details);
 
   const reconciled = shapeForShopper(settings, run, found.spec);
@@ -189,16 +190,10 @@ function startRun(settings: Settings, draft: TrackingInputDraft): Run {
   return { input, digest, promptDigest, startedAt };
 }
 
-function cacheKeyFor(provider: ComponentProvider, run: Run): string {
-  const identity = { name: provider.name, model: provider.model };
-  const skus = run.input.candidates.map((product) => product.sku);
-  return specCacheKey(run.promptDigest, skus, identity);
-}
-
 async function findSpec(
   settings: Settings,
   provider: ComponentProvider,
-  run: Run,
+  prompt: PromptPair,
   key: string,
 ): Promise<Found> {
   const read = await readCache(settings, key);
@@ -210,7 +205,7 @@ async function findSpec(
   const calledModel = !settings.inFlight.has(key);
   let call: ModelCall;
   try {
-    call = await sharedCall(settings, key, () => askModel(settings, provider, run));
+    call = await sharedCall(settings, key, () => askModel(settings, provider, prompt));
   } catch (error) {
     const failed = error instanceof TimeoutError ? 'timeout' : 'provider-error';
     return { failed, details: { calledModel, cache: read.outcome, error } };
@@ -240,11 +235,15 @@ async function readCache(settings: Settings, key: string): Promise<CacheRead> {
 async function askModel(
   settings: Settings,
   provider: ComponentProvider,
-  run: Run,
+  prompt: PromptPair,
 ): Promise<ModelCall> {
-  const { system, user } = buildPrompt(run.input, run.promptDigest);
   const result = await withinBudget('generation', settings.modelTimeoutMs, (signal) =>
-    provider.generate({ system, user, schema: generatedSpecSchema, signal }),
+    provider.generate({
+      system: prompt.system,
+      user: prompt.user,
+      schema: generatedSpecSchema,
+      signal,
+    }),
   );
   const parsed = generatedSpecSchema.safeParse(result.spec);
   return {

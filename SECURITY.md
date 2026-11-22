@@ -227,18 +227,19 @@ the primary model can act. Ours can't.
 
 - **Cohort cost, if a visitor can choose a cohort.** The cohort key is built from `segment`,
   `surface`, `slot`, `locale`, `maxItems`, whether the shopper is new, the category being browsed,
-  the top category their signals favour and the SKUs of the candidates. If you draw any of those
-  from something a visitor controls (a `locale` copied out of `Accept-Language`, a category read off
-  a URL slug), one visitor can create as many cohorts as they have the patience for. Each new value
-  will be a fresh model call. There's also the shipped in-memory cache to think about: it holds
-  10,000 entries and evicts the oldest. Enough new values will push out the cohorts real shoppers
-  were being served from. A cohort prompt has no searches or signal lists, but any text in those
-  fields goes in as written. A visitor who can set one can send text to your provider. The rest of
-  the damage is to the bill and the latency. Take those fields from sets you control and put a rate
-  limit in front of the page. With `@rudra-js/a2ui`, the agent (or anyone who calls your
-  endpoint) picks the category and `maxItems`. An agent can also place as many components as it
-  likes. `fitRecommendationRequest` drops a category your candidates don't have. Pick candidates on
-  your side and not from a hint. Also rate-limit the endpoint.
+  the top category their signals favour and the candidates, in the order you sent them. If you draw
+  any of those from something a visitor controls (a `locale` copied out of `Accept-Language`, a
+  category read off a URL slug, a sort order taken from the query string), one visitor can create as
+  many cohorts as they have the patience for. Each new value will be a fresh model call. There's
+  also the shipped in-memory cache to think about: it holds 10,000 entries and evicts the oldest.
+  Enough new values will push out the cohorts real shoppers were being served from. A cohort prompt
+  has no searches or signal lists, but any text in those fields goes in as written. A visitor who
+  can set one can send text to your provider. The rest of the damage is to the bill and the latency.
+  Take those fields from sets you control and put a rate limit in front of the page. With
+  `@rudra-js/a2ui`, the agent (or anyone who calls your endpoint) picks the category and `maxItems`.
+  An agent can also place as many components as it likes. `fitRecommendationRequest` drops a
+  category your candidates don't have. Pick candidates on your side and not from a hint. Also
+  rate-limit the endpoint.
 
 - **Instruction disclosure.** A determined injection could get fragments of the instruction half
   echoed back inside a text field. This is a small loss, since these instructions are open source
