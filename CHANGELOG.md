@@ -17,15 +17,15 @@ bump may break them.
   the text has a `Ӏ`, by look with that `Ӏ` read as an l. A reading that comes
   out the same as an earlier one is left out. Neither screen catches or lets
   through anything it didn't before. `@rudra-js/core` now uses it instead of
-  keeping its own copy of the same readings. This is why the peer range of core
-  on attested is `^0.9.2`.
+  keeping its own copy of the same readings. This is why core now needs the
+  attested from this release.
 - `@rudra-js/core/schemas` exports `defaultHrefForSku`, `defaultFormatPrice`,
   `defaultFormatBundlePrice` and `findSellableProduct`. These are the defaults a
   block uses to link to a product, show a price, and leave out a product that is
   out of stock. `@rudra-js/react` now re-exports the first three from there, so
   its API stays the same, and `@rudra-js/a2ui` uses them instead of its own copy.
-  Neither package renders anything differently. This is why the peer range of
-  react and a2ui on core is `^0.9.2`. Core also ships a `schemas/package.json`
+  Neither package renders anything differently. This is why react and a2ui now
+  need the core from this release. Core also ships a `schemas/package.json`
   that points at the built files, so tools that resolve modules without reading
   package `exports`, such as TypeScript's `moduleResolution: node`, can still
   find `@rudra-js/core/schemas`, which react now loads.
@@ -66,6 +66,13 @@ bump may break them.
   only shows up for some inputs, like escaping one more kind of character, can
   still keep the keys. Every key moves once with this release, so each entry
   misses once and is generated again.
+
+### Removed
+
+- `@rudra-js/core` no longer exports `parseGeneratedSpec`, which 0.7.0
+  deprecated. It only passed its argument to `generatedSpecSchema.parse`, so
+  call that to get the same throwing check, or use `safeParseGeneratedSpec` to
+  get a result back instead of an error.
 
 ### Fixed
 

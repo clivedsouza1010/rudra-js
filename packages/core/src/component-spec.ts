@@ -130,10 +130,6 @@ export function parseComponentSpec(value: unknown): ComponentSpec {
   return componentSpecSchema.parse(value);
 }
 
-export function parseGeneratedSpec(value: unknown): GeneratedSpec {
-  return generatedSpecSchema.parse(value);
-}
-
 export function safeParseGeneratedSpec(value: unknown): GeneratedSpecResult {
   return generatedSpecSchema.safeParse(value);
 }
