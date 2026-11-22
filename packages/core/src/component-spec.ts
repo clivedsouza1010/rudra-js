@@ -40,6 +40,8 @@ const gridBlockSchema = z.object({
   items: z.array(productReferenceSchema),
 });
 
+export const GRID_COLUMNS = gridBlockSchema.shape.columns.options.map((option) => option.value);
+
 export function columnsFor(count: number, widest: 2 | 3 | 4): 2 | 3 | 4 {
   return Math.min(widest, Math.max(2, count)) as 2 | 3 | 4;
 }
