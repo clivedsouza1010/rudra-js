@@ -39,21 +39,12 @@ The demo bar at the top lets you switch shoppers to see the sections change, and
 `@rudra-js/react` README, and there is no CSS in the package. With it off you see the markup the
 package emits inside an otherwise styled page. `?styles=off` on any product URL does the same.
 
-## Recording the three new sections
+## What's recorded
 
-Only `recommendations` has a transcript today, for RJ-00001 and shopper S-0001. The other three
-sections show core's own picks until you record them. To record them for that page, run record mode
-once and visit it:
-
-```sh
-RUDRA_DEMO_MODE=record npm run dev --workspace @rudra-js/example-demo
-# then visit http://localhost:3000/product/RJ-00001?shopper=S-0001
-```
-
-That bills three model calls and writes three new files under `recordings/`. The existing
-`recommendations` transcript is replayed, not billed again. Commit the three files. Then add the
-three slots to the check in `replay-miss.test.ts`, so a prompt change that orphans one of them
-fails the test too.
+All four sections have a transcript for two pages, both for shopper S-0001: RJ-00001, a backpack,
+and RJ-00107, a headlamp. A shopper whose prompt is the same, such as another shopper in the same
+cohort, replays them too. Any other page or shopper gets core's own picks in a section with no
+transcript. `replay-miss.test.ts` checks all four sections of the RJ-00001 page.
 
 ## Running it
 

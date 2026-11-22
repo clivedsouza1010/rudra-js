@@ -15,10 +15,16 @@ import {
 const RECORDINGS = fileURLToPath(new URL('../examples/demo/recordings/', import.meta.url));
 const RECOMMENDATIONS = 'Page: "pdp", slot "recommendations", locale "en-US"';
 
-function committedUsage(): Required<TokenUsage> {
-  const transcripts = recommendationsTranscripts(RECORDINGS);
-  expect(transcripts).toHaveLength(1);
-  return transcripts[0]![1].result!.usage as Required<TokenUsage>;
+function committedColdUsages(): TokenUsage[] {
+  return recommendationsTranscripts(RECORDINGS).map(([, transcript]) => {
+    const usage = transcript.result!.usage as Required<TokenUsage>;
+    return {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      cacheReadTokens: 0,
+      cacheWriteTokens: usage.cacheReadTokens + usage.cacheWriteTokens,
+    };
+  });
 }
 
 async function billedBy(name: ArmName): Promise<TokenUsage | undefined> {
@@ -37,17 +43,12 @@ describe('what the stub bills', () => {
   const armsWithAModel: ArmName[] = ['c cohort', 'd per-shopper'];
 
   for (const name of armsWithAModel) {
-    it(`${name} bills the committed transcript as a cold call`, async () => {
-      const recorded = committedUsage();
-      expect(recorded.inputTokens).toBeGreaterThan(0);
-      expect(recorded.cacheReadTokens + recorded.cacheWriteTokens).toBeGreaterThan(0);
+    it(`${name} bills a committed transcript as a cold call`, async () => {
+      const billed = await billedBy(name);
 
-      expect(await billedBy(name)).toEqual({
-        inputTokens: recorded.inputTokens,
-        outputTokens: recorded.outputTokens,
-        cacheReadTokens: 0,
-        cacheWriteTokens: recorded.cacheReadTokens + recorded.cacheWriteTokens,
-      });
+      expect(billed?.inputTokens).toBeGreaterThan(0);
+      expect(billed?.cacheWriteTokens).toBeGreaterThan(0);
+      expect(committedColdUsages()).toContainEqual(billed);
     });
   }
 });
@@ -100,15 +101,22 @@ describe('reading the committed transcript', () => {
   });
 
   it('refuses a recordings directory with no transcript', () => {
-    expect(() => loadColdUsage(scratch())).toThrow(/one recommendations transcript.*found 0/);
+    expect(() => loadColdUsage(scratch())).toThrow(/no recommendations transcript/);
   });
 
-  it('refuses a recordings directory with more than one recommendations transcript', () => {
+  it('bills from the dearest of several recommendations transcripts', () => {
     const directory = scratch();
-    writeFileSync(join(directory, 'a.json'), JSON.stringify({ user: RECOMMENDATIONS }));
-    writeFileSync(join(directory, 'b.json'), JSON.stringify({ user: RECOMMENDATIONS }));
+    const usage = { inputTokens: 10, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0 };
+    const write = (file: string, outputTokens: number) =>
+      writeFileSync(
+        join(directory, file),
+        JSON.stringify({ user: RECOMMENDATIONS, result: { usage: { ...usage, outputTokens } } }),
+      );
+    write('a.json', 20);
+    write('b.json', 30);
+    write('c.json', 25);
 
-    expect(() => loadColdUsage(directory)).toThrow(/one recommendations transcript.*found 2/);
+    expect(loadColdUsage(directory)).toMatchObject({ outputTokens: 30 });
   });
 
   it('bills from the recommendations transcript and ignores the other sections', () => {
@@ -154,8 +162,7 @@ describe('the recordings directory', () => {
     vi.resetModules();
 
     const fresh = await import('./arms.js');
-    const recorded = committedUsage();
 
-    expect(fresh.loadColdUsage().inputTokens).toBe(recorded.inputTokens);
+    expect(fresh.loadColdUsage()).toEqual(loadColdUsage(RECORDINGS));
   });
 });

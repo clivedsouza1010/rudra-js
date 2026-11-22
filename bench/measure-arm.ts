@@ -3,6 +3,7 @@ import {
   type ComponentGeneratorOptions,
   type GenerationEvent,
   type Product,
+  type TokenUsage,
 } from '@rudra-js/core';
 import { buildTrackingInput } from '../examples/demo/src/fixtures/tracking-input.js';
 import type { Shopper } from '../examples/demo/src/fixtures/shoppers.js';
@@ -39,6 +40,15 @@ export interface ArmResult {
   violations: Record<string, number>;
 }
 
+export function costOf(usage: TokenUsage, prices: TokenPrices): number {
+  return (
+    ((usage.inputTokens ?? 0) / 1_000_000) * prices.inputPerMillion +
+    ((usage.outputTokens ?? 0) / 1_000_000) * prices.outputPerMillion +
+    ((usage.cacheWriteTokens ?? 0) / 1_000_000) * prices.cacheWritePerMillion +
+    ((usage.cacheReadTokens ?? 0) / 1_000_000) * prices.cacheReadPerMillion
+  );
+}
+
 export function summarise(
   identity: ArmIdentity,
   events: readonly GenerationEvent[],
@@ -71,11 +81,7 @@ export function summarise(
   }
 
   const views = events.length;
-  const cost =
-    (inputTokens / 1_000_000) * prices.inputPerMillion +
-    (outputTokens / 1_000_000) * prices.outputPerMillion +
-    (cacheWriteTokens / 1_000_000) * prices.cacheWritePerMillion +
-    (cacheReadTokens / 1_000_000) * prices.cacheReadPerMillion;
+  const cost = costOf({ inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens }, prices);
 
   return {
     arm: identity.name,

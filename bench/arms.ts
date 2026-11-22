@@ -8,7 +8,7 @@ import {
   type ProductReference,
   type TokenUsage,
 } from '@rudra-js/core';
-import type { ArmSpec, TokenPrices } from './measure-arm.js';
+import { costOf, type ArmSpec, type TokenPrices } from './measure-arm.js';
 
 export const PRICES: TokenPrices = {
   inputPerMillion: 5,
@@ -39,15 +39,7 @@ export function recommendationsTranscripts(directory: string): [string, Transcri
     .filter(([, transcript]) => transcript.user?.includes(RECOMMENDATIONS_SLOT));
 }
 
-export function loadColdUsage(directory: string = RECORDINGS_DIRECTORY): TokenUsage {
-  const transcripts = recommendationsTranscripts(directory);
-  if (transcripts.length !== 1) {
-    throw new Error(
-      `expected one recommendations transcript in ${directory} and found ${transcripts.length}, so there is nothing to bill from`,
-    );
-  }
-
-  const [path, transcript] = transcripts[0]!;
+function coldUsage(path: string, transcript: Transcript): TokenUsage {
   const usage = transcript.result?.usage;
   if (usage === undefined) {
     throw new Error(`the transcript at ${path} reports no usage, so there is nothing to bill from`);
@@ -59,6 +51,21 @@ export function loadColdUsage(directory: string = RECORDINGS_DIRECTORY): TokenUs
     cacheReadTokens: 0,
     cacheWriteTokens: (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0),
   };
+}
+
+export function loadColdUsage(directory: string = RECORDINGS_DIRECTORY): TokenUsage {
+  const usages = recommendationsTranscripts(directory).map(([path, transcript]) =>
+    coldUsage(path, transcript),
+  );
+  if (usages.length === 0) {
+    throw new Error(
+      `found no recommendations transcript in ${directory}, so there is nothing to bill from`,
+    );
+  }
+
+  return usages.reduce((dearest, usage) =>
+    costOf(usage, PRICES) > costOf(dearest, PRICES) ? usage : dearest,
+  );
 }
 
 const STUB_GRID_ITEMS = 4;
