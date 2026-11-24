@@ -77,8 +77,16 @@ export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): Spe
   };
 }
 
+const nullStores = new WeakSet<SpecCache>();
+
 export function createNullSpecCache(): SpecCache {
-  return { get: async () => undefined, set: async () => {} };
+  const store: SpecCache = { get: async () => undefined, set: async () => {} };
+  nullStores.add(store);
+  return store;
+}
+
+export function isNullSpecCache(cache: SpecCache): boolean {
+  return nullStores.has(cache);
 }
 
 export function specCacheKey(

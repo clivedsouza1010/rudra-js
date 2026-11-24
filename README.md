@@ -77,11 +77,12 @@ const catalog = [
   { sku: 'A-3', title: 'Chef knife', category: 'Knives', price: 55, currency: 'USD' },
 ];
 
-async function recommendations() {
-  // Passing no provider means no API key.
-  // Core builds the block itself, and the same input always gives the same block.
-  const generator = createComponentGenerator({ provider: null });
+// Passing no provider means no API key.
+// Core builds the block itself, and the same input always gives the same block.
+// Create the generator once, so every request shares its cache.
+const generator = createComponentGenerator({ provider: null });
 
+async function recommendations() {
   // Parsing fills in what you left out and rejects anything that doesn't belong.
   // Always pass the parsed candidates to the renderer, not your raw objects.
   const input = parseTrackingInput({
@@ -114,6 +115,12 @@ When you're ready for a model, add [`@rudra-js/anthropic`](packages/anthropic) a
 `provider`. Everything else above stays the same. The model will then write the wording. It will
 also pick the layout and the emphasis. By default, the products in a grid or carousel will still be
 picked by core. This is done per request, from the candidates you pass in.
+
+On a cache miss the page waits for the model, for up to 1.5 seconds by default. To keep the model
+out of the page request, pass `waitForModel: false`. A page that misses then gets the fallback at
+once, and the model's answer goes into the cache for the next shopper. You can also fill the cache
+ahead of time from a job. See
+[Keeping the model off the page](packages/core#keeping-the-model-off-the-page).
 
 If you're going to send real shopper traffic, read
 [Running it in a regulated shop](packages/core#running-it-in-a-regulated-shop) first.

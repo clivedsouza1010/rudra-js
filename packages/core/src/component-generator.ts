@@ -16,6 +16,7 @@ import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.
 import {
   cachedSpecSchema,
   createMemorySpecCache,
+  isNullSpecCache,
   specCacheKey,
   type CachedSpec,
   type SpecCache,
@@ -36,6 +37,7 @@ export interface GenerationEvent {
   degradedReason?: DegradedReason;
   error?: unknown;
   cache?: 'hit' | 'miss' | 'error' | 'timeout';
+  background?: true;
 }
 
 export interface ComponentGeneratorOptions {
@@ -45,6 +47,8 @@ export interface ComponentGeneratorOptions {
   cacheTimeoutMs?: number;
   generation?: 'cohort' | 'per-shopper';
   rank?: RankOrder;
+  waitForModel?: boolean;
+  waitUntil?: (work: Promise<unknown>) => void;
   onEvent?: (event: GenerationEvent) => void;
 }
 
@@ -94,6 +98,7 @@ interface CacheRead {
 interface ModelCall {
   spec: GeneratedSpec | null;
   usage?: TokenUsage;
+  failedWrite?: { error: unknown };
 }
 
 interface Settings {
@@ -103,6 +108,8 @@ interface Settings {
   rank: RankOrder;
   modelTimeoutMs: number;
   cacheTimeoutMs: number;
+  waitForModel: boolean;
+  waitUntil: ComponentGeneratorOptions['waitUntil'];
   onEvent: ComponentGeneratorOptions['onEvent'];
   inFlight: Map<string, Promise<ModelCall>>;
 }
@@ -126,13 +133,19 @@ type EventDetails = Pick<
 export function createComponentGenerator(
   options: ComponentGeneratorOptions = {},
 ): ComponentGenerator {
+  const generation = options.generation ?? 'cohort';
+  const waitForModel = options.waitForModel ?? true;
+  if (!waitForModel) assertPagesCanBeServed(generation, options.cache);
+
   const settings: Settings = {
     provider: options.provider ?? null,
     cache: options.cache ?? createMemorySpecCache(),
-    generation: options.generation ?? 'cohort',
+    generation,
     rank: options.rank ?? 'signals',
-    modelTimeoutMs: options.modelTimeoutMs ?? 1_500,
+    modelTimeoutMs: options.modelTimeoutMs ?? (waitForModel ? 1_500 : 30_000),
     cacheTimeoutMs: options.cacheTimeoutMs ?? 50,
+    waitForModel,
+    waitUntil: options.waitUntil,
     onEvent: options.onEvent,
     inFlight: new Map(),
   };
@@ -141,6 +154,24 @@ export function createComponentGenerator(
     generate: (draft) => generate(settings, draft),
     generateDeterministic: (draft) => generateDeterministic(settings, draft),
   };
+}
+
+function assertPagesCanBeServed(
+  generation: Settings['generation'],
+  cache: SpecCache | undefined,
+): void {
+  if (generation === 'per-shopper') {
+    throw new RangeError(
+      "waitForModel: false needs generation: 'cohort'. A per-shopper prompt changes with " +
+        'almost every view, so the call it starts would almost never reach a page.',
+    );
+  }
+  if (cache && isNullSpecCache(cache)) {
+    throw new RangeError(
+      'waitForModel: false needs a cache that keeps entries. Pages only get the answer ' +
+        'from the cache, so with createNullSpecCache() no call would ever reach one.',
+    );
+  }
 }
 
 async function generate(settings: Settings, draft: TrackingInputDraft): Promise<ComponentSpec> {
@@ -200,6 +231,11 @@ async function findSpec(
   if (read.entry) {
     const details = { calledModel: false, cache: read.outcome };
     return { spec: read.entry.spec, generatedAt: read.entry.generatedAt, source: 'cache', details };
+  }
+
+  if (!settings.waitForModel) {
+    if (read.outcome === 'miss') fillInBackground(settings, provider, prompt, key);
+    return { failed: 'not-cached', details: { calledModel: false, cache: read.outcome } };
   }
 
   const calledModel = !settings.inFlight.has(key);
@@ -262,6 +298,61 @@ function sharedCall(
   const started = ask().finally(() => settings.inFlight.delete(key));
   settings.inFlight.set(key, started);
   return started;
+}
+
+function fillInBackground(
+  settings: Settings,
+  provider: ComponentProvider,
+  prompt: PromptPair,
+  key: string,
+): void {
+  if (settings.inFlight.has(key)) return;
+
+  const startedAt = Date.now();
+  const finished = (
+    source: SpecSource,
+    details: Pick<GenerationEvent, 'cache' | 'error' | 'usage' | 'degradedReason'>,
+  ) =>
+    report(settings, {
+      key,
+      source,
+      elapsedMs: Date.now() - startedAt,
+      calledModel: true,
+      ...details,
+      background: true,
+    });
+
+  const askAndStore = async (): Promise<ModelCall> => {
+    const call = await askModel(settings, provider, prompt);
+    if (!call.spec) return call;
+    try {
+      await settings.cache.set(key, { spec: call.spec, generatedAt: Date.now() });
+      return call;
+    } catch (error) {
+      return { ...call, failedWrite: { error } };
+    }
+  };
+
+  const work = sharedCall(settings, key, askAndStore).then(
+    (call) => {
+      const usage = call.usage ? { usage: call.usage } : {};
+      if (!call.spec) {
+        finished('fallback', { ...usage, degradedReason: 'invalid-generation' });
+      } else if (call.failedWrite) {
+        finished('fallback', { cache: 'error', error: call.failedWrite.error, ...usage });
+      } else {
+        finished('llm', usage);
+      }
+    },
+    (error: unknown) => {
+      const degradedReason = error instanceof TimeoutError ? 'timeout' : 'provider-error';
+      finished('fallback', { error, degradedReason });
+    },
+  );
+
+  try {
+    settings.waitUntil?.(work);
+  } catch {}
 }
 
 function storeInBackground(settings: Settings, key: string, cached: CachedSpec): void {

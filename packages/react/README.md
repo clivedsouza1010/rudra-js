@@ -161,12 +161,12 @@ analytics.
 directly from a rendered page. Anything more specific will only appear under `hasDiagnostics`,
 because it tells a visitor what you run and when it's failing:
 
-| Attribute               | On          | Value                                                                                                                  |
-| ----------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `data-rudra-provider`   | the wrapper | The model vendor, or `none`                                                                                            |
-| `data-rudra-model`      | the wrapper | The model name, or `none`                                                                                              |
-| `data-rudra-latency-ms` | the wrapper | How long generation took                                                                                               |
-| `data-rudra-degraded`   | the wrapper | Why it fell back: `no-provider`, `provider-error`, `timeout`, `invalid-generation`, `unusable-on-serve` or `requested` |
+| Attribute               | On          | Value                                                                                                                                |
+| ----------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `data-rudra-provider`   | the wrapper | The model vendor, or `none`                                                                                                          |
+| `data-rudra-model`      | the wrapper | The model name, or `none`                                                                                                            |
+| `data-rudra-latency-ms` | the wrapper | How long generation took                                                                                                             |
+| `data-rudra-degraded`   | the wrapper | Why it fell back: `no-provider`, `provider-error`, `timeout`, `invalid-generation`, `unusable-on-serve`, `requested` or `not-cached` |
 
 ## Replacing a renderer
 

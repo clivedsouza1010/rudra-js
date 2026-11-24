@@ -241,6 +241,24 @@ describe('the deadline', () => {
     expect(events.map((event) => event.degradedReason)).toEqual(['timeout']);
   });
 
+  it('gives a waiting page 1.5 seconds by default', async () => {
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const pending = generatorWith({ provider: hangingProvider() })
+        .generate(payload())
+        .finally(() => (settled = true));
+
+      await vi.advanceTimersByTimeAsync(1_499);
+      expect(settled).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect((await pending).degradedReason).toBe('timeout');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('tells the provider to stop, rather than only ignoring it', async () => {
     let seen: AbortSignal | undefined;
     const provider: ComponentProvider = {
@@ -839,6 +857,284 @@ describe('when the component was generated', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('with waitForModel: false', () => {
+  const offThePage = (options: ComponentGeneratorOptions = {}) => {
+    const events: GenerationEvent[] = [];
+    const running: Promise<unknown>[] = [];
+    const generator = createComponentGenerator({
+      cache: createMemorySpecCache(),
+      waitForModel: false,
+      waitUntil: (work) => running.push(work),
+      onEvent: (event) => events.push(event),
+      ...options,
+    });
+    const settle = () => Promise.all(running);
+    return { generator, events, running, settle };
+  };
+
+  it('renders the fallback on a miss without waiting for the model', async () => {
+    const { generator, running } = offThePage({ provider: hangingProvider() });
+    const startedAt = Date.now();
+
+    const spec = await generator.generate(payload());
+
+    expect(Date.now() - startedAt).toBeLessThan(500);
+    expect(spec).toMatchObject({ source: 'fallback', degradedReason: 'not-cached' });
+    expect(running).toHaveLength(1);
+  });
+
+  it('serves the next shopper in the cohort what the model wrote behind the first page', async () => {
+    const counted = countingProvider();
+    const { generator, settle } = offThePage({ provider: counted.provider });
+
+    await generator.generate(payload());
+    await settle();
+    const next = await generator.generate(payload({ user: { id: 'shopper-2' } }));
+
+    expect(next.source).toBe('cache');
+    expect(counted.calls).toBe(1);
+  });
+
+  it('starts one call for pages that miss while it runs, not one each', async () => {
+    const counted = countingProvider();
+    const { generator, running, settle } = offThePage({ provider: counted.provider });
+
+    await Promise.all(Array.from({ length: 8 }, () => generator.generate(payload())));
+    await settle();
+
+    expect(counted.calls).toBe(1);
+    expect(running).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      'throws',
+      {
+        get: async () => {
+          throw new Error('redis is down');
+        },
+        set: async () => {},
+      },
+      'error',
+    ],
+    ['hangs', { get: () => new Promise<undefined>(() => {}), set: async () => {} }, 'timeout'],
+  ])('starts no call when the store %s', async (_label, cache, outcome) => {
+    const counted = countingProvider();
+    const { generator, events } = offThePage({
+      provider: counted.provider,
+      cache,
+      cacheTimeoutMs: 20,
+    });
+
+    const spec = await generator.generate(payload());
+
+    expect(spec.degradedReason).toBe('not-cached');
+    expect(counted.calls).toBe(0);
+    expect(events).toMatchObject([{ cache: outcome, calledModel: false }]);
+  });
+
+  it('reports the page and the call behind it as two events, and counts the call once', async () => {
+    const { generator, events, settle } = offThePage({ provider: countingProvider().provider });
+
+    await generator.generate(payload());
+    await settle();
+
+    expect(events).toHaveLength(2);
+    expect(Object.keys(events[0] ?? {})).toEqual([
+      'key',
+      'source',
+      'elapsedMs',
+      'calledModel',
+      'cache',
+      'degradedReason',
+    ]);
+    expect(events[0]).toMatchObject({ source: 'fallback', calledModel: false, cache: 'miss' });
+    expect(Object.keys(events[1] ?? {})).toEqual([
+      'key',
+      'source',
+      'elapsedMs',
+      'calledModel',
+      'usage',
+      'background',
+    ]);
+    expect(events[1]).toMatchObject({
+      key: events[0]?.key,
+      source: 'llm',
+      calledModel: true,
+      usage: { inputTokens: 10 },
+    });
+  });
+
+  it.each([
+    ['the provider errors', { provider: throwingProvider() }, 'provider-error'],
+    ['the model runs out of time', { provider: hangingProvider(), modelTimeoutMs: 20 }, 'timeout'],
+    [
+      'the answer does not parse',
+      { provider: respondingWith({ bad: true }) },
+      'invalid-generation',
+    ],
+  ])(
+    'reports a call that fails when %s, and tries again on the next miss',
+    async (_label, options, reason) => {
+      const { generator, events, running, settle } = offThePage(options);
+
+      await generator.generate(payload());
+      await settle();
+      await generator.generate(payload());
+
+      expect(events[1]).toMatchObject({
+        source: 'fallback',
+        calledModel: true,
+        degradedReason: reason,
+        background: true,
+      });
+      expect(running).toHaveLength(2);
+    },
+  );
+
+  it('hands over what the provider threw, and the deadline itself on a timeout', async () => {
+    const thrown = new Error('upstream is down');
+    const failed = offThePage({ provider: throwingProvider(thrown) });
+    const late = offThePage({ provider: hangingProvider(), modelTimeoutMs: 20 });
+
+    await Promise.all([failed.generator.generate(payload()), late.generator.generate(payload())]);
+    await Promise.all([failed.settle(), late.settle()]);
+
+    expect(failed.events[1]?.error).toBe(thrown);
+    expect(late.events[1]?.error).toBeInstanceOf(TimeoutError);
+  });
+
+  it('reports what an unparseable answer cost', async () => {
+    const { generator, events, settle } = offThePage({
+      provider: {
+        name: 'odd',
+        model: 'odd-model',
+        generate: async () => ({
+          spec: { not: 'a spec' } as unknown as GeneratedSpec,
+          usage: { inputTokens: 11, outputTokens: 3 },
+        }),
+      },
+    });
+
+    await generator.generate(payload());
+    await settle();
+
+    expect(events[1]).toMatchObject({
+      degradedReason: 'invalid-generation',
+      usage: { inputTokens: 11, outputTokens: 3 },
+    });
+  });
+
+  it('reports an answer the store refused as a fallback, not as a success', async () => {
+    const refused = new Error('READONLY');
+    const { generator, events, settle } = offThePage({
+      provider: countingProvider().provider,
+      cache: {
+        get: async () => undefined,
+        set: async () => {
+          throw refused;
+        },
+      },
+    });
+
+    await generator.generate(payload());
+    await settle();
+
+    expect(Object.keys(events[1] ?? {})).toEqual([
+      'key',
+      'source',
+      'elapsedMs',
+      'calledModel',
+      'cache',
+      'error',
+      'usage',
+      'background',
+    ]);
+    expect(events[1]).toMatchObject({ source: 'fallback', cache: 'error', error: refused });
+  });
+
+  it('keeps the call open until its answer is in the store', async () => {
+    const counted = countingProvider();
+    const store = createMemorySpecCache();
+    let release!: () => void;
+    const writeHeld = new Promise<void>((resolve) => (release = resolve));
+    let workDone = false;
+    const { generator, running } = offThePage({
+      provider: counted.provider,
+      cache: {
+        get: (key) => store.get(key),
+        set: async (key, cached) => {
+          await writeHeld;
+          await store.set(key, cached);
+        },
+      },
+    });
+
+    await generator.generate(payload());
+    void running[0]?.then(() => (workDone = true));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await generator.generate(payload());
+
+    expect(workDone).toBe(false);
+    expect(counted.calls).toBe(1);
+
+    release();
+    await running[0];
+    expect((await generator.generate(payload())).source).toBe('cache');
+  });
+
+  it('gives the model 30 seconds by default, since no page waits on it', async () => {
+    vi.useFakeTimers();
+    try {
+      const { generator, events } = offThePage({ provider: hangingProvider() });
+
+      await generator.generate(payload());
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect(events).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(events[1]).toMatchObject({ degradedReason: 'timeout', background: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still fills the cache when waitUntil throws', async () => {
+    let filled!: () => void;
+    const backgroundDone = new Promise<void>((resolve) => (filled = resolve));
+    const generator = createComponentGenerator({
+      provider: countingProvider().provider,
+      cache: createMemorySpecCache(),
+      waitForModel: false,
+      waitUntil: () => {
+        throw new Error('after() called outside a request');
+      },
+      onEvent: (event) => {
+        if (event.background) filled();
+      },
+    });
+
+    const first = await generator.generate(payload());
+    await backgroundDone;
+    const next = await generator.generate(payload());
+
+    expect(first.degradedReason).toBe('not-cached');
+    expect(next.source).toBe('cache');
+  });
+
+  it('refuses per-shopper mode, where almost no call would reach a page', () => {
+    expect(() =>
+      createComponentGenerator({ waitForModel: false, generation: 'per-shopper' }),
+    ).toThrow(RangeError);
+  });
+
+  it('refuses a store that keeps nothing, where no call could reach a page', () => {
+    expect(() =>
+      createComponentGenerator({ waitForModel: false, cache: createNullSpecCache() }),
+    ).toThrow(RangeError);
   });
 });
 

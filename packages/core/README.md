@@ -121,9 +121,11 @@ out.
 | `cache`          | Where generated specs live between requests. Pass `createNullSpecCache()` to keep none.                 | `createMemorySpecCache()` |
 | `generation`     | `'cohort'` shares one spec between shoppers who look alike. `'per-shopper'` generates for each shopper. | `'cohort'`                |
 | `rank`           | `'signals'` orders products by the shopper's signals. `'given'` keeps the order you sent.               | `'signals'`               |
-| `modelTimeoutMs` | How long the model gets. After that, core aborts the request and renders the fallback.                  | `1500`                    |
-| `cacheTimeoutMs` | How long a cache read gets. After that, the request generates as if the cache had nothing.              | `50`                      |
-| `onEvent`        | Called once per `generate` with a `GenerationEvent`. If your function throws, core ignores the error.   | none                      |
+| `modelTimeoutMs` | How long the model gets before core aborts the call. With `waitForModel: false` it's `30000`.           | `1500`                    |
+| `cacheTimeoutMs` | How long a cache read gets. Then a waiting page asks the model. With `waitForModel: false`, none does.  | `50`                      |
+| `waitForModel`   | `false` keeps the model out of the page request. See [below](#keeping-the-model-off-the-page).          | `true`                    |
+| `waitUntil`      | With `waitForModel: false`, core hands it the model call still running when the page is sent.           | none                      |
+| `onEvent`        | Called once per `generate`, and once per call behind a page. If your function throws, core ignores it.  | none                      |
 
 ## `tracking-input`
 
@@ -659,6 +661,106 @@ Core can't drop all the entries of a shopper for you, because nothing maps a
 shopper to their keys. Per-shopper entries will end when they expire or when
 newer entries push them out. You can also delete an entry by a `key` you kept.
 
+## Keeping the model off the page
+
+By default, a page that misses the cache waits for the model, for up to
+`modelTimeoutMs`. Pass `waitForModel: false` and no page waits:
+
+- On a hit, the page gets the cached spec, the same as before.
+- On a miss, the page gets the fallback straight away and core asks the model
+  behind it. The answer goes into the cache, so the next shopper in that cohort
+  gets it.
+- Pages on the same server that miss while that call runs share it. They don't
+  start one each. Each server starts its own.
+
+```ts
+import { after } from 'next/server';
+
+const generator = createComponentGenerator({
+  provider,
+  cache: sharedStore,
+  waitForModel: false,
+  waitUntil: after,
+});
+```
+
+`waitUntil` gets the call that's still running when the page is sent. Serverless
+hosts stop work once the response is out unless you hand it over. In Next.js,
+pass `after`. On other Vercel functions, pass `waitUntil` from
+`@vercel/functions`. A long-running Node server doesn't need it.
+
+A few things work differently in this mode:
+
+- `modelTimeoutMs` defaults to 30,000. The 1,500 default is a budget for a page
+  that's waiting. A call cut off at 1.5 seconds never reaches the cache.
+- Use a store all your servers share. The built-in store lives inside one
+  process, so each serverless instance would fill its own copy.
+- If the store can't be read (it throws, or takes longer than
+  `cacheTimeoutMs`), the page gets the fallback and no call starts. A store that
+  can't be read can't hand the answer to the next page either. If your store is
+  only slow, raise `cacheTimeoutMs`.
+- Pages that got the fallback this way say `degradedReason: 'not-cached'`.
+- `generation: 'per-shopper'` throws. A per-shopper prompt changes with almost
+  every view, so almost no call would reach a page.
+- `createNullSpecCache()` throws too. Pages only get the answer from the cache,
+  so with a store that keeps nothing no call would ever reach one.
+
+### Building specs ahead of time
+
+To have specs ready before the first shopper arrives, run a job that fills the
+same store. The job uses an ordinary generator, which waits, with a longer
+timeout:
+
+```ts
+const writes: Promise<void>[] = [];
+const warmer = createComponentGenerator({
+  provider,
+  cache: {
+    get: (key) => sharedStore.get(key),
+    set: (key, cached) => {
+      const write = sharedStore.set(key, cached);
+      writes.push(write);
+      return write;
+    },
+  },
+  modelTimeoutMs: 60_000,
+  cacheTimeoutMs: 5_000,
+});
+
+for (const page of productPages) {
+  for (const segment of ['new', 'loyalty']) {
+    await warmer.generate({
+      user: { id: 'warm-up', segment },
+      context: { surface: 'pdp', currentCategory: page.category },
+      candidates: page.candidates,
+    });
+  }
+}
+
+await Promise.allSettled(writes);
+```
+
+`generate` returns without waiting for the store to save the answer. That's why
+the job keeps each write and waits for all of them before it ends. Without that,
+a host that stops the job as soon as it returns can lose the last few.
+
+An input with no signals fills the cohort of shoppers with no history on that
+page. Shoppers with history fall into a cohort by the category they lean
+towards, and those fill in on their first view. A cohort that's already in the
+store is a cache hit, so running the job again only pays for what changed. That's
+what the longer `cacheTimeoutMs` is for: a read that runs out of time counts as
+a miss and pays for the cohort again.
+
+Each input has to match what the page sends: the same surface, slot, locale,
+item count, segment and category, and the same candidates in the same order. The
+job also has to use the same provider and model as your pages, on the same
+version of `@rudra-js/core`. Both are part of the key, so a job on another model
+fills entries no page reads. A
+product that sells out or comes back moves the key, as
+[Cohorts](#cohorts) explains. Run the job after stock changes, or let pages
+fill the new key behind them. Your store also has to keep entries for longer
+than the time between runs.
+
 ## Watching it in production
 
 The generator never fails a render. If a provider has been down for a week, this
@@ -667,13 +769,24 @@ Each call to `generate` that gets past input validation reports exactly one
 `GenerationEvent`. If a payload fails `parseTrackingInput`, it will throw
 instead and report nothing.
 
+With `waitForModel: false`, a call that starts behind a page reports one more
+event when it ends, with `background: true`. That event rendered nothing. Its
+`source` is `'llm'` if the answer went into the cache. Otherwise it's
+`'fallback'`, with a `degradedReason` if the model failed, or with
+`cache: 'error'` if the store refused the answer. After a timeout, a provider
+error or a refused write, `error` has what was thrown. The page's own event has
+`calledModel: false`.
+
 These are the numbers to keep:
 
 - **Fallback share.** This is the share of events with `source: 'fallback'`. Be
   sure to alert if it climbs. `degradedReason` will tell you which way the call
   failed. If the reason is `'provider-error'` or `'timeout'`, `error` has the
-  value that was thrown.
+  value that was thrown. With `waitForModel: false`, count the page events and
+  the `background: true` events apart. A provider that's down shows up in the
+  second.
 - **Cache hit rate.** `cache: 'hit'` over the events that have a `cache` field.
+  Leave out events with `background: true`.
   A store that's down will show as `cache: 'error'` and a slow store as
   `cache: 'timeout'`. A broken store will then show up here and not just as a
   rising bill.

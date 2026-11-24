@@ -111,6 +111,7 @@ const DEGRADED_REASONS = [
   'invalid-generation',
   'unusable-on-serve',
   'requested',
+  'not-cached',
 ] as const;
 export type DegradedReason = (typeof DEGRADED_REASONS)[number];
 

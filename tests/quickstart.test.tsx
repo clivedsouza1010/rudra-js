@@ -11,11 +11,12 @@ const catalog = [
   { sku: 'A-3', title: 'Chef knife', category: 'Knives', price: 55, currency: 'USD' },
 ];
 
-async function recommendations() {
-  // Passing no provider means no API key.
-  // Core builds the block itself, and the same input always gives the same block.
-  const generator = createComponentGenerator({ provider: null });
+// Passing no provider means no API key.
+// Core builds the block itself, and the same input always gives the same block.
+// Create the generator once, so every request shares its cache.
+const generator = createComponentGenerator({ provider: null });
 
+async function recommendations() {
   // Parsing fills in what you left out and rejects anything that doesn't belong.
   // Always pass the parsed candidates to the renderer, not your raw objects.
   const input = parseTrackingInput({

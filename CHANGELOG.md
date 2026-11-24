@@ -10,6 +10,27 @@ bump may break them.
 
 ## [Unreleased]
 
+### Added
+
+- `createComponentGenerator` takes `waitForModel` and `waitUntil`. With
+  `waitForModel: false`, no page waits on the model. A page that misses the
+  cache gets the fallback at once, with `degradedReason: 'not-cached'`, and
+  core asks the model behind it. The answer goes into the cache for the next
+  shopper in that cohort. Pages on one server that miss while the call runs
+  share it. `waitUntil` gets that call so a serverless host keeps it running
+  after the response, for example Next.js's `after`. In this mode
+  `modelTimeoutMs` defaults to 30,000, a store that can't be read starts no
+  call, and `generation: 'per-shopper'` and `createNullSpecCache()` throw. The
+  call reports its own `GenerationEvent` when it ends, with `background: true`.
+  The default, `waitForModel: true`, works as before. The core README shows how
+  to fill the cache from a job before the first shopper arrives.
+
+### Changed
+
+- `DegradedReason` has a new member, `'not-cached'`. Only `waitForModel: false`
+  produces it, but a `Record` or an exhaustive `switch` over `DegradedReason`
+  will need an entry for it.
+
 ## [0.10.0] - 2026-11-22
 
 ### Added
