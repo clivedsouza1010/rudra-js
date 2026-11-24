@@ -45,7 +45,8 @@ By default, `model` is `claude-sonnet-5` and `thinking` is
 optional too.
 
 Your page request waits while generation runs inside core's `modelTimeoutMs`.
-This is 1500ms by default. If a model reasons before it answers, it won't finish
+This is 1500ms by default. To take the call out of the page request, see
+[Keeping the model off the page](../core#keeping-the-model-off-the-page). If a model reasons before it answers, it won't finish
 in that time. By default Sonnet 5 will reason if the request leaves `thinking`
 out. So the `thinking` default is what keeps Sonnet 5 inside the time limit.
 

@@ -842,6 +842,193 @@ describe('when the component was generated', () => {
   });
 });
 
+describe('with waitForModel: false', () => {
+  const offThePage = (options: ComponentGeneratorOptions = {}) => {
+    const events: GenerationEvent[] = [];
+    const running: Promise<unknown>[] = [];
+    const generator = createComponentGenerator({
+      cache: createMemorySpecCache(),
+      waitForModel: false,
+      waitUntil: (work) => running.push(work),
+      onEvent: (event) => events.push(event),
+      ...options,
+    });
+    const settle = () => Promise.all(running);
+    return { generator, events, running, settle };
+  };
+
+  it('renders the fallback on a miss without waiting for the model', async () => {
+    const { generator, running } = offThePage({ provider: hangingProvider() });
+    const startedAt = Date.now();
+
+    const spec = await generator.generate(payload());
+
+    expect(Date.now() - startedAt).toBeLessThan(500);
+    expect(spec).toMatchObject({ source: 'fallback', degradedReason: 'not-cached' });
+    expect(running).toHaveLength(1);
+  });
+
+  it('serves the next shopper in the cohort what the model wrote behind the first page', async () => {
+    const counted = countingProvider();
+    const { generator, settle } = offThePage({ provider: counted.provider });
+
+    await generator.generate(payload());
+    await settle();
+    const next = await generator.generate(payload({ user: { id: 'shopper-2' } }));
+
+    expect(next.source).toBe('cache');
+    expect(counted.calls).toBe(1);
+  });
+
+  it('starts one call for pages that miss while it runs, not one each', async () => {
+    const counted = countingProvider();
+    const { generator, running, settle } = offThePage({ provider: counted.provider });
+
+    await Promise.all(Array.from({ length: 8 }, () => generator.generate(payload())));
+    await settle();
+
+    expect(counted.calls).toBe(1);
+    expect(running).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      'throws',
+      {
+        get: async () => {
+          throw new Error('redis is down');
+        },
+        set: async () => {},
+      },
+      'error',
+    ],
+    ['hangs', { get: () => new Promise<undefined>(() => {}), set: async () => {} }, 'timeout'],
+  ])('starts no call when the store %s', async (_label, cache, outcome) => {
+    const counted = countingProvider();
+    const { generator, events } = offThePage({
+      provider: counted.provider,
+      cache,
+      cacheTimeoutMs: 20,
+    });
+
+    const spec = await generator.generate(payload());
+
+    expect(spec.degradedReason).toBe('not-cached');
+    expect(counted.calls).toBe(0);
+    expect(events).toMatchObject([{ cache: outcome, calledModel: false }]);
+  });
+
+  it('reports the page and the call behind it as two events, and counts the call once', async () => {
+    const { generator, events, settle } = offThePage({ provider: countingProvider().provider });
+
+    await generator.generate(payload());
+    await settle();
+
+    expect(events).toHaveLength(2);
+    expect(Object.keys(events[0] ?? {})).toEqual([
+      'key',
+      'source',
+      'elapsedMs',
+      'calledModel',
+      'cache',
+      'degradedReason',
+    ]);
+    expect(events[0]).toMatchObject({ source: 'fallback', calledModel: false, cache: 'miss' });
+    expect(Object.keys(events[1] ?? {})).toEqual([
+      'key',
+      'source',
+      'elapsedMs',
+      'calledModel',
+      'usage',
+      'background',
+    ]);
+    expect(events[1]).toMatchObject({
+      key: events[0]?.key,
+      source: 'llm',
+      calledModel: true,
+      usage: { inputTokens: 10 },
+    });
+  });
+
+  it.each([
+    ['the provider errors', { provider: throwingProvider() }, 'provider-error'],
+    [
+      'the answer does not parse',
+      { provider: respondingWith({ bad: true }) },
+      'invalid-generation',
+    ],
+  ])(
+    'reports a call that fails when %s, and tries again on the next miss',
+    async (_label, options, reason) => {
+      const { generator, events, running, settle } = offThePage(options);
+
+      await generator.generate(payload());
+      await settle();
+      await generator.generate(payload());
+
+      expect(events[1]).toMatchObject({
+        source: 'fallback',
+        calledModel: true,
+        degradedReason: reason,
+        background: true,
+      });
+      expect(running).toHaveLength(2);
+    },
+  );
+
+  it('gives the model 30 seconds by default, since no page waits on it', async () => {
+    vi.useFakeTimers();
+    try {
+      const provider: ComponentProvider = {
+        name: 'slow',
+        model: 'slow-model',
+        generate: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 20_000));
+          return { spec: modelSpec(['TR-101']) };
+        },
+      };
+      const { generator, events, settle } = offThePage({ provider });
+
+      await generator.generate(payload());
+      await vi.advanceTimersByTimeAsync(20_000);
+      await settle();
+
+      expect(events[1]).toMatchObject({ source: 'llm', background: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still fills the cache when waitUntil throws', async () => {
+    let filled!: () => void;
+    const backgroundDone = new Promise<void>((resolve) => (filled = resolve));
+    const generator = createComponentGenerator({
+      provider: countingProvider().provider,
+      cache: createMemorySpecCache(),
+      waitForModel: false,
+      waitUntil: () => {
+        throw new Error('after() called outside a request');
+      },
+      onEvent: (event) => {
+        if (event.background) filled();
+      },
+    });
+
+    const first = await generator.generate(payload());
+    await backgroundDone;
+    const next = await generator.generate(payload());
+
+    expect(first.degradedReason).toBe('not-cached');
+    expect(next.source).toBe('cache');
+  });
+
+  it('refuses per-shopper mode, where almost no call would reach a page', () => {
+    expect(() =>
+      createComponentGenerator({ waitForModel: false, generation: 'per-shopper' }),
+    ).toThrow(RangeError);
+  });
+});
+
 describe('generateDeterministic', () => {
   it('never consults the model, even when one is configured', async () => {
     const counted = countingProvider();

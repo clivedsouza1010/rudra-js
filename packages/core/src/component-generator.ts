@@ -36,6 +36,7 @@ export interface GenerationEvent {
   degradedReason?: DegradedReason;
   error?: unknown;
   cache?: 'hit' | 'miss' | 'error' | 'timeout';
+  background?: true;
 }
 
 export interface ComponentGeneratorOptions {
@@ -45,6 +46,8 @@ export interface ComponentGeneratorOptions {
   cacheTimeoutMs?: number;
   generation?: 'cohort' | 'per-shopper';
   rank?: RankOrder;
+  waitForModel?: boolean;
+  waitUntil?: (work: Promise<unknown>) => void;
   onEvent?: (event: GenerationEvent) => void;
 }
 
@@ -103,6 +106,8 @@ interface Settings {
   rank: RankOrder;
   modelTimeoutMs: number;
   cacheTimeoutMs: number;
+  waitForModel: boolean;
+  waitUntil: ComponentGeneratorOptions['waitUntil'];
   onEvent: ComponentGeneratorOptions['onEvent'];
   inFlight: Map<string, Promise<ModelCall>>;
 }
@@ -126,13 +131,24 @@ type EventDetails = Pick<
 export function createComponentGenerator(
   options: ComponentGeneratorOptions = {},
 ): ComponentGenerator {
+  const generation = options.generation ?? 'cohort';
+  const waitForModel = options.waitForModel ?? true;
+  if (!waitForModel && generation === 'per-shopper') {
+    throw new RangeError(
+      "waitForModel: false needs generation: 'cohort'. A per-shopper prompt changes with " +
+        'almost every view, so the call it starts would almost never reach a page.',
+    );
+  }
+
   const settings: Settings = {
     provider: options.provider ?? null,
     cache: options.cache ?? createMemorySpecCache(),
-    generation: options.generation ?? 'cohort',
+    generation,
     rank: options.rank ?? 'signals',
-    modelTimeoutMs: options.modelTimeoutMs ?? 1_500,
+    modelTimeoutMs: options.modelTimeoutMs ?? (waitForModel ? 1_500 : 30_000),
     cacheTimeoutMs: options.cacheTimeoutMs ?? 50,
+    waitForModel,
+    waitUntil: options.waitUntil,
     onEvent: options.onEvent,
     inFlight: new Map(),
   };
@@ -202,6 +218,11 @@ async function findSpec(
     return { spec: read.entry.spec, generatedAt: read.entry.generatedAt, source: 'cache', details };
   }
 
+  if (!settings.waitForModel) {
+    if (read.outcome === 'miss') fillInBackground(settings, provider, prompt, key);
+    return { failed: 'not-cached', details: { calledModel: false, cache: read.outcome } };
+  }
+
   const calledModel = !settings.inFlight.has(key);
   let call: ModelCall;
   try {
@@ -262,6 +283,62 @@ function sharedCall(
   const started = ask().finally(() => settings.inFlight.delete(key));
   settings.inFlight.set(key, started);
   return started;
+}
+
+function fillInBackground(
+  settings: Settings,
+  provider: ComponentProvider,
+  prompt: PromptPair,
+  key: string,
+): void {
+  if (settings.inFlight.has(key)) return;
+
+  const startedAt = Date.now();
+  const askAndStore = async () => {
+    const call = await askModel(settings, provider, prompt);
+    if (call.spec) {
+      try {
+        await settings.cache.set(key, { spec: call.spec, generatedAt: Date.now() });
+      } catch {}
+    }
+    return call;
+  };
+
+  const work = sharedCall(settings, key, askAndStore).then(
+    (call) => {
+      const elapsedMs = Date.now() - startedAt;
+      const usage = call.usage ? { usage: call.usage } : {};
+      report(
+        settings,
+        call.spec
+          ? { key, source: 'llm', elapsedMs, calledModel: true, ...usage, background: true }
+          : {
+              key,
+              source: 'fallback',
+              elapsedMs,
+              calledModel: true,
+              ...usage,
+              degradedReason: 'invalid-generation',
+              background: true,
+            },
+      );
+    },
+    (error: unknown) => {
+      report(settings, {
+        key,
+        source: 'fallback',
+        elapsedMs: Date.now() - startedAt,
+        calledModel: true,
+        error,
+        degradedReason: error instanceof TimeoutError ? 'timeout' : 'provider-error',
+        background: true,
+      });
+    },
+  );
+
+  try {
+    settings.waitUntil?.(work);
+  } catch {}
 }
 
 function storeInBackground(settings: Settings, key: string, cached: CachedSpec): void {
