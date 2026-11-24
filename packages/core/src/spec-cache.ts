@@ -77,8 +77,17 @@ export function createMemorySpecCache(options: MemorySpecCacheOptions = {}): Spe
   };
 }
 
+const NULL_SPEC_CACHE: SpecCache = Object.freeze({
+  get: async () => undefined,
+  set: async () => {},
+});
+
 export function createNullSpecCache(): SpecCache {
-  return { get: async () => undefined, set: async () => {} };
+  return NULL_SPEC_CACHE;
+}
+
+export function isNullSpecCache(cache: SpecCache): boolean {
+  return cache === NULL_SPEC_CACHE;
 }
 
 export function specCacheKey(

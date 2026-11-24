@@ -122,10 +122,10 @@ out.
 | `generation`     | `'cohort'` shares one spec between shoppers who look alike. `'per-shopper'` generates for each shopper. | `'cohort'`                |
 | `rank`           | `'signals'` orders products by the shopper's signals. `'given'` keeps the order you sent.               | `'signals'`               |
 | `modelTimeoutMs` | How long the model gets before core aborts the call. With `waitForModel: false` it's `30000`.           | `1500`                    |
-| `cacheTimeoutMs` | How long a cache read gets. After that, the request generates as if the cache had nothing.              | `50`                      |
+| `cacheTimeoutMs` | How long a cache read gets. Then it counts as a miss. With `waitForModel: false` that starts no call.   | `50`                      |
 | `waitForModel`   | `false` keeps the model out of the page request. See [below](#keeping-the-model-off-the-page).          | `true`                    |
 | `waitUntil`      | With `waitForModel: false`, core hands it the model call still running when the page is sent.           | none                      |
-| `onEvent`        | Called once per `generate` with a `GenerationEvent`. If your function throws, core ignores the error.   | none                      |
+| `onEvent`        | Called once per `generate`, and once per call behind a page. If your function throws, core ignores it.  | none                      |
 
 ## `tracking-input`
 
@@ -670,7 +670,8 @@ By default, a page that misses the cache waits for the model, for up to
 - On a miss, the page gets the fallback straight away and core asks the model
   behind it. The answer goes into the cache, so the next shopper in that cohort
   gets it.
-- Pages that miss while that call runs share it. They don't start one each.
+- Pages on the same server that miss while that call runs share it. They don't
+  start one each. Each server starts its own.
 
 ```ts
 import { after } from 'next/server';
@@ -701,6 +702,8 @@ A few things work differently in this mode:
 - Pages that got the fallback this way say `degradedReason: 'not-cached'`.
 - `generation: 'per-shopper'` throws. A per-shopper prompt changes with almost
   every view, so almost no call would reach a page.
+- `createNullSpecCache()` throws too. Pages only get the answer from the cache,
+  so with a store that keeps nothing no call would ever reach one.
 
 ### Building specs ahead of time
 
@@ -713,6 +716,7 @@ const warmer = createComponentGenerator({
   provider,
   cache: sharedStore,
   modelTimeoutMs: 60_000,
+  cacheTimeoutMs: 5_000,
 });
 
 for (const page of productPages) {
@@ -729,7 +733,9 @@ for (const page of productPages) {
 An input with no signals fills the cohort of shoppers with no history on that
 page. Shoppers with history fall into a cohort by the category they lean
 towards, and those fill in on their first view. A cohort that's already in the
-store is a cache hit, so running the job again only pays for what changed.
+store is a cache hit, so running the job again only pays for what changed. That's
+what the longer `cacheTimeoutMs` is for: a read that runs out of time counts as
+a miss and pays for the cohort again.
 
 Each input has to match what the page sends: the same surface, slot, locale,
 item count, segment and category, and the same candidates in the same order. A
@@ -748,9 +754,11 @@ instead and report nothing.
 
 With `waitForModel: false`, a call that starts behind a page reports one more
 event when it ends, with `background: true`. That event rendered nothing. Its
-`source` is `'llm'` if the answer went into the cache, or `'fallback'` with a
-`degradedReason` if it didn't. It has no `cache` field, and the page's own event
-has `calledModel: false`.
+`source` is `'llm'` if the answer went into the cache. Otherwise it's
+`'fallback'`, with a `degradedReason` if the model failed, or with
+`cache: 'error'` if the store refused the answer. After a timeout, a provider
+error or a refused write, `error` has what was thrown. The page's own event has
+`calledModel: false`.
 
 These are the numbers to keep:
 
@@ -761,6 +769,7 @@ These are the numbers to keep:
   the `background: true` events apart. A provider that's down shows up in the
   second.
 - **Cache hit rate.** `cache: 'hit'` over the events that have a `cache` field.
+  Leave out events with `background: true`.
   A store that's down will show as `cache: 'error'` and a slow store as
   `cache: 'timeout'`. A broken store will then show up here and not just as a
   rising bill.

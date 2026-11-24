@@ -16,6 +16,7 @@ import { buildDigest, toCohortDigest, type SignalDigest } from './signal-digest.
 import {
   cachedSpecSchema,
   createMemorySpecCache,
+  isNullSpecCache,
   specCacheKey,
   type CachedSpec,
   type SpecCache,
@@ -97,6 +98,7 @@ interface CacheRead {
 interface ModelCall {
   spec: GeneratedSpec | null;
   usage?: TokenUsage;
+  failedWrite?: { error: unknown };
 }
 
 interface Settings {
@@ -133,12 +135,7 @@ export function createComponentGenerator(
 ): ComponentGenerator {
   const generation = options.generation ?? 'cohort';
   const waitForModel = options.waitForModel ?? true;
-  if (!waitForModel && generation === 'per-shopper') {
-    throw new RangeError(
-      "waitForModel: false needs generation: 'cohort'. A per-shopper prompt changes with " +
-        'almost every view, so the call it starts would almost never reach a page.',
-    );
-  }
+  if (!waitForModel) assertPagesCanBeServed(generation, options.cache);
 
   const settings: Settings = {
     provider: options.provider ?? null,
@@ -157,6 +154,24 @@ export function createComponentGenerator(
     generate: (draft) => generate(settings, draft),
     generateDeterministic: (draft) => generateDeterministic(settings, draft),
   };
+}
+
+function assertPagesCanBeServed(
+  generation: Settings['generation'],
+  cache: SpecCache | undefined,
+): void {
+  if (generation === 'per-shopper') {
+    throw new RangeError(
+      "waitForModel: false needs generation: 'cohort'. A per-shopper prompt changes with " +
+        'almost every view, so the call it starts would almost never reach a page.',
+    );
+  }
+  if (cache && isNullSpecCache(cache)) {
+    throw new RangeError(
+      'waitForModel: false needs a cache that keeps entries. Pages only get the answer ' +
+        'from the cache, so with createNullSpecCache() no call would ever reach one.',
+    );
+  }
 }
 
 async function generate(settings: Settings, draft: TrackingInputDraft): Promise<ComponentSpec> {
@@ -294,45 +309,44 @@ function fillInBackground(
   if (settings.inFlight.has(key)) return;
 
   const startedAt = Date.now();
-  const askAndStore = async () => {
+  const finished = (
+    source: SpecSource,
+    details: Pick<GenerationEvent, 'cache' | 'error' | 'usage' | 'degradedReason'>,
+  ) =>
+    report(settings, {
+      key,
+      source,
+      elapsedMs: Date.now() - startedAt,
+      calledModel: true,
+      ...details,
+      background: true,
+    });
+
+  const askAndStore = async (): Promise<ModelCall> => {
     const call = await askModel(settings, provider, prompt);
-    if (call.spec) {
-      try {
-        await settings.cache.set(key, { spec: call.spec, generatedAt: Date.now() });
-      } catch {}
+    if (!call.spec) return call;
+    try {
+      await settings.cache.set(key, { spec: call.spec, generatedAt: Date.now() });
+      return call;
+    } catch (error) {
+      return { ...call, failedWrite: { error } };
     }
-    return call;
   };
 
   const work = sharedCall(settings, key, askAndStore).then(
     (call) => {
-      const elapsedMs = Date.now() - startedAt;
       const usage = call.usage ? { usage: call.usage } : {};
-      report(
-        settings,
-        call.spec
-          ? { key, source: 'llm', elapsedMs, calledModel: true, ...usage, background: true }
-          : {
-              key,
-              source: 'fallback',
-              elapsedMs,
-              calledModel: true,
-              ...usage,
-              degradedReason: 'invalid-generation',
-              background: true,
-            },
-      );
+      if (!call.spec) {
+        finished('fallback', { ...usage, degradedReason: 'invalid-generation' });
+      } else if (call.failedWrite) {
+        finished('fallback', { cache: 'error', error: call.failedWrite.error, ...usage });
+      } else {
+        finished('llm', usage);
+      }
     },
     (error: unknown) => {
-      report(settings, {
-        key,
-        source: 'fallback',
-        elapsedMs: Date.now() - startedAt,
-        calledModel: true,
-        error,
-        degradedReason: error instanceof TimeoutError ? 'timeout' : 'provider-error',
-        background: true,
-      });
+      const degradedReason = error instanceof TimeoutError ? 'timeout' : 'provider-error';
+      finished('fallback', { error, degradedReason });
     },
   );
 
