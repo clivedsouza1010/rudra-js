@@ -712,9 +712,17 @@ same store. The job uses an ordinary generator, which waits, with a longer
 timeout:
 
 ```ts
+const writes: Promise<void>[] = [];
 const warmer = createComponentGenerator({
   provider,
-  cache: sharedStore,
+  cache: {
+    get: (key) => sharedStore.get(key),
+    set: (key, cached) => {
+      const write = sharedStore.set(key, cached);
+      writes.push(write);
+      return write;
+    },
+  },
   modelTimeoutMs: 60_000,
   cacheTimeoutMs: 5_000,
 });
@@ -728,7 +736,13 @@ for (const page of productPages) {
     });
   }
 }
+
+await Promise.allSettled(writes);
 ```
+
+`generate` returns without waiting for the store to save the answer. That's why
+the job keeps each write and waits for all of them before it ends. Without that,
+a host that stops the job as soon as it returns can lose the last few.
 
 An input with no signals fills the cohort of shoppers with no history on that
 page. Shoppers with history fall into a cohort by the category they lean
