@@ -122,7 +122,7 @@ out.
 | `generation`     | `'cohort'` shares one spec between shoppers who look alike. `'per-shopper'` generates for each shopper. | `'cohort'`                |
 | `rank`           | `'signals'` orders products by the shopper's signals. `'given'` keeps the order you sent.               | `'signals'`               |
 | `modelTimeoutMs` | How long the model gets before core aborts the call. With `waitForModel: false` it's `30000`.           | `1500`                    |
-| `cacheTimeoutMs` | How long a cache read gets. Then it counts as a miss. With `waitForModel: false` that starts no call.   | `50`                      |
+| `cacheTimeoutMs` | How long a cache read gets. Then a waiting page asks the model. With `waitForModel: false`, none does.  | `50`                      |
 | `waitForModel`   | `false` keeps the model out of the page request. See [below](#keeping-the-model-off-the-page).          | `true`                    |
 | `waitUntil`      | With `waitForModel: false`, core hands it the model call still running when the page is sent.           | none                      |
 | `onEvent`        | Called once per `generate`, and once per call behind a page. If your function throws, core ignores it.  | none                      |
@@ -738,7 +738,10 @@ what the longer `cacheTimeoutMs` is for: a read that runs out of time counts as
 a miss and pays for the cohort again.
 
 Each input has to match what the page sends: the same surface, slot, locale,
-item count, segment and category, and the same candidates in the same order. A
+item count, segment and category, and the same candidates in the same order. The
+job also has to use the same provider and model as your pages, on the same
+version of `@rudra-js/core`. Both are part of the key, so a job on another model
+fills entries no page reads. A
 product that sells out or comes back moves the key, as
 [Cohorts](#cohorts) explains. Run the job after stock changes, or let pages
 fill the new key behind them. Your store also has to keep entries for longer
