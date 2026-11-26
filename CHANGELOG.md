@@ -10,6 +10,8 @@ bump may break them.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-26
+
 ### Added
 
 - `createComponentGenerator` takes `waitForModel` and `waitUntil`. With
@@ -1015,7 +1017,8 @@ and `@rudra-js/anthropic`.
   - If you have a `BlockRenderContext` built by hand, add `bundles` (the shop's
     sets keyed by id) and `formatBundlePrice`.
 
-[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.10.0...HEAD
+[unreleased]: https://github.com/clivedsouza1010/rudra-js/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/clivedsouza1010/rudra-js/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/clivedsouza1010/rudra-js/compare/v0.8.3...v0.9.0

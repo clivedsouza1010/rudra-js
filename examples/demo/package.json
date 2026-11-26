@@ -1,6 +1,6 @@
 {
   "name": "@rudra-js/example-demo",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,9 +10,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@rudra-js/anthropic": "0.10.0",
-    "@rudra-js/core": "0.10.0",
-    "@rudra-js/react": "0.10.0",
+    "@rudra-js/anthropic": "0.11.0",
+    "@rudra-js/core": "0.11.0",
+    "@rudra-js/react": "0.11.0",
     "next": "^16.4.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

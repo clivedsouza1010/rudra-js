@@ -1,6 +1,6 @@
 {
   "name": "@rudra-js/attested",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Checks product copy a language model wrote against the facts you give it. From rudra-js.",
   "keywords": [
     "rudra-js",
