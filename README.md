@@ -16,7 +16,7 @@ The whole point is to stop the model from just writing html because that can lea
 
 rudra-js also runs three checks on the words the model produces. One looks for patterns around prices and ratings and stock. Another checks that any digits match things from your input like categories or tags. The last one is a list of claims without numbers like top pick.
 
-Fields that fail get dropped. Even so some rewordings can slip through if they avoid the lists and spelled out numbers get past the digit check. That is why the main protection is that the model never sees a price and has nowhere to put one anyway. The block ends up in the first html response so crawlers see it without needing javascript.
+Fields that fail get dropped. Even so some rewordings can slip through if they avoid the lists and spelled out numbers get past the digit check. That is why the main protection is that the model never sees a price and has nowhere to put one anyway. If you render the block on the server, it ends up in the first html response so crawlers see it without needing javascript.
 
 On our benchmark, the default mode uses fewer model calls than generating per shopper.
 
@@ -25,7 +25,7 @@ On our benchmark, the default mode uses fewer model calls than generating per sh
 ## Getting started
 
 No API key is needed if you skip the provider because `@rudra-js/core` just builds the block itself
-and the same input always gives the same result.
+and the same input always gives the same block.
 
 ```sh
 npm install @rudra-js/core@latest @rudra-js/react@latest @rudra-js/attested@latest
