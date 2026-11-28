@@ -8,7 +8,7 @@ You specify the tracking input to the generator, rudra-js does all the work.
 - The model comes back with one recommendation block for a product page.
 - rudra-js checks everything against your catalog and react renders it out.
 
-The whole point is to stop the model from just writing html because that can lead to fake prices or products you dont even sell. Instead the model returns a spec using only fields the library defines. It can pick a layout and write a headline but there is no place for prices or names or links so it has to use skus from what you provided. 
+The whole point is to stop the model from just writing html because that can lead to fake prices or products you dont even sell. Instead the model returns a spec using only fields the library defines. It can pick a layout and write a headline but there is no place for prices or names or links so it has to use skus from what you provided.
 
 ![The demo's product page for a made-up outdoor store, with a gallery, a buy box and the first recommendation section. In that section the line under the heading and the cards marked Featured are the model's. The products, their order and the line under each are core's picks, and every title, price and image comes from the demo's catalog.](docs/demo.png)
 
@@ -18,14 +18,14 @@ rudra-js also runs three checks on the words the model produces. One looks for p
 
 Fields that fail get dropped. Even so some rewordings can slip through if they avoid the lists and spelled out numbers get past the digit check. That is why the main protection is that the model never sees a price and has nowhere to put one anyway. The block ends up in the first html response so crawlers see it without needing javascript.
 
-On our benchmark, the default mode uses fewer model calls than generating per shopper. 
+On our benchmark, the default mode uses fewer model calls than generating per shopper.
 
 > **Status: `0.11.0`, early.** the public API might still change between minor versions before `1.0`.
 
 ## Getting started
 
-No API key is needed if you skip the provider because `@rudra-js/core` just builds the block itself 
-and the same input always gives the same result. 
+No API key is needed if you skip the provider because `@rudra-js/core` just builds the block itself
+and the same input always gives the same result.
 
 ```sh
 npm install @rudra-js/core@latest @rudra-js/react@latest @rudra-js/attested@latest
@@ -96,7 +96,7 @@ If an [A2UI](https://a2ui.org) agent builds your pages, add [`@rudra-js/a2ui`](p
 | [`@rudra-js/core`](packages/core)           | The schemas and logic that turn a tracking input into a spec you can render in your code. The spec is checked with `@rudra-js/attested`.                                        |
 | [`@rudra-js/react`](packages/react)         | Renders the spec with React, on the server or in the browser.                                                                                                                   |
 | [`@rudra-js/anthropic`](packages/anthropic) | Connector to the Anthropic API.                                                                                                                                                 |
-| [`@rudra-js/attested`](packages/attested)   | checks the model output against the app facts.                                                                                                          |
+| [`@rudra-js/attested`](packages/attested)   | checks the model output against the app facts.                                                                                                                                  |
 | [`@rudra-js/a2ui`](packages/a2ui)           | Puts the block in an [A2UI](https://a2ui.org) interface: an agent places it in React, or your server sends it to any other A2UI renderer. Your server still picks the products. |
 
 ## Development
@@ -156,7 +156,6 @@ RUDRA_DEMO_MODE=record npm run dev --workspace @rudra-js/example-demo
 ```
 
 More details for the demo are here [`examples/demo/README.md`](examples/demo/README.md)
-
 
 ## Getting help
 
