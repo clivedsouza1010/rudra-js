@@ -4,68 +4,32 @@ rudra-js is an open-source TypeScript library for generating dynamic product rec
 
 You specify the tracking input to the generator, rudra-js does all the work.
 
-- Sends the sanitized data to an LLM (Large Language Model), which is applicable only when a provider is configured.
-- The LLM will design one product-recommendation block and send it back in the response for a product page.
-- rudra-js checks it against your catalog, and React renders it.
+- It sends the sanitized data to an LLM (Large Language Model), which is applicable only when a provider is configured.
+- The model comes back with one recommendation block for a product page.
+- rudra-js checks everything against your catalog and react renders it out.
 
-If a language model is allowed to write raw HTML, it can make up a price. It can also show a product
-you don't sell. That is why rudra-js will not let the model write HTML at all. The model has to
-return a spec instead: a short description of the block, made up only of fields rudra-js defines. It
-picks the layout and writes the headline and copy, but there isn't a field for a price, a product
-name, an image or a link. To name a product, it will have to use a SKU from the list you give it.
+The whole point is to stop the model from just writing html because that can lead to fake prices or products you dont even sell. Instead the model returns a spec using only fields the library defines. It can pick a layout and write a headline but there is no place for prices or names or links so it has to use skus from what you provided. 
 
 ![The demo's product page for a made-up outdoor store, with a gallery, a buy box and the first recommendation section. In that section the line under the heading and the cards marked Featured are the model's. The products, their order and the line under each are core's picks, and every title, price and image comes from the demo's catalog.](docs/demo.png)
 
-`@rudra-js/react` will turn the spec into HTML. To do this, it will read the title, price, image and
-link of the products from your catalog as the page is served. Anything the model wrote will be
-rendered as escaped text.
+`@rudra-js/react` turns the spec into html by pulling real details from your catalog at render time and anything from the model gets escaped.
 
-rudra-js also checks all of the words the model writes, in three passes:
+rudra-js also runs three checks on the words the model produces. One looks for patterns around prices and ratings and stock. Another checks that any digits match things from your input like categories or tags. The last one is a list of claims without numbers like top pick.
 
-- Patterns for prices, discounts, ratings, delivery dates and stock counts.
-- A digit check. All digits in a sentence have to come from your input, as a category or a tag on a
-  product the model was shown.
-- A list of claims that carry no number to check, like "top pick" and "customer favourite".
+Fields that fail get dropped. Even so some rewordings can slip through if they avoid the lists and spelled out numbers get past the digit check. That is why the main protection is that the model never sees a price and has nowhere to put one anyway. The block ends up in the first html response so crawlers see it without needing javascript.
 
-Any field that fails a pass will be dropped.
+On our benchmark, the default mode uses fewer model calls than generating per shopper. 
 
-Two of the passes are just word lists. This means a rewording that is on neither list will get
-through. A number spelled out in words will also get past the digit check, as this check can only
-read digits. For example, "Four and a half stars from other hikers" gets past all three passes. You
-can go and see how big the gap is: the tests keep a list of rewordings that still pass. That's why
-the real defence is structural: the model will never be told a price and there's nowhere in the spec
-to put it.
-
-This block is part of the first HTML response and doesn't need any client-side JavaScript. Even a
-crawler that never runs JavaScript will read it.
-
-On our 500-shopper benchmark, the default mode makes 460 model calls per 1,000 page views. That
-would be 1,000 if you generated for each shopper.
-
-> **Status: `0.11.0`, early.** It installs and it works: the Getting started below runs as a test on
-> every commit. But the public API might still change between minor versions before `1.0`. Any
-> change like this will be in the changelog.
+> **Status: `0.11.0`, early.** the public API might still change between minor versions before `1.0`.
 
 ## Getting started
 
-You don't need an API key to start. If you leave the provider out, `@rudra-js/core` will build the
-block itself (with no model).
+No API key is needed if you skip the provider because `@rudra-js/core` just builds the block itself 
+and the same input always gives the same result. 
 
 ```sh
 npm install @rudra-js/core@latest @rudra-js/react@latest @rudra-js/attested@latest
 ```
-
-Just use this one command for a new app and for an app that already uses rudra-js. It's also how you
-upgrade. If your app has `@rudra-js/anthropic`, you will need to add it to the command with
-`@latest` too. For `@rudra-js/a2ui`, use the install line in the README of that package instead.
-This line also names the two A2UI packages.
-
-You will need React 18 or 19, but not Server Components. `@rudra-js/react` is just plain React with
-no hooks. It will work with `renderToString` and in a client-rendered app. If your framework
-supports Server Components, it can be used as one too. To put the block in the first HTML response,
-you have to render it on the server.
-
-You also need Node 22.12 or later.
 
 ```tsx
 import { createComponentGenerator, parseTrackingInput } from '@rudra-js/core';
@@ -111,16 +75,11 @@ and `generate` read the clock while the page renders. To fix this, you can creat
 `cacheComponents: true` and `partialPrefetching: true` from `next.config.ts`. There's more in the
 [quick start](https://rudrajs.com/learn/quick-start#cache-components).
 
-When you're ready for a model, add [`@rudra-js/anthropic`](packages/anthropic) and pass it as the
-`provider`. Everything else above stays the same. The model will then write the wording. It will
-also pick the layout and the emphasis. By default, the products in a grid or carousel will still be
-picked by core. This is done per request, from the candidates you pass in.
+When adding a model, add [`@rudra-js/anthropic`](packages/anthropic) and pass it as the
+`provider`. The wording and layout get handled by it but core still picks the products from your candidates on each request.
 
-On a cache miss the page waits for the model, for up to 1.5 seconds by default. To keep the model
-out of the page request, pass `waitForModel: false`. A page that misses then gets the fallback at
-once, and the model's answer goes into the cache for the next shopper. You can also fill the cache
-ahead of time from a job. See
-[Keeping the model off the page](packages/core#keeping-the-model-off-the-page).
+You can set `waitForModel: false` so the page serves a fallback right away and the model result caches for later.
+See [Keeping the model off the page](packages/core#keeping-the-model-off-the-page).
 
 If you're going to send real shopper traffic, read
 [Running it in a regulated shop](packages/core#running-it-in-a-regulated-shop) first.
@@ -137,7 +96,7 @@ If an [A2UI](https://a2ui.org) agent builds your pages, add [`@rudra-js/a2ui`](p
 | [`@rudra-js/core`](packages/core)           | The schemas and logic that turn a tracking input into a spec you can render in your code. The spec is checked with `@rudra-js/attested`.                                        |
 | [`@rudra-js/react`](packages/react)         | Renders the spec with React, on the server or in the browser.                                                                                                                   |
 | [`@rudra-js/anthropic`](packages/anthropic) | Connector to the Anthropic API.                                                                                                                                                 |
-| [`@rudra-js/attested`](packages/attested)   | validates the model output against the app facts. Has no dependencies.                                                                                                          |
+| [`@rudra-js/attested`](packages/attested)   | checks the model output against the app facts.                                                                                                          |
 | [`@rudra-js/a2ui`](packages/a2ui)           | Puts the block in an [A2UI](https://a2ui.org) interface: an agent places it in React, or your server sends it to any other A2UI renderer. Your server still picks the products. |
 
 ## Development
@@ -181,35 +140,23 @@ ANTHROPIC_API_KEY= RUDRA_REPLAY_ONLY=1 npm run build --workspace @rudra-js/examp
 
 ## Example
 
-[`examples/demo`](examples/demo) is a small Next.js site that runs rudra-js on a real page.
-Its product page asks the LLM for four recommendation sections, each its own slot. The server
-renders them as part of the HTML response for the page. Nothing is fetched after the page loads.
-All four sections have a committed transcript for the page below, so on replay each one shows the
-model's answer instead of core's own picks.
+[`examples/demo`](examples/demo) itself is a small next js site that requests four recommendation sections and renders them server side with committed transcripts so replays show the model answers instead of core picks.
+
+You can run it locally to see the page and recordings are safe as long as they only use demo data.
 
 ```sh
 npm run dev --workspace @rudra-js/example-demo
 # then visit http://localhost:3000/product/RJ-00001?shopper=S-0001
 ```
 
-That will replay the transcripts committed under `examples/demo/recordings/`. These are saved model
-calls: the prompt and the model's answer. You won't be billed for replaying, whatever keys you have
-in your environment. To spend money, you have to set `RUDRA_DEMO_MODE` to `record`:
+If you want to record new ones you set the demo mode to record but that actually calls the model and spends money.
 
 ```sh
 RUDRA_DEMO_MODE=record npm run dev --workspace @rudra-js/example-demo
 ```
 
-That will call Claude once per prompt that doesn't have a transcript yet, then save the answer as a
-new transcript. If a prompt has one, it will replay for free, even on another page. But a different
-shopper on the same page might need a new call, because transcripts have to match the model id and
-prompt.
+More details for the demo are here [`examples/demo/README.md`](examples/demo/README.md)
 
-[`examples/demo/README.md`](examples/demo/README.md) covers the rest:
-
-- the environment variables
-- how to re-record a transcript after a prompt change
-- why the files under `recordings/` must only ever hold demo shoppers and demo catalogs
 
 ## Getting help
 
